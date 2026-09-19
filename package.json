@@ -21,20 +21,27 @@
     "knip": "knip",
     "lint": "biome lint .",
     "package:win": "npm run package:win --workspace=@meldshell/desktop",
+    "package:linux": "npm run package:linux --workspace=@meldshell/desktop",
     "postinstall": "npm run install:electron && npm run rebuild:native",
     "rebuild:native": "npm run rebuild:native --workspace=@meldshell/desktop",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\" \"packages/**/*.test.ts\" \"packages/**/*.test.mjs\" \"apps/desktop/src/**/*.test.ts\" \"apps/desktop/src/**/*.test.mjs\"",
     "check:fast": "npm run lint && npm run format:check && npm run typecheck"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
     "@effect/language-service": "0.87.2",
+    "@effect/sql": "0.52.1",
+    "@effect/sql-sqlite-node": "0.53.0",
     "@types/node": "24.10.1",
+    "effect": "3.22.1",
     "knip": "6.34.0",
+    "tsx": "4.23.13",
     "typescript": "5.9.3"
   },
   "packageManager": "npm@12.0.2",
   "overrides": {
+    "@effect/platform": "0.97.1",
     "better-sqlite3": "13.0.3"
   },
   "allowScripts": {
