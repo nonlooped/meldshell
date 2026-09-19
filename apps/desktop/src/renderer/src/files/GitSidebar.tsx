@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { Button, IconButton, DropdownMenu, MenuAction, TextField } from "../ui/controls"
 import { FileIcon } from "../ui/FileIcon"
+import { useTabStore } from "../app/tab-store"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { type GraphRow, layoutGraph } from "./git-graph"
 const graphColors = [
@@ -60,36 +61,6 @@ function statusLabel(change: GitChange): string {
   ].join(", ")
 }
 
-function InlineDiff({
-  workspaceId,
-  path,
-  side,
-}: {
-  side: GitDiffSide
-  workspaceId: string
-  path: string
-}): React.JSX.Element {
-  const diff = useQuery({
-    queryKey: ["git-diff", workspaceId, path, side],
-    queryFn: () => window.meldshell.getGitDiff({ workspaceId, path, side }),
-    refetchInterval: 5000,
-    retry: false,
-  })
-  if (diff.isPending)
-    return (
-      <p className="git-notice" role="status">
-        Loading diff…
-      </p>
-    )
-  if (diff.isError)
-    return (
-      <p className="git-notice" role="alert">
-        {diff.error.message}
-      </p>
-    )
-  return <ChangeDiff path={path} patch={diff.data} showHeader={false} />
-}
-
 function FileRow({
   workspaceId,
   change,
@@ -103,23 +74,25 @@ function FileRow({
   workspaceId: string
   change: GitChange
 }): React.JSX.Element {
+  const openDiff = useTabStore((state) => state.openDiff)
   const slash = change.path.lastIndexOf("/")
   return (
-    <Collapsible.Root className="git-file-entry">
+    <div className="git-file-entry">
       <div className="git-file-row">
-        <Collapsible.Trigger
+        <button
+          type="button"
+          onClick={() => openDiff(workspaceId, change.path, side)}
           className="git-file"
           title={`${change.originalPath ? `${change.originalPath} → ` : ""}${change.path} · ${statusLabel(change)}`}
           aria-label={`${change.path}, ${statusLabel(change)}`}
         >
-          <ChevronRight size={12} className="disclosure-chevron" />
           <FileIcon path={change.path} size={16} />
           <span className="git-file-name">{change.path.slice(slash + 1)}</span>
           <span className="git-file-directory">{change.path.slice(0, Math.max(0, slash))}</span>
           <span className="git-file-status" data-kind={changeKind(change.status)}>
             {change.status === "??" ? "U" : change.status.trim()}
           </span>
-        </Collapsible.Trigger>
+        </button>
         <IconButton
           label={`${side === "staged" ? "Unstage" : "Stage"} ${change.path}`}
           disabled={busy}
@@ -137,15 +110,7 @@ function FileRow({
           </IconButton>
         )}
       </div>
-      <Collapsible.Panel
-        className="git-inline-diff"
-        role="region"
-        aria-label={`Diff for ${change.path}`}
-        tabIndex={0}
-      >
-        <InlineDiff workspaceId={workspaceId} path={change.path} side={side} />
-      </Collapsible.Panel>
-    </Collapsible.Root>
+    </div>
   )
 }
 

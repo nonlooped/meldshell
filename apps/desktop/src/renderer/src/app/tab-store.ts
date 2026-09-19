@@ -1,3 +1,4 @@
+import type { GitDiffSide } from "@meldshell/contracts/ipc"
 import { create } from "zustand"
 import {
   movePane,
@@ -15,6 +16,7 @@ export interface FileTab {
   readonly id: string
   readonly workspaceId: string
   readonly path: string
+  readonly diffSide?: GitDiffSide
   readonly line?: number
   readonly endLine?: number
 }
@@ -37,6 +39,7 @@ interface TabStore {
   readonly files: readonly FileTab[]
   readonly selectedFileId: string | null
   readonly openFile: (workspaceId: string, path: string, line?: number, endLine?: number) => void
+  readonly openDiff: (workspaceId: string, path: string, side: GitDiffSide) => void
   readonly selectTab: (id: string) => void
   readonly closeTab: (id: string) => void
 
@@ -137,6 +140,17 @@ export const useTabStore = create<TabStore>((set, get) => ({
         files: state.files.some((file) => file.id === id)
           ? state.files.map((file) => (file.id === id ? { ...file, line, endLine } : file))
           : [...state.files, { id, workspaceId, path: normalized, line, endLine }],
+        selectedFileId: id,
+      }
+    }),
+  openDiff: (workspaceId, path, diffSide) =>
+    set((state) => {
+      const normalized = path.replaceAll("\\", "/")
+      const id = `diff:${JSON.stringify([workspaceId, normalized, diffSide])}`
+      return {
+        files: state.files.some((file) => file.id === id)
+          ? state.files
+          : [...state.files, { id, workspaceId, path: normalized, diffSide }],
         selectedFileId: id,
       }
     }),

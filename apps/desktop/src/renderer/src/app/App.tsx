@@ -17,6 +17,7 @@ import { InteractionDialog } from "../threads/InteractionDialog"
 import { SearchDialog } from "../threads/SearchDialog"
 import { Inbox } from "../threads/Inbox"
 import { FilesSidebar } from "../files/FilesSidebar"
+import { DiffViewer } from "../files/DiffViewer"
 import { FileViewer } from "../files/FileViewer"
 import { MeldMark } from "../ui/MeldMark"
 import { WorkspaceManager } from "../workspaces/WorkspaceManager"
@@ -142,7 +143,11 @@ function FileOrThread({ file, children }: { file?: FileTab; children: React.Reac
   if (!file) return <>{children}</>
   return (
     <Tabs.Panel value={file.id} className="thread-content">
-      <FileViewer key={file.id} file={file} />
+      {file.diffSide ? (
+        <DiffViewer key={file.id} file={file} side={file.diffSide} />
+      ) : (
+        <FileViewer key={file.id} file={file} />
+      )}
     </Tabs.Panel>
   )
 }
