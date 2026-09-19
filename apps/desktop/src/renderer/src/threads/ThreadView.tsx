@@ -1,4 +1,3 @@
-import { Tabs } from "@base-ui-components/react/tabs"
 import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import { useThreadActions } from "../data/mutations"
 import { useSelectedProvider } from "../data/providers"
@@ -57,7 +56,7 @@ export function ThreadView({
   const error =
     draft.error ?? threadSettingsMutation.error?.message ?? interruptMutation.error?.message
   return (
-    <Tabs.Panel value={thread.id} className="thread-view">
+    <div className="thread-view">
       <div className="thread-content">
         <Transcript
           threadId={thread.id}
@@ -116,6 +115,6 @@ export function ThreadView({
           </Button>
         </div>
       )}
-    </Tabs.Panel>
+    </div>
   )
 }

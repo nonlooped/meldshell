@@ -5,6 +5,9 @@ import { emptyDraft, useThreadDrafts } from "./thread-drafts"
 
 beforeEach(() => {
   useTabStore.setState({
+    threadTabs: [],
+    selectedThreadTabId: null,
+    layout: null,
     openThreadIds: [],
     selectedThreadId: null,
     selectedFileId: null,

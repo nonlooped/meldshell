@@ -5,11 +5,13 @@ import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   Archive,
   ChevronDown,
+  Columns2,
   Folder,
   FolderPlus,
   LoaderCircle,
   CircleAlert,
   MoreHorizontal,
+  Rows2,
   Search,
   SquarePen,
   Trash2,
@@ -18,6 +20,8 @@ import {
   Settings,
 } from "lucide-react"
 import { ProviderIcon } from "../ui/ProviderIcon"
+import { threadDragProps } from "../app/thread-drag"
+import type { SplitEdge } from "../app/thread-layout"
 import { Button, DropdownMenu, MenuAction, MenuChoice, MenuRadioGroup } from "../ui/controls"
 
 type InboxRow =
@@ -42,6 +46,8 @@ interface InboxProps {
   readonly onNewThread: () => void
   readonly onAddWorkspace: () => void
   readonly onOpen: (threadId: string) => void
+  /** Opens the thread in a new pane beside the one in front, the keyboard route to a split. */
+  readonly onOpenBeside: (threadId: string, edge: SplitEdge) => void
   readonly onSetStatus: (thread: Thread) => void
   readonly onDelete: (thread: Thread) => void
   readonly canLoadMore: boolean
@@ -56,6 +62,7 @@ function InboxThread({
   providersByThreadId,
   selectedThreadId,
   onOpen,
+  onOpenBeside,
   onPin,
   onSetStatus,
   onDelete,
@@ -65,6 +72,7 @@ function InboxThread({
   | "providersByThreadId"
   | "selectedThreadId"
   | "onOpen"
+  | "onOpenBeside"
   | "onPin"
   | "onSetStatus"
   | "onDelete"
@@ -79,8 +87,9 @@ function InboxThread({
       <BaseButton
         type="button"
         className="thread-open"
+        {...threadDragProps(thread.id)}
         aria-current={selectedThreadId === thread.id ? "true" : undefined}
-        title={thread.title}
+        title={`${thread.title}\nDrag onto a pane to open it there`}
         onClick={() => onOpen(thread.id)}
       >
         {thread.status === "active" ? (
@@ -146,6 +155,18 @@ function InboxThread({
         }
       >
         <MenuAction
+          icon={<Columns2 size={13} strokeWidth={1.75} />}
+          onClick={() => onOpenBeside(thread.id, "right")}
+        >
+          Open to the right
+        </MenuAction>
+        <MenuAction
+          icon={<Rows2 size={13} strokeWidth={1.75} />}
+          onClick={() => onOpenBeside(thread.id, "bottom")}
+        >
+          Open below
+        </MenuAction>
+        <MenuAction
           icon={thread.pinned ? <PinOff size={13} /> : <Pin size={13} />}
           onClick={() => onPin(thread)}
         >
@@ -178,6 +199,7 @@ export function Inbox({
   onNewThread,
   onAddWorkspace,
   onOpen,
+  onOpenBeside,
   onSetStatus,
   onDelete,
   canLoadMore,
@@ -369,6 +391,7 @@ export function Inbox({
                     providersByThreadId={providersByThreadId}
                     selectedThreadId={selectedThreadId}
                     onOpen={onOpen}
+                    onOpenBeside={onOpenBeside}
                     onPin={onPin}
                     onSetStatus={onSetStatus}
                     onDelete={onDelete}

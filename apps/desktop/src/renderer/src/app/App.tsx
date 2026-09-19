@@ -25,8 +25,9 @@ import { AppScale } from "./AppScale"
 import { AppDialog, Button, DropdownMenu, MenuChoice, MenuRadioGroup } from "../ui/controls"
 import { handleAppShortcut } from "./app-shortcuts"
 import { useTabStore, type FileTab } from "./tab-store"
+import { visibleThreads } from "./thread-layout"
 import { useViewStore } from "./view-store"
-import { ThreadView } from "../threads/ThreadView"
+import { ThreadWorkbench } from "./ThreadWorkbench"
 import { useThreadDrafts } from "./thread-drafts"
 
 import { SettingsView } from "../settings/SettingsView"
@@ -146,12 +147,13 @@ function FileOrThread({ file, children }: { file?: FileTab; children: React.Reac
   )
 }
 
-function useSelectedTab(selectedThreadId: string | null) {
+function useSelectedTab() {
+  const selectedThreadTabId = useTabStore((state) => state.selectedThreadTabId)
   const files = useTabStore((state) => state.files)
   const selectedFileId = useTabStore((state) => state.selectedFileId)
   return {
     selectedFile: files.find((file) => file.id === selectedFileId),
-    selectedTabId: selectedFileId ?? selectedThreadId,
+    selectedTabId: selectedFileId ?? selectedThreadTabId,
   }
 }
 
@@ -160,7 +162,8 @@ export function App(): React.JSX.Element {
   const selectedThreadId = useTabStore((state) => state.selectedThreadId)
   const openThread = useTabStore((state) => state.openThread)
   const closeThread = useTabStore((state) => state.closeTab)
-  const { selectedFile, selectedTabId } = useSelectedTab(selectedThreadId)
+  const openBeside = useTabStore((state) => state.openBeside)
+  const { selectedFile, selectedTabId } = useSelectedTab()
   const selectThread = useTabStore((state) => state.selectTab)
   const cycleTabs = useTabStore((state) => state.cycle)
   const removeThread = useTabStore((state) => state.removeThread)
@@ -243,11 +246,18 @@ export function App(): React.JSX.Element {
   // the keyboard listener would be torn down and re-registered on every render.
   const requestNewThread = useCallback((): void => {
     closeSettings()
-    // A thread with nothing sent yet is already "the new thread", so reuse it instead of piling up
-    // empty threads.
+    // Reuse an empty solo draft, but leave drafts inside shared layouts in place.
+    const sharedThreadIds = new Set(
+      useTabStore
+        .getState()
+        .threadTabs.flatMap((tab) =>
+          tab.layout.kind === "split" ? visibleThreads(tab.layout) : [],
+        ),
+    )
     const draftThread = snapshot.threads.find(
       (thread) =>
         isDraftThread(thread) &&
+        !sharedThreadIds.has(thread.id) &&
         thread.status === "active" &&
         snapshot.workspaces.some((workspace) => workspace.id === thread.workspaceId),
     )
@@ -338,8 +348,8 @@ export function App(): React.JSX.Element {
       <TitleBar
         openThreads={openThreads}
         providersByThreadId={providersByThreadId}
-        selectedThreadId={selectedTabId}
-        onCloseThread={closeThread}
+        selectedTabId={selectedTabId}
+        onCloseTab={closeThread}
         sidebarsVisible={!settingsOpen}
         inboxCollapsed={inbox.collapsed}
         sourceControlCollapsed={sourceControl.collapsed}
@@ -394,6 +404,10 @@ export function App(): React.JSX.Element {
                   closeSettings()
                   openThread(threadId)
                 }}
+                onOpenBeside={(threadId, edge) => {
+                  closeSettings()
+                  openBeside(threadId, edge)
+                }}
                 onSetStatus={(thread) =>
                   setStatusMutation.mutate({
                     threadId: thread.id,
@@ -430,14 +444,11 @@ export function App(): React.JSX.Element {
                   hasThread={selectedThread !== null}
                   onNewThread={requestNewThread}
                 >
-                  {selectedThread !== null && (
-                    <ThreadView
-                      key={selectedThread.id}
-                      snapshot={snapshot}
-                      thread={selectedThread}
-                      searchTarget={searchTarget}
-                    />
-                  )}
+                  <ThreadWorkbench
+                    snapshot={snapshot}
+                    threads={allThreads}
+                    searchTarget={searchTarget}
+                  />
                 </ThreadPane>
               </FileOrThread>
             </main>
