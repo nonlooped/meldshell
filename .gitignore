@@ -1,0 +1,60 @@
+# Dependencies and build output
+node_modules/
+dist/
+out/
+release/
+.vite/
+*.tsbuildinfo
+.cache/
+
+# Logs and local application data
+*.log
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3-shm
+*.sqlite3-wal
+
+# Local environment and signing credentials
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+
+# Team-local AI tooling, installed skills, and MCP configuration
+.agents/
+.claude/
+.codex/
+.cursor/
+.windsurf/
+.aider*
+.mcp.json
+mcp.json
+AGENTS.local.md
+CLAUDE.local.md
+/skills-lock.json
+/scripts/launch-playwright-electron-mcp.cmd
+.playwright-mcp/
+.playwright-cli/
+
+# Local artifacts
+/artifacts/
+
+# Local editor settings and scratch files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+/tmp/
+/temp/
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini

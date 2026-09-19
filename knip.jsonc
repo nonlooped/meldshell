@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreBinaries": ["install-electron"],
+  "includeEntryExports": true,
+  // The compiler loads its plugin by name. SQLite, semver and which stay direct desktop
+  // dependencies because bundled workers leave them external for Electron packaging.
+  "ignoreDependencies": ["babel-plugin-react-compiler", "better-sqlite3", "semver", "which"],
+  "workspaces": {
+    "apps/desktop": {
+      "entry": ["src/main/index.ts", "src/main/workers/*.ts", "src/**/*.test.mjs"],
+      "project": ["src/**/*.{ts,tsx,mjs}"]
+    },
+    "packages/*": {
+      "project": ["src/**/*.ts"]
+    }
+  }
+}

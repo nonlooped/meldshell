@@ -1,0 +1,17 @@
+{
+  "name": "@meldshell/provider-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/worker.ts",
+    "./process-tree": "./src/process-tree.ts"
+  },
+  "dependencies": {
+    "@meldshell/contracts": "*",
+    "effect": "3.22.1"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

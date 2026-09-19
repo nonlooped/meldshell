@@ -1,0 +1,208 @@
+.reference-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  vertical-align: baseline;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  font: 0.88em var(--font-mono);
+  cursor: pointer;
+}
+.reference-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reference-chip svg {
+  flex-shrink: 0;
+}
+.reference-line {
+  color: var(--text-secondary);
+}
+.reference-preview {
+  max-width: min(620px, 85vw);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.reference-preview > span {
+  display: block;
+  margin-bottom: 6px;
+}
+.reference-preview pre {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  font: 12px var(--font-mono);
+  white-space: pre;
+  text-align: left;
+}
+.source-link > svg {
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+
+.markdown-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 8px;
+  font-family: var(--font-text);
+}
+.markdown-toolbar .button {
+  font-size: 11px;
+}
+.markdown-toolbar .text-input {
+  flex: 1;
+  min-width: 120px;
+}
+.markdown-content > :first-child {
+  margin-top: 0;
+}
+.markdown-content > :last-child {
+  margin-bottom: 0;
+}
+.markdown-code {
+  margin: 12px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.markdown-code > header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--surface-hover);
+  border-bottom: 1px solid var(--line);
+  color: var(--text-secondary);
+  font: 12px var(--font-mono);
+}
+.markdown-code > header > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.markdown-code-scroll {
+  display: flex;
+  max-height: 65vh;
+  overflow: auto;
+}
+.markdown-code-scroll[data-folded] {
+  max-height: 300px;
+  overflow-y: hidden;
+}
+.event-markdown .markdown-code-scroll pre {
+  flex: 1;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  background: transparent;
+  line-height: 1.65;
+  font-size: 0.9em;
+}
+.event-markdown .markdown-code-scroll pre code {
+  font-size: inherit;
+}
+.event-markdown .markdown-code-scroll .markdown-line-numbers {
+  position: sticky;
+  left: 0;
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  text-align: right;
+  background: var(--surface-menu);
+  user-select: none;
+}
+.markdown-diagram {
+  display: block;
+  margin: 12px auto;
+  padding: 12px;
+  background: #fff;
+}
+.markdown-notice {
+  padding: 10px;
+  color: var(--text-secondary);
+  font-size: 0.85em;
+}
+.event-markdown .markdown-table {
+  max-height: 400px;
+  overflow: auto;
+  margin-top: 0;
+}
+.event-markdown .markdown-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-menu);
+}
+.markdown-table-container[data-expanded] .markdown-table {
+  max-height: 80vh;
+}
+.markdown-quote[data-folded] {
+  max-height: 180px;
+  overflow: hidden;
+}
+.markdown-image-button {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+  max-width: 100%;
+}
+.markdown-lightbox {
+  max-height: 65vh;
+  overflow: auto;
+}
+.dialog:has(.markdown-lightbox) {
+  width: min(1100px, 90vw);
+  max-width: 90vw;
+}
+
+.event-markdown mark {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--color-modified) 35%, transparent);
+}
+.event-markdown mark[data-current] {
+  outline: 2px solid var(--color-modified);
+}
+.reference-chip:focus-visible,
+.markdown-image-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.event-markdown .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.file-source-content {
+  position: relative;
+  display: inline-block;
+  min-width: 100%;
+}
+.file-line-target {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--surface-active);
+  outline: 1px solid var(--line-strong);
+  pointer-events: none;
+}
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.dialog:has(.markdown-table-expanded) {
+  width: min(1400px, 94vw);
+  max-width: 94vw;
+}
+.markdown-table-expanded .markdown-table {
+  max-height: 70vh;
+}

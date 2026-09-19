@@ -1,0 +1,640 @@
+import { useLayoutEffect, useRef, useState } from "react"
+import { Button as BaseButton } from "@base-ui-components/react/button"
+import type { ComposerAttachment } from "@meldshell/contracts/ipc"
+import type {
+  AppSnapshot,
+  ReasoningEffort,
+  SandboxMode,
+  SetThreadSettingsInput,
+} from "@meldshell/contracts"
+import {
+  ChevronDown,
+  Eye,
+  ImageIcon,
+  FolderPen,
+  Paperclip,
+  RefreshCw,
+  ShieldCheck,
+  TriangleAlert,
+  X,
+} from "lucide-react"
+import { ArrowUp, Square } from "lucide-react"
+import { effortLabel, resolveSelection, selectableModels } from "../data/catalog"
+import { FileIcon } from "../ui/FileIcon"
+import { ModelPicker } from "./ModelPicker"
+import {
+  Button,
+  IconButton,
+  DropdownMenu,
+  MenuChoice,
+  MenuGroup,
+  MenuRadioGroup,
+  MenuSeparator,
+} from "../ui/controls"
+
+interface ComposerProps {
+  readonly snapshot: AppSnapshot
+  readonly threadId: string
+  readonly draft: string
+  readonly onDraftChange: (draft: string) => void
+  readonly providerReady: boolean
+  readonly providerDetail: string
+  readonly onRecheckProvider: () => void
+  readonly onChangeSettings: (input: SetThreadSettingsInput) => void
+  readonly onSend: () => void
+  readonly onInterrupt: () => void
+  readonly running: boolean
+  readonly interrupting: boolean
+  readonly queuedCount: number
+  readonly sending: boolean
+  readonly attachments: ReadonlyArray<ComposerAttachment>
+  readonly onAddAttachments: (attachments: ReadonlyArray<ComposerAttachment>) => void
+  readonly onRemoveAttachment: (index: number) => void
+}
+
+const SPEED_LABEL = { standard: "Standard", fast: "Fast" } as const
+const SANDBOX_LABEL: Readonly<Record<SandboxMode, string>> = {
+  "read-only": "Read only",
+  "workspace-write": "Workspace write",
+  "danger-full-access": "Full access",
+}
+
+const LevelIcon = ({ index, count }: { index: number; count: number }): React.JSX.Element => {
+  const activeBars = count <= 1 ? 2 : 1 + Math.round((index / (count - 1)) * 3)
+  return (
+    <span className="option-level-icon" aria-hidden="true">
+      {[0, 1, 2, 3].map((bar) => (
+        <span key={bar} data-active={bar < activeBars} />
+      ))}
+    </span>
+  )
+}
+
+const SandboxIcon = ({ mode }: { mode: SandboxMode }): React.JSX.Element => {
+  if (mode === "read-only") return <Eye size={14} strokeWidth={1.7} />
+  if (mode === "workspace-write") return <FolderPen size={14} strokeWidth={1.7} />
+  return <ShieldCheck size={14} strokeWidth={1.7} />
+}
+
+const SpeedIcon = ({ speed }: { speed: keyof typeof SPEED_LABEL }): React.JSX.Element => (
+  <svg
+    className="speed-icon"
+    width="14"
+    height="14"
+    viewBox="0 0 16 16"
+    fill="none"
+    aria-hidden="true"
+  >
+    <path d="M2.25 11.75a5.9 5.9 0 0 1 11.5 0" />
+    <path d={speed === "fast" ? "M8 10.75 11.35 6.4" : "M8 10.75 6.25 7.55"} />
+    <circle cx="8" cy="10.75" r="0.8" fill="currentColor" stroke="none" />
+  </svg>
+)
+
+function ComposerAttachments({
+  attachments,
+  onRemoveAttachment,
+}: Pick<ComposerProps, "attachments" | "onRemoveAttachment">): React.JSX.Element | null {
+  if (attachments.length === 0) return null
+  return (
+    <div className="composer-attachments" aria-label="Turn attachments">
+      {attachments.map((attachment, index) => (
+        <span className="attachment-chip" key={index}>
+          <span className="attachment-preview" aria-hidden="true">
+            {attachment.previewUrl || attachment.type === "image" ? (
+              <img src={attachment.previewUrl ?? attachment.value} alt="" />
+            ) : attachment.type === "localImage" ? (
+              <ImageIcon size={22} />
+            ) : (
+              <FileIcon path={attachment.name ?? attachment.value} size={22} />
+            )}
+          </span>
+          <span className="attachment-details">
+            <span className="attachment-name" title={attachment.name ?? attachment.value}>
+              {attachment.name ?? (attachment.type === "image" ? "Pasted image" : attachment.value)}
+            </span>
+            <span className="attachment-kind">
+              {attachment.type === "image" || attachment.type === "localImage"
+                ? "Image"
+                : attachment.type === "skill"
+                  ? "Skill"
+                  : "File"}
+            </span>
+          </span>
+          <IconButton
+            unstyled
+            label={`Remove ${attachment.name ?? "attachment"}`}
+            onClick={() => onRemoveAttachment(index)}
+          >
+            <X size={11} />
+          </IconButton>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function sendTitle({
+  sending,
+  providerReady,
+  providerName,
+  hasSelection,
+  loadingAttachments,
+  hasContent,
+  running,
+  sendShortcutLabel,
+}: {
+  sending: boolean
+  providerReady: boolean
+  providerName: string
+  hasSelection: boolean
+  loadingAttachments: boolean
+  hasContent: boolean
+  running: boolean
+  sendShortcutLabel: string
+}): string {
+  if (sending) return "Sending message…"
+  if (!providerReady) return `${providerName} is unavailable`
+  if (!hasSelection) return "Enable a model in Settings"
+  if (loadingAttachments) return "Adding attachments…"
+  if (!hasContent) return "Write a message or attach a file"
+  if (running) return `Queue for the next turn (${sendShortcutLabel})`
+  return `Send to ${providerName} (${sendShortcutLabel})`
+}
+
+function ReasoningSettings({
+  selection,
+  threadId,
+  onChangeSettings,
+}: Pick<ComposerProps, "threadId" | "onChangeSettings"> & {
+  selection: ModelSelection
+}): React.JSX.Element | null {
+  const isClaude = selection.provider.harness === "claude-code"
+  const efforts = selection.model.reasoningEfforts
+  const supportsFast = selection.model.supportsFast
+  const fastTier = selection.model.serviceTiers.find(
+    (tier) => tier.id === selection.model.fastServiceTier,
+  )
+  const selectedEffortIndex = Math.max(
+    0,
+    efforts.findIndex((effort) => effort === selection.reasoningEffort),
+  )
+
+  if (efforts.length === 0 && !supportsFast) return null
+  return (
+    <DropdownMenu
+      trigger={
+        <BaseButton type="button" className="chip" aria-label="Change reasoning effort and speed">
+          <span className="chip-value-icons">
+            {efforts.length > 0 && <LevelIcon index={selectedEffortIndex} count={efforts.length} />}
+            {supportsFast && <SpeedIcon speed={selection.speed} />}
+          </span>
+          <span className="chip-label">
+            {selection.reasoningEffort === null
+              ? "Reasoning"
+              : effortLabel(selection.reasoningEffort)}
+            {supportsFast && ` · ${SPEED_LABEL[selection.speed]}`}
+          </span>
+          <ChevronDown size={13} strokeWidth={1.75} className="chip-chevron" />
+        </BaseButton>
+      }
+    >
+      {efforts.length > 0 && (
+        <MenuRadioGroup
+          value={selection.reasoningEffort ?? ""}
+          onValueChange={(value) =>
+            onChangeSettings({
+              threadId,
+              reasoningEffort: String(value) as ReasoningEffort,
+            })
+          }
+        >
+          <MenuGroup label="Reasoning effort">
+            {efforts.map((effort, index) => (
+              <MenuChoice key={effort} value={effort}>
+                {effortLabel(effort)}
+                <span className="menu-option-icon">
+                  <LevelIcon index={index} count={efforts.length} />
+                </span>
+              </MenuChoice>
+            ))}
+          </MenuGroup>
+        </MenuRadioGroup>
+      )}
+
+      {efforts.length > 0 && supportsFast && <MenuSeparator />}
+
+      {supportsFast && (
+        <MenuRadioGroup
+          value={selection.speed}
+          onValueChange={(value) =>
+            onChangeSettings({
+              threadId,
+              speed: String(value) as keyof typeof SPEED_LABEL,
+            })
+          }
+        >
+          <MenuGroup label="Speed">
+            {isClaude && <p className="speed-description">Fast uses paid usage credits.</p>}
+            {[SPEED_LABEL.standard, fastTier?.name ?? SPEED_LABEL.fast].map((label, index) => (
+              <MenuChoice
+                key={index === 0 ? "standard" : "fast"}
+                value={index === 0 ? "standard" : "fast"}
+              >
+                {label}
+                <span className="menu-option-icon">
+                  <SpeedIcon speed={index === 0 ? "standard" : "fast"} />
+                </span>
+              </MenuChoice>
+            ))}
+          </MenuGroup>
+        </MenuRadioGroup>
+      )}
+    </DropdownMenu>
+  )
+}
+
+type ModelSelection = NonNullable<ReturnType<typeof resolveSelection>>
+
+function ComposerSettings({
+  snapshot,
+  threadId,
+  selection,
+  onChangeSettings,
+}: Pick<ComposerProps, "snapshot" | "threadId" | "onChangeSettings"> & {
+  selection: ModelSelection | null
+}): React.JSX.Element {
+  if (selection === null)
+    return <span className="composer-hint">No model is enabled. Add one in Settings.</span>
+  const isClaude = selection.provider.harness === "claude-code"
+  const isCursor = selection.provider.harness === "cursor"
+  const toolPermissions = isClaude || isCursor
+  const permissionLabels = isClaude
+    ? { ask: "Manual", deny: "Don’t ask", full: "Bypass permissions" }
+    : { ask: "Ask Every Time", deny: "Deny requests (custom)", full: "Run Everything" }
+  const options: Array<{
+    id: string
+    label: string
+    sandbox: SandboxMode
+    approvalPolicy: "on-request" | "never"
+  }> = toolPermissions
+    ? [
+        ...(isClaude
+          ? [
+              {
+                id: "read",
+                label: "Read tools only (custom)",
+                sandbox: "read-only" as const,
+                approvalPolicy: "on-request" as const,
+              },
+            ]
+          : []),
+        {
+          id: "ask",
+          label: permissionLabels.ask,
+          sandbox: "workspace-write",
+          approvalPolicy: "on-request",
+        },
+        ...(isClaude
+          ? [
+              {
+                id: "edits",
+                label: "Accept edits",
+                sandbox: "danger-full-access" as const,
+                approvalPolicy: "on-request" as const,
+              },
+            ]
+          : []),
+        {
+          id: "deny",
+          label: permissionLabels.deny,
+          sandbox: "workspace-write",
+          approvalPolicy: "never",
+        },
+        {
+          id: "full",
+          label: permissionLabels.full,
+          sandbox: "danger-full-access",
+          approvalPolicy: "never",
+        },
+      ]
+    : (Object.keys(SANDBOX_LABEL) as SandboxMode[]).map((sandbox) => ({
+        id: sandbox,
+        label: SANDBOX_LABEL[sandbox],
+        sandbox,
+        approvalPolicy: "on-request",
+      }))
+  const selected = isCursor
+    ? options.find(
+        (option) =>
+          option.id ===
+          (selection.approvalPolicy === "never"
+            ? selection.sandbox === "danger-full-access"
+              ? "full"
+              : "deny"
+            : "ask"),
+      )!
+    : toolPermissions
+      ? (options.find(
+          (option) =>
+            option.sandbox === selection.sandbox &&
+            option.approvalPolicy === selection.approvalPolicy,
+        ) ??
+        options.find((option) => option.sandbox === selection.sandbox) ??
+        options.find((option) => option.id === "ask")!)
+      : options.find((option) => option.sandbox === selection.sandbox)!
+  const visible = selectableModels(snapshot).filter((model) => !model.hidden)
+  return (
+    <>
+      <ModelPicker
+        providers={snapshot.providers}
+        models={visible}
+        selected={selection.model}
+        onSelect={(modelId) => onChangeSettings({ threadId, modelId })}
+      />
+
+      <ReasoningSettings
+        selection={selection}
+        threadId={threadId}
+        onChangeSettings={onChangeSettings}
+      />
+
+      <DropdownMenu
+        trigger={
+          <BaseButton
+            type="button"
+            className="chip"
+            aria-label={
+              toolPermissions
+                ? `Change ${isClaude ? "Claude" : "Cursor"} permissions`
+                : "Change sandbox access"
+            }
+          >
+            <SandboxIcon mode={selection.sandbox} />
+            <span className="chip-label">{selected.label}</span>
+            <ChevronDown size={13} strokeWidth={1.75} className="chip-chevron" />
+          </BaseButton>
+        }
+      >
+        <MenuRadioGroup
+          value={selected.id}
+          onValueChange={(value) => {
+            const option = options.find((entry) => entry.id === value)
+            if (option)
+              onChangeSettings({
+                threadId,
+                sandbox: option.sandbox,
+                ...(toolPermissions
+                  ? { approvalPolicy: option.approvalPolicy, mode: "default" }
+                  : {}),
+              })
+          }}
+        >
+          <MenuGroup label={toolPermissions ? "Tool permissions" : "Filesystem access"}>
+            {options.map((option) => (
+              <MenuChoice key={option.id} value={option.id}>
+                {option.label}
+                <span className="menu-option-icon">
+                  <SandboxIcon mode={option.sandbox} />
+                </span>
+              </MenuChoice>
+            ))}
+          </MenuGroup>
+        </MenuRadioGroup>
+      </DropdownMenu>
+    </>
+  )
+}
+
+const harnessName = (harness: string | undefined): string => {
+  switch (harness) {
+    case "cursor":
+      return "Cursor"
+    case "claude-code":
+      return "Claude"
+    default:
+      return "Codex"
+  }
+}
+
+export function Composer({
+  snapshot,
+  threadId,
+  draft,
+  onDraftChange,
+  providerReady,
+  providerDetail,
+  onRecheckProvider,
+  onChangeSettings,
+  onSend,
+  onInterrupt,
+  running,
+  interrupting,
+  queuedCount,
+  sending,
+  attachments,
+  onAddAttachments,
+  onRemoveAttachment,
+}: ComposerProps): React.JSX.Element {
+  const enterToSend = snapshot.settings.sendShortcut === "enter"
+  const sendShortcutLabel = enterToSend ? "Enter" : "Ctrl+Enter"
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [loadingAttachments, setLoadingAttachments] = useState(false)
+  const attachmentReadsPending = useRef(0)
+  const selection = resolveSelection(snapshot, threadId)
+  const providerName = harnessName(selection?.provider.harness)
+  const canSend =
+    providerReady &&
+    selection !== null &&
+    (draft.trim().length > 0 || attachments.length > 0) &&
+    !sending &&
+    !loadingAttachments
+
+  const addAttachments = async (
+    read: () => Promise<ReadonlyArray<ComposerAttachment>>,
+  ): Promise<void> => {
+    if (sending) return
+    attachmentReadsPending.current += 1
+    setLoadingAttachments(true)
+    setAttachmentError(null)
+    try {
+      onAddAttachments(await read())
+    } catch {
+      setAttachmentError("Could not read attachments. Try attaching them again.")
+    } finally {
+      attachmentReadsPending.current -= 1
+      setLoadingAttachments(attachmentReadsPending.current > 0)
+    }
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Re-measure the textarea after each draft edit.
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current
+    if (textarea === null) return
+
+    textarea.style.minHeight = "0px"
+    textarea.style.height = "0px"
+    const maxHeight = Number.parseFloat(getComputedStyle(textarea).maxHeight)
+    const nextHeight = Math.min(textarea.scrollHeight, maxHeight)
+    textarea.style.height = `${nextHeight}px`
+    textarea.style.minHeight = ""
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden"
+  }, [draft])
+
+  return (
+    <div className="composer-zone">
+      {!providerReady && (
+        <div className="notice" role="status">
+          <TriangleAlert size={15} strokeWidth={1.75} />
+          <div className="notice-body">
+            <span>{providerDetail}</span>
+            <Button size="sm" onClick={onRecheckProvider}>
+              <RefreshCw size={13} strokeWidth={1.75} />
+              Check again
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="composer">
+        <ComposerAttachments attachments={attachments} onRemoveAttachment={onRemoveAttachment} />
+        {loadingAttachments && (
+          <div className="composer-attachment-status" role="status">
+            Adding attachments…
+          </div>
+        )}
+        {attachmentError && (
+          <div className="composer-attachment-status" role="alert">
+            {attachmentError}
+          </div>
+        )}
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          rows={2}
+          placeholder={`Ask ${providerName} to work in this workspace…`}
+          aria-label={`Message ${providerName}`}
+          aria-keyshortcuts={enterToSend ? "Enter" : "Control+Enter"}
+          onChange={(event) => onDraftChange(event.target.value)}
+          onPaste={(event) => {
+            const images = Array.from(event.clipboardData.files).filter((file) =>
+              file.type.startsWith("image/"),
+            )
+            if (images.length === 0) return
+            event.preventDefault()
+            void addAttachments(() =>
+              Promise.all(
+                images.map(
+                  (file) =>
+                    new Promise<ComposerAttachment>((resolve, reject) => {
+                      const reader = new FileReader()
+                      reader.onload = () => {
+                        if (typeof reader.result !== "string") {
+                          reject(new Error("Could not read image"))
+                          return
+                        }
+                        resolve({
+                          type: "image",
+                          value: reader.result,
+                          name: file.name || "Pasted image",
+                        })
+                      }
+                      reader.onerror = () => reject(reader.error)
+                      reader.onabort = () => reject(new Error("Image read cancelled"))
+                      reader.readAsDataURL(file)
+                    }),
+                ),
+              ),
+            )
+          }}
+          onKeyDown={(event) => {
+            if (
+              event.key === "Enter" &&
+              !event.nativeEvent.isComposing &&
+              !event.shiftKey &&
+              !event.altKey &&
+              (event.ctrlKey || enterToSend) &&
+              canSend &&
+              attachmentReadsPending.current === 0
+            ) {
+              event.preventDefault()
+              onSend()
+            }
+          }}
+        />
+
+        <div className="composer-controls">
+          <IconButton
+            unstyled
+            className="chip"
+            label="Attach image, file, or skill"
+            disabled={loadingAttachments || sending}
+            onClick={() => void addAttachments(() => window.meldshell.selectAttachments())}
+          >
+            <Paperclip size={13} strokeWidth={1.75} />
+          </IconButton>
+          <ComposerSettings
+            snapshot={snapshot}
+            threadId={threadId}
+            selection={selection}
+            onChangeSettings={onChangeSettings}
+          />
+
+          <span className="composer-controls-spacer" />
+
+          <div className="composer-actions">
+            {!running && queuedCount === 0 && (
+              <span className="composer-shortcut" aria-hidden="true">
+                {!enterToSend && (
+                  <>
+                    <kbd>Ctrl</kbd>
+                    <span>+</span>
+                  </>
+                )}
+                <kbd>Enter</kbd>
+              </span>
+            )}
+            {queuedCount > 0 && (
+              <span className="composer-hint">
+                {queuedCount} queued {queuedCount === 1 ? "message" : "messages"}
+              </span>
+            )}
+
+            {running && (
+              <IconButton
+                unstyled
+                className="stop-button"
+                label={interrupting ? "Stopping turn" : "Interrupt turn"}
+                disabled={interrupting}
+                onClick={onInterrupt}
+              >
+                <Square size={11} fill="currentColor" strokeWidth={1.5} />
+              </IconButton>
+            )}
+
+            <IconButton
+              unstyled
+              className="send-button"
+              disabled={!canSend}
+              aria-label="Send message"
+              label={sendTitle({
+                sending,
+                providerReady,
+                providerName,
+                hasSelection: selection !== null,
+                loadingAttachments,
+                hasContent: draft.trim().length > 0 || attachments.length > 0,
+                running,
+                sendShortcutLabel,
+              })}
+              onClick={() => onSend()}
+            >
+              <ArrowUp size={16} strokeWidth={2.25} />
+            </IconButton>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

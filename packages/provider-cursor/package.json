@@ -1,0 +1,19 @@
+{
+  "name": "@meldshell/provider-cursor",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/client.ts",
+    "./worker": "./src/worker-runtime.ts"
+  },
+  "dependencies": {
+    "@meldshell/contracts": "*",
+    "effect": "3.22.1",
+    "which": "7.0.0",
+    "@meldshell/provider-runtime": "*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}
