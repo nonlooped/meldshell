@@ -173,39 +173,36 @@ export function FileViewer({ file }: { file: FileTab }) {
         </p>
       )}
       {preview?.kind === "unsupported" && <p className="git-notice">{preview.content}</p>}
-      {preview?.kind === "html" && !file.line && (
-        <HtmlPreview file={file} content={preview.content} />
-      )}
+      {preview?.kind === "html" && <HtmlPreview file={file} content={preview.content} />}
       {preview?.kind === "image" && (
         <div className="file-image scrollable">
           <img src={preview.content} alt={file.path} />
         </div>
       )}
-      {preview &&
-        (preview.kind === "text" || (file.line && ["markdown", "html"].includes(preview.kind))) && (
-          <pre
-            className="file-source scrollable"
-            tabIndex={0}
-            aria-label={file.line ? `Source at line ${file.line}` : "Source"}
-          >
-            <span className="file-source-content">
-              {file.line && file.line <= lineCount && (
-                <span
-                  ref={lineRef}
-                  className="file-line-target"
-                  data-path={file.path}
-                  aria-hidden="true"
-                  style={{
-                    top: `${(file.line - 1) * 1.6}em`,
-                    height: `${(Math.min(file.endLine ?? file.line, lineCount) - file.line + 1) * 1.6}em`,
-                  }}
-                />
-              )}
-              <SourceCode path={file.path} text={preview.content} />
-            </span>
-          </pre>
-        )}
-      {preview?.kind === "markdown" && !file.line && (
+      {preview?.kind === "text" && (
+        <pre
+          className="file-source scrollable"
+          tabIndex={0}
+          aria-label={file.line ? `Source at line ${file.line}` : "Source"}
+        >
+          <span className="file-source-content">
+            {file.line && file.line <= lineCount && (
+              <span
+                ref={lineRef}
+                className="file-line-target"
+                data-path={file.path}
+                aria-hidden="true"
+                style={{
+                  top: `${(file.line - 1) * 1.6}em`,
+                  height: `${(Math.min(file.endLine ?? file.line, lineCount) - file.line + 1) * 1.6}em`,
+                }}
+              />
+            )}
+            <SourceCode path={file.path} text={preview.content} />
+          </span>
+        </pre>
+      )}
+      {preview?.kind === "markdown" && (
         <div className="file-markdown event-text event-markdown scrollable">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
