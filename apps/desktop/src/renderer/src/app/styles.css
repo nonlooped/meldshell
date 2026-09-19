@@ -274,6 +274,17 @@ input {
   color: var(--text-primary);
 }
 
+.tab[data-shared] {
+  max-width: 320px;
+}
+
+.tab-pane-count {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
 .tab-label {
   display: flex;
   min-width: 0;
@@ -807,6 +818,138 @@ input {
   min-width: 0;
   min-height: 0;
   grid-template-rows: minmax(0, 1fr) auto;
+}
+
+/* ── Thread panes ────────────────────────────────────────────────────────── */
+
+.thread-split {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The shared separator is a vertical hairline; a stacked split needs the same rule turned. */
+.thread-split-separator[aria-orientation="horizontal"] {
+  width: auto;
+  height: 1px;
+}
+
+.thread-split-separator[aria-orientation="horizontal"]::after {
+  inset: -3px 0;
+}
+
+.thread-tile {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+/* Pane chrome appears only in a split, where a thread has to be identified and moved. */
+.thread-tile:has(> .thread-tile-header) {
+  grid-template-rows: auto minmax(0, 1fr);
+  container-type: inline-size;
+}
+
+.thread-tile-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--line-subtle);
+  color: var(--text-tertiary);
+}
+
+.thread-tile[data-focused] > .thread-tile-header {
+  border-bottom-color: var(--line);
+  color: var(--text-primary);
+}
+
+.thread-tile-title {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: grab;
+}
+
+.thread-tile-title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-tile-title > small {
+  flex: 0 0 auto;
+  color: var(--color-modified);
+  white-space: nowrap;
+}
+
+/* A pane is narrower than the window, so the reading column measures itself against the pane. */
+.thread-tile:has(> .thread-tile-header)
+:is(.transcript, .transcript-loading, .transcript-origin, .composer-zone) {
+  padding-inline: clamp(16px, 7cqi, 104px);
+}
+
+.thread-drop-preview {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: grid;
+  border: 1px solid var(--accent);
+  background: var(--surface-selected);
+  place-items: center;
+  pointer-events: none;
+}
+
+.thread-drop-preview[data-zone="left"] {
+  right: 50%;
+}
+
+.thread-drop-preview[data-zone="right"] {
+  left: 50%;
+}
+
+.thread-drop-preview[data-zone="top"] {
+  bottom: 50%;
+}
+
+.thread-drop-preview[data-zone="bottom"] {
+  top: 50%;
+}
+
+.thread-drop-preview > span {
+  padding: 5px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-size: 12px;
+}
+
+.split-thread-picker {
+  display: grid;
+  max-height: 320px;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.split-thread-picker .button {
+  justify-content: flex-start;
+  overflow-wrap: anywhere;
 }
 
 .transcript-region {

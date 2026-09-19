@@ -105,6 +105,45 @@ Workspace management is available from the workspace menu. Model selection
 uses a searchable picker with provider headings and compact model rows; provider catalogs and usage
 remain separate where capabilities differ.
 
+## Splitting the thread pane
+
+The thread pane holds one thread by default and can be divided into side-by-side
+or stacked panes so two conversations are watched at once.
+
+```text
+┌──────────────────┬───────────────────────┬──────────────────────────┐
+│ Search (Ctrl+K)  │ Thread ⋯ ×            │ Thread ⋯ ×               │
+│ Workspace filter │ Canonical conversation│ Canonical conversation   │
+│ + New thread     │                       │                          │
+│ Pinned / Active  │ Message composer      │ Message composer         │
+│                  ├───────────────────────┴──────────────────────────┤
+│ Archived         │ Thread ⋯ ×                                       │
+│                  │ Canonical conversation                           │
+│ ⚙ Settings       │ Message composer                                 │
+└──────────────────┴──────────────────────────────────────────────────┘
+```
+
+A thread is dragged from its solo tab, its inbox row, or the title of a pane it
+already occupies. Over a pane, the outer quarter of each side previews a split
+along that edge; the middle previews taking the pane over, which swaps two
+threads that are both on screen. The inbox row menu opens a thread to the right
+of or below the pane in front, and a pane's own menu splits it against a thread
+chosen by name, so no split depends on a pointer.
+
+Panes are resized by dragging or arrowing the hairline between them, down to a
+size where the reading column still works; the column measures itself against
+the pane rather than the window. Splitting never opens a thread twice: a thread
+already open moves into the split. Each split layout shares one tab, with a split
+icon, thread titles, and pane count; solo threads keep individual tabs. Opening
+another thread creates a solo tab, while selecting an already open thread returns
+to its tab and focuses its pane. Switching tabs preserves each layout and its
+pane sizes. Closing a shared tab closes the entire view without stopping its
+threads; closing a pane removes only that pane and gives its space to its neighbor.
+A split with one remaining pane becomes a solo tab. Showing only one thread moves
+it into a solo tab and keeps the remaining panes together. A pane wears a header
+— title, layout menu, close — only while the pane is shared; a single pane keeps
+the plain thread view.
+
 ## Material and depth
 
 Depth comes from the system, not from painted panels. The window uses the
@@ -195,6 +234,9 @@ indicator that is never removed for aesthetics.
 - `Ctrl+P`: thread switcher.
 - `Ctrl+Tab` and `Ctrl+Shift+Tab`: move through open tabs.
 - `Ctrl+W`: close selected tab without interrupting its turn.
+- Splits are reachable without a pointer: the inbox row menu opens a thread
+  beside the pane in front, a pane's layout menu splits it or leaves it alone on
+  screen, and the separator between panes resizes with arrow keys.
 - `Ctrl+K`: search transcripts.
 - `Ctrl+Enter`: send by default; General settings can also enable Enter to send.
 - `Shift+Enter`: insert a newline.
