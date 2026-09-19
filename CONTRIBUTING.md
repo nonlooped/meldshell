@@ -1,17 +1,21 @@
 # Contributing to MeldShell
 
-MeldShell targets Windows 11 x64 and requires Node.js 24 or newer. Install dependencies with `npm install`; this also downloads Electron and rebuilds SQLite for Electron's ABI.
+Use Node.js 24 or newer. `npm install` downloads Electron and rebuilds SQLite for its ABI; `npm run dev` starts the desktop app. Windows 11 x64 and Linux x64 are the configured packaging targets.
 
-Before opening a change, review the diff and choose the smallest existing check that covers the affected behavior. Follow the [verification rules](AGENTS.md#verification); full builds are not required for routine changes.
+## Choose checks by impact
 
-Use `npm run lint` for Biome's desktop and package lint checks, `npm run format` to format supported files, and `npm run format:check` to check formatting. The root `biome.json` preserves the previous formatting preferences and excludes generated Codex schemas and lockfiles. Markdown and YAML are not formatted by Biome. React Compiler diagnostics still come from the compiler during builds; Biome does not replace every React ESLint rule.
+Follow [AGENTS.md's verification policy](AGENTS.md#verification). Commands live in [package.json](package.json); use an existing targeted test or workspace check when it covers the risk.
 
-Functions with a cognitive complexity score above 20 fail lint through `noExcessiveCognitiveComplexity`.
+Biome handles supported source formatting and linting, including a cognitive-complexity limit of 20. It does not format Markdown or YAML. Generated Codex schemas and lockfiles are excluded. React Compiler diagnostics come from builds.
 
-`npm run check:fast` runs lint, formatting, and workspace typechecks. `npm run check` also builds the desktop bundles and checks unused dependencies and exports with Knip. Use the full check for changes spanning package or process boundaries.
+`check:fast` combines lint, formatting, and workspace typechecks. `check` adds the desktop build and Knip; it does not run `npm test`. Choose these aggregate commands only under the repository verification policy. The [release workflow](.github/workflows/release.yml) runs the full check and tests separately.
 
-Validate UI interactions and authenticated provider behavior manually when needed. Provider requests can consume account quota.
+Authenticated provider checks can consume account quota. UI and manual verification follow the repository policy; report unverified behavior explicitly.
 
-Keep provider-native payloads intact when adding canonical event mappings. New app-server schemas must be regenerated with the supported Codex CLI and committed under `packages/provider-codex/schema`.
+## Provider changes
 
-Agent contributors start with [AGENTS.md](AGENTS.md). When changing skills or rules, follow the ownership and review notes in [agent documentation maintenance](docs/agent-documentation.md).
+Preserve native payloads when mapping canonical events. Process, session, and recovery constraints are in [Architecture](docs/architecture.md); provider-specific behavior is in [Claude](docs/claude-provider.md) and [Cursor](docs/cursor-provider.md).
+
+Regenerate changed Codex app-server schemas with the supported CLI and commit them under `packages/provider-codex/schema`. Consult the CLI's schema-generation help before changing generated files.
+
+For installer work, use the [release checklist](docs/release.md). For rules, skills, or documentation changes, use [documentation maintenance](docs/agent-documentation.md).
