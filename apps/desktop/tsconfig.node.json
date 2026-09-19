@@ -1,0 +1,16 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*"],
+  "compilerOptions": {
+    "composite": true,
+    "strict": true,
+    "plugins": [{ "name": "@effect/language-service" }],
+    "types": ["electron-vite/node"],
+    "baseUrl": ".",
+    "paths": {
+      "@meldshell/contracts": ["../../packages/contracts/src/index.ts"],
+      "@meldshell/core": ["../../packages/core/src/index.ts"],
+      "@meldshell/provider-codex": ["../../packages/provider-codex/src/index.ts"]
+    }
+  }
+}

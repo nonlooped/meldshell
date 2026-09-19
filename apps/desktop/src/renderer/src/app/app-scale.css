@@ -1,0 +1,45 @@
+/* Use viewport units: percentage sizes already account for the parent's zoom,
+ * so dividing those by the scale would compensate twice. */
+html body {
+  zoom: var(--app-scale, 1);
+  width: calc(100vw / var(--app-scale, 1));
+  height: calc(100vh / var(--app-scale, 1));
+  --caption-inset: calc(146px / var(--app-scale, 1));
+  --titlebar-height: calc(44px / var(--app-scale, 1));
+}
+
+.app-scale-viewport {
+  position: fixed;
+  top: calc(var(--titlebar-height) + 12px);
+  right: 20px;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.app-scale-indicator {
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-menu);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-popup);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.app-scale-indicator[data-starting-style],
+.app-scale-indicator[data-ending-style] {
+  opacity: 0;
+}
+
+.app-scale-indicator[data-limited] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-scale-indicator {
+    transition: none;
+  }
+}

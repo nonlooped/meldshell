@@ -1,0 +1,17 @@
+{
+  "name": "@meldshell/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ipc": "./src/ipc.ts"
+  },
+  "dependencies": {
+    "@effect/rpc": "0.76.2",
+    "effect": "3.22.1"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

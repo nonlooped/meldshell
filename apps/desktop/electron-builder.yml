@@ -1,0 +1,35 @@
+appId: com.meldshell.desktop
+productName: MeldShell
+directories:
+  buildResources: build
+  output: ../../release
+files:
+  - out/**
+  - package.json
+  - "!**/.vscode/*"
+  - "!src/*"
+  - "!electron.vite.config.{js,ts,mjs,cjs}"
+  - "!README.md"
+  - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
+  # Claude Code is discovered on the user's machine; never ship the SDK's native CLI.
+  - "!node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+asar: true
+asarUnpack:
+  - node_modules/better-sqlite3/**
+  - resources/**
+win:
+  executableName: MeldShell
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  artifactName: ${productName}-${version}-setup.${ext}
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  oneClick: false
+  perMachine: false
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+npmRebuild: true

@@ -1,0 +1,15 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "include": ["src/renderer/src/env.d.ts", "src/renderer/src/**/*", "src/preload/*.d.ts"],
+  "compilerOptions": {
+    "composite": true,
+    "strict": true,
+    "plugins": [{ "name": "@effect/language-service" }],
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@renderer/*": ["src/renderer/src/*"],
+      "@meldshell/contracts": ["../../packages/contracts/src/index.ts"]
+    }
+  }
+}

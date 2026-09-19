@@ -1,0 +1,46 @@
+{
+  "name": "meldshell",
+  "version": "0.1.0",
+  "private": true,
+  "author": "MeldShell contributors",
+  "description": "A local desktop environment for concurrent coding-agent threads",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspace=@meldshell/desktop",
+    "check": "npm run check:fast && npm run build && npm run knip",
+    "dev": "npm run dev --workspace=@meldshell/desktop",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "install:electron": "install-electron --no",
+    "knip": "knip",
+    "lint": "biome lint .",
+    "package:win": "npm run package:win --workspace=@meldshell/desktop",
+    "postinstall": "npm run install:electron && npm run rebuild:native",
+    "rebuild:native": "npm run rebuild:native --workspace=@meldshell/desktop",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check:fast": "npm run lint && npm run format:check && npm run typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.12",
+    "@effect/language-service": "0.87.2",
+    "@types/node": "24.10.1",
+    "knip": "6.34.0",
+    "typescript": "5.9.3"
+  },
+  "packageManager": "npm@12.0.2",
+  "overrides": {
+    "better-sqlite3": "13.0.3"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true,
+    "electron@44.1.1": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true
+  }
+}
