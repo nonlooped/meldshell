@@ -59,6 +59,61 @@ function replacePane(
   }
 }
 
+function alignedPaneCount(layout: ThreadLayout, orientation: "horizontal" | "vertical"): number {
+  return layout.kind === "split" && layout.orientation === orientation
+    ? alignedPaneCount(layout.first, orientation) + alignedPaneCount(layout.second, orientation)
+    : 1
+}
+
+function balanceAlignedSplits(
+  layout: ThreadLayout,
+  orientation: "horizontal" | "vertical",
+): ThreadLayout {
+  if (layout.kind === "thread" || layout.orientation !== orientation) return layout
+  const first = balanceAlignedSplits(layout.first, orientation)
+  const second = balanceAlignedSplits(layout.second, orientation)
+  const firstCount = alignedPaneCount(first, orientation)
+  const secondCount = alignedPaneCount(second, orientation)
+  return {
+    ...layout,
+    ratio: (firstCount / (firstCount + secondCount)) * 100,
+    first,
+    second,
+  }
+}
+
+function containsThread(layout: ThreadLayout, threadId: string): boolean {
+  return layout.kind === "thread"
+    ? layout.threadId === threadId
+    : containsThread(layout.first, threadId) || containsThread(layout.second, threadId)
+}
+
+function replacePaneAndBalance(
+  layout: ThreadLayout,
+  target: string,
+  replacement: ThreadLayout,
+  orientation: "horizontal" | "vertical",
+): { readonly layout: ThreadLayout; readonly aligned: boolean } {
+  if (layout.kind === "thread") {
+    return { layout: layout.threadId === target ? replacement : layout, aligned: true }
+  }
+  const targetInFirst = containsThread(layout.first, target)
+  const changed = replacePaneAndBalance(
+    targetInFirst ? layout.first : layout.second,
+    target,
+    replacement,
+    orientation,
+  )
+  const next = targetInFirst
+    ? { ...layout, first: changed.layout }
+    : { ...layout, second: changed.layout }
+  const aligned = changed.aligned && layout.orientation === orientation
+  return {
+    layout: aligned ? balanceAlignedSplits(next, orientation) : next,
+    aligned,
+  }
+}
+
 function swapPanes(layout: ThreadLayout, left: string, right: string): ThreadLayout {
   if (layout.kind === "thread") {
     if (layout.threadId === left) return threadLeaf(right)
@@ -69,26 +124,6 @@ function swapPanes(layout: ThreadLayout, left: string, right: string): ThreadLay
     first: swapPanes(layout.first, left, right),
     second: swapPanes(layout.second, left, right),
   }
-}
-
-/** The pane a selection acts on: the focused one while it is still on screen, else the first pane. */
-function focusedPane(layout: ThreadLayout, selected: string | null): string {
-  const visible = visibleThreads(layout)
-  return selected !== null && visible.includes(selected) ? selected : visible[0]!
-}
-
-/**
- * Showing a thread never adds a pane: an already visible thread just takes focus, and any other
- * thread takes over the focused pane.
- */
-export function selectPane(
-  layout: ThreadLayout | null,
-  selected: string | null,
-  threadId: string,
-): ThreadLayout {
-  if (!layout) return threadLeaf(threadId)
-  if (visibleThreads(layout).includes(threadId)) return layout
-  return replacePane(layout, focusedPane(layout, selected), threadLeaf(threadId))
 }
 
 export function splitPane(
@@ -102,14 +137,20 @@ export function splitPane(
   // Splitting with a thread that is already on screen moves it rather than duplicating it.
   const remaining = removePane(layout, threadId) ?? layout
   const before = edge === "left" || edge === "top"
-  return replacePane(remaining, target, {
-    kind: "split",
-    id: splitId,
-    orientation: edge === "left" || edge === "right" ? "horizontal" : "vertical",
-    ratio: 50,
-    first: threadLeaf(before ? threadId : target),
-    second: threadLeaf(before ? target : threadId),
-  })
+  const orientation = edge === "left" || edge === "right" ? "horizontal" : "vertical"
+  return replacePaneAndBalance(
+    remaining,
+    target,
+    {
+      kind: "split",
+      id: splitId,
+      orientation,
+      ratio: 50,
+      first: threadLeaf(before ? threadId : target),
+      second: threadLeaf(before ? target : threadId),
+    },
+    orientation,
+  ).layout
 }
 
 /**

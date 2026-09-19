@@ -114,7 +114,7 @@ export function FileIcon({
       icon={directory ? (expanded ? folderOpenIcon : folderIcon) : icon}
       width={size}
       height={size}
-      className="file-icon"
+      className="file-icon shrink-0"
       aria-hidden="true"
     />
   )

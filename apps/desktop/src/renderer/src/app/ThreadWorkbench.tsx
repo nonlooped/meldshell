@@ -1,4 +1,6 @@
-import { useState, type DragEvent } from "react"
+import { centeredStateClasses, textInputClasses, iconButtonClasses } from "../ui/styles"
+import { Pressable, FadeDiv } from "../ui/motion"
+import { useState } from "react"
 import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import { Group, Panel, Separator } from "react-resizable-panels"
 import { Columns2, Maximize2, MoreHorizontal, Rows2, X } from "lucide-react"
@@ -6,8 +8,14 @@ import { Button as BaseButton } from "@base-ui-components/react/button"
 import { AppDialog, Button, DropdownMenu, IconButton, MenuAction } from "../ui/controls"
 import { ThreadView } from "../threads/ThreadView"
 import { useTabStore } from "./tab-store"
-import { dropZone, type DropZone, type SplitEdge, type ThreadLayout } from "./thread-layout"
-import { endThreadDrag, threadDragProps, threadDragType, useThreadDrag } from "./thread-drag"
+import {
+  movePane,
+  splitPane,
+  type DropZone,
+  type SplitEdge,
+  type ThreadLayout,
+} from "./thread-layout"
+import { useThreadDrag, useThreadDraggable, useThreadDroppable } from "./thread-drag"
 
 interface WorkbenchProps {
   readonly snapshot: AppSnapshot
@@ -28,15 +36,6 @@ const edgeLabels: Readonly<Record<SplitEdge, string>> = {
   right: "Split — open on the right",
   top: "Split — open above",
   bottom: "Split — open below",
-}
-
-/** The pane's own coordinates decide the drop: its outer quarters split, its middle takes over. */
-function zoneFor(event: DragEvent<HTMLElement>): DropZone {
-  const bounds = event.currentTarget.getBoundingClientRect()
-  return dropZone(
-    (event.clientX - bounds.left) / bounds.width,
-    (event.clientY - bounds.top) / bounds.height,
-  )
 }
 
 /** The keyboard route to a split: pick the thread the new pane should show. */
@@ -67,13 +66,15 @@ function SplitPicker({
       actions={<Button onClick={onClose}>Cancel</Button>}
     >
       <input
-        className="text-input"
+        data-motion="background-color border-color box-shadow"
+        data-motion-duration="0.2"
+        className={textInputClasses}
         aria-label="Find a thread to open beside this one"
         placeholder="Find a thread…"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
-      <div className="split-thread-picker scrollable">
+      <div className="grid max-h-[320px] gap-[4px] mt-[12px] [&_.button]:justify-start [&_.button]:[overflow-wrap:anywhere] overflow-y-auto [scrollbar-gutter:stable]">
         {candidates.map((candidate) => (
           <Button
             key={candidate.id}
@@ -103,12 +104,16 @@ function ThreadTileHeader({
   onFocus: () => void
 }): React.JSX.Element {
   const [picker, setPicker] = useState<SplitEdge | null>(null)
+  const draggable = useThreadDraggable(thread.id, "pane")
   return (
-    <div className="thread-tile-header">
+    <div className="thread-tile-header flex min-w-0 items-center gap-[2px] [padding:3px_6px] border-b-[1px] border-b-[color:var(--line-subtle)] text-[var(--text-tertiary)]">
       <BaseButton
+        ref={draggable.ref}
         type="button"
-        className="thread-tile-title"
-        {...threadDragProps(thread.id)}
+        className={
+          "flex min-w-0 flex-1 items-center gap-[8px] p-[4px] border-0 bg-transparent text-inherit [font:inherit] text-[12px] text-left [cursor:grab] [&_>_span]:overflow-hidden [&_>_span]:text-ellipsis [&_>_span]:whitespace-nowrap [&_>_small]:flex-none [&_>_small]:text-[var(--color-modified)] [&_>_small]:whitespace-nowrap"
+        }
+        data-dragging={draggable.isDragging ? "" : undefined}
         onClick={onFocus}
         title={`${thread.title}\nDrag onto a pane to move or split it`}
       >
@@ -119,8 +124,10 @@ function ThreadTileHeader({
         align="end"
         trigger={
           <BaseButton
+            data-motion="background-color border-color color opacity"
+            render={<Pressable />}
             type="button"
-            className="icon-button"
+            className={iconButtonClasses}
             aria-label={`Pane layout for ${thread.title}`}
           >
             <MoreHorizontal size={15} strokeWidth={1.75} />
@@ -166,57 +173,54 @@ function ThreadTile({
   searchTarget,
 }: WorkbenchProps & { thread: Thread; split: boolean }): React.JSX.Element {
   const focused = useTabStore((state) => state.selectedThreadId === thread.id)
-  const dragging = useThreadDrag((state) => state.threadId)
-  const [preview, setPreview] = useState<{ threadId: string; zone: DropZone } | null>(null)
-  // A drop, a cancelled drag, or a drag that ended elsewhere leaves no event on this pane; the
-  // preview is tied to the thread being dragged so it cannot outlive it.
-  if (preview !== null && preview.threadId !== dragging) setPreview(null)
+  const droppable = useThreadDroppable(thread.id)
   const focus = (): void => {
     if (!focused) useTabStore.getState().selectThread(thread.id)
   }
-  // Files and text dragged into the composer are not thread moves and must reach their own handlers.
-  const accepts = (event: DragEvent<HTMLElement>): boolean =>
-    dragging !== null &&
-    dragging !== thread.id &&
-    event.dataTransfer.types.includes(threadDragType) &&
-    threads.some((candidate) => candidate.id === dragging)
   return (
     <section
-      className="thread-tile"
+      ref={droppable.ref}
+      className={threadTileClasses}
       aria-label={thread.title}
       data-focused={split && focused ? "" : undefined}
       onFocusCapture={focus}
       onPointerDownCapture={focus}
-      onDragOver={(event) => {
-        if (dragging === null || !accepts(event)) return
-        event.preventDefault()
-        event.dataTransfer.dropEffect = "move"
-        setPreview({ threadId: dragging, zone: zoneFor(event) })
-      }}
-      onDragLeave={(event) => {
-        if (
-          !(event.relatedTarget instanceof Node) ||
-          !event.currentTarget.contains(event.relatedTarget)
-        )
-          setPreview(null)
-      }}
-      onDrop={(event) => {
-        if (dragging === null || !accepts(event)) return
-        event.preventDefault()
-        event.stopPropagation()
-        useTabStore.getState().dropThread(thread.id, dragging, zoneFor(event))
-        setPreview(null)
-        endThreadDrag()
-      }}
     >
       {split && <ThreadTileHeader thread={thread} threads={threads} onFocus={focus} />}
       <ThreadView snapshot={snapshot} thread={thread} searchTarget={searchTarget} />
-      {preview !== null && (
-        <div className="thread-drop-preview" data-zone={preview.zone}>
-          <span>{zoneLabels[preview.zone]}</span>
-        </div>
-      )}
     </section>
+  )
+}
+
+function DropPreviewNode({
+  node,
+  threadId,
+  label,
+}: {
+  readonly node: ThreadLayout
+  readonly threadId: string
+  readonly label: string
+}): React.JSX.Element {
+  if (node.kind === "thread") {
+    const dropped = node.threadId === threadId
+    return (
+      <div className={dropPreviewPaneClasses} data-dropped={dropped ? "" : undefined}>
+        {dropped && <span>{label}</span>}
+      </div>
+    )
+  }
+  return (
+    <div
+      className="flex w-full h-full min-w-0 min-h-0"
+      style={{ flexDirection: node.orientation === "horizontal" ? "row" : "column" }}
+    >
+      <div className="flex-none min-w-0 min-h-0" style={{ flexBasis: `${node.ratio}%` }}>
+        <DropPreviewNode node={node.first} threadId={threadId} label={label} />
+      </div>
+      <div className="flex-none min-w-0 min-h-0" style={{ flexBasis: `${100 - node.ratio}%` }}>
+        <DropPreviewNode node={node.second} threadId={threadId} label={label} />
+      </div>
+    </div>
   )
 }
 
@@ -228,16 +232,16 @@ function LayoutNode({
   if (node.kind === "thread") {
     const thread = props.threads.find((candidate) => candidate.id === node.threadId)
     return thread === undefined ? (
-      <div className="centered-state" role="status">
+      <FadeDiv className={centeredStateClasses} role="status">
         <p>Loading thread…</p>
-      </div>
+      </FadeDiv>
     ) : (
       <ThreadTile thread={thread} split={split} {...props} />
     )
   }
   return (
     <Group
-      className="thread-split"
+      className="w-full h-full min-w-0 min-h-0"
       orientation={node.orientation}
       onLayoutChanged={(layout, meta) => {
         const ratio = layout[node.first.id]
@@ -251,7 +255,8 @@ function LayoutNode({
         <LayoutNode key={node.first.id} node={node.first} split {...props} />
       </Panel>
       <Separator
-        className="pane-separator thread-split-separator"
+        data-motion="background-color"
+        className={paneSeparatorClasses}
         aria-label="Resize thread panes"
       />
       <Panel id={node.second.id} defaultSize={`${100 - node.ratio}%`} minSize="15%">
@@ -263,8 +268,55 @@ function LayoutNode({
 
 export function ThreadWorkbench(props: WorkbenchProps): React.JSX.Element | null {
   const layout = useTabStore((state) => state.layout)
+  const preview = useThreadDrag((state) => state.preview)
   if (layout === null) return null
+  const previewLayout =
+    preview === null
+      ? null
+      : preview.zone === "center"
+        ? movePane(layout, preview.targetThreadId, preview.threadId)
+        : splitPane(layout, preview.targetThreadId, preview.threadId, preview.zone, "drop-preview")
   // A single pane keeps the plain thread view: pane chrome appears only once panes have to be told
   // apart.
-  return <LayoutNode key={layout.id} node={layout} split={layout.kind === "split"} {...props} />
+  return (
+    <div className="relative w-full h-full min-w-0 min-h-0">
+      <LayoutNode key={layout.id} node={layout} split={layout.kind === "split"} {...props} />
+      {preview !== null && previewLayout !== null && (
+        <div className="absolute z-[5] [inset:0] pointer-events-none" aria-hidden="true">
+          <DropPreviewNode
+            node={previewLayout}
+            threadId={preview.threadId}
+            label={zoneLabels[preview.zone]}
+          />
+        </div>
+      )}
+    </div>
+  )
 }
+
+const threadTileClasses = [
+  "relative grid w-full h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)] overflow-hidden",
+  "[&:has(>_.thread-tile-header)]:grid-rows-[auto_minmax(0,_1fr)]",
+  "[&:has(>_.thread-tile-header)]:[container-type:inline-size]",
+  "[&[data-focused]_>_.thread-tile-header]:[border-bottom-color:var(--line)]",
+  "[&[data-focused]_>_.thread-tile-header]:text-[var(--text-primary)]",
+  "[&:has(>_.thread-tile-header)_.transcript]:px-[clamp(16px,_7cqi,_104px)]",
+  "[&:has(>_.thread-tile-header)_.transcript-loading]:px-[clamp(16px,_7cqi,_104px)]",
+  "[&:has(>_.thread-tile-header)_.transcript-origin]:px-[clamp(16px,_7cqi,_104px)]",
+  "[&:has(>_.thread-tile-header)_.composer-zone]:px-[clamp(16px,_7cqi,_104px)]",
+].join(" ")
+
+const dropPreviewPaneClasses = [
+  "grid w-full h-full min-w-0 min-h-0 border-[1px] border-[color:var(--line-strong)] place-items-center",
+  "[&[data-dropped]]:border-[color:var(--accent)] [&[data-dropped]]:bg-[var(--surface-selected)]",
+  "[&_>_span]:[padding:5px_9px] [&_>_span]:rounded-[var(--radius-sm)] [&_>_span]:bg-[var(--accent)]",
+  "[&_>_span]:text-[var(--accent-foreground)] [&_>_span]:text-[12px]",
+].join(" ")
+
+const paneSeparatorClasses = [
+  "relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute",
+  "[&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)]",
+  "[&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]",
+  "[&[aria-orientation='horizontal']]:w-auto [&[aria-orientation='horizontal']]:h-[1px]",
+  "[&[aria-orientation='horizontal']::after]:[inset:-3px_0]",
+].join(" ")

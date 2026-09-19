@@ -34,7 +34,7 @@ export function WorkspaceManager({
   }
   return (
     <>
-      <div className="workspace-settings-toolbar">
+      <div className="flex justify-between items-center gap-[16px] [margin:10px_0_24px] text-[var(--text-secondary)] text-[12px]">
         <span>
           {workspaces.length} {workspaces.length === 1 ? "workspace" : "workspaces"}
         </span>
@@ -44,16 +44,18 @@ export function WorkspaceManager({
       </div>
       {error && !editing && !removing && <p role="alert">{error}</p>}
       {workspaces.length === 0 && (
-        <p className="settings-empty">Add a folder to start a workspace.</p>
+        <p className="settings-empty [padding:28px_0] text-[var(--text-tertiary)] text-[12.5px] text-center">
+          Add a folder to start a workspace.
+        </p>
       )}
       {workspaces.map((workspace) => (
-        <section className="workspace-card" key={workspace.id}>
+        <section className={workspaceCardClasses} key={workspace.id}>
           <Folder size={19} />
-          <div className="workspace-card-copy">
+          <div className="min-w-0 flex-1">
             <h3>{workspace.name}</h3>
             <code>{workspace.path}</code>
           </div>
-          <div className="workspace-card-actions">
+          <div className="flex flex-wrap gap-[8px] [@media(max-width:_1050px)]:ml-[35px]">
             <Button
               size="sm"
               disabled={pending}
@@ -108,7 +110,7 @@ export function WorkspaceManager({
           maxLength={100}
           onValueChange={setName}
         />
-        <p className="setting-description">
+        <p className="m-0 text-[var(--text-secondary)] text-[12px] leading-[1.6]">
           This changes the name in MeldShell. The folder stays at its current path.
         </p>
         {error && <p role="alert">{error}</p>}
@@ -150,3 +152,11 @@ export function WorkspaceManager({
     </>
   )
 }
+
+const workspaceCardClasses = [
+  "flex items-center gap-[16px] [padding:20px_0] border-b-[1px] border-b-[color:var(--line-subtle)]",
+  "[&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)] [&_h3]:[margin:0_0_7px] [&_h3]:text-[13px]",
+  "[&_h3]:font-medium [&_h3]:[overflow-wrap:anywhere] [&_code]:[font:11px_var(--font-mono)]",
+  "[&_code]:text-[var(--text-secondary)] [&_code]:[overflow-wrap:anywhere]",
+  "[@media(max-width:_1050px)]:flex-wrap",
+].join(" ")

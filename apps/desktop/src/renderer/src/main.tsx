@@ -1,8 +1,10 @@
+import { FadeMain } from "./ui/motion"
 import { createRoot } from "react-dom/client"
 import { Tooltip } from "@base-ui-components/react/tooltip"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ErrorBoundary } from "react-error-boundary"
 import { App } from "./app/App"
+import { ThreadDragProvider } from "./app/thread-drag"
 import { MeldMark } from "./ui/MeldMark"
 import { Button } from "./ui/controls"
 import "./app/styles.css"
@@ -28,20 +30,31 @@ createRoot(root).render(
   <Tooltip.Provider delay={420} closeDelay={80}>
     <ErrorBoundary
       fallbackRender={({ resetErrorBoundary }) => (
-        <main className="centered-state renderer-failure">
-          <MeldMark className="brand-mark" />
+        <FadeMain className={centeredStateClasses}>
+          <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
           <h2>The MeldShell interface stopped</h2>
           <p>Your stored threads and background processes are still separate from this view.</p>
           <Button variant="primary" onClick={resetErrorBoundary}>
             Reload interface
           </Button>
-        </main>
+        </FadeMain>
       )}
       onReset={() => window.location.reload()}
     >
       <QueryClientProvider client={queryClient}>
-        <App />
+        <ThreadDragProvider>
+          <App />
+        </ThreadDragProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   </Tooltip.Provider>,
 )
+
+const centeredStateClasses = [
+  "flex h-full flex-col items-center justify-center p-[40px] [grid-row:1_/_-1] text-center",
+  "[&_.brand-mark]:w-[34px] [&_.brand-mark]:h-[34px] [&_.brand-mark]:flex-[0_0_34px]",
+  "[&_.brand-mark]:mb-[16px] [&_.brand-mark]:text-[var(--text-tertiary)] [&_h2]:m-0",
+  "[&_h2]:[font-family:var(--font-display)] [&_h2]:text-[20px] [&_h2]:font-semibold",
+  "[&_h2]:tracking-[-0.01em] [&_p]:max-w-[380px] [&_p]:[margin:8px_0_20px]",
+  "[&_p]:text-[var(--text-secondary)] [&_p]:text-[12.5px] [&_p]:leading-[1.6] h-full bg-[var(--scrim)]",
+].join(" ")

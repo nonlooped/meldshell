@@ -1,3 +1,4 @@
+import { FadeDiv } from "../ui/motion"
 import { queryKeys } from "../data/cache"
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { Collapsible } from "@base-ui-components/react/collapsible"
@@ -62,11 +63,13 @@ function Message({
   }, [copyState])
 
   return (
-    <div className={`message ${className}`}>
+    <div
+      className={`min-w-0 [&:hover_>_.message-actions]:opacity-[1] [&:focus-within_>_.message-actions]:opacity-[1] [&_>_.turn-changes]:mt-[14px] ${className}`}
+    >
       <Markdown text={text} />
       {event.kind === "user" && <MessageAttachments payload={event.payload} />}
       {children}
-      <div className="message-actions">
+      <div data-motion="opacity" className={workingSectionClasses}>
         <IconButton
           unstyled
           label={copyState === "copied" ? "Copied" : "Copy message"}
@@ -94,7 +97,7 @@ function Message({
               : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
           </time>
         </Toggle>
-        <span className="message-copy-status" role="status">
+        <span className="text-[var(--text-secondary)] text-[11px]" role="status">
           {copyState === "failed"
             ? "Copy failed. Try again."
             : copyState === "copied"
@@ -111,7 +114,7 @@ function MessageAttachments({ payload }: { payload: unknown }) {
     payload && typeof payload === "object" && "attachments" in payload ? payload.attachments : null
   if (!Array.isArray(attachments)) return null
   return (
-    <div className="message-attachments">
+    <div className="flex flex-wrap gap-[6px] mt-[8px]">
       {attachments.map((attachment, index) => {
         if (!attachment || typeof attachment.value !== "string") return null
         if (attachment.type !== "mention" && attachment.type !== "skill") return null
@@ -201,7 +204,11 @@ function ToolBody({
         ))}
       </>
     )
-  return <div className="work-item-output">{text}</div>
+  return (
+    <div className="work-item-output max-h-[220px] m-0 overflow-auto text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[10.75px] leading-[1.55] whitespace-pre-wrap">
+      {text}
+    </div>
+  )
 }
 
 function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Element {
@@ -222,7 +229,7 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
 
   if (!detail) {
     return (
-      <div className="work-item-static">
+      <div className="flex min-w-0 min-h-[28px] items-center gap-[7px] [padding:4px_7px] rounded-[var(--radius-sm)] text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.75px] [&_span]:min-w-0 [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap">
         {iconFor(event)}
         <span>{toolSummary(event)}</span>
       </div>
@@ -230,13 +237,19 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
   }
   return (
     <Collapsible.Root className="work-item" defaultOpen={false}>
-      <Collapsible.Trigger className="work-item-trigger">
+      <Collapsible.Trigger
+        data-motion="background-color border-color color box-shadow"
+        className={workItemTriggerClasses}
+      >
         {iconFor(event)}
         <span className="work-item-title" title={toolSummary(event)}>
           {toolSummary(event)}
         </span>
         {tool.status && (
-          <span className="work-item-status" data-failed={tool.failed || undefined}>
+          <span
+            className="work-item-status [&[data-failed]]:text-[var(--color-deleted)]"
+            data-failed={tool.failed || undefined}
+          >
             {tool.status}
           </span>
         )}
@@ -244,9 +257,16 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
           <span title={tool.progress}>{tool.progress}</span>
         )}
         {tool.parent && <span title={tool.parent}>Subagent</span>}
-        <ChevronRight className="disclosure-chevron" size={13} />
+        <ChevronRight
+          data-motion="transform background-color"
+          data-motion-duration="0.2"
+          className={
+            "disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
+          }
+          size={13}
+        />
       </Collapsible.Trigger>
-      <Collapsible.Panel className="work-item-detail">
+      <Collapsible.Panel className="grid gap-[10px] min-w-0 [margin:6px_6px_16px_26px]">
         <ToolBody
           event={event}
           tool={tool}
@@ -261,7 +281,11 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
         {tool.error && <ToolOutput label="Error" text={tool.error} error />}
         {tool.images.length > 0 && <ToolImageGallery images={tool.images} />}
         {(tool.cwd || tool.outputFile || tool.exitCode !== null) && (
-          <dl className="tool-metadata">
+          <dl
+            className={
+              "[&_>_div[data-failed]]:text-[var(--color-deleted)] grid gap-[5px] m-0 text-[var(--text-tertiary)] text-[11px] leading-[1.5] [&_>_div]:flex [&_>_div]:[align-items:baseline] [&_>_div]:gap-[10px] [&_dt]:flex-[0_0_64px] [&_dd]:min-w-0 [&_dd]:m-0 [&_dd]:[overflow-wrap:anywhere] [&_code]:[font-family:var(--font-mono)]"
+            }
+          >
             {tool.exitCode !== null && (
               <div data-failed={tool.exitCode !== 0 || undefined}>
                 <dt>Exit code</dt>
@@ -301,16 +325,32 @@ function WorkingSection({ turn }: { readonly turn: TranscriptTurn }): React.JSX.
   if (turn.workingEvents.length === 0) return null
 
   return (
-    <Collapsible.Root className="working-section" defaultOpen={!turn.complete}>
-      <Collapsible.Trigger className="working-summary">
-        <ChevronRight className="disclosure-chevron" size={14} />
+    <Collapsible.Root className="text-[var(--text-tertiary)]" defaultOpen={!turn.complete}>
+      <Collapsible.Trigger
+        data-motion="background-color border-color color box-shadow"
+        className="[list-style:none] flex min-h-[28px] items-center gap-[6px] [padding:3px_6px_3px_2px] rounded-[var(--radius-sm)] cursor-pointer text-[11px] font-medium w-full border-0 bg-transparent text-inherit [font:inherit] text-left [&::-webkit-details-marker]:hidden [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)]"
+      >
+        <ChevronRight
+          data-motion="transform background-color"
+          data-motion-duration="0.2"
+          className={
+            "disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
+          }
+          size={14}
+        />
         <span>Working for {formatDuration(turn.durationMs)}</span>
       </Collapsible.Trigger>
-      <Collapsible.Panel className="working-body">
+      <Collapsible.Panel className="flex flex-col gap-[1px] [margin:3px_0_1px_7px] [padding:3px_0_3px_12px] border-l-[1px] border-l-[color:var(--line-subtle)]">
         {turn.workingEvents.map((event) => {
           if (turn.complete && event.method === "turn/diff/updated") return null
           if (event.kind === "assistant")
-            return <Markdown key={event.id} text={fallbackText(event)} className="working-note" />
+            return (
+              <Markdown
+                key={event.id}
+                text={fallbackText(event)}
+                className="[padding:6px_8px] text-[var(--text-secondary)] text-[11.5px] leading-[1.55]"
+              />
+            )
           return <ToolLine key={event.id} event={event} />
         })}
       </Collapsible.Panel>
@@ -326,13 +366,24 @@ function TurnRow({ turn }: { readonly turn: TranscriptTurn }): React.JSX.Element
   return (
     <MarkdownSources value={sources}>
       <MarkdownStreaming value={!turn.complete}>
-        <article className="transcript-turn">
+        <article className="transcript-turn select-text flex flex-col gap-[14px]">
           {turn.userMessages.map((event) => (
-            <Message key={event.id} event={event} className="turn-user" />
+            <Message
+              key={event.id}
+              event={event}
+              className={
+                "[&_>_.message-actions]:justify-end [&_>_.event-markdown]:[padding:12px_16px] [&_>_.event-markdown]:border-[1px] [&_>_.event-markdown]:border-[color:var(--line-subtle)] [&_>_.event-markdown]:rounded-[var(--radius)] [&_>_.event-markdown]:bg-[var(--surface-hover)] [&_>_.event-markdown]:text-[var(--text-primary)] w-[fit-content] max-w-[min(78%,_680px)] ml-[auto]"
+              }
+            />
           ))}
           <WorkingSection key={turn.complete ? "complete" : "working"} turn={turn} />
           {turn.finalResponse !== null ? (
-            <Message event={turn.finalResponse} className="turn-final">
+            <Message
+              event={turn.finalResponse}
+              className={
+                "[&_>_.event-markdown]:text-[var(--text-primary)] text-[var(--text-primary)]"
+              }
+            >
               {turn.complete && <TurnChanges events={turn.workingEvents} />}
             </Message>
           ) : (
@@ -429,26 +480,38 @@ export function Transcript({
     else if (hasTurns) virtualizer.scrollToEnd()
   }, [targetIndex, hasTurns, virtualizer])
 
-  if (query.isLoading) return <div className="transcript-loading">Loading transcript…</div>
+  if (query.isLoading)
+    return (
+      <div className="transcript-loading min-h-0 [padding:36px_clamp(24px,_7vw,_104px)] text-[var(--text-tertiary)] text-[12px]">
+        Loading transcript…
+      </div>
+    )
   if (query.isError && !query.data)
-    return <div className="transcript-loading">This transcript could not be read from disk.</div>
+    return (
+      <div className="transcript-loading min-h-0 [padding:36px_clamp(24px,_7vw,_104px)] text-[var(--text-tertiary)] text-[12px]">
+        This transcript could not be read from disk.
+      </div>
+    )
   if (turns.length === 0 && query.data?.olderCursor == null)
     return (
-      <div className="transcript-origin">
-        <div className="transcript-origin-body">
+      <div className="transcript-origin [padding:0_clamp(24px,_7vw,_104px)_12px]">
+        <FadeDiv className="w-full max-w-[680px] [margin:0_auto]">
           {workspace !== undefined && (
-            <p className="transcript-origin-workspace" title={workspace.path}>
+            <p
+              className="flex [align-items:baseline] gap-[8px] m-0 px-[2px] text-[12px] leading-[1.5] [&_span]:shrink-0 [&_span]:text-[var(--text-tertiary)] [&_strong]:overflow-hidden [&_strong]:text-[var(--text-secondary)] [&_strong]:font-medium [&_strong]:text-ellipsis [&_strong]:whitespace-nowrap"
+              title={workspace.path}
+            >
               <span>Workspace</span>
               <strong>{workspace.name}</strong>
             </p>
           )}
-        </div>
+        </FadeDiv>
       </div>
     )
 
   return (
     <MarkdownWorkspace value={workspace}>
-      <div className="transcript-region">
+      <div className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,_1fr)]">
         {query.isError && (
           <Button variant="ghost" size="sm" onClick={() => void query.refetch()}>
             Retry transcript updates
@@ -468,8 +531,15 @@ export function Transcript({
                 : "Load earlier messages"}
           </Button>
         )}
-        <div ref={scrollRef} className="transcript scrollable" aria-live="polite">
-          <div className="transcript-virtual" style={{ height: virtualizer.getTotalSize() }}>
+        <div
+          ref={scrollRef}
+          className="transcript min-h-0 [padding:36px_clamp(24px,_7vw,_104px)] overflow-y-auto [scrollbar-gutter:stable]"
+          aria-live="polite"
+        >
+          <div
+            className="relative w-full max-w-[860px] [margin:0_auto]"
+            style={{ height: virtualizer.getTotalSize() }}
+          >
             {virtualizer.getVirtualItems().map((item) => {
               const turn = turns[item.index]
               if (turn === undefined) return null
@@ -478,7 +548,7 @@ export function Transcript({
                   key={turn.id}
                   ref={virtualizer.measureElement}
                   data-index={item.index}
-                  className="transcript-virtual-row"
+                  className="absolute top-[0] left-[0] w-full pb-[26px] [&[data-search-match]_.transcript-turn]:border-l-[2px] [&[data-search-match]_.transcript-turn]:border-l-[color:var(--text-secondary)] [&[data-search-match]_.transcript-turn]:pl-[16px]"
                   data-search-match={turn.id === targetTurnId || undefined}
                   style={{ transform: `translateY(${item.start}px)` }}
                 >
@@ -491,7 +561,7 @@ export function Transcript({
         {showLatest && (
           <BaseButton
             type="button"
-            className="scroll-latest"
+            className="absolute z-[2] bottom-[12px] left-[50%] [transform:translateX(-50%)] flex items-center gap-[6px] max-w-[calc(100%_-_32px)] [padding:7px_12px] border-[1px] border-[color:var(--line-strong)] rounded-[999px] bg-[var(--surface-menu)] text-[var(--text-primary)] text-[12px] whitespace-nowrap cursor-pointer [&:hover]:bg-[var(--surface-overlay)]"
             onClick={() => virtualizer.scrollToEnd()}
           >
             <ArrowDown size={14} aria-hidden="true" />
@@ -502,3 +572,23 @@ export function Transcript({
     </MarkdownWorkspace>
   )
 }
+
+const workingSectionClasses = [
+  "message-actions select-none flex items-center flex-wrap gap-[4px] min-h-[28px] mt-[4px] opacity-[0]",
+  "[&_button]:inline-flex [&_button]:items-center [&_button]:justify-center [&_button]:min-h-[26px]",
+  "[&_button]:[padding:4px_6px] [&_button]:border-0 [&_button]:rounded-[4px] [&_button]:bg-transparent",
+  "[&_button]:text-[var(--text-tertiary)] [&_button]:[font-family:inherit]",
+  "[&_button]:[line-height:inherit] [&_button]:[font-weight:inherit] [&_button]:text-[11px]",
+  "[&_button]:cursor-pointer [&_button:hover]:bg-[var(--surface-hover)]",
+  "[&_button:hover]:text-[var(--text-primary)] [@media(hover:_none)]:opacity-[1]",
+].join(" ")
+
+const workItemTriggerClasses = [
+  "[list-style:none] flex min-w-0 min-h-[28px] items-center gap-[7px] [padding:4px_7px]",
+  "rounded-[var(--radius-sm)] [font-family:var(--font-mono)] text-[10.75px] cursor-pointer w-full",
+  "border-0 bg-transparent text-inherit [font:inherit] text-left [&::-webkit-details-marker]:hidden",
+  "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)] [&_span]:min-w-0",
+  "[&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap",
+  "[&_.disclosure-chevron]:ml-[auto] [&_.work-item-title]:flex-1 [&_.work-item-status]:shrink-0",
+  "[&_.work-item-status]:text-[11px]",
+].join(" ")

@@ -1,3 +1,4 @@
+import { FadeDiv } from "../ui/motion"
 import { useState } from "react"
 import { Tabs } from "@base-ui-components/react/tabs"
 import type {
@@ -16,6 +17,7 @@ import { ModelDialog } from "./ModelDialog"
 import { ProviderCard } from "./ProviderCard"
 import { ThreadTitleCard } from "./ThreadTitleCard"
 import { SubscriptionUsage } from "./SubscriptionUsage"
+import { UpdateSettings } from "./UpdateSettings"
 
 import { Preferences } from "./Preferences"
 
@@ -85,6 +87,11 @@ const SECTIONS: ReadonlyArray<{
   },
 ]
 
+const desktopPlatformLabel = (): string => {
+  if (window.meldshell.platform === "linux") return "Linux desktop"
+  return "Windows desktop"
+}
+
 export function SettingsView({
   snapshot,
   settingsPending,
@@ -111,7 +118,7 @@ export function SettingsView({
 
   return (
     <Tabs.Root
-      className="settings"
+      className="grid h-full min-h-0 grid-cols-[212px_minmax(0,_1fr)]"
       orientation="vertical"
       value={section}
       onValueChange={(value) => {
@@ -124,12 +131,12 @@ export function SettingsView({
         The nav is laid out exactly like the inbox, and Back occupies the same footer slot the
         Settings entry does, so the same click target toggles between the two views.
       */}
-      <aside className="settings-nav">
-        <div className="settings-nav-header">
+      <aside className="grid min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto] [padding:20px_12px_10px] border-r-[1px] border-r-[color:var(--line-subtle)]">
+        <div className="[padding:0_10px_20px] [&_h1]:m-0 [&_h1]:[font-family:var(--font-display)] [&_h1]:text-[15px] [&_h1]:font-semibold [&_h1]:tracking-[-0.01em] [&_h1]:leading-[22px]">
           <h1>Settings</h1>
         </div>
 
-        <Tabs.List className="settings-nav-items" aria-label="Settings sections">
+        <Tabs.List className={settingsNavItemsClasses} aria-label="Settings sections">
           {SECTIONS.map((entry) => (
             <Tabs.Tab key={entry.id} value={entry.id}>
               {entry.icon}
@@ -138,12 +145,12 @@ export function SettingsView({
           ))}
         </Tabs.List>
 
-        <div className="settings-nav-footer">
+        <div className="pt-[8px] mt-[6px] border-t-[1px] border-t-[color:var(--line-subtle)] [&_.button]:h-[42px] [&_.button]:pr-[12px] [&_.button]:pl-[12px]">
           <Button
             variant="ghost"
             block
             icon={<ArrowLeft size={15} strokeWidth={1.75} />}
-            style={{ justifyContent: "flex-start" }}
+            className="justify-start!"
             onClick={closeSettings}
           >
             Back
@@ -151,16 +158,23 @@ export function SettingsView({
         </div>
       </aside>
 
-      <Tabs.Panel key={section} value={section} className="settings-body">
-        <div className="settings-header">
+      <Tabs.Panel
+        key={section}
+        value={section}
+        className="[container-type:inline-size] grid min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)]"
+      >
+        <div className={settingsHeaderClasses}>
           <div>
             <h2>{active?.title}</h2>
             <p>{active?.caption}</p>
           </div>
         </div>
 
-        <div key={section} className="settings-scroll scrollable">
-          <div className="settings-content">
+        <div
+          key={section}
+          className="min-h-0 [padding:0_40px_48px] [@media(max-width:_880px)]:pr-[24px] [@media(max-width:_880px)]:pl-[24px] [@media(max-width:_680px)]:pr-[16px] [@media(max-width:_680px)]:pl-[16px] overflow-y-auto [scrollbar-gutter:stable]"
+        >
+          <FadeDiv className="w-[min(840px,_100%)]">
             {settingsError && <p role="alert">{settingsError}</p>}
             {section === "general" || section === "appearance" ? (
               <Preferences
@@ -170,7 +184,7 @@ export function SettingsView({
                 pending={settingsPending}
               />
             ) : section === "usage" ? (
-              <div className="subscription-usage-list">
+              <div className="flex flex-col">
                 {snapshot.providers
                   .filter((provider) =>
                     ["codex", "claude-code", "cursor"].includes(provider.harness),
@@ -187,7 +201,9 @@ export function SettingsView({
               />
             ) : section === "providers" ? (
               snapshot.providers.length === 0 ? (
-                <p className="settings-empty">No providers are configured.</p>
+                <p className="settings-empty [padding:28px_0] text-[var(--text-tertiary)] text-[12.5px] text-center">
+                  No providers are configured.
+                </p>
               ) : (
                 snapshot.providers.map((provider) => (
                   <ProviderCard
@@ -207,35 +223,50 @@ export function SettingsView({
                 ))
               )
             ) : (
-              <section className="about-settings">
-                <div className="about-brand">
-                  <MeldMark className="about-brand-mark" />
+              <section className="max-w-[720px]">
+                <div className="flex items-center gap-[14px] [padding:4px_0_28px] [&_h3]:m-0 [&_h3]:[font-family:var(--font-display)] [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:[margin:3px_0_0] [&_p]:text-[var(--text-tertiary)] [&_p]:text-[11.5px]">
+                  <MeldMark className="w-[36px] h-[36px] flex-[0_0_36px] text-[var(--text-primary)]" />
                   <div>
                     <h3>MeldShell</h3>
                     <p>A local desktop workspace for coding-agent threads.</p>
                   </div>
                 </div>
-                <div className="about-list">
-                  <div className="about-row">
-                    <span className="setting-label">App version</span>
-                    <span className="about-value">{desktopPackage.version}</span>
+                <div className="border-t-[1px] border-t-[color:var(--line-subtle)]">
+                  <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
+                    <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
+                      App version
+                    </span>
+                    <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
+                      {desktopPackage.version}
+                    </span>
                   </div>
-                  <div className="about-row">
-                    <span className="setting-label">Platform</span>
-                    <span className="about-value">Windows desktop</span>
+                  <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
+                    <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
+                      Platform
+                    </span>
+                    <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
+                      {desktopPlatformLabel()}
+                    </span>
                   </div>
-                  <div className="about-row">
-                    <span className="setting-label">Runtime</span>
-                    <span className="about-value">
+                  <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
+                    <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
+                      Runtime
+                    </span>
+                    <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
                       Electron {desktopPackage.devDependencies.electron}
                     </span>
                   </div>
-                  <div className="about-row">
-                    <span className="setting-label">Data</span>
-                    <span className="about-value">Stored locally</span>
+                  <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
+                    <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
+                      Data
+                    </span>
+                    <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
+                      Stored locally
+                    </span>
                   </div>
                 </div>
-                <div className="about-shortcuts">
+                <UpdateSettings />
+                <div className="mt-[32px] max-w-[380px] [&_h3]:text-[12px] [&_h3]:font-medium [&_h3]:text-[var(--text-secondary)] [&_p]:flex [&_p]:justify-between [&_p]:text-[12px] [&_kbd]:[font:10px_var(--font-mono)] [&_kbd]:text-[var(--text-tertiary)]">
                   <h3>Keyboard shortcuts</h3>
                   <p>
                     <span>Search transcripts</span>
@@ -256,7 +287,7 @@ export function SettingsView({
                 </div>
               </section>
             )}
-          </div>
+          </FadeDiv>
         </div>
       </Tabs.Panel>
 
@@ -327,3 +358,26 @@ export function SettingsView({
     </Tabs.Root>
   )
 }
+
+const settingsNavItemsClasses = [
+  "flex min-h-0 overflow-y-auto flex-col gap-[1px] [&_button]:flex [&_button]:relative",
+  "[&_button]:min-h-[36px] [&_button]:shrink-0 [&_button]:items-center [&_button]:gap-[9px]",
+  "[&_button]:[padding:0_12px] [&_button]:border-0 [&_button]:rounded-[var(--radius)]",
+  "[&_button]:bg-transparent [&_button]:text-[var(--text-secondary)] [&_button]:cursor-default",
+  "[&_button]:text-[12.5px] [&_button]:text-left [&_button:hover]:bg-[var(--surface-hover)]",
+  "[&_button:hover]:text-[var(--text-primary)] [&_button[data-selected]]:bg-[var(--surface-selected)]",
+  "[&_button[data-selected]]:text-[var(--text-primary)] [&_button[data-selected]]:font-semibold",
+  "[&_button[data-selected]::before]:absolute [&_button[data-selected]::before]:top-[10px]",
+  "[&_button[data-selected]::before]:bottom-[10px] [&_button[data-selected]::before]:left-[0]",
+  "[&_button[data-selected]::before]:w-[2px] [&_button[data-selected]::before]:rounded-[2px]",
+  "[&_button[data-selected]::before]:bg-[var(--accent)] [&_button[data-selected]::before]:[content:'']",
+].join(" ")
+
+const settingsHeaderClasses = [
+  "flex items-center justify-between gap-[16px] w-[min(840px,_calc(100%_-_80px))] min-h-0",
+  "[padding:32px_0_24px] [margin:0_40px] [&_h2]:m-0 [&_h2]:[font-family:var(--font-display)]",
+  "[&_h2]:text-[23px] [&_h2]:font-semibold [&_h2]:tracking-[-0.01em] [&_p]:[margin:6px_0_0]",
+  "[&_p]:text-[var(--text-secondary)] [&_p]:text-[12.5px]",
+  "[@media(max-width:_880px)]:w-[calc(100%_-_48px)] [@media(max-width:_880px)]:mx-[24px]",
+  "[@media(max-width:_680px)]:w-[calc(100%_-_32px)] [@media(max-width:_680px)]:pt-[24px]",
+].join(" ")

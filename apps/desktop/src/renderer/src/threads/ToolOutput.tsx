@@ -29,11 +29,11 @@ export function ToolOutput({
   }, [copyState])
 
   return (
-    <section className="tool-output" aria-label={label} data-error={error || undefined}>
-      <div className="tool-output-header">
-        <span className="tool-output-label">{label}</span>
+    <section className={toolOutputClasses} aria-label={label} data-error={error || undefined}>
+      <div className={toolOutputHeaderClasses}>
+        <span className="tool-output-label mr-[auto] font-semibold">{label}</span>
         <SelectField
-          className="tool-output-language"
+          className="tool-output-language [&:focus-visible]:[outline:1px_solid_var(--accent)] [&:focus-visible]:[outline-offset:-2px]"
           label={`${label} syntax language`}
           value={language}
           onValueChange={setLanguage}
@@ -62,7 +62,7 @@ export function ToolOutput({
             { value: "diff", label: "Diff" },
           ]}
         />
-        <span className="tool-copy-status" role="status">
+        <span className="text-[11px]" role="status">
           {copyState === "failed"
             ? "Copy failed. Try again."
             : copyState === "copied"
@@ -90,7 +90,9 @@ export function ToolOutput({
         </IconButton>
       </div>
       <pre
-        className="tool-output-content scrollable"
+        className={
+          "[&_>_code]:[font:inherit] [&:focus-visible]:[outline:1px_solid_var(--accent)] [&:focus-visible]:[outline-offset:-2px] max-h-[240px] m-0 p-[12px] overflow-auto text-[var(--text-primary)] [font:12px_/_1.65_var(--font-mono)] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:2] [&[data-expanded]]:max-h-none overflow-y-auto [scrollbar-gutter:stable]"
+        }
         data-expanded={expanded || undefined}
         tabIndex={0}
         aria-label={`${label} content`}
@@ -101,3 +103,31 @@ export function ToolOutput({
     </section>
   )
 }
+
+const toolOutputClasses = [
+  "[&_.token.comment]:text-[var(--text-tertiary)] [&_.token.prolog]:text-[var(--text-tertiary)]",
+  "[&_.token.doctype]:text-[var(--text-tertiary)] [&_.token.keyword]:text-[var(--color-renamed)]",
+  "[&_.token.tag]:text-[var(--color-renamed)] [&_.token.boolean]:text-[var(--color-renamed)]",
+  "[&_.token.string]:text-[var(--color-added)] [&_.token.attr-value]:text-[var(--color-added)]",
+  "[&_.token.number]:text-[var(--color-modified)] [&_.token.function]:text-[var(--color-modified)]",
+  "[&_.token.class-name]:text-[var(--color-modified)] [&_.token.property]:text-[var(--color-info)]",
+  "[&_.token.attr-name]:text-[var(--color-info)] min-w-0 overflow-hidden border-[1px] border-[color:var(--line)]",
+  "rounded-[var(--radius-sm)] [&[data-error]]:[border-color:var(--color-deleted)]",
+  "[&[data-error]_.tool-output-label]:text-[var(--color-deleted)]",
+].join(" ")
+
+const toolOutputHeaderClasses = [
+  "flex items-center gap-[8px] min-h-[32px] [padding:3px_8px_3px_12px]",
+  "border-b-[1px] border-b-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[11px]",
+  "[&_.tool-output-language]:min-w-0 [&_.tool-output-language]:max-w-[150px]",
+  "[&_.tool-output-language]:min-h-[26px] [&_.tool-output-language]:border-[1px] [&_.tool-output-language]:border-[color:var(--line)]",
+  "[&_.tool-output-language]:rounded-[var(--radius-sm)] [&_.tool-output-language]:bg-transparent",
+  "[&_.tool-output-language]:text-[var(--text-secondary)] [&_.tool-output-language]:[font:inherit]",
+  "[&_button]:inline-flex [&_button]:items-center [&_button]:justify-center [&_button]:min-w-[26px]",
+  "[&_button]:min-h-[26px] [&_button]:[padding:3px_6px] [&_button]:border-0",
+  "[&_button]:rounded-[var(--radius-sm)] [&_button]:bg-transparent",
+  "[&_button]:text-[var(--text-secondary)] [&_button]:[font:inherit] [&_button]:cursor-pointer",
+  "[&_button:hover]:bg-[var(--surface-hover)] [&_button:hover]:text-[var(--text-primary)]",
+  "[&_button:focus-visible]:[outline:1px_solid_var(--accent)]",
+  "[&_button:focus-visible]:[outline-offset:-2px]",
+].join(" ")

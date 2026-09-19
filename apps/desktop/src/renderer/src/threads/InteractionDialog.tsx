@@ -23,8 +23,11 @@ function QuestionInput({
   onValueChange: (value: string[]) => void
 }): React.JSX.Element {
   const choices = question.options?.map((option) => (
-    <Field.Item key={option.value ?? option.label} className="question-option">
-      <Field.Label className="question-option-label">
+    <Field.Item
+      key={option.value ?? option.label}
+      className="question-option [&_+_.question-option]:mt-[10px] [&[data-disabled]]:opacity-[0.5]"
+    >
+      <Field.Label className="flex items-center gap-[8px] text-[var(--text-primary)] text-[12px] leading-[1.5]">
         {question.multiSelect ? (
           <Checkbox value={option.value ?? option.label} />
         ) : (
@@ -33,15 +36,22 @@ function QuestionInput({
         <span>{option.label}</span>
       </Field.Label>
       {option.description && (
-        <Field.Description className="question-option-description">
+        <Field.Description className="[margin:3px_0_0_23px] text-[var(--text-secondary)] text-[12px] leading-[1.5]">
           {option.description}
         </Field.Description>
       )}
     </Field.Item>
   ))
   return (
-    <Fieldset.Root className="question-fieldset" disabled={disabled}>
-      <Fieldset.Legend className="field-label">{question.question}</Fieldset.Legend>
+    <Fieldset.Root
+      className={
+        "min-w-0 [margin:16px_0] p-0 border-0 [&_>_legend]:mb-[8px] [&_>_.field]:mt-[12px]"
+      }
+      disabled={disabled}
+    >
+      <Fieldset.Legend className="block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium">
+        {question.question}
+      </Fieldset.Legend>
       {choices && choices.length > 0 && (
         <Field.Root name={name} disabled={disabled}>
           {question.multiSelect ? (
@@ -65,7 +75,7 @@ function QuestionInput({
       )}
       {allowFreeText && question.multiline ? (
         <textarea
-          className="interaction-editor"
+          className="w-full [box-sizing:border-box] [resize:vertical] p-[10px] text-[var(--text-primary)] bg-[var(--surface-raised)] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] [font:inherit]"
           aria-label={question.header}
           disabled={disabled}
           value={value[0] ?? ""}
@@ -171,15 +181,19 @@ export function InteractionDialog({
         </>
       }
     >
-      <p className="approval-detail">{request.detail}</p>
+      <p className="max-h-[220px] overflow-auto [padding:9px_10px] [margin:12px_20px_0] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.198)] text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[11.5px] leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere]">
+        {request.detail}
+      </p>
       {request.kind === "cursor-plan" && <Markdown className="cursor-plan" text={request.plan} />}
       {request.kind === "cursor-permission" && (
-        <pre className="approval-detail">
+        <pre className="max-h-[220px] overflow-auto [padding:9px_10px] [margin:12px_20px_0] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.198)] text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[11.5px] leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere]">
           {JSON.stringify((request.params as { toolCall?: unknown }).toolCall, null, 2)}
         </pre>
       )}
       {request.kind === "permissions" && (
-        <pre className="approval-detail">{JSON.stringify(request.permissions, null, 2)}</pre>
+        <pre className="max-h-[220px] overflow-auto [padding:9px_10px] [margin:12px_20px_0] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.198)] text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[11.5px] leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere]">
+          {JSON.stringify(request.permissions, null, 2)}
+        </pre>
       )}
       {request.kind === "user-input" &&
         request.questions.map((question) => (
