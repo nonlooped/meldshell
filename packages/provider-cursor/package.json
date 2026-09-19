@@ -8,10 +8,11 @@
     "./worker": "./src/worker-runtime.ts"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "1.4.0",
     "@meldshell/contracts": "*",
+    "@meldshell/provider-runtime": "*",
     "effect": "3.22.1",
-    "which": "7.0.0",
-    "@meldshell/provider-runtime": "*"
+    "which": "7.0.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
