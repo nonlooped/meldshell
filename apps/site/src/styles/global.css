@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/* Tokens follow the desktop app's monochrome system: its dark base is the page background,
+   and the only hues are status and brand colors. */
+
+@theme {
+  --color-*: initial;
+  --color-desktop: #161617;
+  --color-window: #161617;
+  --color-ink: #f2f2f3;
+  --color-ink-2: #adadb2;
+  --color-ink-3: #86868c;
+  --color-ink-4: #4a4a4e;
+  --color-line: rgb(255 255 255 / 0.09);
+  --color-line-strong: rgb(255 255 255 / 0.18);
+  --color-hover: rgb(255 255 255 / 0.045);
+  --color-selected: rgb(255 255 255 / 0.065);
+  --color-raised: rgb(31 31 33 / 0.8);
+  --color-running: #88b9ed;
+  --color-waiting: #e5bc75;
+  --color-queued: #b8a1ed;
+  --color-added: #83c994;
+  --color-deleted: #ed9393;
+  --color-white: #fff;
+  --color-black: #000;
+
+  --font-display: "Archivo", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, monospace;
+
+  --radius-control: 5px;
+  --radius-row: 6px;
+  --radius-surface: 10px;
+  --radius-window: 12px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-desktop);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+}
+
+@utility glass {
+  background: rgb(22 22 23 / 0.72);
+  backdrop-filter: blur(32px) saturate(1.15);
+  border: 1px solid var(--color-line);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 1px 2px rgb(0 0 0 / 0.3),
+    0 28px 64px rgb(0 0 0 / 0.42);
+}
+
+@utility glass-bar {
+  background: rgb(22 22 23 / 0.72);
+  backdrop-filter: blur(32px) saturate(1.15);
+  border-top: 1px solid var(--color-line);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+
+@utility display-wide {
+  font-family: var(--font-display);
+  font-variation-settings: "wdth" 118;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+@utility hairline-t {
+  border-top: 1px solid var(--color-line);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-bar {
+    background: var(--color-window);
+    backdrop-filter: none;
+  }
+}

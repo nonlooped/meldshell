@@ -1,0 +1,54 @@
+---
+/* The page ends the way a desktop does: a centered taskbar with the places worth pinning and a
+   live clock. */
+import BrandIcon from "./BrandIcon.astro"
+import Wordmark from "./Wordmark.astro"
+
+interface Props {
+  repo: string
+  releases: string
+}
+const { repo, releases } = Astro.props
+const item =
+  "grid place-items-center size-11 rounded-control text-ink-2 hover:bg-hover hover:text-ink transition-colors"
+---
+
+<footer class="mt-24 glass-bar">
+  <div class="mx-auto max-w-[1200px] px-4 h-16 grid grid-cols-[1fr_auto_1fr] items-center">
+    <span class="text-[12px] text-ink-3 hidden sm:block">MeldShell</span>
+    <nav class="flex items-center gap-1 col-start-2" aria-label="Footer">
+      <a href="/" class={item} title="MeldShell" aria-label="MeldShell">
+        <Wordmark size={22} />
+      </a>
+      <a href={repo} class={item} title="Source on GitHub" aria-label="Source on GitHub">
+        <BrandIcon name="github" size={22} />
+      </a>
+      <a href={releases} class={item} title="Download" aria-label="Download">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 4v11M7 10l5 5 5-5M5 19h14"></path>
+        </svg>
+      </a>
+      <a href={`${repo}/tree/main/docs`} class={item} title="Documentation" aria-label="Documentation">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 4.5h9.5L19 9v10.5H5z M14.5 4.5V9H19 M8 13h8M8 16.5h8"></path>
+        </svg>
+      </a>
+    </nav>
+    <div class="justify-self-end text-right text-[12px] leading-[1.35] text-ink-2 tabular-nums" data-clock>
+      <div data-time>—</div>
+      <div class="text-ink-3" data-date></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const time = document.querySelector<HTMLElement>("[data-time]")
+  const date = document.querySelector<HTMLElement>("[data-date]")
+  const tick = () => {
+    const now = new Date()
+    if (time) time.textContent = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    if (date) date.textContent = now.toLocaleDateString(undefined, { year: "numeric", month: "numeric", day: "numeric" })
+  }
+  tick()
+  window.setInterval(tick, 15_000)
+</script>
