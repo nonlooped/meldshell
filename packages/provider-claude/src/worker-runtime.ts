@@ -159,10 +159,20 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
   }
   const discoveryStatus = (cause: unknown): ClaudeStatus => {
     const message = errorText(cause)
-    if (/not installed|not available on PATH/i.test(message))
-      return status("missing", message)
+    if (/not installed|not available on PATH/i.test(message)) return status("missing", message)
     if (/override could not be resolved/i.test(message)) return status("error", message)
     return status("error", `Could not connect to Claude Code: ${message}`)
+  }
+
+  const accountStatus = (account: Awaited<ReturnType<Query["accountInfo"]>>): ClaudeStatus => {
+    const authenticated = isAuthenticated(account)
+    return status(
+      authenticated ? "ready" : "unauthenticated",
+      authenticated
+        ? "Claude Code is ready."
+        : "Sign in with claude auth login in a terminal, then check again. You can also configure an Anthropic API key.",
+      account.email ?? null,
+    )
   }
 
   const probe = (): Promise<void> => {
@@ -203,18 +213,11 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
           session.supportedModels(),
           session.accountInfo(),
         ])
-        const authenticated = isAuthenticated(account)
         publish({
           type: "provider-ready",
           providerKey: "anthropic",
           models: claudeModels(models),
-          status: status(
-            authenticated ? "ready" : "unauthenticated",
-            authenticated
-              ? "Claude Code is ready."
-              : "Sign in with claude auth login in a terminal, then check again. You can also configure an Anthropic API key.",
-            account.email ?? null,
-          ),
+          status: accountStatus(account),
         })
       } catch (cause) {
         if (/not installed|override could not be resolved/i.test(errorText(cause)))
