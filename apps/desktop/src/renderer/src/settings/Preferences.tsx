@@ -28,7 +28,7 @@ function OpacitySlider({
   )
   return (
     <Slider.Root
-      className="opacity-control"
+      className="flex items-center gap-[12px] w-full [&[data-disabled]]:opacity-[0.5] [&[data-disabled]_.opacity-slider-control]:cursor-default [&_output]:min-w-[4ch] [&_output]:text-right [&_output]:tabular-nums [&_output]:text-[var(--text-secondary)]"
       min={20}
       max={100}
       step={1}
@@ -42,12 +42,12 @@ function OpacitySlider({
         if (!disabled && next !== value) onCommit(next)
       }}
     >
-      <Slider.Control className="opacity-slider-control">
-        <Slider.Track className="opacity-slider-track">
-          <Slider.Indicator className="opacity-slider-indicator" />
+      <Slider.Control className="opacity-slider-control flex items-center h-[26px] flex-1 min-w-0 [touch-action:none] select-none cursor-pointer">
+        <Slider.Track className="relative w-full h-[4px] rounded-[2px] bg-[var(--line-strong)]">
+          <Slider.Indicator className="h-full rounded-[inherit] bg-[var(--accent)]" />
           <Slider.Thumb
             id="app-opacity"
-            className="opacity-slider-thumb"
+            className="w-[14px] h-[14px] border-[2px] border-[color:var(--accent)] rounded-[50%] bg-[var(--accent)] [&:has(:focus-visible)]:[outline:2px_solid_var(--accent)] [&:has(:focus-visible)]:[outline-offset:3px]"
             aria-label="App opacity"
             getAriaValueText={(_formatted, next) => `${next}%`}
           />
@@ -78,7 +78,7 @@ export function Preferences({
       : 88)
   return (
     <section
-      className="settings-group"
+      className="settings-group m-0 border-t-[1px] border-t-[color:var(--line-subtle)] border-b-[1px] border-b-[color:var(--line-subtle)] [&_+_.settings-group]:border-t-0"
       aria-label={section === "general" ? "General preferences" : "Appearance preferences"}
     >
       {section === "general" ? (

@@ -1,3 +1,5 @@
+import { threadContentClasses } from "../ui/styles"
+import { FadeDiv } from "../ui/motion"
 import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import { useThreadActions } from "../data/mutations"
 import { useSelectedProvider } from "../data/providers"
@@ -56,8 +58,8 @@ export function ThreadView({
   const error =
     draft.error ?? threadSettingsMutation.error?.message ?? interruptMutation.error?.message
   return (
-    <div className="thread-view">
-      <div className="thread-content">
+    <div className="grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]">
+      <FadeDiv className={threadContentClasses}>
         <Transcript
           threadId={thread.id}
           workspace={snapshot.workspaces.find((workspace) => workspace.id === thread.workspaceId)}
@@ -99,9 +101,13 @@ export function ThreadView({
           onInterrupt={() => interruptMutation.mutate(thread.id)}
           interrupting={interruptMutation.isPending}
         />
-      </div>
+      </FadeDiv>
       {error && (
-        <div className="app-error" role="alert">
+        <FadeDiv
+          duration={0.2}
+          className="fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] flex items-center gap-[20px] [padding:12px_18px] max-w-[80vw] bg-[var(--surface-overlay)] text-[var(--text-primary)] border-[1px] border-[color:var(--line-strong)] rounded-[var(--radius)] text-[12px] [box-shadow:var(--shadow-popup)]"
+          role="alert"
+        >
           {error}
           <Button
             size="sm"
@@ -113,7 +119,7 @@ export function ThreadView({
           >
             Dismiss
           </Button>
-        </div>
+        </FadeDiv>
       )}
     </div>
   )

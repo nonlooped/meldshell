@@ -1,9 +1,11 @@
+import { motion } from "motion/react"
+import { useMotionPreference } from "../ui/motion"
 import { queryKeys } from "../data/cache"
 import { useState } from "react"
 import { Meter } from "@base-ui-components/react/meter"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { useQuery } from "@tanstack/react-query"
-import type { Provider, ProviderStatus, UsageLimit } from "@meldshell/contracts"
+import type { Provider, ProviderStatus, UsageLimit, UsageWindow } from "@meldshell/contracts"
 import { AlertCircle, Eye, EyeOff, RefreshCw } from "lucide-react"
 import { ProviderIcon } from "../ui/ProviderIcon"
 import { Button } from "../ui/controls"
@@ -62,72 +64,79 @@ function AccountEmail({
   const label = revealed ? `Hide the ${name} account email` : `Reveal the ${name} account email`
   return (
     <Toggle
-      className="usage-account"
+      className="flex min-w-0 items-center gap-[6px] p-0 border-0 [background:none] text-[var(--text-secondary)] [font:inherit] text-[12px] cursor-pointer [&[data-revealed]_.usage-account-email]:[filter:none] [&_svg]:shrink-0 [&_svg]:text-[var(--text-tertiary)] [&:hover]:text-[var(--text-primary)] [&:hover_svg]:text-[var(--text-primary)]"
       title={label}
       aria-label={label}
       pressed={revealed}
       {...(revealed ? { "data-revealed": "" } : {})}
       onPressedChange={setRevealed}
     >
-      <span className="usage-account-email">{email}</span>
+      <span
+        data-motion="filter"
+        className="usage-account-email overflow-hidden [font-family:var(--font-mono)] text-[11.5px] text-ellipsis whitespace-nowrap [filter:blur(4.5px)] select-none"
+      >
+        {email}
+      </span>
       {revealed ? <EyeOff size={12} aria-hidden="true" /> : <Eye size={12} aria-hidden="true" />}
     </Toggle>
   )
 }
 
 /*
- * Allowances are read at a glance and compared against each other, so each one is a dial: the arc
- * carries the shape of the number, and the caption underneath carries its name and reset time.
+ * The remaining figure is what the page exists to show, so it leads every row in one aligned
+ * column: the eye lands on the numbers first and compares them down the page, then reads the
+ * allowance name, its bar, and its reset time beside each.
  */
-const DIAL_RADIUS = 40
-const DIAL_LENGTH = 2 * Math.PI * DIAL_RADIUS
-
-function UsageDial({
+function UsageRow({
   label,
+  detail,
   remaining,
   resetsAt,
 }: {
   readonly label: string
+  readonly detail?: string
   readonly remaining: number
   readonly resetsAt?: number | null
 }): React.JSX.Element {
+  const reducedMotion = useMotionPreference()
   const low = remaining <= 10
   return (
-    <Meter.Root className="usage-dial" value={remaining} aria-label={`${label} remaining`}>
-      <div className="usage-dial-figure" {...(low ? { "data-low": "" } : {})}>
-        <svg viewBox="0 0 96 96" aria-hidden="true">
-          <circle className="usage-dial-track" cx="48" cy="48" r={DIAL_RADIUS} />
-          <circle
-            className="usage-dial-arc"
-            cx="48"
-            cy="48"
-            r={DIAL_RADIUS}
-            strokeDasharray={DIAL_LENGTH}
-            strokeDashoffset={(DIAL_LENGTH * (100 - remaining)) / 100}
-          />
-        </svg>
-        <span className="usage-dial-value">
+    <Meter.Root
+      className={usageRowClasses}
+      value={remaining}
+      aria-label={`${label} remaining`}
+      {...(low ? { "data-low": "" } : {})}
+    >
+      <span className="flex w-[84px] flex-[0_0_84px] flex-col gap-[2px] pt-[1px] [@container(max-width:_540px)]:w-auto [@container(max-width:_540px)]:basis-[auto]">
+        <span className="[font-family:var(--font-display)] text-[var(--text-primary)] text-[24px] font-semibold tabular-nums tracking-[-0.03em] leading-[1] [[data-low]_&]:text-[var(--color-modified)]">
           {remaining}
-          <span>%</span>
-        </span>
-      </div>
-      <h4>{label}</h4>
-      <p className="usage-dial-caption">
-        {low && (
-          <span className="usage-limit-warning">
-            {remaining === 0 ? "Limit reached" : "Running low"}
+          <span className="ml-[1px] text-[14px] font-medium text-[var(--text-tertiary)] [[data-low]_&]:text-inherit">
+            %
           </span>
-        )}
-        <span>{resetLabel(resetsAt)}</span>
-      </p>
+        </span>
+        <span className="text-[var(--text-tertiary)] text-[11px] leading-[1.4]">
+          {low ? (remaining === 0 ? "limit reached" : "running low") : "remaining"}
+        </span>
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-[8px]">
+        <span className="text-[var(--text-primary)] text-[13px] font-medium leading-[1.4]">
+          {label}
+        </span>
+        <span className="relative block h-[5px] w-full overflow-hidden rounded-[3px] bg-[var(--surface-active)]">
+          <motion.span
+            className="absolute inset-y-0 left-0 rounded-[3px] bg-[var(--text-primary)] [[data-low]_&]:bg-[var(--color-modified)]"
+            initial={reducedMotion ? false : { width: 0 }}
+            animate={{ width: `${remaining}%` }}
+            transition={{ duration: reducedMotion ? 0 : 0.45, ease: [0.2, 0.7, 0.2, 1] }}
+          />
+        </span>
+        <span className="text-[var(--text-secondary)] text-[12px] leading-[1.5]">
+          {resetLabel(resetsAt)}
+          {detail && ` · ${detail}`}
+        </span>
+      </span>
     </Meter.Root>
   )
-}
-
-function creditBalance(credits: NonNullable<UsageLimit["credits"]>): string {
-  if (credits.unlimited) return "Unlimited"
-  if (credits.balance != null) return `${credits.balance} credits`
-  return credits.hasCredits ? "Available" : "No credits remaining"
 }
 
 function limitNotice(limit: UsageLimit): string {
@@ -141,21 +150,11 @@ function limitNotice(limit: UsageLimit): string {
 const groupName = (id: string, limit: UsageLimit): string =>
   limit.limitName ?? (id === "codex" ? "Codex" : id)
 
-function Facts({
-  entries,
-}: {
-  readonly entries: ReadonlyArray<readonly [string, string]>
-}): React.JSX.Element | null {
-  if (entries.length === 0) return null
+function GroupHeading({ children }: { readonly children: string }): React.JSX.Element {
   return (
-    <dl className="usage-facts">
-      {entries.map(([term, value]) => (
-        <div key={term}>
-          <dt>{term}</dt>
-          <dd>{value}</dd>
-        </div>
-      ))}
-    </dl>
+    <h4 className="m-0 [padding:26px_0_2px] [&:first-child]:pt-[4px] text-[var(--text-secondary)] text-[12px] font-semibold leading-[1.4] [overflow-wrap:anywhere] [.usage-row_+_&]:mt-[6px] [.usage-row_+_&]:border-t-[1px] [.usage-row_+_&]:border-t-[color:var(--line-subtle)]">
+      {children}
+    </h4>
   )
 }
 
@@ -163,108 +162,116 @@ function UsageGroup({
   id,
   limit,
   showHeading,
-  showPlan,
 }: {
   readonly id: string
   readonly limit: UsageLimit
   readonly showHeading: boolean
-  readonly showPlan: boolean
 }): React.JSX.Element {
-  const windows = [
-    {
-      key: "primary",
-      label: id === "extra" ? "Monthly limit" : "Primary limit",
-      window: limit.primary,
-    },
-    { key: "secondary", label: "Secondary limit", window: limit.secondary },
-  ]
-  const monthly = limit.individualLimit
-  const credits = limit.credits
-  const hasWindows = windows.some(({ window }) => window != null) || monthly != null
   const name = groupName(id, limit)
-  const plan = limit.planType?.replaceAll("_", " ")
+  const windows: ReadonlyArray<readonly [string, string, UsageWindow]> = [
+    ["primary", id === "extra" ? "Monthly limit" : "Primary limit", limit.primary] as const,
+    ["secondary", "Secondary limit", limit.secondary] as const,
+  ].flatMap(([key, fallback, window]) => (window == null ? [] : [[key, fallback, window] as const]))
+  const monthly = limit.individualLimit
+  const rowCount = windows.length + (monthly ? 1 : 0)
+  // A group with a single allowance is the allowance: the group name labels the row directly and
+  // the window's own name moves into the description, so one number never gets two headings.
+  const single = rowCount === 1 && showHeading
+  const reached = limit.spendControlReached || limit.rateLimitReachedType
+  // Rows, headings, and notices are direct siblings of the body so hairlines follow the sequence.
   return (
-    <section className="usage-group" aria-label={name}>
-      {showHeading && (
-        <div className="usage-group-heading">
-          <h4>{name}</h4>
-          {showPlan && plan && plan !== "unknown" && <span className="usage-plan">{plan}</span>}
-        </div>
-      )}
-      {(limit.spendControlReached || limit.rateLimitReachedType) && (
-        <p className="usage-notice">
+    <>
+      {showHeading && !single && <GroupHeading>{name}</GroupHeading>}
+      {reached && (
+        <p className="flex items-center gap-[8px] [margin:12px_0_4px] text-[var(--text-secondary)] text-[12px] leading-[1.5] [&_svg]:shrink-0 [&_svg]:text-[var(--color-modified)]">
           <AlertCircle size={13} aria-hidden="true" />
           {limitNotice(limit)}
         </p>
       )}
-      {hasWindows ? (
-        <div className="usage-dials">
-          {windows.map(({ key, label, window }) =>
-            window == null ? null : (
-              <UsageDial
+      {rowCount === 0 ? (
+        <p className="[margin:12px_0] text-[var(--text-secondary)] text-[12px] leading-[1.6]">
+          No usage windows were reported for this allowance.
+        </p>
+      ) : (
+        <>
+          {windows.map(([key, fallback, window]) => {
+            const windowName = window.label ?? windowLabel(window.windowDurationMins, fallback)
+            return (
+              <UsageRow
                 key={key}
-                label={window.label ?? windowLabel(window.windowDurationMins, label)}
+                label={single ? name : windowName}
+                {...(single && windowName !== name ? { detail: windowName } : {})}
                 remaining={remainingPercent(window.usedPercent)}
                 resetsAt={window.resetsAt}
               />
-            ),
-          )}
+            )
+          })}
           {monthly && (
-            <UsageDial
-              label="Monthly credit limit"
+            <UsageRow
+              label={single ? name : "Monthly credit limit"}
+              detail={`${monthly.used} / ${monthly.limit} credits used`}
               remaining={remainingPercent(100 - monthly.remainingPercent)}
               resetsAt={monthly.resetsAt}
             />
           )}
-        </div>
-      ) : (
-        <p className="usage-description">No usage windows were reported for this allowance.</p>
+        </>
       )}
-      <Facts
-        entries={[
-          ...(credits ? ([["Credit balance", creditBalance(credits)]] as const) : []),
-          ...(monthly
-            ? ([["Monthly credits used", `${monthly.used} / ${monthly.limit}`]] as const)
-            : []),
-        ]}
-      />
-    </section>
+    </>
   )
 }
 
-function UsageConnectionState({
-  name,
-  account,
-  busy,
-  unavailable,
+function UsageMessage({
+  title,
   detail,
+  role,
 }: {
-  name: string
-  account: string
-  busy: boolean
-  unavailable: string | undefined
-  detail: string | undefined
+  readonly title: string
+  readonly detail: string
+  readonly role: "status" | "alert"
 }): React.JSX.Element {
   return (
-    <div className="usage-state" role="status">
-      <h4>
-        {busy
-          ? `Connecting to ${name}…`
-          : unavailable === "unauthenticated"
-            ? "Sign in to see your usage"
-            : unavailable === "missing"
-              ? `Install ${name} to see your usage`
-              : `${name} is unavailable`}
-      </h4>
-      <p>
-        {busy
-          ? "Your subscription allowances will appear here."
-          : unavailable === "unauthenticated"
-            ? `Sign in with your ${account}, then refresh this page.`
-            : (detail ?? `Could not connect to ${name}. Try refreshing.`)}
-      </p>
+    <div className="flex items-start gap-[10px] [padding:18px_0_20px]" role={role}>
+      {role === "alert" && (
+        <AlertCircle
+          size={15}
+          aria-hidden="true"
+          className="mt-[1px] shrink-0 text-[var(--color-modified)]"
+        />
+      )}
+      <div className="flex min-w-0 flex-col gap-[4px]">
+        <span className="text-[var(--text-primary)] text-[13px] font-medium">{title}</span>
+        <p className="m-0 text-[var(--text-secondary)] text-[12px] leading-[1.6]">{detail}</p>
+      </div>
     </div>
   )
+}
+
+function connectionMessage(
+  name: string,
+  account: string,
+  busy: boolean,
+  unavailable: string | undefined,
+  detail: string | undefined,
+): { title: string; detail: string } {
+  if (busy)
+    return {
+      title: `Connecting to ${name}…`,
+      detail: "Your subscription allowances will appear here.",
+    }
+  if (unavailable === "unauthenticated")
+    return {
+      title: "Sign in to see your usage",
+      detail: `Sign in with your ${account}, then refresh this page.`,
+    }
+  if (unavailable === "missing")
+    return {
+      title: `Install ${name} to see your usage`,
+      detail: detail ?? `Could not connect to ${name}. Try refreshing.`,
+    }
+  return {
+    title: `${name} is unavailable`,
+    detail: detail ?? `Could not connect to ${name}. Try refreshing.`,
+  }
 }
 
 export function SubscriptionUsage({
@@ -298,106 +305,112 @@ export function SubscriptionUsage({
       .filter((plan): plan is string => Boolean(plan) && plan !== "unknown"),
   )
   const accountPlan = plans.size === 1 ? [...plans][0] : null
+  const connection = connectionMessage(name, account, busy, unavailable, status.data?.detail)
   return (
-    <section className="subscription-usage" aria-label={`${name} subscription usage`}>
-      <header className="usage-provider-header">
-        <span className="usage-provider-logo">
-          <ProviderIcon provider={provider} size={20} />
-        </span>
-        <div className="usage-provider-identity">
-          <div className="usage-provider-name">
-            <h3>{name}</h3>
-            {accountPlan && <span className="usage-plan">{accountPlan}</span>}
-          </div>
-          {email ? (
-            <AccountEmail email={email} name={name} />
-          ) : (
-            <p className="usage-account-fallback">{ready ? accountLabel : "Not connected"}</p>
-          )}
-        </div>
-        {usage.data && (
-          <span className="usage-updated" title="Usage refreshes every minute">
-            Updated{" "}
-            {new Date(usage.data.checkedAt).toLocaleTimeString(undefined, {
-              hour: "numeric",
-              minute: "2-digit",
-            })}
+    <section
+      className="settings-group m-0 border-b-[1px] border-b-[color:var(--line-subtle)] [&:last-child]:border-b-0"
+      aria-label={`${name} subscription usage`}
+    >
+      <header className="flex items-center justify-between gap-[20px] [padding:26px_0_22px] [@container(max-width:_540px)]:flex-wrap [@container(max-width:_540px)]:gap-[12px]">
+        <div className="flex min-w-0 flex-[1_1_auto] items-center gap-[14px]">
+          <span
+            className="grid w-[36px] h-[36px] flex-[0_0_36px] place-items-center rounded-[var(--radius)] bg-[var(--surface-hover)] text-[var(--text-primary)]"
+            aria-hidden="true"
+          >
+            <ProviderIcon provider={provider} size={20} />
           </span>
-        )}
-        <Button
-          size="sm"
-          icon={<RefreshCw size={13} aria-hidden="true" />}
-          disabled={busy}
-          onClick={() => {
-            if (ready) void usage.refetch()
-            else
-              void refreshStatus()
-                .then(() => status.refetch())
-                .catch(() => status.refetch())
-          }}
-        >
-          {busy ? "Refreshing…" : "Refresh"}
-        </Button>
+          <div className="flex min-w-0 flex-col">
+            <h3 className="m-0 [font-family:var(--font-display)] text-[var(--text-primary)] text-[16px] font-semibold tracking-[-0.01em] leading-[1.3]">
+              {name}
+            </h3>
+            <div className="flex min-w-0 items-center gap-[6px] [margin:3px_0_0] text-[var(--text-secondary)] text-[12px] leading-[1.6]">
+              {accountPlan && (
+                <span className="[text-transform:capitalize]">{accountPlan} plan</span>
+              )}
+              {accountPlan && <span aria-hidden="true">·</span>}
+              {email ? (
+                <AccountEmail email={email} name={name} />
+              ) : (
+                <span>{ready ? accountLabel : "Not connected"}</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-[12px]">
+          {usage.data && (
+            <span
+              className="text-[var(--text-tertiary)] text-[11px] tabular-nums whitespace-nowrap"
+              title="Usage refreshes every minute"
+            >
+              Updated{" "}
+              {new Date(usage.data.checkedAt).toLocaleTimeString(undefined, {
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
+          <Button
+            size="sm"
+            icon={<RefreshCw size={13} aria-hidden="true" />}
+            disabled={busy}
+            onClick={() => {
+              if (ready) void usage.refetch()
+              else
+                void refreshStatus()
+                  .then(() => status.refetch())
+                  .catch(() => status.refetch())
+            }}
+          >
+            {busy ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
       </header>
 
-      <div className="usage-body">
+      <div className="flex flex-col pb-[10px] [&_>_.usage-row:first-child]:pt-[6px]">
         {!ready ? (
-          <UsageConnectionState
-            name={name}
-            account={account}
-            busy={busy}
-            unavailable={unavailable}
-            detail={status.data?.detail}
-          />
+          <UsageMessage role="status" title={connection.title} detail={connection.detail} />
         ) : (
           <>
             {usage.isError && (
-              <div className="usage-error" role="alert">
-                <AlertCircle size={15} aria-hidden="true" />
-                <div>
-                  <strong>
-                    {usage.data
-                      ? "Could not refresh usage. Showing the last update."
-                      : "Could not load subscription usage"}
-                  </strong>
-                  <p>{usageHint}</p>
-                </div>
-              </div>
+              <UsageMessage
+                role="alert"
+                title={
+                  usage.data
+                    ? "Could not refresh usage. Showing the last update."
+                    : "Could not load subscription usage"
+                }
+                detail={usageHint}
+              />
             )}
             {usage.isPending && (
-              <div className="usage-state" role="status">
-                <h4>Loading usage…</h4>
-                <p>Fetching the latest usage from {name}.</p>
-              </div>
+              <UsageMessage
+                role="status"
+                title="Loading usage…"
+                detail={`Fetching the latest usage from ${name}.`}
+              />
             )}
-            {usage.data && (
-              <>
-                {limits.length === 0 && (
-                  <p className="usage-description">
-                    No subscription limits were reported for this account.
-                  </p>
-                )}
-                {limits.map(({ id, limit }) => (
-                  <UsageGroup
-                    key={id}
-                    id={id}
-                    limit={limit}
-                    showHeading={limits.length > 1 || groupName(id, limit) !== name}
-                    showPlan={accountPlan === null}
-                  />
-                ))}
-                <Facts
-                  entries={
-                    usage.data.resetCredits === null
-                      ? []
-                      : [["Usage resets available", String(usage.data.resetCredits)]]
-                  }
-                />
-              </>
+            {usage.data && limits.length === 0 && (
+              <p className="[margin:18px_0_20px] text-[var(--text-secondary)] text-[12px] leading-[1.6]">
+                No subscription limits were reported for this account.
+              </p>
             )}
+            {limits.map(({ id, limit }) => (
+              <UsageGroup
+                key={id}
+                id={id}
+                limit={limit}
+                showHeading={limits.length > 1 || groupName(id, limit) !== name}
+              />
+            ))}
           </>
         )}
       </div>
     </section>
   )
 }
+
+const usageRowClasses = [
+  "usage-row flex items-start gap-[24px] [padding:20px_0]",
+  "[.usage-row_+_&]:border-t-[1px] [.usage-row_+_&]:border-t-[color:var(--line-subtle)]",
+  "[@container(max-width:_540px)]:flex-col [@container(max-width:_540px)]:gap-[12px]",
+].join(" ")

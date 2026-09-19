@@ -11,9 +11,15 @@ export function TurnChanges({ events }: { events: ReadonlyArray<CanonicalEvent> 
   const patches = turnChangePatches(events)
   if (patches.length === 0) return null
   const fallback = (
-    <section className="turn-changes" aria-label="Turn changes">
+    <section
+      className="turn-changes border-t-[1px] border-t-[color:var(--line-subtle)] pt-[10px] min-w-0"
+      aria-label="Turn changes"
+    >
       {patches.map(({ path, patch }, index) => (
-        <pre className="work-item-output" key={`${index}:${path}`}>
+        <pre
+          className="work-item-output max-h-[220px] m-0 overflow-auto text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[10.75px] leading-[1.55] whitespace-pre-wrap"
+          key={`${index}:${path}`}
+        >
           {path}
           {"\n\n"}
           {patch}

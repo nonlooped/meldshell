@@ -18,6 +18,9 @@
       "!**/skills-lock.json"
     ]
   },
+  "css": {
+    "parser": { "tailwindDirectives": true }
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",

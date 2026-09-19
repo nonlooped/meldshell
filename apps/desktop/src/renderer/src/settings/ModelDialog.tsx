@@ -62,7 +62,7 @@ export function ModelDialog({
         MeldShell's menus.
       </p>
 
-      <div className="dialog-field">
+      <div className="[padding:14px_20px_0] mt-[0]">
         <TextField
           label="Model identifier"
           mono
@@ -77,10 +77,12 @@ export function ModelDialog({
           onValueChange={setDisplayName}
         />
 
-        <div className="field">
-          <span className="field-label">Reasoning efforts</span>
+        <div className="field block [&_+_.field]:mt-[14px]">
+          <span className="block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium">
+            Reasoning efforts
+          </span>
           <ToggleGroup
-            className="effort-picker"
+            className="flex flex-wrap gap-[6px]"
             multiple
             value={efforts}
             aria-label="Reasoning efforts"
@@ -89,14 +91,19 @@ export function ModelDialog({
             }
           >
             {REASONING_EFFORTS.map((effort) => (
-              <Toggle key={effort} value={effort} className="effort-toggle">
+              <Toggle
+                data-motion="background-color color"
+                key={effort}
+                value={effort}
+                className="h-[26px] [padding:0_10px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-transparent text-[var(--text-tertiary)] cursor-default text-[11.5px] [&:hover]:text-[var(--text-secondary)] [&[data-pressed]]:[border-color:transparent] [&[data-pressed]]:bg-[var(--accent)] [&[data-pressed]]:text-[var(--accent-foreground)] [&[data-pressed]]:font-medium"
+              >
                 {effortLabel(effort)}
               </Toggle>
             ))}
           </ToggleGroup>
         </div>
 
-        <div className="checkbox-row">
+        <div className="flex items-center gap-[10px] mt-[16px] text-[var(--text-secondary)] text-[12.5px]">
           <Switch
             checked={supportsFast}
             onCheckedChange={setSupportsFast}

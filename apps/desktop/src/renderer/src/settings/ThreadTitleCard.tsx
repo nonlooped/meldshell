@@ -1,3 +1,5 @@
+import { buttonClasses } from "../ui/styles"
+import { Pressable } from "../ui/motion"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { modelLabel } from "../data/model-label"
 import type { AppSnapshot } from "@meldshell/contracts"
@@ -29,7 +31,10 @@ export function ThreadTitleCard({
   const label = chosen ? modelLabel(chosen.displayName) : CURRENT_MODEL_LABEL
 
   return (
-    <section className="settings-group" aria-label="Thread preferences">
+    <section
+      className="settings-group m-0 border-t-[1px] border-t-[color:var(--line-subtle)] border-b-[1px] border-b-[color:var(--line-subtle)] [&_+_.settings-group]:border-t-0"
+      aria-label="Thread preferences"
+    >
       <SettingRow
         label="Title model"
         description="Follow each thread's active model, or choose one model for every title."
@@ -38,15 +43,20 @@ export function ThreadTitleCard({
           align="end"
           trigger={
             <BaseButton
+              data-motion="background-color border-color color opacity"
+              render={<Pressable />}
               type="button"
               disabled={pending}
-              className="button"
+              className={`${buttonClasses} justify-between!`}
               data-block="true"
               aria-label="Change the model that names threads"
-              style={{ justifyContent: "space-between" }}
             >
               {label}
-              <ChevronDown size={13} strokeWidth={1.75} className="chip-chevron" />
+              <ChevronDown
+                size={13}
+                strokeWidth={1.75}
+                className="flex-none text-[var(--text-tertiary)]"
+              />
             </BaseButton>
           }
         >
@@ -55,10 +65,17 @@ export function ThreadTitleCard({
             onValueChange={(value) => onChangeTitleModel(String(value))}
           >
             <MenuGroup label="Follow the thread">
-              <MenuChoice value={CURRENT_TITLE_MODEL} className="model-item">
-                <span className="model-item-body">
-                  <span className="model-item-name">{CURRENT_MODEL_LABEL}</span>
-                  <span className="model-item-slug">The model selected for this thread</span>
+              <MenuChoice
+                value={CURRENT_TITLE_MODEL}
+                className="h-auto [padding:7px_9px] items-start"
+              >
+                <span className="flex min-w-0 flex-1 flex-col gap-[1px]">
+                  <span className="model-item-name text-inherit text-[12.5px]">
+                    {CURRENT_MODEL_LABEL}
+                  </span>
+                  <span className="text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10px]">
+                    The model selected for this thread
+                  </span>
                 </span>
               </MenuChoice>
             </MenuGroup>
@@ -68,10 +85,16 @@ export function ThreadTitleCard({
             {available.length > 0 && (
               <MenuGroup label="Always use">
                 {available.map((model) => (
-                  <MenuChoice key={model.id} value={model.id} className="model-item">
-                    <span className="model-item-body">
-                      <span className="model-item-name">{modelLabel(model.displayName)}</span>
-                      <span className="model-item-provider">
+                  <MenuChoice
+                    key={model.id}
+                    value={model.id}
+                    className="h-auto [padding:7px_9px] items-start"
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col gap-[1px]">
+                      <span className="model-item-name text-inherit text-[12.5px]">
+                        {modelLabel(model.displayName)}
+                      </span>
+                      <span className="flex items-center gap-[5px] text-[var(--text-tertiary)] text-[11px]">
                         <ProviderIcon provider={providerById.get(model.providerId)} size={12} />
                         {providerById.get(model.providerId)?.harness === "codex"
                           ? "Codex"

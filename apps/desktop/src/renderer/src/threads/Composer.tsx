@@ -1,3 +1,5 @@
+import { chipClasses } from "../ui/styles"
+import { FadeDiv, Pressable } from "../ui/motion"
 import { useLayoutEffect, useRef, useState } from "react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { ComposerAttachment } from "@meldshell/contracts/ipc"
@@ -17,8 +19,9 @@ import {
   ShieldCheck,
   TriangleAlert,
   X,
+  ArrowUp,
+  Square,
 } from "lucide-react"
-import { ArrowUp, Square } from "lucide-react"
 import { effortLabel, resolveSelection, selectableModels } from "../data/catalog"
 import { FileIcon } from "../ui/FileIcon"
 import { ModelPicker } from "./ModelPicker"
@@ -62,7 +65,12 @@ const SANDBOX_LABEL: Readonly<Record<SandboxMode, string>> = {
 const LevelIcon = ({ index, count }: { index: number; count: number }): React.JSX.Element => {
   const activeBars = count <= 1 ? 2 : 1 + Math.round((index / (count - 1)) * 3)
   return (
-    <span className="option-level-icon" aria-hidden="true">
+    <span
+      className={
+        "flex w-[14px] h-[14px] items-end justify-center gap-[1px] [&_>_span]:w-[2px] [&_>_span]:rounded-[1px] [&_>_span]:[background:currentColor] [&_>_span]:opacity-[0.22] [&_>_span:nth-child(1)]:h-[4px] [&_>_span:nth-child(2)]:h-[7px] [&_>_span:nth-child(3)]:h-[10px] [&_>_span:nth-child(4)]:h-[13px] [&_>_span[data-active='true']]:opacity-[0.9]"
+      }
+      aria-hidden="true"
+    >
       {[0, 1, 2, 3].map((bar) => (
         <span key={bar} data-active={bar < activeBars} />
       ))}
@@ -78,7 +86,7 @@ const SandboxIcon = ({ mode }: { mode: SandboxMode }): React.JSX.Element => {
 
 const SpeedIcon = ({ speed }: { speed: keyof typeof SPEED_LABEL }): React.JSX.Element => (
   <svg
-    className="speed-icon"
+    className="flex-none [stroke:currentColor] stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]"
     width="14"
     height="14"
     viewBox="0 0 16 16"
@@ -97,10 +105,16 @@ function ComposerAttachments({
 }: Pick<ComposerProps, "attachments" | "onRemoveAttachment">): React.JSX.Element | null {
   if (attachments.length === 0) return null
   return (
-    <div className="composer-attachments" aria-label="Turn attachments">
+    <div
+      className="flex gap-[8px] overflow-x-auto p-[8px] border-b-[1px] border-b-[color:var(--line-subtle)]"
+      aria-label="Turn attachments"
+    >
       {attachments.map((attachment, index) => (
-        <span className="attachment-chip" key={index}>
-          <span className="attachment-preview" aria-hidden="true">
+        <FadeDiv duration={0.2} className={attachmentChipClasses} key={index}>
+          <span
+            className="grid w-[48px] h-[48px] flex-[0_0_48px] overflow-hidden rounded-[3px] bg-[var(--surface-active)] place-items-center [&_img]:w-full [&_img]:h-full [&_img]:object-contain"
+            aria-hidden="true"
+          >
             {attachment.previewUrl || attachment.type === "image" ? (
               <img src={attachment.previewUrl ?? attachment.value} alt="" />
             ) : attachment.type === "localImage" ? (
@@ -109,11 +123,14 @@ function ComposerAttachments({
               <FileIcon path={attachment.name ?? attachment.value} size={22} />
             )}
           </span>
-          <span className="attachment-details">
-            <span className="attachment-name" title={attachment.name ?? attachment.value}>
+          <span className="flex flex-1 min-w-0 flex-col gap-[3px]">
+            <span
+              className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+              title={attachment.name ?? attachment.value}
+            >
               {attachment.name ?? (attachment.type === "image" ? "Pasted image" : attachment.value)}
             </span>
-            <span className="attachment-kind">
+            <span className="text-[var(--text-tertiary)] text-[11px]">
               {attachment.type === "image" || attachment.type === "localImage"
                 ? "Image"
                 : attachment.type === "skill"
@@ -128,7 +145,7 @@ function ComposerAttachments({
           >
             <X size={11} />
           </IconButton>
-        </span>
+        </FadeDiv>
       ))}
     </div>
   )
@@ -184,18 +201,32 @@ function ReasoningSettings({
   return (
     <DropdownMenu
       trigger={
-        <BaseButton type="button" className="chip" aria-label="Change reasoning effort and speed">
-          <span className="chip-value-icons">
+        <BaseButton
+          data-motion="background-color border-color color opacity"
+          render={<Pressable />}
+          type="button"
+          className={chipClasses}
+          aria-label="Change reasoning effort and speed"
+        >
+          <span
+            className={
+              "flex h-[14px] items-center gap-[3px] text-[var(--text-tertiary)] [&_>_svg]:flex-none"
+            }
+          >
             {efforts.length > 0 && <LevelIcon index={selectedEffortIndex} count={efforts.length} />}
             {supportsFast && <SpeedIcon speed={selection.speed} />}
           </span>
-          <span className="chip-label">
+          <span className="overflow-hidden text-ellipsis">
             {selection.reasoningEffort === null
               ? "Reasoning"
               : effortLabel(selection.reasoningEffort)}
             {supportsFast && ` · ${SPEED_LABEL[selection.speed]}`}
           </span>
-          <ChevronDown size={13} strokeWidth={1.75} className="chip-chevron" />
+          <ChevronDown
+            size={13}
+            strokeWidth={1.75}
+            className="flex-none text-[var(--text-tertiary)]"
+          />
         </BaseButton>
       }
     >
@@ -213,7 +244,7 @@ function ReasoningSettings({
             {efforts.map((effort, index) => (
               <MenuChoice key={effort} value={effort}>
                 {effortLabel(effort)}
-                <span className="menu-option-icon">
+                <span className="grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] text-[var(--text-secondary)] place-items-center">
                   <LevelIcon index={index} count={efforts.length} />
                 </span>
               </MenuChoice>
@@ -235,14 +266,18 @@ function ReasoningSettings({
           }
         >
           <MenuGroup label="Speed">
-            {isClaude && <p className="speed-description">Fast uses paid usage credits.</p>}
+            {isClaude && (
+              <p className="[margin:8px_12px] text-[11px] text-[var(--text-secondary)]">
+                Fast uses paid usage credits.
+              </p>
+            )}
             {[SPEED_LABEL.standard, fastTier?.name ?? SPEED_LABEL.fast].map((label, index) => (
               <MenuChoice
                 key={index === 0 ? "standard" : "fast"}
                 value={index === 0 ? "standard" : "fast"}
               >
                 {label}
-                <span className="menu-option-icon">
+                <span className="grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] text-[var(--text-secondary)] place-items-center">
                   <SpeedIcon speed={index === 0 ? "standard" : "fast"} />
                 </span>
               </MenuChoice>
@@ -265,7 +300,11 @@ function ComposerSettings({
   selection: ModelSelection | null
 }): React.JSX.Element {
   if (selection === null)
-    return <span className="composer-hint">No model is enabled. Add one in Settings.</span>
+    return (
+      <span className="text-[var(--text-tertiary)] text-[10.5px] tabular-nums whitespace-nowrap">
+        No model is enabled. Add one in Settings.
+      </span>
+    )
   const isClaude = selection.provider.harness === "claude-code"
   const isCursor = selection.provider.harness === "cursor"
   const toolPermissions = isClaude || isCursor
@@ -362,8 +401,10 @@ function ComposerSettings({
       <DropdownMenu
         trigger={
           <BaseButton
+            data-motion="background-color border-color color opacity"
+            render={<Pressable />}
             type="button"
-            className="chip"
+            className={chipClasses}
             aria-label={
               toolPermissions
                 ? `Change ${isClaude ? "Claude" : "Cursor"} permissions`
@@ -371,8 +412,12 @@ function ComposerSettings({
             }
           >
             <SandboxIcon mode={selection.sandbox} />
-            <span className="chip-label">{selected.label}</span>
-            <ChevronDown size={13} strokeWidth={1.75} className="chip-chevron" />
+            <span className="overflow-hidden text-ellipsis">{selected.label}</span>
+            <ChevronDown
+              size={13}
+              strokeWidth={1.75}
+              className="flex-none text-[var(--text-tertiary)]"
+            />
           </BaseButton>
         }
       >
@@ -394,7 +439,7 @@ function ComposerSettings({
             {options.map((option) => (
               <MenuChoice key={option.id} value={option.id}>
                 {option.label}
-                <span className="menu-option-icon">
+                <span className="grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] text-[var(--text-secondary)] place-items-center">
                   <SandboxIcon mode={option.sandbox} />
                 </span>
               </MenuChoice>
@@ -483,29 +528,37 @@ export function Composer({
   }, [draft])
 
   return (
-    <div className="composer-zone">
+    <div className="composer-zone [padding:0_clamp(24px,_7vw,_104px)_18px] [&_.notice]:max-w-[860px] [&_.notice]:mr-[auto] [&_.notice]:ml-[auto]">
       {!providerReady && (
-        <div className="notice" role="status">
+        <FadeDiv
+          duration={0.2}
+          className="notice flex items-start gap-[10px] [padding:10px_12px] mb-[10px] border-[1px] border-[color:var(--line)] border-l-[2px] border-l-[color:var(--text-secondary)] rounded-[var(--radius)] [background:rgba(255,_255,_255,_0.027)] text-[var(--text-secondary)] text-[12px] leading-[1.5] [&_svg]:flex-none [&_svg]:mt-[1px] [&_svg]:text-[var(--text-primary)]"
+          role="status"
+        >
           <TriangleAlert size={15} strokeWidth={1.75} />
-          <div className="notice-body">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-[8px]">
             <span>{providerDetail}</span>
             <Button size="sm" onClick={onRecheckProvider}>
               <RefreshCw size={13} strokeWidth={1.75} />
               Check again
             </Button>
           </div>
-        </div>
+        </FadeDiv>
       )}
 
-      <div className="composer">
+      <div
+        data-motion="background-color border-color box-shadow"
+        data-motion-duration="0.2"
+        className={composerClasses}
+      >
         <ComposerAttachments attachments={attachments} onRemoveAttachment={onRemoveAttachment} />
         {loadingAttachments && (
-          <div className="composer-attachment-status" role="status">
+          <div className="text-[var(--text-tertiary)] text-[11px] p-[8px]" role="status">
             Adding attachments…
           </div>
         )}
         {attachmentError && (
-          <div className="composer-attachment-status" role="alert">
+          <div className="text-[var(--text-tertiary)] text-[11px] p-[8px]" role="alert">
             {attachmentError}
           </div>
         )}
@@ -564,10 +617,11 @@ export function Composer({
           }}
         />
 
-        <div className="composer-controls">
+        <div className="flex items-center flex-wrap gap-[6px] [padding:7px_8px_8px] border-t-[1px] border-t-[color:var(--line-subtle)] [@container(max-width:_620px)]:gap-[4px] [@container(max-width:_620px)]:[&_.chip]:px-[6px]">
           <IconButton
+            data-motion="background-color border-color color opacity"
             unstyled
-            className="chip"
+            className={chipClasses}
             label="Attach image, file, or skill"
             disabled={loadingAttachments || sending}
             onClick={() => void addAttachments(() => window.meldshell.selectAttachments())}
@@ -581,11 +635,14 @@ export function Composer({
             onChangeSettings={onChangeSettings}
           />
 
-          <span className="composer-controls-spacer" />
+          <span className="flex-[1_1_auto] min-w-[8px]" />
 
-          <div className="composer-actions">
+          <div className="flex flex-none items-center gap-[6px] ml-[auto]">
             {!running && queuedCount === 0 && (
-              <span className="composer-shortcut" aria-hidden="true">
+              <span
+                className="inline-flex items-center gap-[3px] mr-[5px] text-[var(--text-tertiary)] text-[10px] whitespace-nowrap [&_kbd]:[font:inherit] [@container(max-width:_620px)]:hidden"
+                aria-hidden="true"
+              >
                 {!enterToSend && (
                   <>
                     <kbd>Ctrl</kbd>
@@ -596,7 +653,7 @@ export function Composer({
               </span>
             )}
             {queuedCount > 0 && (
-              <span className="composer-hint">
+              <span className="text-[var(--text-tertiary)] text-[10.5px] tabular-nums whitespace-nowrap">
                 {queuedCount} queued {queuedCount === 1 ? "message" : "messages"}
               </span>
             )}
@@ -604,7 +661,7 @@ export function Composer({
             {running && (
               <IconButton
                 unstyled
-                className="stop-button"
+                className="[display:inline-grid] w-[28px] h-[28px] flex-[0_0_28px] border-[1px] border-[color:var(--line)] rounded-[50%] bg-transparent text-[var(--text-secondary)] cursor-default place-items-center [&:hover]:bg-[var(--surface-hover)] [&:hover]:[border-color:var(--line-strong)] [&:hover]:text-[var(--text-primary)]"
                 label={interrupting ? "Stopping turn" : "Interrupt turn"}
                 disabled={interrupting}
                 onClick={onInterrupt}
@@ -614,8 +671,9 @@ export function Composer({
             )}
 
             <IconButton
+              data-motion="background-color border-color color opacity"
               unstyled
-              className="send-button"
+              className={sendButtonClasses}
               disabled={!canSend}
               aria-label="Send message"
               label={sendTitle({
@@ -638,3 +696,36 @@ export function Composer({
     </div>
   )
 }
+
+const attachmentChipClasses = [
+  "inline-flex flex-[0_0_210px] max-w-[min(240px,_100%)] items-center gap-[8px] p-[6px]",
+  "border-[1px] border-[color:var(--line-subtle)] rounded-[5px] text-[var(--text-secondary)] text-[10.5px]",
+  "[&_button]:grid [&_button]:w-[20px] [&_button]:h-[20px] [&_button]:flex-[0_0_20px] [&_button]:p-0",
+  "[&_button]:border-0 [&_button]:rounded-[3px] [&_button]:text-inherit [&_button]:bg-transparent",
+  "[&_button]:cursor-default [&_button]:place-items-center [&_button:hover]:bg-[var(--surface-active)]",
+  "[&_button:hover]:text-[var(--text-primary)]",
+].join(" ")
+
+const composerClasses = [
+  "composer [container-type:inline-size] flex w-full max-w-[860px] [margin:0_auto] flex-col",
+  "border-[1px] border-[color:var(--line)] rounded-[var(--radius-xl)] bg-[var(--surface-raised)]",
+  "[box-shadow:0_4px_16px_rgba(0,_0,_0,_0.1),_inset_0_1px_0_var(--line-subtle)]",
+  "[&:focus-within]:[border-color:var(--line-strong)]",
+  "[&:focus-within]:[box-shadow:0_4px_16px_rgba(0,_0,_0,_0.1),_inset_0_1px_0_var(--line-subtle),_0_0_0_2px_var(--surface-active)]",
+  "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-raised)]",
+  "[@media(prefers-reduced-transparency:_reduce)]:[&:focus-within]:bg-[var(--surface-raised)]",
+  "[&_textarea]:min-h-[72px] [&_textarea]:max-h-[210px] [&_textarea]:overflow-y-hidden",
+  "[&_textarea]:[padding:15px_16px_10px] [&_textarea]:border-0 [&_textarea]:bg-transparent",
+  "[&_textarea]:text-[var(--text-primary)] [&_textarea]:text-[14px] [&_textarea]:leading-[1.55]",
+  "[&_textarea]:outline-none [&_textarea]:resize-none",
+  "[&_textarea::placeholder]:text-[var(--text-tertiary)]",
+].join(" ")
+
+const sendButtonClasses = [
+  "[display:inline-grid] w-[30px] h-[30px] flex-[0_0_30px] border-0 rounded-[50%] bg-[var(--accent)]",
+  "text-[var(--accent-foreground)] cursor-default place-items-center",
+  "[&:disabled]:bg-[var(--surface-active)] [&:disabled]:text-[var(--text-disabled)]",
+  "[&:hover:not(:disabled)]:bg-[var(--accent-hover)]",
+  "[&:hover:not(:disabled)]:[box-shadow:0_0_0_3px_var(--surface-active)]",
+  "[&:active:not(:disabled)]:bg-[var(--text-secondary)]",
+].join(" ")

@@ -15,7 +15,7 @@ import {
 import { IconButton } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
 import { ProviderIcon } from "../ui/ProviderIcon"
-import { threadDragProps } from "./thread-drag"
+import { useThreadDraggable } from "./thread-drag"
 import { type ThreadLayout, visibleThreads } from "./thread-layout"
 
 interface TitleBarProps {
@@ -28,6 +28,32 @@ interface TitleBarProps {
   readonly sourceControlCollapsed: boolean
   readonly onToggleInbox: () => void
   readonly onToggleSourceControl: () => void
+}
+
+function ThreadTabFrame({
+  threadId,
+  selected,
+  shared,
+  children,
+}: React.PropsWithChildren<{
+  readonly threadId: string
+  readonly selected: boolean
+  readonly shared: boolean
+}>): React.JSX.Element {
+  const draggable = useThreadDraggable(threadId, "tab", shared)
+  return (
+    <div
+      ref={draggable.ref}
+      data-motion="background-color border-color color box-shadow"
+      data-motion-enter
+      className={tabClasses}
+      data-dragging={draggable.isDragging ? "" : undefined}
+      {...(selected ? { "data-selected": "" } : {})}
+      {...(shared ? { "data-shared": "" } : {})}
+    >
+      {children}
+    </div>
+  )
 }
 
 function TabMark({ layout, provider }: { layout: ThreadLayout; provider: Provider | undefined }) {
@@ -49,11 +75,11 @@ export function TitleBar({
   const files = useTabStore((state) => state.files)
   const threadTabs = useTabStore((state) => state.threadTabs)
   return (
-    <header className="titlebar">
-      <MeldMark className="brand-mark" />
+    <header className="[-webkit-app-region:drag] flex items-center gap-[10px] min-w-0 [padding:0_var(--caption-inset)_0_12px] border-b-[1px] border-b-[color:var(--line-subtle)] select-none">
+      <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
       {sidebarsVisible && (
         <IconButton
-          className="window-interactive"
+          className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
           label={inboxCollapsed ? "Expand inbox" : "Collapse inbox"}
           aria-expanded={!inboxCollapsed}
           aria-controls="inbox"
@@ -64,10 +90,17 @@ export function TitleBar({
       )}
 
       {openThreads.length > 0 && (
-        <Separator className="titlebar-divider" orientation="vertical" aria-hidden="true" />
+        <Separator
+          className="w-[1px] h-[18px] flex-[0_0_1px] bg-[var(--line)]"
+          orientation="vertical"
+          aria-hidden="true"
+        />
       )}
 
-      <Tabs.List className="tab-strip" aria-label="Open tabs">
+      <Tabs.List
+        className="flex min-w-0 flex-[1_1_auto] items-center gap-[2px] overflow-hidden"
+        aria-label="Open tabs"
+      >
         {threadTabs.map((tab) => {
           const members = visibleThreads(tab.layout).flatMap((id) => {
             const thread = openThreads.find((candidate) => candidate.id === id)
@@ -85,12 +118,11 @@ export function TitleBar({
               : `${provider.displayName} via ${provider.harness}`
 
           return (
-            <div
+            <ThreadTabFrame
               key={tab.id}
-              className="tab window-interactive"
-              {...(shared ? {} : threadDragProps(thread.id))}
-              {...(tab.id === selectedTabId ? { "data-selected": "" } : {})}
-              {...(shared ? { "data-shared": "" } : {})}
+              threadId={thread.id}
+              selected={tab.id === selectedTabId}
+              shared={shared}
             >
               <Tabs.Tab
                 value={tab.id}
@@ -100,49 +132,61 @@ export function TitleBar({
                     ? `${label}\n${members.length} threads`
                     : `${title}\n${providerLabel}\nDrag onto a pane to move or split it`
                 }
-                className="tab-label"
+                className="flex min-w-0 flex-[1_1_auto] items-center gap-[7px] [padding:0_6px] border-0 bg-transparent text-inherit overflow-hidden text-[12px] cursor-default"
               >
-                <span className="tab-provider-mark" aria-hidden="true">
+                <span
+                  className="tab-provider-mark grid w-[14px] h-[14px] flex-[0_0_14px] text-[var(--text-tertiary)] place-items-center"
+                  aria-hidden="true"
+                >
                   <TabMark layout={tab.layout} provider={provider} />
                 </span>
-                <span className="tab-title">{title}</span>
+                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                  {title}
+                </span>
                 {shared && (
-                  <span className="tab-pane-count" aria-hidden="true">
+                  <span
+                    className="flex-none text-[var(--text-tertiary)] text-[10px] tabular-nums"
+                    aria-hidden="true"
+                  >
                     {members.length}
                   </span>
                 )}
               </Tabs.Tab>
               <IconButton
+                data-motion="background-color border-color color opacity"
                 unstyled
-                className="tab-close"
+                className="tab-close grid w-[18px] h-[18px] flex-[0_0_18px] p-0 border-0 rounded-[4px] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center opacity-[0] [&:focus-visible]:opacity-[1] [&:hover]:bg-[var(--surface-active)] [&:hover]:text-[var(--text-primary)]"
                 label={`Close ${label}`}
                 onClick={() => onCloseTab(tab.id)}
               >
                 <X size={12} strokeWidth={2} />
               </IconButton>
-            </div>
+            </ThreadTabFrame>
           )
         })}
         {files.map((file) => (
           <div
+            data-motion="background-color border-color color box-shadow"
+            data-motion-enter
             key={file.id}
-            className="tab window-interactive"
+            className={tabClasses}
             {...(file.id === selectedTabId ? { "data-selected": "" } : {})}
           >
             <Tabs.Tab
               value={file.id}
-              className="tab-label"
+              className="flex min-w-0 flex-[1_1_auto] items-center gap-[7px] [padding:0_6px] border-0 bg-transparent text-inherit overflow-hidden text-[12px] cursor-default"
               title={`${file.path}${file.diffSide ? ` · ${file.diffSide} changes` : ""}`}
             >
               <FileIcon path={file.path} size={14} />
-              <span className="tab-title">
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                 {file.path.split("/").pop()}
                 {file.diffSide ? ` · ${file.diffSide} changes` : ""}
               </span>
             </Tabs.Tab>
             <IconButton
+              data-motion="background-color border-color color opacity"
               unstyled
-              className="tab-close"
+              className="tab-close grid w-[18px] h-[18px] flex-[0_0_18px] p-0 border-0 rounded-[4px] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center opacity-[0] [&:focus-visible]:opacity-[1] [&:hover]:bg-[var(--surface-active)] [&:hover]:text-[var(--text-primary)]"
               label={`Close ${file.path}`}
               onClick={() => onCloseTab(file.id)}
             >
@@ -153,7 +197,7 @@ export function TitleBar({
       </Tabs.List>
       {sidebarsVisible && (
         <IconButton
-          className="window-interactive"
+          className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
           label={sourceControlCollapsed ? "Expand files and changes" : "Collapse files and changes"}
           aria-expanded={!sourceControlCollapsed}
           aria-controls="source-control"
@@ -165,3 +209,14 @@ export function TitleBar({
     </header>
   )
 }
+
+const tabClasses = [
+  "flex h-[30px] max-w-[224px] min-w-0 items-center gap-[3px] [padding:0_4px]",
+  "border-[1px] border-[color:transparent] rounded-[var(--radius)] bg-transparent text-[var(--text-tertiary)]",
+  "cursor-default [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)]",
+  "[&[data-selected]]:[border-color:var(--line-subtle)] [&[data-selected]]:bg-[var(--surface-selected)]",
+  "[&[data-selected]]:text-[var(--text-primary)] [&[data-shared]]:max-w-[320px]",
+  "[&[data-selected]_.tab-provider-mark]:text-[var(--text-secondary)] [&:hover_.tab-close]:opacity-[1]",
+  "[&[data-selected]_.tab-close]:opacity-[1] [-webkit-app-region:no-drag]",
+  "[&_*]:[-webkit-app-region:no-drag]",
+].join(" ")

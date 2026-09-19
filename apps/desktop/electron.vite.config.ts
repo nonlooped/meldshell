@@ -1,6 +1,7 @@
 import { resolve } from "node:path"
 import { defineConfig, externalizeDepsPlugin } from "electron-vite"
 import react from "@vitejs/plugin-react"
+import tailwindcss from "@tailwindcss/vite"
 
 const bundledMainPackages = [
   "@meldshell/contracts",
@@ -49,6 +50,7 @@ export default defineConfig({
       },
     },
     plugins: [
+      tailwindcss(),
       react({
         babel: {
           plugins: ["babel-plugin-react-compiler"],

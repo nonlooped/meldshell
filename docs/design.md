@@ -1,10 +1,10 @@
 # MeldShell interface design
 
 This document defines the design language: the look, feel, and behaviour every
-screen should follow. It intentionally avoids hard values. Exact tokens, sizes,
-and timings live in the renderer stylesheet and are the source of truth; this
-document explains the intent behind them so new UI reads as MeldShell without
-copying old pixels.
+screen should follow. It intentionally avoids hard values. Exact sizes and colors
+live in the renderer Tailwind utilities and shared theme tokens. Animation timings
+live in the Motion helpers. These define the exact values; this document explains
+the intent behind them so new UI reads as MeldShell without copying old pixels.
 
 Reviewed against the renderer on 2026-09-05. Current behavior includes dark,
 light, and system themes, pinned threads, an Archived section, transcript
@@ -166,6 +166,13 @@ Base UI supplies behaviour only: focus capture, roving index, typeahead,
 dismissal, portalling, and ARIA wiring. MeldShell owns every pixel through one
 wrapper layer, so there is no vendor theme to override and feature code never
 rebuilds popup scaffolding by hand.
+
+Style components with Tailwind utilities next to their markup. Shared utility
+compositions live in `ui/styles.ts`. Keep raw CSS limited to theme tokens, document
+defaults, platform scrollbars, and vendor math/diff typesetting. Motion owns
+animations: `ui/motion.tsx` handles entrances and popups, while `data-motion` opts
+individual controls into interpolation of their Tailwind hover, focus, and Base UI
+states. Never animate virtualized row positioning.
 
 Icons are thin line glyphs with a consistent optical weight; product and brand
 marks and file-type icons are the exceptions.

@@ -34,7 +34,9 @@ function FileRow({
   const row = (
     <BaseButton
       type="button"
-      className="explorer-row"
+      className={
+        "flex items-center gap-[6px] w-full min-h-[28px] [padding:3px_10px] border-0 bg-transparent text-inherit text-left cursor-pointer [&:hover]:bg-[var(--surface-hover)] [&_>_svg]:shrink-0 [&_>_svg]:w-[12px] [&_>_.file-icon]:w-[16px]"
+      }
       style={{ paddingLeft: 10 + depth * 14 }}
       title={`${entry.path}${entry.status ? ` (${statusKind(entry.status)})` : ""}`}
       onClick={entry.directory ? undefined : () => openFile(workspaceId, entry.path)}
@@ -46,10 +48,10 @@ function FileRow({
           <ChevronRight size={12} />
         )
       ) : (
-        <span className="explorer-spacer" />
+        <span className="shrink-0 w-[12px]" />
       )}
       <FileIcon path={entry.path} directory={entry.directory} expanded={expanded} />
-      <span className="explorer-name" data-kind={statusKind(entry.status)}>
+      <span className={explorerNameClasses} data-kind={statusKind(entry.status)}>
         {entry.name}
       </span>
     </BaseButton>
@@ -90,13 +92,19 @@ function Directory({
   })
   if (query.isPending)
     return (
-      <p className="git-notice" role="status">
+      <p
+        className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
+        role="status"
+      >
         Loading files…
       </p>
     )
   if (query.isError)
     return (
-      <div className="git-notice" role="alert">
+      <div
+        className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
+        role="alert"
+      >
         {query.error.message}
         <Button size="sm" onClick={() => void query.refetch()}>
           Retry
@@ -104,7 +112,7 @@ function Directory({
       </div>
     )
   return (
-    <ul className="explorer-list" aria-label={path || "Workspace files"}>
+    <ul className="[list-style:none] p-0 m-0" aria-label={path || "Workspace files"}>
       {query.data.slice(0, limit).map((entry) => (
         <FileRow
           key={entry.path}
@@ -116,7 +124,11 @@ function Directory({
           depth={depth}
         />
       ))}
-      {query.data.length === 0 && <li className="git-notice">Empty folder</li>}
+      {query.data.length === 0 && (
+        <li className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
+          Empty folder
+        </li>
+      )}
       {query.data.length > limit && (
         <li>
           <Button size="sm" variant="ghost" onClick={() => setLimit(limit + 300)}>
@@ -137,14 +149,17 @@ export function FilesSidebar({
 }) {
   const client = useQueryClient()
   return (
-    <Tabs.Root defaultValue="files" className="workspace-sidebar">
-      <Tabs.List className="workspace-sidebar-tabs" aria-label="Workspace sidebar">
+    <Tabs.Root defaultValue="files" className="flex flex-col h-full min-h-0 overflow-hidden">
+      <Tabs.List className={workspaceSidebarTabsClasses} aria-label="Workspace sidebar">
         <Tabs.Tab value="files">Files</Tabs.Tab>
         <Tabs.Tab value="changes">Changes</Tabs.Tab>
       </Tabs.List>
-      <Tabs.Panel value="files" className="explorer-panel">
-        <div className="git-section-toolbar">
-          <span className="explorer-workspace" title={workspace?.path}>
+      <Tabs.Panel value="files" className="flex flex-col h-full min-h-0 overflow-hidden">
+        <div className="flex items-center shrink-0 pr-[6px] [&_.git-section-heading]:flex-1 [&_.git-section-heading]:min-w-0">
+          <span
+            className="flex-1 [padding:8px_12px] overflow-hidden text-ellipsis whitespace-nowrap"
+            title={workspace?.path}
+          >
             {workspace?.name ?? "Files"}
           </span>
           <IconButton
@@ -157,17 +172,36 @@ export function FilesSidebar({
             <RefreshCw size={14} />
           </IconButton>
         </div>
-        <div className="scrollable explorer-body">
+        <div className="overflow-y-auto [scrollbar-gutter:stable] overflow-auto flex-1">
           {workspace ? (
             <Directory key={workspace.id} workspaceId={workspace.id} path="" />
           ) : (
-            <p className="git-notice">Choose a thread to browse its workspace.</p>
+            <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
+              Choose a thread to browse its workspace.
+            </p>
           )}
         </div>
       </Tabs.Panel>
-      <Tabs.Panel value="changes" className="explorer-panel">
+      <Tabs.Panel value="changes" className="flex flex-col h-full min-h-0 overflow-hidden">
         <GitSidebar workspace={workspace} threadId={threadId} />
       </Tabs.Panel>
     </Tabs.Root>
   )
 }
+
+const explorerNameClasses = [
+  "overflow-hidden text-ellipsis whitespace-nowrap [&[data-kind='added']]:text-[var(--color-added)]",
+  "[&[data-kind='modified']]:text-[var(--color-modified)]",
+  "[&[data-kind='renamed']]:text-[var(--color-renamed)]",
+  "[&[data-kind='deleted']]:text-[var(--color-deleted)]",
+  "[&[data-kind='conflict']]:text-[var(--color-deleted)]",
+  "[&[data-kind='ignored']]:text-[var(--text-tertiary)]",
+].join(" ")
+
+const workspaceSidebarTabsClasses = [
+  "flex gap-[16px] [padding:0_12px] border-b-[1px] border-b-[color:var(--line)] shrink-0",
+  "[&_button]:[background:none] [&_button]:border-0 [&_button]:border-b-[2px] [&_button]:border-b-[color:transparent]",
+  "[&_button]:text-[var(--text-secondary)] [&_button]:[padding:10px_0] [&_button]:cursor-pointer",
+  "[&_button[data-active]]:text-[var(--text-primary)]",
+  "[&_button[data-active]]:[border-bottom-color:currentColor]",
+].join(" ")

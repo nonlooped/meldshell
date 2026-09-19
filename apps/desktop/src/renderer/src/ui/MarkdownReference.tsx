@@ -85,7 +85,7 @@ export function ReferenceChip({ reference, label }: { reference: FileReference; 
         />
       </span>
       {reference.line && (
-        <span className="reference-line">
+        <span className="text-[var(--text-secondary)]">
           · L{reference.line}
           {reference.endLine ? `–${reference.endLine}` : ""}
         </span>
@@ -94,7 +94,7 @@ export function ReferenceChip({ reference, label }: { reference: FileReference; 
   )
   if (!workspace)
     return (
-      <span className="reference-chip" title={title}>
+      <span className={referenceChipClasses} title={title}>
         {content}
       </span>
     )
@@ -102,11 +102,11 @@ export function ReferenceChip({ reference, label }: { reference: FileReference; 
     <ContentTooltip
       open={open}
       onOpenChange={setOpen}
-      className="reference-preview"
+      className={referencePreviewClasses}
       trigger={
         <button
           type="button"
-          className="reference-chip"
+          className={referenceChipClasses}
           aria-label={`Open ${title}`}
           onClick={() => openFile(workspace.id, reference.path, reference.line, reference.endLine)}
         >
@@ -195,9 +195,34 @@ function WebPageLink({
   })
   const title = webLinkLabel(query.data, sources.get(href) || suppliedTitle, fallback)
   return (
-    <a className="source-link" href={href} target="_blank" rel="noreferrer">
+    <a
+      className={"[&_>_svg]:[vertical-align:-1px] [&_>_svg]:mr-[4px]"}
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+    >
       <Globe size={12} aria-hidden="true" />
       <SearchText text={title} />
     </a>
   )
 }
+
+const referenceChipClasses = [
+  "inline-flex items-center gap-[5px] max-w-full [vertical-align:baseline] [padding:1px_5px]",
+  "border-[1px] border-[color:var(--line)] rounded-[var(--radius-sm)] bg-[var(--surface-hover)]",
+  "text-[var(--text-primary)] [font:0.88em_var(--font-mono)] cursor-pointer [&_>_span]:overflow-hidden",
+  "[&_>_span]:text-ellipsis [&_>_span]:whitespace-nowrap [&_svg]:shrink-0",
+  "[&:focus-visible]:[outline:2px_solid_var(--accent)] [&:focus-visible]:[outline-offset:2px]",
+].join(" ")
+
+const referencePreviewClasses = [
+  "[&_.token.comment]:text-[var(--text-tertiary)] [&_.token.prolog]:text-[var(--text-tertiary)]",
+  "[&_.token.doctype]:text-[var(--text-tertiary)] [&_.token.keyword]:text-[var(--color-renamed)]",
+  "[&_.token.tag]:text-[var(--color-renamed)] [&_.token.boolean]:text-[var(--color-renamed)]",
+  "[&_.token.string]:text-[var(--color-added)] [&_.token.attr-value]:text-[var(--color-added)]",
+  "[&_.token.number]:text-[var(--color-modified)] [&_.token.function]:text-[var(--color-modified)]",
+  "[&_.token.class-name]:text-[var(--color-modified)] [&_.token.property]:text-[var(--color-info)]",
+  "[&_.token.attr-name]:text-[var(--color-info)] max-w-[min(620px,_85vw)] whitespace-normal",
+  "[overflow-wrap:anywhere] [&_>_span]:block [&_>_span]:mb-[6px] [&_pre]:m-0 [&_pre]:max-h-[240px]",
+  "[&_pre]:overflow-auto [&_pre]:[font:12px_var(--font-mono)] [&_pre]:whitespace-pre [&_pre]:text-left",
+].join(" ")

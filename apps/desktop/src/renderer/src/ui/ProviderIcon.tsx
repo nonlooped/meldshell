@@ -29,7 +29,7 @@ export function ProviderIcon({ provider, size }: ProviderIconProps): React.JSX.E
         icon={icon}
         width={size}
         height={size}
-        className="provider-icon"
+        className="shrink-0"
         data-provider={key}
         aria-hidden="true"
       />
@@ -40,7 +40,7 @@ export function ProviderIcon({ provider, size }: ProviderIconProps): React.JSX.E
     <Bot
       size={size}
       strokeWidth={1.8}
-      className="provider-icon"
+      className="shrink-0"
       data-provider={provider?.key ?? "unknown"}
       aria-hidden="true"
     />

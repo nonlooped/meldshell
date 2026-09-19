@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Collapsible } from "@base-ui-components/react/collapsible"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import type { Workspace } from "@meldshell/contracts"
 import type { GitChange, GitSnapshot, GitDiffSide, GitFileAction } from "@meldshell/contracts/ipc"
 import {
@@ -78,18 +79,28 @@ function FileRow({
   const slash = change.path.lastIndexOf("/")
   return (
     <div className="git-file-entry">
-      <div className="git-file-row">
+      <div
+        className={
+          "flex items-center gap-[0] pr-[6px] [&_.git-file]:flex-1 [&_.git-file]:min-w-0 [&_.git-file]:pr-[6px] [&_>_.icon-button]:shrink-0"
+        }
+      >
         <button
           type="button"
           onClick={() => openDiff(workspaceId, change.path, side)}
-          className="git-file"
+          className={
+            "git-file [&:hover]:bg-[var(--surface-hover)] flex items-center gap-[7px] w-full h-[28px] border-0 [padding:0_14px] bg-transparent text-left cursor-pointer [&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)]"
+          }
           title={`${change.originalPath ? `${change.originalPath} → ` : ""}${change.path} · ${statusLabel(change)}`}
           aria-label={`${change.path}, ${statusLabel(change)}`}
         >
           <FileIcon path={change.path} size={16} />
-          <span className="git-file-name">{change.path.slice(slash + 1)}</span>
-          <span className="git-file-directory">{change.path.slice(0, Math.max(0, slash))}</span>
-          <span className="git-file-status" data-kind={changeKind(change.status)}>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-primary)]">
+            {change.path.slice(slash + 1)}
+          </span>
+          <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] text-[10px]">
+            {change.path.slice(0, Math.max(0, slash))}
+          </span>
+          <span className={gitFileStatusClasses} data-kind={changeKind(change.status)}>
             {change.status === "??" ? "U" : change.status.trim()}
           </span>
         </button>
@@ -135,6 +146,10 @@ export function GitSidebar({
     onSettled: refresh,
   })
   const [commitBusy, setCommitBusy] = useState(false)
+  const [changesOpen, setChangesOpen] = useState(true)
+  const [graphOpen, setGraphOpen] = useState(true)
+  const changesPanelRef = usePanelRef()
+  const graphPanelRef = usePanelRef()
   const query = useQuery({
     queryKey: ["git", workspace?.id, limit],
     queryFn: () => window.meldshell.getGitSnapshot({ workspaceId: workspace!.id, limit }),
@@ -143,15 +158,26 @@ export function GitSidebar({
     retry: false,
   })
   return (
-    <aside className="git-sidebar" aria-label="Source control">
+    <aside
+      className="h-full min-w-0 flex flex-col overflow-hidden text-[var(--text-secondary)] text-[12px]"
+      aria-label="Source control"
+    >
       {!workspace ? (
-        <p className="git-notice">Select a thread to view its workspace changes and history.</p>
+        <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
+          Select a thread to view its workspace changes and history.
+        </p>
       ) : query.isPending ? (
-        <p className="git-notice" role="status">
+        <p
+          className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
+          role="status"
+        >
           Reading repository…
         </p>
       ) : query.isError ? (
-        <p className="git-notice" role="alert">
+        <p
+          className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
+          role="alert"
+        >
           {query.error.message}
           <br />
           Check the workspace folder and refresh to try again.
@@ -170,24 +196,67 @@ export function GitSidebar({
             onRefresh={refresh}
           />
           {action.isError && (
-            <p className="git-notice" role="alert">
+            <p
+              className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
+              role="alert"
+            >
               {action.error.message}
             </p>
           )}
-          <ChangesSection
-            busy={action.isPending || commitBusy}
-            onAction={(path, operation) => action.mutate({ path, action: operation })}
-            workspaceId={workspace.id}
-            changes={query.data.changes}
-            refreshing={query.isFetching}
-            onRefresh={() => void query.refetch()}
-          />
-          <GraphSection
-            workspaceId={workspace.id}
-            data={query.data}
-            limit={limit}
-            setLimit={setLimit}
-          />
+          <Group className="min-h-0 flex-1" orientation="vertical">
+            <Panel
+              id="changes"
+              panelRef={changesPanelRef}
+              className="min-h-0"
+              defaultSize="65%"
+              minSize="96px"
+              collapsedSize="32px"
+              collapsible
+              onResize={({ inPixels }) => setChangesOpen(inPixels > 32)}
+            >
+              <ChangesSection
+                open={changesOpen}
+                onOpenChange={(open) => {
+                  setChangesOpen(open)
+                  if (open) changesPanelRef.current?.expand()
+                  else changesPanelRef.current?.collapse()
+                }}
+                busy={action.isPending || commitBusy}
+                onAction={(path, operation) => action.mutate({ path, action: operation })}
+                workspaceId={workspace.id}
+                changes={query.data.changes}
+                refreshing={query.isFetching}
+                onRefresh={() => void query.refetch()}
+              />
+            </Panel>
+            <Separator
+              className={gitSectionSeparatorClasses}
+              aria-label="Resize source control sections"
+            />
+            <Panel
+              id="graph"
+              panelRef={graphPanelRef}
+              className="min-h-0"
+              defaultSize="35%"
+              minSize="96px"
+              collapsedSize="32px"
+              collapsible
+              onResize={({ inPixels }) => setGraphOpen(inPixels > 32)}
+            >
+              <GraphSection
+                open={graphOpen}
+                onOpenChange={(open) => {
+                  setGraphOpen(open)
+                  if (open) graphPanelRef.current?.expand()
+                  else graphPanelRef.current?.collapse()
+                }}
+                workspaceId={workspace.id}
+                data={query.data}
+                limit={limit}
+                setLimit={setLimit}
+              />
+            </Panel>
+          </Group>
         </>
       )}
     </aside>
@@ -254,10 +323,14 @@ function CommitSection({
   const disabled = busy || mutation.isPending
   const canCommit = !disabled && staged && !conflicts && Boolean(message.trim())
   return (
-    <section className="git-commit-section" aria-label="Commit changes">
-      <div className="git-message-editor">
+    <section className="[padding:10px_12px] shrink-0" aria-label="Commit changes">
+      <div
+        className={
+          "relative [&_>_.icon-button]:absolute [&_>_.icon-button]:top-[50%] [&_>_.icon-button]:right-[4px] [&_>_.icon-button]:[transform:translateY(-50%)] [&_.git-commit-message]:pr-[34px]"
+        }
+      >
         <TextField
-          className="git-commit-message"
+          className="git-commit-message w-full min-w-0"
           aria-label="Commit message"
           placeholder={`Message on ${data.branch} (Ctrl+Enter to commit)`}
           value={message}
@@ -278,7 +351,7 @@ function CommitSection({
           <Sparkles size={15} />
         </IconButton>
       </div>
-      <div className="git-commit-actions">
+      <div className={"flex items-center gap-[6px] mt-[8px] [&_>_.button:first-child]:flex-1"}>
         <Button variant="primary" disabled={!canCommit} onClick={() => mutation.mutate("commit")}>
           <Check size={14} />
           Commit
@@ -304,17 +377,26 @@ function CommitSection({
         </DropdownMenu>
       </div>
       {mutation.isPending && (
-        <p className="git-commit-hint" role="status">
+        <p
+          className="[margin:8px_0_0] text-[var(--text-tertiary)] text-[11px] [overflow-wrap:anywhere]"
+          role="status"
+        >
           {mutation.variables === "generate" ? "Generating message…" : "Running Git…"}
         </p>
       )}
       {notice && (
-        <p className="git-commit-hint" role="status">
+        <p
+          className="[margin:8px_0_0] text-[var(--text-tertiary)] text-[11px] [overflow-wrap:anywhere]"
+          role="status"
+        >
           {notice}
         </p>
       )}
       {mutation.isError && (
-        <p className="git-commit-hint" role="alert">
+        <p
+          className="[margin:8px_0_0] text-[var(--text-tertiary)] text-[11px] [overflow-wrap:anywhere]"
+          role="alert"
+        >
           {mutation.error.message}
         </p>
       )}
@@ -323,6 +405,8 @@ function CommitSection({
 }
 
 function ChangesSection({
+  open,
+  onOpenChange,
   changes,
   busy,
   onAction,
@@ -330,6 +414,8 @@ function ChangesSection({
   refreshing,
   onRefresh,
 }: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
   changes: readonly GitChange[]
   busy: boolean
   onAction: (path: string, action: GitFileAction) => void
@@ -338,18 +424,32 @@ function ChangesSection({
   onRefresh: () => void
 }): React.JSX.Element {
   return (
-    <Collapsible.Root render={<section />} className="git-section" defaultOpen>
-      <div className="git-section-toolbar">
-        <Collapsible.Trigger className="git-section-heading">
-          <ChevronRight size={13} className="disclosure-chevron" />
+    <Collapsible.Root
+      render={<section />}
+      className="flex flex-col h-full min-h-0 border-t-[1px] border-t-[color:var(--line-subtle)]"
+      open={open}
+      onOpenChange={onOpenChange}
+    >
+      <div className="flex items-center shrink-0 pr-[6px] [&_.git-section-heading]:flex-1 [&_.git-section-heading]:min-w-0">
+        <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-semibold [&:hover]:bg-[var(--surface-hover)]">
+          <ChevronRight
+            data-motion="transform background-color"
+            data-motion-duration="0.2"
+            size={13}
+            className={
+              "disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
+            }
+          />
           <span>Changes</span>
-          <span className="git-count">{changes.length}</span>
+          <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
+            {changes.length}
+          </span>
         </Collapsible.Trigger>
         <IconButton label="Refresh source control" disabled={refreshing} onClick={onRefresh}>
           <RefreshCw size={14} />
         </IconButton>
       </div>
-      <Collapsible.Panel className="git-section-body scrollable">
+      <Collapsible.Panel className="flex-1 min-h-0 overflow-x-auto pb-[8px] overflow-y-auto [scrollbar-gutter:stable]">
         {(["staged", "unstaged"] as const).map((side) => {
           const files = changes.filter((change) =>
             side === "staged"
@@ -358,12 +458,16 @@ function ChangesSection({
           )
           return (
             <div key={side}>
-              <div className="git-change-group">
+              <div className="flex items-center gap-[6px] [padding:7px_14px] text-[11px] font-semibold">
                 {side === "staged" ? "Staged changes" : "Unstaged changes"}
-                <span className="git-count">{files.length}</span>
+                <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
+                  {files.length}
+                </span>
               </div>
               {files.length === 0 ? (
-                <p className="git-notice">No {side} changes.</p>
+                <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
+                  No {side} changes.
+                </p>
               ) : (
                 files.map((change) => (
                   <FileRow
@@ -385,11 +489,15 @@ function ChangesSection({
 }
 
 function GraphSection({
+  open,
+  onOpenChange,
   workspaceId,
   data,
   limit,
   setLimit,
 }: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
   workspaceId: string
   data: GitSnapshot
   limit: number
@@ -398,20 +506,38 @@ function GraphSection({
   const rows = layoutGraph(data.commits)
   const graphWidth = Math.max(1, ...rows.map((row) => row.width)) * 14 + 12
   return (
-    <Collapsible.Root render={<section />} className="git-section" defaultOpen>
-      <Collapsible.Trigger className="git-section-heading">
-        <ChevronRight size={13} className="disclosure-chevron" />
+    <Collapsible.Root
+      render={<section />}
+      className="flex flex-col h-full min-h-0"
+      open={open}
+      onOpenChange={onOpenChange}
+    >
+      <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-semibold [&:hover]:bg-[var(--surface-hover)]">
+        <ChevronRight
+          data-motion="transform background-color"
+          data-motion-duration="0.2"
+          size={13}
+          className={
+            "disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
+          }
+        />
         <span>Graph</span>
-        <span className="git-count">All branches</span>
+        <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
+          All branches
+        </span>
       </Collapsible.Trigger>
       <Collapsible.Panel
-        className="git-section-body scrollable"
+        className="flex-1 min-h-0 overflow-x-auto pb-[8px] overflow-y-auto [scrollbar-gutter:stable]"
         tabIndex={0}
         role="region"
         aria-label="Commit graph"
       >
-        {rows.length === 0 && <p className="git-notice">No commits yet.</p>}
-        <ol className="git-commits">
+        {rows.length === 0 && (
+          <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
+            No commits yet.
+          </p>
+        )}
+        <ol className="[list-style:none] p-0 m-0">
           {rows.map((row) => (
             <CommitRow
               key={row.commit.hash}
@@ -432,7 +558,9 @@ function GraphSection({
               Load older commits
             </Button>
           ) : (
-            <p className="git-notice">Showing the latest 2,000 commits.</p>
+            <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
+              Showing the latest 2,000 commits.
+            </p>
           ))}
       </Collapsible.Panel>
     </Collapsible.Root>
@@ -454,13 +582,19 @@ function CommitDiff({
   })
   if (query.isPending)
     return (
-      <p className="git-notice" role="status">
+      <p
+        className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
+        role="status"
+      >
         Loading commit changes…
       </p>
     )
   if (query.isError)
     return (
-      <div className="git-notice" role="alert">
+      <div
+        className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
+        role="alert"
+      >
         {query.error.message}
         <Button size="sm" onClick={() => void query.refetch()}>
           Retry
@@ -483,10 +617,15 @@ function CommitRow({
   return (
     <Collapsible.Root render={<li />}>
       <Collapsible.Trigger
-        className="git-commit"
+        className="w-full border-0 bg-transparent text-left cursor-pointer pl-[0] flex items-center gap-[6px] h-[28px] pr-[12px] [&:hover]:bg-[var(--surface-hover)] [&[aria-expanded='true']]:bg-[var(--surface-hover)]"
         title={`${commit.subject}\n${commit.author} · ${commit.date}\n${commit.hash}\n${commit.refs}`}
       >
-        <svg width={graphWidth} height={28} aria-hidden="true" className="git-lanes">
+        <svg
+          width={graphWidth}
+          height={28}
+          aria-hidden="true"
+          className="shrink-0 overflow-visible [&_path]:[fill:none] [&_path]:[stroke:currentColor] [&_path]:stroke-[1.25] [&_circle]:[fill:currentColor] [&_circle]:[stroke:currentColor]"
+        >
           {edges.map((edge, index) => (
             <path
               key={index}
@@ -499,17 +638,25 @@ function CommitRow({
           )}
           <circle style={{ color: laneColor(row.color) }} cx={12 + lane * 14} cy={14} r={3.5} />
         </svg>
-        <span className="git-commit-subject">{commit.subject}</span>
-        {commit.refs && <span className="git-ref">{commit.refs}</span>}
-        <span className="git-hash">{commit.hash.slice(0, 7)}</span>
+        <span className="flex-1 min-w-[50px] overflow-hidden text-ellipsis whitespace-nowrap">
+          {commit.subject}
+        </span>
+        {commit.refs && (
+          <span className="max-w-[100px] overflow-hidden text-ellipsis whitespace-nowrap border-[1px] border-[color:var(--line-strong)] rounded-[var(--radius-sm)] [padding:1px_4px] text-[10px] text-[var(--color-info)]">
+            {commit.refs}
+          </span>
+        )}
+        <span className="[font-family:var(--font-mono)] text-[var(--text-tertiary)] text-[10px]">
+          {commit.hash.slice(0, 7)}
+        </span>
       </Collapsible.Trigger>
       <Collapsible.Panel
-        className="git-inline-diff"
+        className="[&_.event-diff]:border-0 [&_.event-diff]:rounded-[0] max-h-[480px] overflow-auto border-y-[1px] border-y-[color:var(--line-subtle)] [&_.work-item-output]:m-0 [&_.work-item-output]:whitespace-pre-wrap [&_.work-item-output]:[overflow-wrap:anywhere]"
         role="region"
         aria-label={`Changes in ${commit.hash.slice(0, 7)}`}
         tabIndex={0}
       >
-        <p className="git-notice">
+        <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
           {commit.subject}
           <br />
           {commit.author} · {commit.date.slice(0, 10)}
@@ -525,3 +672,18 @@ function CommitRow({
     </Collapsible.Root>
   )
 }
+
+const gitFileStatusClasses = [
+  "ml-[auto] [font-family:var(--font-mono)] text-[11px] whitespace-pre",
+  "[&[data-kind='added']]:text-[var(--color-added)] [&[data-kind='untracked']]:text-[var(--color-added)]",
+  "[&[data-kind='modified']]:text-[var(--color-modified)]",
+  "[&[data-kind='renamed']]:text-[var(--color-renamed)]",
+  "[&[data-kind='deleted']]:text-[var(--color-deleted)]",
+  "[&[data-kind='conflict']]:text-[var(--color-deleted)]",
+].join(" ")
+
+const gitSectionSeparatorClasses = [
+  "relative h-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute",
+  "[&::after]:z-[2] [&::after]:[inset:-3px_0] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)]",
+  "[&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]",
+].join(" ")
