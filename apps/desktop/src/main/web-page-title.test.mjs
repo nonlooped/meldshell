@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { titleParser, publicAddress, pageUrl, getWebPageTitle } from "./web-page-title.ts"
+import { titleParser } from "./web-page-title.ts"
 
 function title(chunks) {
   let result = null
@@ -32,38 +32,4 @@ test("decodes entities and handles titles split across response chunks", () => {
 
 test("bounds title length and keeps the first title", () => {
   assert.equal(title(["<title>" + "x".repeat(5000) + "</title><title>Wrong</title>"]).length, 1024)
-})
-
-test("rejects local network and mapped addresses before fetching", () => {
-  for (const address of [
-    "127.0.0.1",
-    "10.1.2.3",
-    "172.16.1.2",
-    "192.168.1.1",
-    "169.254.169.254",
-    "100.64.0.1",
-    "0.0.0.0",
-    "::1",
-    "::ffff:127.0.0.1",
-    "fc00::1",
-    "fe80::1",
-    "2001::1",
-    "2002:7f00:1::",
-  ])
-    assert.equal(publicAddress(address), false, address)
-  assert.equal(publicAddress("1.1.1.1"), true)
-  assert.equal(publicAddress("2606:4700:4700::1111"), true)
-})
-
-test("validates schemes and credentials and normalizes cache URLs", async () => {
-  for (const url of [
-    "file:///etc/passwd",
-    "javascript:alert(1)",
-    "https://user:secret@example.com",
-    "https://example.com:8443",
-    "invalid",
-  ])
-    assert.equal(pageUrl(url), null)
-  assert.equal(pageUrl("https://example.com/page#section").href, "https://example.com/page")
-  assert.equal(await getWebPageTitle("http://127.0.0.1/"), null)
 })

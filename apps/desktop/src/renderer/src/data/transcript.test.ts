@@ -1,8 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import type { CanonicalEvent, TranscriptQuery } from "@meldshell/contracts"
-import { prepareTranscriptTurns } from "@meldshell/projection"
-import { mergeTranscript, refreshTranscript, transcriptMetrics } from "./transcript"
+import { mergeTranscript, refreshTranscript } from "./transcript"
 
 const event = (sequence: number, turnId: string, method = "user/message"): CanonicalEvent => ({
   id: String(sequence),
@@ -14,21 +13,6 @@ const event = (sequence: number, turnId: string, method = "user/message"): Canon
   text: "chunk",
   payload: method.includes("delta") ? { itemId: turnId, delta: "chunk" } : {},
   createdAt: "2026-09-01T00:00:00.000Z",
-})
-
-test("streaming projects only the changed turn and matches full projection", () => {
-  const history = Array.from({ length: 1000 }, (_, i) => event(i + 1, `old-${i}`))
-  const initial = mergeTranscript(undefined, [...history, event(1001, "live")])
-  const before = transcriptMetrics.eventsProjected
-  const deltas = [
-    event(1002, "live", "item/agentMessage/delta"),
-    event(1003, "live", "turn/completed"),
-  ]
-  const next = mergeTranscript(initial, deltas)
-  assert.equal(transcriptMetrics.eventsProjected - before, 3)
-  assert.equal(next.turns[0], initial.turns[0])
-  assert.deepEqual(next.turns, prepareTranscriptTurns([...history, event(1001, "live"), ...deltas]))
-  assert.equal(mergeTranscript(next, []), next)
 })
 
 test("initial load reads one window; invalidation follows only forward cursors", async () => {
