@@ -1,0 +1,114 @@
+name: Release installers
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate stable version tag
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const root = JSON.parse(fs.readFileSync("package.json"));
+            const desktop = JSON.parse(fs.readFileSync("apps/desktop/package.json"));
+            if (!/^\d+\.\d+\.\d+$/.test(desktop.version) || root.version !== desktop.version || process.env.GITHUB_REF_NAME !== `v${desktop.version}`) {
+              throw new Error("Tag must match the stable version in root and desktop package.json");
+            }
+          '
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm rebuild better-sqlite3
+      - run: npm run check
+      - run: npm test
+
+  package:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            platform: win
+          - os: ubuntu-24.04
+            platform: linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Package without publishing
+        working-directory: apps/desktop
+        run: npx --no-install electron-builder --${{ matrix.platform }} --x64 --publish never
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: installers-${{ matrix.platform }}
+          path: |
+            release/*.exe
+            release/*.AppImage
+            release/*.blockmap
+            release/latest*.yml
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+
+  release:
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: installers-*
+          merge-multiple: true
+          path: release
+      - name: Assemble draft release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          test -s "release/MeldShell-${version}-setup.exe"
+          test -s "release/MeldShell-${version}-x64.AppImage"
+          test -s release/latest.yml
+          test -s release/latest-linux.yml
+          cd release
+          sha256sum *.exe *.AppImage > SHA256SUMS.txt
+          if gh release view "$RELEASE_TAG" --json isDraft > existing.json 2>/dev/null; then
+            test "$(jq -r .isDraft existing.json)" = true || { echo 'Refusing to overwrite a published release'; exit 1; }
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "MeldShell $version" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" ./*.exe ./*.AppImage ./*.blockmap ./latest*.yml ./SHA256SUMS.txt --clobber

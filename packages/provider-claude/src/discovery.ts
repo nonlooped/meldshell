@@ -30,8 +30,7 @@ const record = (value: unknown): Record<string, unknown> =>
 const versionArgs = async (claudePath: string): Promise<{ command: string; args: string[] }> => {
   if (!/\.m?js$/i.test(claudePath)) return { command: claudePath, args: [] }
   const node = await which("node", { nothrow: true })
-  if (!node)
-    throw new Error("Node.js is required to run this Claude Code JavaScript entrypoint.")
+  if (!node) throw new Error("Node.js is required to run this Claude Code JavaScript entrypoint.")
   return { command: node, args: [claudePath] }
 }
 
