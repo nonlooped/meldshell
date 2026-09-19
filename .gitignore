@@ -5,6 +5,7 @@ out/
 release/
 .vite/
 .astro/
+.vercel/
 *.tsbuildinfo
 .cache/
 
