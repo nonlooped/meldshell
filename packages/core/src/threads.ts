@@ -2,15 +2,69 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
   type CreateThreadInput,
+  type ProviderModel,
+  type ReasoningEffort,
   type Thread,
   CoreProtocolError,
   defaultReasoningEffort,
 } from "@meldshell/contracts"
 import { Effect } from "effect"
 import { transaction } from "./database/persistence"
+import { type ProviderModelRow, fromProviderModelRow } from "./database/rows"
 import { DEFAULT_THREAD_TITLE, resolveThreadTitle } from "./titles"
 import { defaultSelection } from "./catalog"
 import { getSnapshot } from "./snapshots"
+
+interface RecentSelectionRow extends ProviderModelRow {
+  readonly last_reasoning_effort: string | null
+  readonly last_speed: "standard" | "fast"
+}
+
+interface NewThreadSelection {
+  readonly model: ProviderModel
+  readonly reasoningEffort: ReasoningEffort | null
+  readonly speed: "standard" | "fast"
+}
+
+const selectionForNewThread = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  const recent = yield* sql<RecentSelectionRow>`
+    SELECT m.id, m.provider_id, m.slug, m.display_name, m.reasoning_efforts, m.metadata,
+           m.supports_fast, m.enabled, m.hidden, m.sort_order, m.built_in,
+           t.reasoning_effort AS last_reasoning_effort, t.speed AS last_speed
+    FROM turns t
+    JOIN providers p ON p.key = t.provider AND p.harness = t.harness
+    JOIN provider_models m ON m.provider_id = p.id AND m.slug = t.model
+    WHERE p.enabled = 1 AND m.enabled = 1
+    ORDER BY t.started_at DESC, t.rowid DESC
+    LIMIT 1
+  `
+  const row = recent[0]
+  if (row !== undefined) {
+    const model = fromProviderModelRow(row)
+    return {
+      model,
+      reasoningEffort:
+        row.last_reasoning_effort !== null &&
+        model.reasoningEfforts.includes(row.last_reasoning_effort)
+          ? row.last_reasoning_effort
+          : defaultReasoningEffort(model.reasoningEfforts, model.defaultReasoningEffort),
+      speed: row.last_speed === "fast" && !model.supportsFast ? "standard" : row.last_speed,
+    } satisfies NewThreadSelection
+  }
+
+  const model = yield* defaultSelection
+  return model === null
+    ? null
+    : ({
+        model,
+        reasoningEffort: defaultReasoningEffort(
+          model.reasoningEfforts,
+          model.defaultReasoningEffort,
+        ),
+        speed: "standard",
+      } satisfies NewThreadSelection)
+})
 
 export const setThreadPinned = (threadId: string, pinned: boolean) =>
   Effect.gen(function* () {
@@ -29,7 +83,7 @@ export const createThread = (input: CreateThreadInput) =>
     // A caller-supplied title is a decision, not a placeholder, so title generation leaves it alone.
     const titleLocked = title === DEFAULT_THREAD_TITLE ? 0 : 1
     const threadId = randomUUID()
-    const selection = yield* defaultSelection
+    const selection = yield* selectionForNewThread
 
     yield* sql.withTransaction(
       Effect.gen(function* () {
@@ -52,11 +106,8 @@ export const createThread = (input: CreateThreadInput) =>
               mode, sandbox, approval_policy
             )
             VALUES (
-              ${threadId}, ${selection.providerId}, ${selection.id},
-              ${defaultReasoningEffort(
-                selection.reasoningEfforts,
-                selection.defaultReasoningEffort,
-              )}, 'standard',
+              ${threadId}, ${selection.model.providerId}, ${selection.model.id},
+              ${selection.reasoningEffort}, ${selection.speed},
               'default', 'workspace-write', 'on-request'
             )
           `
