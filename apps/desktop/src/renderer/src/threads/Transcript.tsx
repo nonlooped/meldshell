@@ -229,7 +229,7 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
     )
   }
   return (
-    <Collapsible.Root className="work-item" defaultOpen={tool.failed || tool.images.length > 0}>
+    <Collapsible.Root className="work-item" defaultOpen={false}>
       <Collapsible.Trigger className="work-item-trigger">
         {iconFor(event)}
         <span className="work-item-title" title={toolSummary(event)}>
@@ -301,15 +301,7 @@ function WorkingSection({ turn }: { readonly turn: TranscriptTurn }): React.JSX.
   if (turn.workingEvents.length === 0) return null
 
   return (
-    <Collapsible.Root
-      className="working-section"
-      defaultOpen={
-        !turn.complete ||
-        turn.workingEvents.some(
-          (event) => toolDetails(event).failed || toolDetails(event).images.length > 0,
-        )
-      }
-    >
+    <Collapsible.Root className="working-section" defaultOpen={!turn.complete}>
       <Collapsible.Trigger className="working-summary">
         <ChevronRight className="disclosure-chevron" size={14} />
         <span>Working for {formatDuration(turn.durationMs)}</span>
