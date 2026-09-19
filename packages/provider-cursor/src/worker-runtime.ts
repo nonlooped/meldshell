@@ -1,12 +1,12 @@
 import { workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
+import { RequestError, type RequestPermissionResponse } from "@agentclientprotocol/sdk"
 import { type TitleRequest, type TurnDispatch, type CursorStatus } from "@meldshell/contracts"
 import { effortOption, modelSelection, parameterizedModels } from "./model-config"
 import { readCursorUsage } from "./usage"
 import {
   CursorClient,
-  CursorRequestError,
   discoverCursor,
   readCursorAccountEmail,
   record,
@@ -20,7 +20,6 @@ import {
   cursorModels,
   cursorPrompt,
   interactionResponse,
-  isInteraction,
   knownNotification,
   nativeMethod,
 } from "./protocol"
@@ -46,9 +45,22 @@ interface RunningTurn {
 }
 interface PendingInteraction {
   session: Session
-  nativeId: string | number
-  method: string
-  params: RecordValue
+  respond: (
+    decision: string,
+    answers?: Readonly<Record<string, ReadonlyArray<string>>>,
+    optionId?: string,
+  ) => void
+}
+
+const automaticPermission = (
+  session: Session,
+  params: RecordValue,
+): { decision: string; optionId?: string } | null => {
+  if (session.permissions?.approvalPolicy !== "never") return null
+  const kind = session.permissions.sandbox === "danger-full-access" ? "allow_once" : "reject_once"
+  const option = records(params.options).find((entry) => entry.kind === kind)
+  if (option) return { decision: "accept", optionId: text(option.optionId) }
+  return kind === "reject_once" ? { decision: "cancel" } : null
 }
 
 export const runCursorWorker = (
@@ -85,41 +97,55 @@ export const runCursorWorker = (
     accountEmail,
     checkedAt: new Date().toISOString(),
   })
-  const onRequest = (
+  const onRequest = <Response>(
     session: Session,
-    message: NativeMessage & { id: string | number },
+    method: string,
     params: RecordValue,
-  ): void => {
+    signal: AbortSignal,
+    response: (
+      decision: string,
+      answers?: Readonly<Record<string, ReadonlyArray<string>>>,
+      optionId?: string,
+    ) => Response,
+  ): Promise<Response> => {
+    signal.throwIfAborted()
     if (
-      !session.emit ||
-      !session.interactive ||
-      session.replaying ||
-      !isInteraction(message.method, params)
-    ) {
-      session.emit?.(nativeMethod(message.method), message.params, false)
-      session.client.reject(message.id, "Unsupported or inactive Cursor client request.")
-      return
+      typeof params.sessionId === "string" &&
+      session.sessionId &&
+      params.sessionId !== session.sessionId
+    )
+      throw RequestError.invalidParams(undefined, "Cursor session does not match this connection.")
+    if (!session.emit || !session.interactive || session.replaying) {
+      throw new RequestError(-32601, "Inactive Cursor client request.")
     }
-    if (
-      message.method === "session/request_permission" &&
-      session.permissions?.approvalPolicy === "never"
-    ) {
-      const kind =
-        session.permissions.sandbox === "danger-full-access" ? "allow_once" : "reject_once"
-      const option = records(params.options).find((entry) => entry.kind === kind)
-      if (option || kind === "reject_once") {
-        const response = option
-          ? { outcome: { outcome: "selected", optionId: option.optionId } }
-          : { outcome: { outcome: "cancelled" } }
-        session.emit("cursor/acp/permission/automatic", { request: message.params, response }, true)
-        session.client.respond(message.id, response)
-        return
-      }
+    const automatic =
+      method === "session/request_permission" ? automaticPermission(session, params) : null
+    if (automatic) {
+      const result = response(automatic.decision, undefined, automatic.optionId)
+      session.emit("cursor/acp/permission/automatic", { request: params, response: result }, true)
+      return Promise.resolve(result)
     }
     const id = randomUUID()
-    approvals.set(id, { session, nativeId: message.id, method: message.method, params })
-    session.emit(nativeMethod(message.method), message.params, true, id)
-    return
+    const pending = new Promise<Response>((resolve, reject) => {
+      const abort = (): void => {
+        approvals.delete(id)
+        session.emit?.("serverRequest/resolved", { requestId: id }, true)
+        reject(signal.reason)
+      }
+      signal.addEventListener("abort", abort, { once: true })
+      approvals.set(id, {
+        session,
+        respond: (decision, answers, optionId) => {
+          // Validate before resolving, so invalid UI answers leave the approval pending.
+          const result = response(decision, answers, optionId)
+          signal.removeEventListener("abort", abort)
+          approvals.delete(id)
+          resolve(result)
+        },
+      })
+    })
+    session.emit(nativeMethod(method), params, true, id)
+    return pending
   }
   const onMessage = (session: Session, message: NativeMessage): void => {
     const params = record(message.params)
@@ -128,22 +154,12 @@ export const runCursorWorker = (
       session.sessionId &&
       params.sessionId !== session.sessionId
     ) {
-      if (message.id !== undefined)
-        session.client.reject(message.id, "Cursor session does not match this connection.", -32602)
       return
     }
     if (message.id !== undefined) {
-      onRequest(session, { ...message, id: message.id }, params)
+      session.emit?.("cursor/acp/request/received", message, false)
       return
     }
-    if (
-      message.method === "session/update" &&
-      record(params.update).sessionUpdate === "config_option_update"
-    )
-      session.configuration = {
-        ...session.configuration,
-        configOptions: record(params.update).configOptions,
-      }
     session.emit?.(
       session.replaying ? "cursor/acp/session/replay" : nativeMethod(message.method),
       message.params,
@@ -170,6 +186,27 @@ export const runCursorWorker = (
     }
     session.client = new dependencies.Client(command, cwd, {
       message: (message) => onMessage(session, message),
+      sessionUpdate: ({ sessionId, update }) => {
+        if (sessionId === session.sessionId && update.sessionUpdate === "config_option_update")
+          session.configuration = { ...session.configuration, configOptions: update.configOptions }
+      },
+      requestPermission: ({ params, signal }) =>
+        onRequest(
+          session,
+          "session/request_permission",
+          params,
+          signal,
+          (decision, answers, optionId): RequestPermissionResponse =>
+            interactionResponse("session/request_permission", params, decision, answers, optionId),
+        ),
+      askQuestion: ({ params, signal }) =>
+        onRequest(session, "cursor/ask_question", params, signal, (decision, answers, optionId) =>
+          interactionResponse("cursor/ask_question", params, decision, answers, optionId),
+        ),
+      createPlan: ({ params, signal }) =>
+        onRequest(session, "cursor/create_plan", params, signal, (decision) =>
+          interactionResponse("cursor/create_plan", params, decision),
+        ),
       spawned: (pid) => publish({ type: "app-server-started", pid }),
       stopped: (pid) => publish({ type: "app-server-stopped", pid }),
     })
@@ -180,9 +217,10 @@ export const runCursorWorker = (
       if (options.catalogOnly) return session
       if (nativeId && record(session.init.agentCapabilities).loadSession !== true)
         throw new Error("This Cursor release cannot resume the saved conversation.")
-      session.configuration = await session.client.request(
-        nativeId ? "session/load" : "session/new",
-        { cwd, mcpServers: [], ...(nativeId ? { sessionId: nativeId } : {}) },
+      session.configuration = await session.client.run((agent) =>
+        nativeId
+          ? agent.request("session/load", { cwd, mcpServers: [], sessionId: nativeId })
+          : agent.request("session/new", { cwd, mcpServers: [] }),
       )
       session.sessionId = nativeId ?? text(session.configuration.sessionId)
       if (!session.sessionId) throw new Error("Cursor returned no session ID.")
@@ -209,17 +247,21 @@ export const runCursorWorker = (
         (entry) => entry.category === category || entry.id === category,
       )
       if (option) {
-        const result = await session.client.request("session/set_config_option", {
-          sessionId: session.sessionId,
-          configId: option.id,
-          value,
-        })
+        const result = await session.client.run((agent) =>
+          agent.request("session/set_config_option", {
+            sessionId: session.sessionId,
+            configId: text(option.id),
+            value,
+          }),
+        )
         session.configuration = { ...session.configuration, ...result }
       } else
-        await session.client.request(fallback, {
-          sessionId: session.sessionId,
-          [category === "model" ? "modelId" : "modeId"]: value,
-        })
+        await session.client.run((agent) =>
+          agent.request(fallback, {
+            sessionId: session.sessionId,
+            [category === "model" ? "modelId" : "modeId"]: value,
+          }),
+        )
     }
   }
   const configureModel = async (
@@ -249,11 +291,13 @@ export const runCursorWorker = (
         throw new Error(
           `Cursor no longer supports ${id}=${value} for ${selection.model}. Refresh the model catalog.`,
         )
-      const result = await session.client.request("session/set_config_option", {
-        sessionId: session.sessionId,
-        configId: id,
-        value,
-      })
+      const result = await session.client.run((agent) =>
+        agent.request("session/set_config_option", {
+          sessionId: session.sessionId,
+          configId: id,
+          value,
+        }),
+      )
       session.configuration = { ...session.configuration, ...result }
     }
   }
@@ -261,16 +305,19 @@ export const runCursorWorker = (
     const image = record(record(session.init.agentCapabilities).promptCapabilities).image === true
     let models
     try {
-      const catalog = await session.client.request("cursor/list_available_models", {})
+      const catalog = await session.client.run((agent) =>
+        agent.request<RecordValue>("cursor/list_available_models", {}),
+      )
       models = parameterizedModels(catalog, session.configuration, image)
     } catch (cause) {
-      if (!(cause instanceof CursorRequestError) || record(cause.nativeError).code !== -32601)
-        throw cause
+      if (!(cause instanceof RequestError) || cause.code !== -32601) throw cause
       // Older releases only expose their model catalog through a new session.
-      session.configuration = await session.client.request("session/new", {
-        cwd: homedir(),
-        mcpServers: [],
-      })
+      session.configuration = await session.client.run((agent) =>
+        agent.request("session/new", {
+          cwd: homedir(),
+          mcpServers: [],
+        }),
+      )
       models = cursorModels(session.configuration, image)
     }
 
@@ -321,11 +368,7 @@ export const runCursorWorker = (
   const cancelInteractions = (session: Session): void => {
     for (const [id, approval] of approvals) {
       if (approval.session !== session) continue
-      try {
-        session.client.respond(approval.nativeId, { outcome: { outcome: "cancelled" } })
-      } catch {
-        /* Connection already closed. */
-      }
+      approval.respond("cancel")
       approvals.delete(id)
       session.emit?.("serverRequest/resolved", { requestId: id }, true)
     }
@@ -397,9 +440,8 @@ export const runCursorWorker = (
         record(record(session.init.agentCapabilities).promptCapabilities).image === true,
       )
       if (turn.interrupted) throw new Error("Cursor turn interrupted.")
-      const result = await session.client.request(
-        "session/prompt",
-        { sessionId: session.sessionId, prompt },
+      const result = await session.client.run(
+        (agent) => agent.request("session/prompt", { sessionId: session.sessionId, prompt }),
         0,
       )
       emit("cursor/acp/session/prompt/result", result)
@@ -413,7 +455,7 @@ export const runCursorWorker = (
       return result
     }
     const failTurn = async (cause: unknown): Promise<void> => {
-      if (cause instanceof CursorRequestError) emit("cursor/acp/error", cause.nativeError)
+      if (cause instanceof RequestError) emit("cursor/acp/error", cause.toErrorResponse())
       if (turn.session) {
         cancelInteractions(turn.session)
         sessions.delete(dispatch.threadId)
@@ -465,9 +507,13 @@ export const runCursorWorker = (
           title += text(record(update.content).text)
       })
       await configureModel(session, request.model, "ask")
-      await session.client.request(
-        "session/prompt",
-        { sessionId: session.sessionId, prompt: [{ type: "text", text: request.prompt }] },
+      const activeSession = session
+      await session.client.run(
+        (agent) =>
+          agent.request("session/prompt", {
+            sessionId: activeSession.sessionId,
+            prompt: [{ type: "text", text: request.prompt }],
+          }),
         60_000,
       )
       if (!stopping && title.trim())
@@ -506,11 +552,12 @@ export const runCursorWorker = (
     turn.interrupted = true
     if (!turn.session) return
     cancelInteractions(turn.session)
-    try {
-      turn.session.client.notify("session/cancel", { sessionId: turn.session.sessionId })
-    } catch {
-      /* Failed turn settles through its task. */
-    }
+    const session = turn.session
+    void session.client
+      .run((agent) => agent.notify("session/cancel", { sessionId: session.sessionId }))
+      .catch(() => {
+        /* Failed turn settles through its task. */
+      })
     const timer = setTimeout(() => {
       if (turns.has(turn.dispatch.turnId)) void turn.session?.client.close()
     }, 2_000)
@@ -550,16 +597,7 @@ export const runCursorWorker = (
         case "resolve-approval": {
           const approval = approvals.get(String(message.requestId))
           if (!approval) throw new Error("This Cursor interaction is no longer pending.")
-          approval.session.client.respond(
-            approval.nativeId,
-            interactionResponse(
-              approval.method,
-              approval.params,
-              message.decision,
-              message.answers,
-              message.optionId,
-            ),
-          )
+          approval.respond(message.decision, message.answers, message.optionId)
           approvals.delete(String(message.requestId))
           approval.session.emit?.("serverRequest/resolved", { requestId: message.requestId }, true)
           ack()

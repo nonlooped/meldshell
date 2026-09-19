@@ -15,7 +15,6 @@ const UsageSummary = Schema.Struct({
         enabled: Schema.Boolean,
         autoPercentUsed: optional(percent),
         apiPercentUsed: optional(percent),
-        totalPercentUsed: optional(percent),
       }),
     ),
   }),
@@ -39,18 +38,13 @@ function parseCursorUsage(response: unknown): CodexUsage {
       : { usedPercent, label, resetsAt: Number.isFinite(reset) ? reset : null }
   const limits: Array<{ id: string; limit: UsageLimit }> = []
   if (plan?.enabled) {
-    const primary = window(plan.autoPercentUsed, "Cursor / Auto pool")
+    // The summary also reports a combined total, but it duplicates the two pools it is made of.
+    const primary = window(plan.autoPercentUsed, "Auto pool")
     const secondary = window(plan.apiPercentUsed, "API pool")
     if (primary || secondary)
       limits.push({
         id: "cursor",
         limit: { limitName: "Plan limits", planType: summary.membershipType, primary, secondary },
-      })
-    const overall = window(plan.totalPercentUsed, "Overall included usage")
-    if (overall)
-      limits.push({
-        id: "cursor-total",
-        limit: { limitName: "Overall usage", primary: overall },
       })
   }
   return { checkedAt: new Date().toISOString(), limits, resetCredits: null }

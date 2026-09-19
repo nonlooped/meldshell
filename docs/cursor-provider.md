@@ -4,7 +4,7 @@ Research and implementation checked on 2026-09-06. This is an ACP integration wi
 
 ## Client choice
 
-MeldShell starts Cursor in `acp` mode and owns a small JSON-RPC client in [provider-cursor](../packages/provider-cursor/src/client.ts). Cursor documents ACP specifically for custom interactive clients. It supplies bidirectional permissions, session resume, modes, and Cursor extensions. This matches a desktop host that needs users to participate during a run. [Cursor ACP documentation](https://cursor.com/docs/cli/acp)
+MeldShell starts Cursor in `acp` mode and uses `@agentclientprotocol/sdk` in [provider-cursor](../packages/provider-cursor/src/client.ts). Cursor documents ACP specifically for custom interactive clients. It supplies bidirectional permissions, session resume, modes, and Cursor extensions. This matches a desktop host that needs users to participate during a run. [Cursor ACP documentation](https://cursor.com/docs/cli/acp)
 
 The alternatives researched were:
 
@@ -12,7 +12,9 @@ The alternatives researched were:
 - **`@cursor/sdk`:** supports local and cloud execution, durable agents, typed streams and programmatic authentication. Its default local execution approves tools automatically; documented gating uses hooks or sandbox configuration. ACP provides the direct interactive permission surface needed here. [TypeScript SDK](https://cursor.com/docs/sdk/typescript)
 - **Cloud API / SDK Bridge:** changes execution or adds a server layer without improving this local desktop integration. [SDK Bridge](https://cursor.com/docs/sdk/bridge)
 
-The client implements ACP v1 directly so Cursor's unprefixed extension methods and unknown payloads reach our persistence boundary intact. It does not introduce an ACP adapter around Codex or Claude. Request timeouts, UTF-8 framing, process exit, response correlation and unsupported-method responses are covered independently of model inference.
+The [ACP TypeScript SDK](https://github.com/agentclientprotocol/typescript-sdk) owns ACP v1 JSON-RPC envelopes, request tracking, response serialization, and NDJSON transport. The integration uses its app API with typed permission and session-update handlers and explicit parsers for Cursor's question and plan extensions. Request handlers return responses or await a user decision; the SDK sends the reply and rejects unsupported or malformed calls. Worker code calls the SDK's typed agent context directly. Connections use `connect()` because conversations remain open between turns and can load saved sessions.
+
+A read-only stream observer retains native notifications before SDK parsing and archives original requests as `cursor/acp/request/received` events. It does not change method names, payloads, or dispatch. MeldShell owns process supervision, the 16 MiB incoming-line limit, and request deadlines. A deadline closes the connection and rejects all outstanding requests; the next submission must explicitly reconnect. Conversation prompts have no deadline; title generation retains its 60-second deadline. Transport and interaction tests use a local fixture without model inference.
 
 ## What was observed locally
 
