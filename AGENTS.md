@@ -1,48 +1,38 @@
-# Agent instructions
+# Working in MeldShell
 
-## Scope and follow-through
+MeldShell supervises Codex, Claude Code, and Cursor in separate processes. Preserve native provider payloads and session behavior, durable thread state, and renderer isolation.
 
-Treat a request to implement, fix, or update something as authorization to finish the relevant local work. Use the conversation and repository to resolve routine choices. Ask only when a missing decision materially changes scope or correctness; continue independent work while waiting.
+## Scope and completion
 
-User instructions take precedence over skill guidelines. Apply skills to the requested task, without adding interviews, reports, redesigns, or approval steps that it does not need. If a local instruction blocks progress, cite its file and exact rule and explain the unresolved issue. Existing authorization carries forward.
+An implementation request authorizes the relevant local work through completion. Resolve routine choices from the conversation and source. Ask when a missing decision changes scope or correctness, and continue independent work while waiting. Preserve unrelated working-tree changes.
 
-Keep unrelated working-tree changes intact. Before an external action that still needs authorization, prepare the concrete result for review.
+User instructions take precedence over skills. Keep skills within the requested task and follow the session's delegation policy. Existing authorization carries forward. Prepare a concrete result before requesting any still-needed authorization for an external action. If a local rule blocks progress, cite its file and exact rule and explain the unresolved issue.
 
-## Project context
+## Read by task
 
-MeldShell supervises external coding harnesses. Preserve provider-native behavior and payloads, durable thread state, and process isolation.
+- [Architecture](docs/architecture.md): process boundaries, IPC, persistence, recovery, or provider integration.
+- [Claude](docs/claude-provider.md) and [Cursor](docs/cursor-provider.md): the selected provider's protocol, permissions, sessions, and limitations.
+- [Design](docs/design.md): desktop UI changes. Renderer tokens and shared components own exact values.
+- [Transcript rendering](docs/markdown-rendering.md): Markdown, file references, diagrams, math, or rich output.
+- [Contributing](CONTRIBUTING.md): setup, check selection, or schema regeneration.
+- [Release](docs/release.md): installer preparation and candidate certification.
+- [Website](docs/website.md): site builds and deployment.
+- [Documentation maintenance](docs/agent-documentation.md): changes to instructions, skills, or documentation.
 
-Read documentation by task:
-
-- [Architecture](docs/architecture.md) for process, persistence, and provider changes.
-- [Interface design](docs/design.md) for UI changes; existing renderer tokens define exact values.
-- [Claude integration](docs/claude-provider.md) for that provider's behavior and limitations.
-- [Contributing](CONTRIBUTING.md) for development setup and live-test constraints.
-- [Release checklist](docs/release.md) when preparing an installer for release.
-
-The roadmap and feature-gap analysis include historical plans. Check implementation before treating a planned feature as missing or a milestone as verified.
+[Roadmap](docs/roadmap.md) describes open product work. The competitive analysis and release records are dated evidence, not implementation instructions or certification of this checkout.
 
 ## Verification
 
-Review the diff and use the smallest existing check that covers a concrete risk.
+Use the smallest existing check that covers the change's concrete risk. Documentation changes need a diff and reference review only. Add regression tests when they can expose the broken behavior.
 
-- Documentation-only changes need a diff and reference review, not executable checks.
-- Leave visual verification and manual testing to the user unless they explicitly ask the agent to perform it. Do not launch Browser, Chrome, Electron, Playwright, screenshot capture, or standalone UI test harnesses to verify changes without that request, including for layout, navigation, or accessibility risks.
-- When visual or interaction evidence is needed, finish the implementation work possible from the code, then ask the user for a screenshot or a short, specific manual check. Use their feedback to continue fixing the issue. Do not build a substitute test environment or repeatedly ask for evidence already provided.
-- Routine copy, styling, spacing, icon, or component edits may use targeted static checks and existing unit tests for concrete code risks. These do not replace the user's visual testing; report clearly when UI behavior has not been verified.
-- Add tests for meaningful regressions that would fail with the broken behavior. Avoid tests that repeat implementation details or merely prove code runs.
-- Run codebase-wide lints, builds, typechecks, suites, or aggregate checks only when requested or when targeted checks cannot cover the impact. State that reason first. Release certification follows its own checklist.
-- Batch verification after coherent changes. Once relevant checks pass, finish; repeat or broaden only for new changes, failures, or unresolved risks.
-- Report what was checked and any unresolved failure.
+Visual verification and manual testing belong to the user unless explicitly requested of the agent. Do not launch a browser, Electron, Playwright, screenshots, or a substitute UI harness for verification without that request. Finish code work first; if visual evidence is needed, request a specific manual check or screenshot and use the feedback without asking for the same evidence again. Targeted static checks do not certify UI behavior.
 
-## Library documentation
+Run repository-wide lint, builds, typechecks, suites, or aggregate checks only when requested or when targeted checks cannot cover the impact; state the reason first. Release certification follows its checklist. Batch checks after coherent changes, then finish once relevant checks pass. Repeat only for new changes, failures, or unresolved risks.
 
-Use Context7 for current library, framework, SDK, API, CLI, or cloud-service documentation when the task depends on their syntax, configuration, migration, or behavior. Resolve the library ID first unless supplied, then query the relevant concept and version. Prefer primary documentation as a fallback when Context7 is unavailable or incomplete. For OpenAI model and Codex guidance, use official OpenAI documentation.
+Report what changed, what was checked, and any remaining failure or verification limit.
 
-Local refactoring, business-logic debugging, code review, and general programming questions do not require library lookups unless a specific dependency behavior needs verification.
+## Dependency documentation
 
-## Communication and delegation
+Use Context7 when correctness depends on a library, framework, SDK, API, CLI, or cloud service's current behavior. Resolve its library ID first unless supplied, then query the relevant concept and version. Use primary documentation if Context7 is unavailable or incomplete, and official OpenAI documentation for OpenAI and Codex guidance.
 
-Lead with the result and use concise, plain prose. Include evidence and limitations that affect the conclusion; use lists or tables when they make comparison easier.
-
-Follow the session's delegation policy. When delegation is authorized and useful, give independent tasks clear ownership and integrate their results. A skill must not require extra agents or a fixed agent count for routine work.
+Local refactoring, business logic, and code review need no external lookup unless a dependency behavior is uncertain.

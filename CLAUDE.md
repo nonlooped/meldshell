@@ -1,3 +1,3 @@
-# Agent instructions
+# MeldShell repository guidance
 
-Read and follow [AGENTS.md](AGENTS.md) for repository guidance and task-specific documentation. It is the shared source of project rules for Codex and Claude.
+Follow [AGENTS.md](AGENTS.md), the shared source of repository rules. Its task links identify the documentation relevant to your change.

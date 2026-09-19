@@ -1,38 +1,45 @@
-# Agent documentation maintenance
+# Maintaining documentation and agent instructions
 
-Reviewed on 2026-09-05 against OpenAI's [GPT-6 Astra guidance](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra), particularly its prompting section. This is a maintenance record, not another set of always-loaded agent rules.
+Use this document when changing repository rules, local skills, or documentation. [AGENTS.md](../AGENTS.md) owns shared working rules; [CLAUDE.md](../CLAUDE.md) points to it.
 
-The guide recommends auditing instructions because Astra follows them closely. The changes here favor authorized follow-through, clear task boundaries, concise communication, and verification proportional to the change. They do not change application models or claim measured performance improvements.
+This rewrite follows [OpenAI's September 11, 2026 article](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra) and the local writing-for-agents skill. Keep always-loaded instructions focused on project constraints, route optional detail by task, and define completion without forcing every change through a fixed procedure.
 
 ## Ownership
 
-- AGENTS.md owns shared repository rules. CLAUDE.md points to it.
-- `.agents/skills` owns the local skill content. In this Windows checkout, `.claude/skills` contains junctions to those directories; both tracked paths reflect an edit. Other checkouts may contain separate copies, so check before editing or syncing them.
-- `agents/openai.yaml` and existing Claude frontmatter preserve invocation preferences. Short aliases remain for existing commands.
-- `skills-lock.json` records upstream installation provenance. These skills now contain local adaptations. Preserve those adaptations when updating upstream; the recorded hashes do not certify the edited local content. Do not invent replacement upstream hashes.
-- User-wide rules and plugin caches outside this repository are outside this audit.
-
-## Review decisions
-
-| Area | Result |
+| Material | Owner |
 | --- | --- |
-| AGENTS.md and contributor guidance | One verification policy, task-based document links, explicit follow-through and skill precedence |
-| Frontend design | Follow MeldShell's visual language; remove forced aesthetic risks and repeated design ceremonies |
-| Grilling and aliases | Bound questions to consequential decisions; remove the extra confirmation gate and missing Skill/domain-modeling dependencies |
-| Architecture skills | Preserve isolation and meaningful tests; remove mandatory agent counts, vocabulary bans, and automatic HTML/interview requirements |
-| Writing skills | Keep concrete editing advice; remove unsupported behavioral theories, punctuation bans, and instructions to invent personality |
-| PR evidence | Correct the formatter path, accept available capture tools, and check upload capability before publishing |
-| Architecture documentation | Reflect the two provider workers and shared desktop supervision |
-| Roadmap and feature-gap analysis | Retain planning history with explicit status and source limitations |
-| Release and design checklists | Keep their criteria and scope them to the relevant task |
-| Claude integration and 0.1.0 release record | Retain provider detail and historical evidence; this audit does not recertify runtime behavior |
+| Scope, authorization, verification, dependency lookup | AGENTS.md |
+| Setup and check selection | CONTRIBUTING.md |
+| Process, IPC, persistence, recovery | Architecture |
+| Native provider behavior | Provider documents |
+| Desktop appearance and interaction intent | Design; exact values remain in renderer code |
+| Current product gaps | Roadmap |
+| Candidate acceptance and artifact evidence | Release checklist and dated release records |
+| Website build and deployment | Website |
+| Local skill instructions | `.agents/skills` |
 
-Removed obsolete instructions within existing files rather than deleting useful skills or historical records.
+The skill directories are Git-ignored. In this checkout, `.claude/skills` links to `.agents/skills`; editing the target updates both consumers. Verify that relationship in another checkout before synchronizing copies. Local skill changes do not travel in a normal repository diff.
 
-## Future edits
+Preserve skill names, explicit-invocation metadata, and aliases unless the requested change includes invocation behavior. A lockfile records upstream provenance, not proof that locally edited skill content matches upstream. Keep local adaptations when updating installations. User-wide skills and plugin caches are outside this repository's documentation scope.
 
-The subsequent 2026-09-05 documentation refresh checked `docs` against the source. [Architecture](architecture.md) and [roadmap](roadmap.md) now describe the implemented IPC, persistence, search, two-provider behavior, and remaining limits. [Interface design](design.md) includes current themes and inbox/settings surfaces. The [feature-gap analysis](meldShell-hofh-feature-gaps.md) has a current reconciliation above its historical research, and [release.md](release.md) covers both providers. The original audit decisions above remain a maintenance record, not a live feature inventory.
+## Editing guidance
 
-Keep project constraints and non-obvious reasons. Replace a failing instruction with a focused correction instead of adding another universal rule. Review a routine edit, an already-authorized implementation, and an explicit interview request to check that the same skill does not force them through one workflow.
+Write project facts and decisions where their readers need them. Link to manifests, configuration, or source for values that are cheap to inspect. Keep runnable setup examples and non-obvious constraints near the task they support.
 
-Check changed links, frontmatter, invocation metadata, and the diff. Behavioral testing is useful when a real failure or complex workflow warrants it. This audit used document and reference review; no application tests, release certification, or live provider calls were needed.
+Separate implemented behavior, design intent, proposed work, and recorded test results. Check the implementation before carrying forward a missing-feature claim. Date historical evidence and retain artifact hashes; editing prose cannot certify a build.
+
+Skill descriptions should identify the task that needs them. A diagnosis skill should permit source inspection and user-provided evidence; a design skill should use the established interface; an interview skill should ask about consequential choices. None should add a universal approval gate, require extra agents, or authorize browser testing against repository policy.
+
+For instructions, state the intended result and the evidence that establishes completion. Keep ordered steps for real dependencies, such as building an artifact before certifying it. Move branch-specific details behind links that say when to read them.
+
+## Completion
+
+Review every changed document for factual claims, local paths, anchors, and duplicated rules. For skills, also review frontmatter, referenced resources, and invocation metadata. Check that a routine edit, a larger implementation, and an explicit interview can follow different paths.
+
+Documentation-only work ends after diff and reference review. Runtime checks and release certification need their own task and evidence.
+
+## September 19, 2026 rewrite
+
+The source review corrected stale claims about bundled Claude Code, two-provider support, Windows-only packaging, full-history fetching, and missing file/Git tools. Historical competitive ranks remain in the planning record, with current status owned by the roadmap.
+
+Local skills were shortened and their task boundaries aligned with AGENTS.md. This was a documentation review, not a measurement of model performance, a live provider test, or a release certification.
