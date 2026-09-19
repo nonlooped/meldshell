@@ -1,111 +1,93 @@
-# MeldShell architecture
+# Architecture
 
-Implementation reference reviewed on 2026-09-08. This describes the current checkout, not a certified release. See [Claude integration](claude-provider.md), [Cursor integration](cursor-provider.md), and [roadmap](roadmap.md) for provider behavior and remaining work.
+Use this reference for process, IPC, persistence, provider, and recovery changes. It describes source behavior, not release certification. Provider details live in [Claude](claude-provider.md) and [Cursor](cursor-provider.md).
 
-## Terms and ownership
+## Ownership and processes
 
-A provider identifies the service supplying an agent (OpenAI, Anthropic, or Cursor); a harness is its coding-agent runtime (Codex, Claude Code, or Cursor CLI). A workspace identifies a local folder. A thread belongs to one workspace, while each turn selects a provider, harness, model, and execution settings. The Cursor catalog includes models from several vendors.
+A workspace identifies a local folder. A thread belongs to one workspace; each turn records its provider, harness, model, and execution settings. A harness is the coding runtime, such as Codex or Claude Code. Cursor's catalog may contain models from several vendors.
 
-Threads are provider-neutral in MeldShell's database and transcript. Native histories are separate: switching back to a harness resumes its own session, without copying the other harness's messages into it.
-
-## Process topology
+Each harness has a separate native session inside a MeldShell thread. Switching back resumes that session without copying another harness's messages.
 
 ```text
 Sandboxed React renderer
-        | named preload methods and change notifications
-Electron main process
-        |-- window, dialogs, notifications, shutdown
-        |-- core utility process
-        |      `-- SQLite, catalog, threads, queue, search, recovery
-        |-- Codex utility process
-        |      `-- supervised codex app-server subprocess
-        |-- Claude utility process
-        |      `-- SDK queries and native Claude child processes
-        `-- Cursor utility process
-               `-- workspace-local Cursor ACP subprocesses
+  | named preload methods and change notifications
+Electron main
+  |-- core utility process: SQLite, catalog, threads, queue, search, recovery
+  |-- Codex utility process: codex app-server subprocess
+  |-- Claude utility process: SDK queries and installed Claude child processes
+  `-- Cursor utility process: workspace-local ACP subprocesses
 ```
 
-Main supervises providers through [worker-provider.ts](../apps/desktop/src/main/runtime/worker-provider.ts). Protocol handling stays in [provider-codex](../packages/provider-codex/src/worker-runtime.ts), [provider-claude](../packages/provider-claude/src/worker-runtime.ts), and [provider-cursor](../packages/provider-cursor/src/worker-runtime.ts). Shared supervision handles delivery acknowledgments, worker generations, event persistence, attention routing, and shutdown without making the native protocols identical.
+[Main supervision](../apps/desktop/src/main/runtime/worker-provider.ts) owns worker generations, delivery acknowledgments, persistence routing, attention, restart, and shutdown. Each provider package owns its native protocol, session behavior, and event mapping. [provider-runtime](../packages/provider-runtime/src) shares process-tree shutdown and worker-envelope handling.
 
-The [core worker](../apps/desktop/src/main/workers/core.ts) is the only application database writer. It admits up to eight RPC handlers while serializing mutation handlers and background search refreshes through one writer gate. SQLite's connection semaphore excludes reads during write transactions; multi-query snapshots also run transactionally. The renderer has no Node.js access and does not talk directly to provider processes.
+The [core worker](../apps/desktop/src/main/workers/core.ts) is the sole application database writer. It admits up to eight RPC handlers and serializes mutation handlers and background search refreshes through one writer gate. SQLite's connection semaphore excludes reads during write transactions; multi-query snapshots also use transactions.
 
-## Application services and IPC
+The renderer has no Node.js access or direct provider connection. Main owns operating-system integration, window management, dialogs, notifications, and shutdown.
 
-Effect layers and scoped runtimes construct the core client, database, desktop events, and provider supervisors. Schedules drive worker restart and background work. Provider boundaries also contain ordinary Promise and callback code; not every module is an Effect service.
+## IPC and startup
 
-[Contracts](../packages/contracts/src/index.ts) define Effect Schema records, errors, worker messages, and core RPCs. Main-to-core Effect RPC messages travel over Electron utility-process messaging. Main-to-provider communication uses validated worker envelopes. The renderer uses named invocation methods and event listeners exposed by the [preload](../apps/desktop/src/preload/index.ts), with main-process validation at the boundary.
+[Contracts](../packages/contracts/src/index.ts) define records, errors, core RPCs, worker envelopes, and renderer IPC. Effect RPC connects main to core over utility-process messaging. Provider workers use validated envelopes. The [preload API](../apps/desktop/src/preload/index.ts) exposes named methods and listeners, with main-process validation.
 
-## Source layout
+Effect layers and scoped runtimes construct services; schedules drive restarts and background work. Provider code also uses Promises and callbacks where native APIs require them.
 
-The desktop main entry registers IPC and opens the window before waiting for core readiness. Provider workers start concurrently in background fibers after their services are acquired. Startup logs record `whenReady`, core readiness, provider readiness, and `ready-to-show`; database migration backups remain mandatory but no longer gate window creation. `window.ts` owns window creation, `ipc.ts` registers renderer requests, `runtime/` owns services and shutdown, and `workers/` contains the utility-process entrypoints. Worker bundle filenames remain stable.
+Main registers IPC and opens the window before core readiness. Providers start concurrently after their services are acquired. Migration backups remain required but do not gate window creation. Startup logs distinguish Electron readiness, core/provider readiness, and the window's ready-to-show event. Preserve worker bundle filenames used by launch code.
 
-Renderer code is grouped into `app`, `data`, `threads`, `files`, `workspaces`, `settings`, and shared `ui`. The data modules own snapshot mutations, shared query keys, and cache invalidation; feature-specific file and Git queries stay with their views.
+## Provider contracts
 
-Contracts separate records, errors, core RPCs, worker envelopes, and renderer IPC. The IPC registry derives preload methods from the same channel definitions. Core database setup, migrations, and row conversion live in `database/`, with workspace and application settings services alongside thread and turn services.
+| Harness | Connection and lifetime | Discovery |
+| --- | --- | --- |
+| Codex | One supervised app-server process over stdio JSONL; committed schemas and Ajv validate native messages | Inherited PATH; minimum version is enforced in [client.ts](../packages/provider-codex/src/client.ts) |
+| Claude Code | A fresh SDK query per turn resumes the stored session; query-bound background work ends with the query | Installed CLI on PATH or `MELDSHELL_CLAUDE_EXECUTABLE`; probe determines compatibility |
+| Cursor | A workspace-local ACP process per conversation remains open between turns; saved sessions load after restart | Installed CLI or `MELDSHELL_CURSOR_EXECUTABLE`; Cursor authentication handshake required |
 
-`packages/provider-runtime` owns process-tree shutdown and worker envelope decoding/acknowledgments shared by the providers. Each provider retains native session behavior, payload mapping, and acknowledgment timing.
+Codex probes at startup, explicit refresh, authentication changes, and on-demand reconnect. It does not use an idle polling timer. Claude's SDK is a protocol client targeting the installed executable, which is not packaged with MeldShell.
 
-## Provider boundaries
+Native payloads remain alongside canonical event kinds. [Projection](../packages/projection/src/index.ts) turns those events into display and search content. A schema's existence does not imply a UI feature: the core currently rejects Codex Plan mode.
 
-Codex is discovered on the inherited `PATH`; it is not bundled. The integration enforces a minimum version of `0.153.0` in [provider-codex/src/client.ts](../packages/provider-codex/src/client.ts). Its worker probes availability, authentication, models, and account state at startup, explicit refresh, authentication changes, and on-demand reconnect—not on an idle timer—and runs one `codex app-server` subprocess over stdio JSONL. Committed app-server schemas and Ajv validate native messages.
+Unavailable providers leave stored conversations readable. External-session import is not implemented.
 
-Claude is discovered on the inherited `PATH` (override `MELDSHELL_CLAUDE_EXECUTABLE`); MeldShell does not bundle Claude Code. There is no minimum-version gate — any runnable user install is accepted, and the probe connection checks protocol compatibility. The pinned Agent SDK is only the protocol client and always targets that installed CLI via `pathToClaudeCodeExecutable`. Each follow-up turn starts a new SDK query with the stored Claude session reference. User, project, and local Claude settings are loaded by that integration. Queries close at turn completion, so query-bound background work does not persist between turns.
+## Turns and recovery
 
-Cursor uses the installed CLI's ACP v1 interface. Each conversation has its own workspace-local process and native session. Connections remain open between turns; saved sessions load after restart. Native Agent/Plan/Ask modes, permission options and blocking question/plan extensions have dedicated handling. See [Cursor integration](cursor-provider.md) for event coverage and limits.
+The database permits one running turn per thread. Different threads can run concurrently without an application concurrency cap. Closing a tab leaves its turn running.
 
-The composer exposes permissions according to the selected harness. Claude supports Code and Plan modes. Codex Plan mode is currently rejected by the core; a committed protocol schema alone does not mean a feature is exposed by MeldShell.
+Submissions during active work commit to `queued_inputs`. Normal promotion joins queued text with blank lines, keeps attachment order, and uses the thread's selected provider/model. Shutdown and worker reconciliation suppress promotion.
 
-Unavailable providers do not prevent reading stored conversations. The integrations do not import sessions created by another client. Native event payloads are retained alongside canonical event kinds; shared transcript projection lives in [packages/projection](../packages/projection/src/index.ts).
+Before dispatch, a turn receives its worker generation. Failed delivery or an ambiguous acknowledgment triggers reconciliation, not automatic replay. A disconnected worker's running turns fail. Application startup interrupts remaining running turns and clears stale approvals while preserving queued input. A later explicit submission can resume the native session; there is no dedicated retry/resume UI action.
 
-## Turns, queues, and failure recovery
+Workers restart with backoff. Renderer reloads do not control their lifetime. Intentional close with active work requests confirmation, interrupts turns, and terminates child process trees. See [interrupt-turn.ts](../apps/desktop/src/main/runtime/interrupt-turn.ts) for escalation and timeout handling.
 
-The database enforces at most one running turn per thread. Different threads can run concurrently without a MeldShell concurrency cap. Closing a tab does not stop its turn.
+## Storage and search
 
-Submissions during a running turn commit to `queued_inputs`. Normal queue promotion joins queued text with blank lines and preserves ordered attachments. Dispatch uses the thread's selected provider and model. Shutdown and worker reconciliation suppress automatic queue promotion.
+[core-client.ts](../apps/desktop/src/main/runtime/core-client.ts) selects `meldshell.sqlite` under Electron user data. [Persistence setup](../packages/core/src/database/persistence.ts) enables foreign keys, WAL, full synchronous writes, and a busy timeout.
 
-Before delivery, a turn is bound to a worker generation. Delivery failures or ambiguous acknowledgments trigger reconciliation rather than automatic replay. A disconnected worker's owned running turns become failed; a full application restart marks remaining running turns interrupted and clears stale approvals. Queued input remains durable. Continuing requires an explicit submission; the renderer has no dedicated retry/resume button.
+The schema stores workspaces, threads, turns, events, queues, provider/model catalogs, per-thread settings, approvals, preferences, and search documents. `provider_sessions` is keyed by thread and harness. Turn rows preserve submitted settings, native turn ID, outcome, and worker generation; next-turn choices live in `thread_settings`.
 
-Provider utilities restart with backoff. Renderer reloads do not own provider lifetime. Intentional close with active turns requests confirmation, interrupts active work, and terminates provider process trees. See [interrupt-turn.ts](../apps/desktop/src/main/runtime/interrupt-turn.ts) and [worker-provider.ts](../apps/desktop/src/main/runtime/worker-provider.ts) for timeout and reconciliation behavior.
+New threads inherit model, effort, and speed from the most recent submitted turn whose model remains available, otherwise the catalog default. Existing threads retain their choices.
 
-## Persistence and search
+[Migrations](../packages/core/src/database/migrations.ts) back up an existing disk database before applying pending migrations transactionally. Thread deletion cascades through history. Workspace removal deletes MeldShell records and transcripts, retains the folder, and rejects removal while work is active.
 
-The database is `meldshell.sqlite` under Electron's application user-data directory, selected in [core-client.ts](../apps/desktop/src/main/runtime/core-client.ts). [Initialization](../packages/core/src/database/persistence.ts) enables foreign keys, WAL, full synchronous writes, and a busy timeout.
+[Search](../packages/core/src/search.ts) indexes projected messages from finished turns in bounded background batches. FTS5 supports word-prefix matching, workspace filtering, and pages of 50 results across active, pinned, and archived threads. New or migrated history may appear after indexing catches up.
 
-The schema includes:
+## Renderer state and history
 
-- `workspaces`, `threads`, `turns`, `events`, and `queued_inputs`.
-- `providers`, `provider_models`, and `thread_settings` for the catalog and next-turn selection.
-- `provider_sessions`, keyed by thread and harness, and `approvals` with native request data.
-- `settings` for application preferences.
-- `transcript_documents`, its FTS5 index, and a dirty-work queue for transcript search.
-- `schema_migrations`, with migrations through version 7 in the current source.
+React Query owns snapshots, thread pages, provider state, usage, and transcripts. Runtime notifications invalidate affected queries. Streaming-only changes invalidate the affected transcript; lifecycle changes retain broader invalidation. Main briefly coalesces compatible text deltas before persistence.
 
-Turn rows retain provider, harness, model, effort, speed, native turn ID, outcome, and worker generation. Native session IDs live in `provider_sessions`; next-turn permission and mode choices live in `thread_settings`.
+Thread lists page before calculating indexed counts and activity. [Transcript.tsx](../apps/desktop/src/renderer/src/threads/Transcript.tsx) loads a recent, turn-complete window and virtualizes turns. Earlier windows load on request or for search navigation. Streaming fetches events after the last sequence and reprojects touched turns.
 
-New threads start with the model, reasoning effort, and speed from the latest submitted turn whose model is still available. They use the catalog default when no usable turn exists. Existing threads retain their own next-turn settings.
+Whole-turn projection preserves message integrity but allows a large turn to exceed the nominal page size. Loaded older windows remain cached. `transcriptMetrics` in renderer `data/transcript.ts` exposes fetch counts, event counts, and projection timings.
 
-[Migrations](../packages/core/src/database/migrations.ts) run transactionally and back up an existing on-disk database before applying pending migrations. Thread deletion cascades through stored history. Workspace removal deletes its MeldShell threads and transcripts, keeps the folder on disk, and rejects removal while work is running.
+Zustand holds tabs, split layouts, selection, and settings navigation in memory. Tabs and unsent drafts do not survive restart. Theme, transcript size, reduced motion, send shortcut, archived visibility, and title-model selection are database-backed.
 
-Search indexes projected messages from finished turns, rather than streaming chunks. A background job processes dirty groups in bounded batches, so recently finished or migrated history may take time to appear. [Search](../packages/core/src/search.ts) supports word-prefix matching, an optional workspace filter, and pages of 50 results across active, pinned, and archived threads.
+React Compiler has local opt-outs for virtualized components. Settings, math, diffs, and Mermaid use lazy loading. File and Git queries stay with their views; main-process [workspace files](../apps/desktop/src/main/workspace-files.ts) and [Git](../apps/desktop/src/main/git.ts) implement their operating-system operations.
 
-## Renderer data flow and limits
+## Security and distribution
 
-React Query owns snapshots, thread pages, provider status, usage, and transcript queries. Runtime-change notifications invalidate affected queries. Validated streaming deltas invalidate only the affected transcript, not the global snapshot or thread list; batches containing a lifecycle change retain full invalidation. Snapshot and list queries bound the thread page before computing indexed per-thread counts and activity. Compatible provider text deltas are briefly coalesced in main before persistence; there is no separate renderer `useSyncExternalStore` transcript subscription layer.
+The window enables sandboxing and context isolation, disables Node integration, and uses a restrictive Content Security Policy. Development uses a local server; packages load bundled renderer resources.
 
-Thread lists use cursor pagination. [Transcript.tsx](../apps/desktop/src/renderer/src/threads/Transcript.tsx) initially loads a recent, turn-complete window and virtualizes rendered turns. Earlier windows load on request or when locating a search result. Streaming reads only events after the last sequence and reprojects touched turns, retaining historical turn references. A long individual turn can exceed the page size and still requires whole-turn projection; explicitly loaded older windows remain cached. Fetch counts, received-event counts, and projection timings are available in `data/transcript.ts`'s `transcriptMetrics`.
+Renderer isolation does not isolate agents editing the same folder. MeldShell has no worktree manager or filesystem locking layer. Native tool permissions are not operating-system sandbox guarantees.
 
-Zustand stores open tabs, selection, and settings navigation in memory. Tabs and unsent composer drafts are not restored after restart. Database-backed preferences include theme, transcript size, reduced motion, send shortcut, archived-thread visibility, and title-model selection.
+[Packaging configuration](../apps/desktop/electron-builder.yml) defines Windows x64 NSIS and Linux x64 AppImage targets. SQLite is unpacked outside ASAR; Claude Code is excluded.
 
-React Compiler is enabled, with local opt-outs around virtualized components. Shared projection assembles streamed messages and structured activity for both transcript display and search. Settings, math rendering, and diff rendering load through lazy boundaries; Mermaid also loads dynamically only for diagrams.
+Installed builds check the configured GitHub Releases feed at startup and every four hours. [The updater](../apps/desktop/src/main/updater.ts) downloads stable releases in main and checks the SHA-512 supplied by release metadata. About exposes a manual check and a restart action after download. Development builds do not contact the feed.
 
-## Updates, security, and release boundaries
-
-The window enables `sandbox` and `contextIsolation`, disables `nodeIntegration`, and uses a restrictive Content Security Policy. Development loads the local development server; packaged builds load bundled renderer resources. Operating-system access stays behind the preload API.
-
-Installed Windows NSIS and Linux AppImage builds check the public `nonlooped/meldshell` GitHub Releases feed at startup and every four hours. `electron-updater` downloads a newer stable release in the main process and verifies it against the SHA-512 value in electron-builder's release metadata. The renderer receives status through named IPC methods and can request a restart only after the download finishes. Development builds do not contact the update feed. The About screen also supports a manual check.
-
-Publishing must include the installer or AppImage and its matching `latest.yml` or `latest-linux.yml` file from the same build. Do not mix metadata and artifacts from different builds.
-
-Renderer isolation does not replace harness permissions or isolate concurrent edits to a shared workspace. MeldShell has no worktree manager or filesystem locking layer. Claude tool permissions are not an operating-system sandbox.
-
-The manifests use Effect 3.22.1. Exact resolved dependencies are recorded in the lockfile; consult manifests before documenting an upgrade. Windows 11 x64 and Linux x64 are the release targets. Packaging unpacks SQLite outside ASAR; Claude Code is not packaged. Certification follows [release.md](release.md).
+Publish artifacts with their matching `latest.yml` or `latest-linux.yml` from the same build. Public updates require a publicly accessible destination. Follow [Release](release.md) for candidate evidence.

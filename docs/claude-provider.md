@@ -1,63 +1,60 @@
 # Claude Code integration
 
-Implementation reviewed on 2026-09-05 against the [provider package](../packages/provider-claude/src/index.ts), [worker](../packages/provider-claude/src/worker-runtime.ts), and [desktop supervisor](../apps/desktop/src/main/runtime/worker-provider.ts). This is a source review, not a new authenticated-provider certification.
+Use this document for Claude discovery, sessions, permissions, model controls, and limitations. The implementation lives in [provider-claude](../packages/provider-claude/src/index.ts), its [worker](../packages/provider-claude/src/worker-runtime.ts), and the [desktop supervisor](../apps/desktop/src/main/runtime/worker-provider.ts).
 
-Choose a Claude model in the composer to start a Claude Code conversation. Settings > Providers > Claude shows connection status and lets you refresh the catalog.
+## Connection and credentials
 
-MeldShell discovers the installed Claude Code CLI on the inherited `PATH` (no minimum-version gate). `MELDSHELL_CLAUDE_EXECUTABLE` can override the executable path (native binary or JavaScript entrypoint). The pinned `@anthropic-ai/claude-agent-sdk` 0.3.261 is only the protocol client; it always targets that installed CLI and never the SDK's bundled native executable. Claude Code is not packaged with MeldShell. Compatibility is determined by a successful probe connection, not a version number.
+Choose a Claude model in the composer. Settings > Providers > Claude shows connection status and catalog refresh.
 
-It reads Claude Code's existing sign-in and environment configuration. If authentication is missing, sign in using `claude auth login` in a terminal, then click **Check again**. API credentials supplied through the environment also work. MeldShell does not store API keys in its database.
+MeldShell discovers the installed Claude Code CLI on PATH. `MELDSHELL_CLAUDE_EXECUTABLE` can select a native binary or JavaScript entrypoint. The pinned Agent SDK targets that executable through `pathToClaudeCodeExecutable`; it does not use or package the SDK's bundled CLI. Compatibility depends on a successful probe, with no minimum-version gate.
 
-## Available
+Claude owns sign-in and environment credentials. When sign-in is missing, use `claude auth login` in a terminal and then Check again in MeldShell. The application does not store API keys in SQLite.
 
-- A provider sidebar and searchable model list. Alias labels include the version from the SDK's `resolvedModel`, while the stored alias remains unchanged.
-- Model history discovered from the public Models.dev catalog. Its version IDs are passed through Claude Code's `modelPicker` settings for capability discovery and policy filtering. MeldShell does not maintain a release list. The public IDs are cached in `~/.cache/meldshell/claude-model-history.json` for offline discovery. A configured Claude picker or a cloud/gateway deployment keeps its own catalog. Explicit IDs can also be added in Settings > Providers > Claude.
-- Standard/Fast controls for models advertising `supportsFastMode`. Each turn passes `settings.fastMode` explicitly, so Standard overrides an inherited fast preference. Fast mode uses paid usage credits on subscription plans, subject to account availability.
-- Separate Codex and Claude subscription cards with refresh and polling. Claude usage comes from the SDK's experimental structured usage method, without reading or storing credentials. This method is version-pinned with the SDK and may need adaptation on upgrade. Accounts without subscription windows show an unavailable-allowances state.
-- Streaming assistant text and reasoning, command output, file changes and diffs, tool calls, and subagent tool activity.
-- Tool approval, denial, cancellation, and Claude's questions, including multiple selections.
-- Code and plan modes, tool permission settings, and interruption.
-- Text, image, file-reference, and skill-file attachments.
-- Saved native sessions, queued follow-up turns, provider-specific title generation, worker restart recovery, and desktop notifications.
-- Claude Code's system prompt and user, project, and local settings. This loads the applicable `CLAUDE.md`, skills, hooks, and configured MCP tools through Claude Code.
-- SDK-supported slash commands entered directly in the composer. Native events for compaction, hooks, rate limits, and background tasks remain in the stored transcript payloads.
+## Models and usage
 
-Each provider has its own native session within a MeldShell thread, stored by thread and harness in `provider_sessions`. Switching back to Claude resumes Claude's history. Codex messages are not copied into that history. Stop an active turn before switching providers. Code/Plan mode is supported for Claude; the current Codex integration rejects Plan mode.
+The picker uses Claude's discovered capabilities. Alias labels can show the SDK's resolved version while retaining the original alias as the stored model ID.
+
+[Model history](../packages/provider-claude/src/model-history.ts) discovers public IDs through Models.dev and supplies them to Claude's model picker for capability and policy filtering. It caches those IDs in `~/.cache/meldshell/claude-model-history.json`. Configured pickers and cloud/gateway deployments retain their own catalogs. Settings also accepts explicit model IDs.
+
+Standard/Fast controls appear for models advertising fast-mode support. Every turn explicitly passes the fast-mode setting so Standard overrides an inherited preference. Account availability and billing remain Claude's responsibility.
+
+The usage card calls the pinned SDK's experimental structured usage method without reading or storing credentials. Accounts without subscription windows show unavailable allowances. Recheck this integration on SDK upgrades.
+
+## Sessions and events
+
+Each thread stores a Claude session separately from its Codex and Cursor sessions. Returning to Claude resumes only Claude history. Stop an active turn before changing providers.
+
+Each follow-up creates a fresh SDK query with the stored session reference. The query closes when the turn ends, so query-bound background work cannot persist between turns. The supervisor tracks child processes and reconciles failed worker-owned turns without automatically replaying them.
+
+The integration supports:
+
+- Streaming text and reasoning, commands, tool calls, file changes/diffs, and subagent activity.
+- Approvals, denial, cancellation, and questions with multiple selections.
+- Code/Plan modes, supported reasoning/speed choices, and interruption.
+- Text, images, file references, and skill-file attachments.
+- Queued turns, provider-specific titles, native session resume, and notifications.
+
+Claude loads its system prompt and user, project, and local settings. Applicable CLAUDE.md files, skills, hooks, and configured MCP tools remain native Claude behavior. Supported slash commands can be typed in the composer. Native compaction, hook, rate-limit, cost, and background-task events remain in stored payloads even where no dedicated control exists.
 
 ## Permissions
 
-Claude's controls describe tool permissions, not an operating-system filesystem sandbox. Native modes use Claude Code's labels; Read tools only is a custom MeldShell restriction.
+These controls govern tools, not an operating-system filesystem sandbox.
 
-| Composer control               | Claude behavior                                                                                                      |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| Read tools only (custom)                | Exposes Read, Glob, Grep, WebSearch, and WebFetch. Blocks command execution, editing, agents, skills, and MCP tools. |
-| Manual               | Uses Claude's default permission mode and configured permission rules.                                               |
-| Accept edits                    | Uses `acceptEdits`; other tools follow Claude's permission rules.                                                    |
-| Don’t ask                  | Uses `dontAsk` to reject actions that need approval.                                                                 |
-| Bypass permissions | Uses `bypassPermissions`.                                                                                            |
-| Plan                           | Uses Claude's plan permission mode. Read-tools restrictions still apply if selected.                                 |
+| Composer choice | Behavior |
+| --- | --- |
+| Read tools only | Custom restriction to Read, Glob, Grep, WebSearch, and WebFetch; excludes commands, edits, agents, skills, and MCP tools |
+| Manual | Claude default mode and configured rules |
+| Accept edits | Native `acceptEdits`; other tools follow Claude rules |
+| Don't ask | Native `dontAsk`; rejects actions requiring approval |
+| Bypass permissions | Native `bypassPermissions` |
+| Plan | Native plan permission mode; selected read-tool restrictions still apply |
 
-Claude evaluates its configured rules before invoking MeldShell's approval callback. Tools already allowed by those rules do not display a dialog. **Allow for this turn** applies SDK permission suggestions only to the current worker query, without writing permission rules to user or project settings. Follow-up turns resume conversation history in a fresh query and may ask again.
+Claude evaluates configured rules before MeldShell's approval callback, so already-allowed tools need no dialog. Allow for this turn applies SDK suggestions to the current query only. It writes no user/project rules, and a follow-up query may ask again.
 
-## Remaining work
+## Limits and verification
 
-There are no dedicated controls yet for MCP authentication and elicitation, plugin management, slash-command discovery, checkpoint rewind, session import/fork, live steering, or background-task management. Native rate-limit and cost events are recorded.
+Dedicated controls for MCP authentication/elicitation, plugin management, command discovery, checkpoint rewind, session import/fork, live steering, and background-task management are absent.
 
-The integration resumes each follow-up turn through the SDK against the installed Claude Code CLI. It does not keep a persistent SDK query between turns. Background work tied to that query therefore stops when the turn finishes.
+This document describes the integration; it does not certify authenticated behavior. Use the [release checklist](release.md) for candidate checks. The older 0.1.0 artifact record does not verify subsequent Claude changes.
 
-The desktop supervisor tracks provider child processes and reconciles interrupted worker-owned turns without replaying them automatically.
-
-## References
-
-Use the [release checklist](release.md) for packaged and authenticated checks. The dated 0.1.0 artifact record does not certify later Claude changes.
-
-External documentation:
-
-- [Agent SDK overview](https://code.claude.com/docs/en/agent-sdk/overview)
-- [Model configuration](https://code.claude.com/docs/en/model-config)
-- [Fast mode](https://code.claude.com/docs/en/fast-mode)
-- [Models.dev](https://models.dev)
-- [Permissions](https://code.claude.com/docs/en/agent-sdk/permissions)
-- [User input](https://code.claude.com/docs/en/agent-sdk/user-input)
-- [Sessions](https://code.claude.com/docs/en/agent-sdk/sessions)
-- [System prompts and project instructions](https://code.claude.com/docs/en/agent-sdk/modifying-system-prompts)
+For dependency changes, consult primary [SDK documentation](https://code.claude.com/docs/en/agent-sdk/overview), [permissions](https://code.claude.com/docs/en/agent-sdk/permissions), [sessions](https://code.claude.com/docs/en/agent-sdk/sessions), [user input](https://code.claude.com/docs/en/agent-sdk/user-input), [model configuration](https://code.claude.com/docs/en/model-config), and [project instructions](https://code.claude.com/docs/en/agent-sdk/modifying-system-prompts).

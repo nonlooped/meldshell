@@ -1,273 +1,80 @@
-# MeldShell interface design
+# Interface design
 
-This document defines the design language: the look, feel, and behaviour every
-screen should follow. It intentionally avoids hard values. Exact sizes and colors
-live in the renderer Tailwind utilities and shared theme tokens. Animation timings
-live in the Motion helpers. These define the exact values; this document explains
-the intent behind them so new UI reads as MeldShell without copying old pixels.
+Use this reference for desktop UI changes. The renderer's theme tokens, Tailwind utilities, shared controls, and Motion helpers own exact values. This document defines design intent and interaction constraints, not visual certification.
 
-Reviewed against the renderer on 2026-09-05. Current behavior includes dark,
-light, and system themes, pinned threads, an Archived section, transcript
-search, and a full-workbench Settings view. Design criteria below describe
-intent; they are not a record of accessibility or visual certification.
+## Purpose and appearance
 
-## Subject, audience, and job
+MeldShell helps a developer supervise several coding conversations while reading one or more selected threads. Keep concurrent activity visible in the inbox and the reading area clear.
 
-MeldShell is a Windows workbench for a developer supervising several coding-agent conversations. The interface has one job: make concurrent work legible without pulling attention away from the selected thread.
+Use the established dense desktop layout. Windows acrylic appears at the window edge, title bar, inbox, and floating controls; Linux uses a solid backdrop. Dark, light, and system-following themes share the same hierarchy.
 
-It should look like installed Windows software. It must not borrow the visual grammar of a marketing site, project-management board, or mobile chat application.
+Chrome uses neutral tones with a contrasting accent for selection, focus, and primary actions. Provider/file icons, diffs, and transcript content retain meaningful colors. Status also needs a label or shape so color is not the only signal.
 
-## Visual thesis
+Use installed system display, text, and monospace fonts for their existing roles. Reading text is larger than controls and metadata. Use sentence-case labels and reserve compact uppercase styling for existing hierarchy needs.
 
-The default dark theme uses smoked glass around a quiet, dense workbench. Light and system-following themes preserve the same hierarchy. Content panes stay legible for reading. Acrylic reads at the window edge, title bar, inbox, and transient surfaces. Activity indication lives where threads are listed, so concurrent runs, waits, and approvals are visible at a glance.
+## Workbench
 
-Activity indication is functional, not decoration. It marks which threads need
-attention and which are busy, using small indicators attached to their rows
-rather than badges scattered across the interface or a separate decorative
-element.
+The tab strip selects views; the inbox finds threads; the content area shows threads or files. Closing a view never interrupts work.
 
-## Palette and contrast
+The inbox lists pinned threads before active threads and an optional Archived section. Archived status is named `settled` in storage. Filter by workspace rather than grouping threads beneath workspace headings. Show workspace names where they disambiguate rows. Empty draft threads stay out of the inbox until submission.
 
-MeldShell keeps a monochrome base theme, including subtly tinted grays and
-white/black alphas. This does not require decolorizing icons or content to match
-the chrome. Color can help distinguish status and activity alongside labels,
-shapes, and motion. High-contrast readability remains a design and verification
-requirement.
+Search opens full-text matches with workspace filtering and paged snippets. Selecting a result opens its matching turn. The thread switcher is a separate action.
 
-The language has four ideas, not four hex codes:
+The composer keeps attachments, next-turn settings, queue state, stop, and send with the conversation. Controls reflect native capabilities: Claude Code/Plan and tool permissions, Codex sandbox/approval choices, and Cursor Agent/Plan/Ask with native permission options. Live steering is not exposed.
 
-- A shared base over the native material, with dark and light token sets.
-- Elevated surfaces for things that float above the base: composer, menus,
-  dialogs, tooltips.
-- A small stepped text hierarchy: primary for content, quieter tiers for
-  secondary context, tertiary metadata, and disabled states.
-- One contrasting accent reserved for selection, focus, and primary actions,
-  with foreground/background inversion appropriate to the selected theme.
+Files and Changes share a workspace sidebar. File and diff tabs use the content area. Git controls expose staged/working changes, commit actions, push, and history. Represent these as workspace operations; they are not proof that one thread owns every changed file.
 
-Provider and file icons retain the colors supplied by their icon libraries;
-monochrome brand assets do not need invented colors. Transcript content and
-diffs retain their own colors inside the neutral frame.
+Settings replaces workbench content while retaining open tabs in memory. Workspace management is reached from the workspace menu. Model selection uses provider headings and searchable rows; catalogs and account usage remain provider-specific.
 
-## Type
+## Split thread layouts
 
-- Display and window chrome: the system display face.
-- Body and controls: the system text face.
-- Commands, paths, diffs, and model metadata: the system monospace face.
+A tab can hold one thread or a tree of horizontal and vertical splits. Each visible thread appears once. Opening another thread creates a solo tab; selecting an open thread returns to its tab and focuses its pane.
 
-The interface uses installed system fonts. No web fonts load at runtime. Type
-scales by role: larger for reading, compact for metadata and controls. Labels
-are sentence case; eyebrows and section headings may use compact uppercase
-styling where the hierarchy needs it.
+Dragging a tab, inbox row, or pane title over a pane previews a split at the outer quarter of an edge. A center drop takes over that pane or swaps threads already on screen. The inbox menu can open a thread to the right or below the focused pane. Pane menus offer splitting by thread name so dragging is optional.
 
-## Window layout
+Separators resize with dragging or arrow keys. Measure reading width against the pane, and retain usable minimum sizes. Switching tabs preserves layouts and ratios for the current session.
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ ◈  [Thread tab] [Thread tab •]                                ─ □ × │
-├──────────────────┬──────────────────────────────────────────────────┤
-│ Search (Ctrl+K)  │                                                  │
-│ Workspace filter │ Canonical conversation                           │
-│ + New thread     │ Reasoning summary                                │
-│                  │ Commands, diffs, plans, goals, and tool events   │
-│ Pinned / Active  │                                                  │
-│  with activity   │                                                  │
-│                  ├──────────────────────────────────────────────────┤
-│ Archived         │ Message composer                                 │
-│  Older threads   │ [context chips] [run controls] [send]            │
-│ ⚙ Settings       │                                                  │
-└──────────────────┴──────────────────────────────────────────────────┘
-```
+A shared tab shows a split icon, titles, and pane count. Closing it removes the view without stopping its threads. Closing one pane gives space to its neighbor; one remaining pane becomes a solo tab. Showing one thread alone moves it to a solo tab and keeps the remaining split together.
 
-The window has three regions: a tab strip for open threads, an inbox for
-finding threads, and a thread pane for reading and replying. Only one tab is
-selected. Closing a tab removes it from the strip and leaves its turn
-untouched; the inbox always provides the route back.
+Pane headers contain title, layout menu, and close controls only when a layout is shared. Tabs and layouts are not restored after application restart.
 
-Threads are never grouped by workspace. The inbox filters and searches across
-workspaces, and each row shows its workspace as quiet secondary text only where
-needed to disambiguate. Pinned threads lead, followed by active work and an
-optional, collapsible Archived section. The database still calls archived
-status `settled`. Empty draft threads stay out of the inbox until submitted.
+## Components and depth
 
-Search opens a dialog with full-text matches across active, pinned, and archived
-history, workspace filtering, and paged snippets. Choosing a result opens its
-thread at the matching turn. `Ctrl+P` is a separate thread switcher.
+Adjacent regions share the base tint and use hairline dividers. Floating menus, dialogs, tooltips, and the composer may add blur or shadow. Dialogs dim the content behind them. With transparency disabled, use solid neutral backgrounds while preserving contrast.
 
-The composer keeps thread context (model, reasoning, speed, sandbox,
-attachments) and run controls (queue state, stop, send) in one row so sending
-and queueing a follow-up stay in the thread. Controls reflect the selected
-harness: Claude has Code/Plan modes and tool permissions; Codex exposes its
-sandbox and approval choices. Live steering is not currently exposed.
+Base UI provides focus, navigation, dismissal, portals, and ARIA behavior through shared wrappers. Feature code uses those wrappers and MeldShell styling. Keep Tailwind utilities near markup and shared compositions in `ui/styles.ts`. Raw CSS is reserved for tokens, document defaults, platform scrollbars, and vendor typesetting.
 
-Settings replaces the workbench content while keeping open tabs in memory.
-Its sections cover General, Appearance, Providers, Usage, Threads, and About.
-Workspace management is available from the workspace menu. Model selection
-uses a searchable picker with provider headings and compact model rows; provider catalogs and usage
-remain separate where capabilities differ.
+Icons share a thin optical weight except for product and file marks. Icon-only controls need an accessible name and tooltip.
 
-## Splitting the thread pane
+Use compact buttons and inputs, menus for choices, switches for enablement, and dialogs for decisions. Put recoverable errors beside the control that resolves them. Durable approvals and attention requests stay with the thread even if an operating-system notification draws attention to them.
 
-The thread pane holds one thread by default and can be divided into side-by-side
-or stacked panes so two conversations are watched at once.
+## Density and motion
 
-```text
-┌──────────────────┬───────────────────────┬──────────────────────────┐
-│ Search (Ctrl+K)  │ Thread ⋯ ×            │ Thread ⋯ ×               │
-│ Workspace filter │ Canonical conversation│ Canonical conversation   │
-│ + New thread     │                       │                          │
-│ Pinned / Active  │ Message composer      │ Message composer         │
-│                  ├───────────────────────┴──────────────────────────┤
-│ Archived         │ Thread ⋯ ×                                       │
-│                  │ Canonical conversation                           │
-│ ⚙ Settings       │ Message composer                                 │
-└──────────────────┴──────────────────────────────────────────────────┘
-```
+Keep controls compact while giving transcripts a comfortable reading width. Running threads have room for title, context, and activity; archived rows are quieter. The inbox resizes within bounds that preserve the reading area.
 
-A thread is dragged from its solo tab, its inbox row, or the title of a pane it
-already occupies. Over a pane, the outer quarter of each side previews a split
-along that edge; the middle previews taking the pane over, which swaps two
-threads that are both on screen. The inbox row menu opens a thread to the right
-of or below the pane in front, and a pane's own menu splits it against a thread
-chosen by name, so no split depends on a pointer.
+User messages form compact blocks. Agent output uses structured reasoning, commands, diffs, plans, and tool activity. Containers and borders should clarify those relationships.
 
-Panes are resized by dragging or arrowing the hairline between them, down to a
-size where the reading column still works; the column measures itself against
-the pane rather than the window. Splitting never opens a thread twice: a thread
-already open moves into the split. Each split layout shares one tab, with a split
-icon, thread titles, and pane count; solo threads keep individual tabs. Opening
-another thread creates a solo tab, while selecting an already open thread returns
-to its tab and focuses its pane. Switching tabs preserves each layout and its
-pane sizes. Closing a shared tab closes the entire view without stopping its
-threads; closing a pane removes only that pane and gives its space to its neighbor.
-A split with one remaining pane becomes a solo tab. Showing only one thread moves
-it into a solo tab and keeps the remaining panes together. A pane wears a header
-— title, layout menu, close — only while the pane is shared; a single pane keeps
-the plain thread view.
+Motion communicates activity or a state change. Use shared Motion helpers and `data-motion` for control interpolation. Keep virtualized row positions free of animation. Running indicators may move continuously; reduced motion and background/unfocused windows suppress motion as defined by existing helpers.
 
-## Material and depth
+## Keyboard behavior
 
-Depth comes from the system, not from painted panels. The window uses the
-native Windows acrylic material; the renderer never fakes the outer backdrop
-with a full-window blur.
+| Shortcut | Action |
+| --- | --- |
+| Ctrl+N | New thread |
+| Ctrl+, | Settings |
+| Ctrl+P | Thread switcher |
+| Ctrl+K | Transcript search |
+| Ctrl+Tab / Ctrl+Shift+Tab | Cycle open tabs |
+| Ctrl+W | Close the selected tab |
+| Ctrl+Enter | Send by default; settings can enable Enter |
+| Shift+Enter | Newline |
+| Shift++ / Shift+- | Scale 70% to 150% in 10% steps outside text fields |
+| Escape | Dismiss the top temporary UI |
 
-The rules:
+Preserve visible focus and visual-order navigation. Menus support arrow navigation; dialogs contain focus and return it to the invoker. Disabled actions remain understandable, and the composer explains missing prerequisites.
 
-- Adjacent regions share one base tint and are separated by hairlines, never
-  by competing tints. Stacked alphas read as seams, not depth.
-- Only genuinely floating things add in-app blur or shadow: menus, dialogs,
-  tooltips, and the composer surface.
-- Dialogs dim the content behind them so attention stays on the decision.
-- When the system disables transparency, every translucent surface falls back
-  to a solid neutral with layout and contrast unchanged.
+## Review criteria
 
-## Components
+Apply [repository verification policy](../AGENTS.md#verification) to the changed UI. Review the affected layout for readable hierarchy, neutral chrome, discoverable actions, keyboard access, and scannable running/queued/approval/error states.
 
-Base UI supplies behaviour only: focus capture, roving index, typeahead,
-dismissal, portalling, and ARIA wiring. MeldShell owns every pixel through one
-wrapper layer, so there is no vendor theme to override and feature code never
-rebuilds popup scaffolding by hand.
-
-Style components with Tailwind utilities next to their markup. Shared utility
-compositions live in `ui/styles.ts`. Keep raw CSS limited to theme tokens, document
-defaults, platform scrollbars, and vendor math/diff typesetting. Motion owns
-animations: `ui/motion.tsx` handles entrances and popups, while `data-motion` opts
-individual controls into interpolation of their Tailwind hover, focus, and Base UI
-states. Never animate virtualized row positioning.
-
-Icons are thin line glyphs with a consistent optical weight; product and brand
-marks and file-type icons are the exceptions.
-Icon-only controls always expose an accessible name and tooltip.
-
-Prefer:
-
-- Compact native-feeling buttons and inputs.
-- Menus for choosing between options: commands, models, reasoning, speed,
-  sandbox, workspaces.
-- Dialogs for decisions and destructive acts: approvals, deletion, catalog
-  edits, close confirmation, thread switching, new-thread creation.
-- Switches for enablement: providers and models.
-- Inline notices for recoverable problems, kept next to the control that can
-  resolve them.
-
-Avoid:
-
-- Pill-shaped navigation and marketing-style cards around every block.
-- Large gradients, floating action buttons, and oversized illustrations.
-- Toasts for anything durable. Approvals and attention requests stay attached
-  to their thread; a Windows notification may attract attention, but the
-  decision itself is presented in the thread.
-
-## Density
-
-MeldShell is dense but calm. Rows, controls, and text favour compact Windows
-dimensions; the transcript favours comfortable reading measure and generous
-margins.
-
-The scale has three ideas:
-
-- Controls share one compact height family, with icon-only controls a step
-  smaller and footer or settings actions a step larger.
-- Inbox rows give active threads room for title, context, and activity, and
-  give settled threads a single quiet line. Headings are shorter than rows.
-- Corners stay small everywhere: tighter on controls and rows, softer on
-  floating surfaces, softest on the composer. Dividers are hairlines.
-
-The inbox is resizable within sensible bounds so operators can trade list
-context against reading width. The thread pane never collapses below a usable
-reading width.
-
-User turns and agent output sound different on the page. User turns are set
-apart as a compact addressed block; agent output reads like a work log with
-structured sections for reasoning, commands, diffs, plans, and tool events.
-
-## Motion
-
-Motion communicates state changes only. Nothing animates for ambience.
-
-- Entering content and hover states fade briefly without shifting layout.
-- A running turn shows restrained continuous motion on its row indicator.
-- Settling, completing, and approval transitions are single, quiet changes:
-  a row recedes, an approval holds a brighter state until decided.
-- Motion respects the operator: reduced-motion settings collapse animation,
-  and background or unfocused windows go still.
-
-## Keyboard model
-
-Every action is keyboard reachable, in visual order, with a visible focus
-indicator that is never removed for aesthetics.
-
-- `Ctrl+N`: new thread.
-- `Ctrl+,`: settings.
-- `Ctrl+P`: thread switcher.
-- `Ctrl+Tab` and `Ctrl+Shift+Tab`: move through open tabs.
-- `Ctrl+W`: close selected tab without interrupting its turn.
-- Splits are reachable without a pointer: the inbox row menu opens a thread
-  beside the pane in front, a pane's layout menu splits it or leaves it alone on
-  screen, and the separator between panes resizes with arrow keys.
-- `Ctrl+K`: search transcripts.
-- `Ctrl+Enter`: send by default; General settings can also enable Enter to send.
-- `Shift+Enter`: insert a newline.
-- `Shift++` / `Shift+-`: scale the interface from 70% to 150% in 10% steps outside text fields; a temporary indicator shows the percentage.
-- `Escape`: dismiss the top temporary surface.
-- Arrow keys: move within tabs, menus, lists, and selection groups.
-
-Menus and dialogs trap and return focus to their invoker. Disabled commands
-stay discoverable: their shortcut does nothing surprising and the composer
-explains what is missing (no model, no thread, empty draft, send in flight).
-
-## Design review checklist
-
-Use these criteria for the affected UI. Choose verification under [AGENTS.md](../AGENTS.md#verification); a small styling edit does not require exercising every screen and accessibility setting.
-
-- It still reads as MeldShell with all text replaced by placeholders: pane
-  hierarchy, activity placement, and window chrome identify it.
-- Depth comes from the system backdrop or one justified floating layer, and
-  adjacent regions share the same base.
-- Chrome follows the neutral theme tokens, and no label shouts where sentence
-  case would do.
-- Removing a border or container does not make the hierarchy less clear.
-- Keyboard order matches visual order, and focus is always visible.
-- A mix of running, queued, approval, failed, and completed work stays
-  scannable in one view.
-- The screen holds together with transparency disabled, motion reduced, and
-  text scaled.
+When the user performs visual checks, include the relevant theme, transparency fallback, reduced motion, or text scale for the risk being addressed. A routine component change does not require a full-screen audit.

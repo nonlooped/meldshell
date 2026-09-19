@@ -1,51 +1,40 @@
 # MeldShell
 
-MeldShell is a local Agentic Development Environment for running many coding-agent threads across many workspace folders from one Windows desktop application.
+MeldShell is a local desktop workbench for running concurrent coding-agent conversations across workspace folders. It integrates Codex, Claude Code, and Cursor through their installed runtimes.
 
-It integrates OpenAI Codex through `codex app-server`, Claude Code through the Anthropic Agent SDK, and Cursor through ACP. Each provider keeps a separate native session within a MeldShell thread. Switching providers resumes that provider's history; it does not transfer the other provider's context.
+Each MeldShell thread keeps a separate native session for each harness. Switching back resumes that harness's history; messages from other harnesses are not transferred.
 
-## Project documents
+## What it provides
 
-- [Product and roadmap](docs/roadmap.md)
-- [System architecture](docs/architecture.md)
-- [Interface design](docs/design.md)
-- [Release checklist](docs/release.md)
-- [0.1.0 release candidate](docs/releases/0.1.0.md)
-- [Contributing](CONTRIBUTING.md)
-- [Agent instructions](AGENTS.md)
-- [Agent documentation maintenance](docs/agent-documentation.md)
+- A searchable inbox, thread tabs, split panes, and per-thread activity.
+- Streaming conversations, tool details, approvals, questions, attachments, and queued follow-ups.
+- SQLite history, durable queues, worker recovery, and native session resume.
+- Workspace files, file previews, diffs, Git staging, commits, push, and history.
+- Provider catalogs, account usage where available, and appearance preferences.
 
-## Development status
+Windows 11 x64 NSIS and Linux x64 AppImage are the configured release targets. Windows uses acrylic; Linux uses a solid backdrop. Release targets and implemented features do not imply completed certification. See the [release checklist](docs/release.md) and [historical candidate record](docs/releases/0.1.0.md).
 
-The 0.1 MVP implementation includes:
+## Run from source
 
-- Electron desktop shell
-- Effect application services
-- React 19 with React Compiler
-- Base UI primitives with a MeldShell-owned monochrome visual system
-- Windows acrylic backdrop
-- Supervised Codex, Claude Code, and Cursor integrations in separate worker processes
-- Streaming transcripts, structured tool activity, approvals, interruption, and retry
-- Durable queued turns with crash recovery
-- File, image, and skill attachments
-- Cursor-loaded thread history and virtualized transcripts
-- Windows background notifications and an unsigned per-user NSIS installer
-
-## Claude Code
-
-Choose a Claude model in the composer. Connection details and a retry button are available under Settings > Providers > Claude. The SDK uses your Claude Code sign-in or configured API credentials. See [Claude integration](docs/claude-provider.md) for supported features and current gaps.
-
-## Commands
+Use Node.js 24 or newer:
 
 ```sh
 npm install
 npm run dev
-npm run typecheck
-npm run build
-npm run check
-npm run package:win
 ```
 
-`npm install` uses Electron's installer CLI and Electron Rebuild to fetch the desktop runtime and compile SQLite for Electron's Node ABI. MeldShell discovers `codex` on `PATH`. The Claude Agent SDK bundles its native Claude Code executable.
+Installation downloads Electron and rebuilds SQLite for Electron's Node ABI. Install and authenticate the coding runtimes separately; MeldShell does not bundle them. Provider settings show connection status and a refresh action.
 
-Windows 11 on x64 is the only supported MVP target. Other platforms are not intentionally blocked, but they are not release targets.
+See [Contributing](CONTRIBUTING.md) for development checks and [Release](docs/release.md) for packaging.
+
+## Documentation
+
+| Task | Reference |
+| --- | --- |
+| Understand capabilities and open work | [Roadmap](docs/roadmap.md) |
+| Change processes, storage, IPC, or recovery | [Architecture](docs/architecture.md) |
+| Work on provider behavior | [Claude](docs/claude-provider.md), [Cursor](docs/cursor-provider.md) |
+| Change desktop UI or transcript output | [Design](docs/design.md), [Markdown](docs/markdown-rendering.md) |
+| Build or deploy the site | [Website](docs/website.md) |
+| Work as an agent | [AGENTS.md](AGENTS.md) |
+| Maintain rules and skills | [Documentation maintenance](docs/agent-documentation.md) |
