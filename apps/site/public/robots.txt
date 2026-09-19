@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://meldshell.vercel.app/sitemap-index.xml

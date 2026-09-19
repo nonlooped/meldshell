@@ -11,6 +11,7 @@
     "typecheck": "astro check"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
     "@iconify-icons/logos": "^2.0.0",
     "@iconify-icons/simple-icons": "^2.0.1",
     "@tailwindcss/vite": "4.3.3",
