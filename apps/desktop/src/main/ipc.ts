@@ -36,9 +36,10 @@ import { requestGeneratedText } from "./runtime/generated-text"
 import { DesktopEvents } from "./runtime/desktop-events"
 
 import { runtime } from "./runtime/services"
-import { confirmAndClose } from "./runtime/shutdown"
+import { confirmAndClose, markInstallingUpdate, prepareToClose } from "./runtime/shutdown"
 import { getMainWindow, applyAppearance } from "./window"
 import { providerFor } from "./runtime/worker-provider"
+import { updateService } from "./updater"
 
 const publishRuntimeChange = (threadId: string): Effect.Effect<void, never, DesktopEvents> =>
   Effect.flatMap(DesktopEvents, (events) => events.publish({ _tag: "RuntimeChanged", threadId }))
@@ -406,4 +407,13 @@ export const registerIpc = (): void => {
     ),
   )
   ipcMain.handle(IPC.closeApp, () => runtime.runPromise(confirmAndClose))
+  ipcMain.handle(IPC.getUpdateStatus, () => updateService.status)
+  ipcMain.handle(IPC.checkForUpdates, () => updateService.check())
+  ipcMain.handle(IPC.installUpdate, async () => {
+    if (updateService.status.state !== "ready") return false
+    const ready = await runtime.runPromise(prepareToClose)
+    if (!ready) return false
+    markInstallingUpdate()
+    return updateService.install()
+  })
 }

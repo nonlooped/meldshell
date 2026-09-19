@@ -49,6 +49,7 @@ test("opens the window with IPC registered while runtime initialization is pendi
     "./runtime/shutdown": {},
     "./window": { createWindow: () => calls.push("window") },
     "./ipc": { registerIpc: () => calls.push("ipc") },
+    "./updater": { updateService: { start: () => calls.push("updater") } },
   }
   const source = readFileSync(new URL("./index.ts", import.meta.url), "utf8")
   const { outputText } = ts.transpileModule(source, {
@@ -64,7 +65,7 @@ test("opens the window with IPC registered while runtime initialization is pendi
   })
   await new Promise((resolve) => setImmediate(resolve))
   try {
-    assert.deepEqual(calls, ["whenReady", "ipc", "window", "runtime"])
+    assert.deepEqual(calls, ["whenReady", "ipc", "window", "updater", "runtime"])
     assert.equal(app.listenerCount("before-quit"), 1, "quit remains observable during startup")
   } finally {
     finishStartup()

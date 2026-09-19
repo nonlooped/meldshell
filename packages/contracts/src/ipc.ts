@@ -63,6 +63,23 @@ export interface GitSnapshot {
   readonly hasMore: boolean
 }
 
+type AppUpdateState =
+  | "unavailable"
+  | "idle"
+  | "checking"
+  | "downloading"
+  | "ready"
+  | "up-to-date"
+  | "error"
+
+export interface AppUpdateStatus {
+  readonly state: AppUpdateState
+  readonly currentVersion: string
+  readonly availableVersion: string | null
+  readonly progressPercent: number | null
+  readonly message: string | null
+}
+
 export type GitFileAction = "stage" | "unstage" | "restore"
 export type GitDiffSide = "staged" | "unstaged"
 
@@ -147,6 +164,9 @@ export const requests = {
   getCursorUsage: request<() => Promise<CodexUsage>>("meldshell:get-cursor-usage"),
   refreshCodexStatus: request<() => Promise<void>>("meldshell:refresh-codex-status"),
   closeApp: request<() => Promise<boolean>>("meldshell:close-app"),
+  getUpdateStatus: request<() => Promise<AppUpdateStatus>>("meldshell:get-update-status"),
+  checkForUpdates: request<() => Promise<AppUpdateStatus>>("meldshell:check-for-updates"),
+  installUpdate: request<() => Promise<boolean>>("meldshell:install-update"),
   getTranscript: request<(input: TranscriptQuery) => Promise<TranscriptPage>>(
     "meldshell:get-transcript",
   ),
@@ -175,6 +195,7 @@ export const IPC = {
   providerStatusChanged: "meldshell:provider-status-changed",
   runtimeChanged: "meldshell:runtime-changed",
   attentionRequested: "meldshell:attention-requested",
+  updateStatusChanged: "meldshell:update-status-changed",
 } as const
 
 export type MeldShellApi = InvokeApi & {
@@ -185,6 +206,7 @@ export type MeldShellApi = InvokeApi & {
     listener: (threadId: string, snapshotChanged?: boolean) => void,
   ) => () => void
   readonly onOpenAttention: (listener: (threadId: string) => void) => () => void
+  readonly onUpdateStatus: (listener: (status: AppUpdateStatus) => void) => () => void
 }
 
 /** Only registered methods cross the preload boundary; callers cannot choose arbitrary channels. */

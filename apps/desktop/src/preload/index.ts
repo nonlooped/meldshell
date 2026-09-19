@@ -41,6 +41,14 @@ const api: MeldShellApi = {
     ipcRenderer.on(IPC.attentionRequested, handleAttention)
     return () => ipcRenderer.removeListener(IPC.attentionRequested, handleAttention)
   },
+  onUpdateStatus: (listener) => {
+    const handleStatus = (
+      _event: Electron.IpcRendererEvent,
+      status: Parameters<typeof listener>[0],
+    ): void => listener(status)
+    ipcRenderer.on(IPC.updateStatusChanged, handleStatus)
+    return () => ipcRenderer.removeListener(IPC.updateStatusChanged, handleStatus)
+  },
 }
 
 contextBridge.exposeInMainWorld("meldshell", api)
