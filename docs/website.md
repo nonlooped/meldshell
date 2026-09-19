@@ -1,11 +1,26 @@
-# Website deployment
+# Website build and deployment
 
-The Astro site targets `https://meldshell.vercel.app`. [vercel.json](../vercel.json) builds from the repository root with Node.js 24, installs only the site workspace, and skips install scripts so website builds do not download Electron or compile SQLite. Astro emits static files into `apps/site/dist`.
+Use this document for the Astro site in `apps/site`. [vercel.json](../vercel.json) defines the site-only install/build commands and `apps/site/dist` output. Install scripts are skipped so a website deployment does not download Electron or compile SQLite.
 
-Connect the Vercel project named `meldshell` to `nonlooped/meldshell`, with the repository root as Root Directory and `main` as the production branch. Vercel's Git integration builds production on pushes to `main` and previews for pull requests. The ignore command compares against the previous successful deployment and skips builds when the site, workspace manifests, lockfile, and Vercel configuration have not changed. Missing deployment history triggers a build.
+## Git deployment
 
-After `npx vercel login`, run `npx vercel link --project meldshell` from the repository root, connect with `npx vercel git connect https://github.com/nonlooped/meldshell.git`, and deploy with `npx vercel --prod`. The GitHub integration must have access to the private repository. Local `.vercel` credentials and project links are ignored by Git.
+The recorded Vercel project is `fscyts-projects/meldshell`, connected to `nonlooped/meldshell`, with the repository root as Root Directory and `main` as production branch. Its deployment at [meldshell.vercel.app](https://meldshell.vercel.app) was reported verified on September 19, 2026; this documentation rewrite did not recheck the remote configuration.
 
-The `fscyts-projects/meldshell` project is connected to GitHub and its production deployment serves `https://meldshell.vercel.app`, verified on 2026-09-19. The project settings also store the site-only install and build commands. No Vercel token is needed in GitHub Actions when using the Git integration.
+The Git integration produces main-branch deployments and pull-request previews. The ignore command compares site files, root manifests, lockfile, and Vercel configuration with the previous successful deployment. Missing history triggers a build.
 
-[.vercelignore](../.vercelignore) limits CLI uploads to the site and root build manifests, excluding desktop installers and local build output. The first successful deployment uploaded 18 files and used Vercel's basic build machine.
+The integration needs repository access. It does not require a Vercel token in GitHub Actions. Check the live project before changing connections or settings.
+
+## CLI deployment
+
+For an authorized setup or deployment, authenticate and link from the repository root:
+
+```sh
+npx vercel login
+npx vercel link --project meldshell
+npx vercel git connect https://github.com/nonlooped/meldshell.git
+npx vercel --prod
+```
+
+Use the connection steps only when needed; an already-linked project does not need relinking for each deploy. Local `.vercel` credentials and project links are Git-ignored.
+
+[.vercelignore](../.vercelignore) limits uploads to the site and root build manifests, excluding installers and local build output. Confirm the intended project, build result, and deployment URL when reporting a deployment.

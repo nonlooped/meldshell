@@ -1,17 +1,9 @@
 # Documentation assets
 
-## meldshell-workbench.png
+## Workbench screenshot
 
-A 2× capture of the actual Electron app, showing Codex and Claude Code
-conversations in the app's split layout. 3200 × 2000.
+`meldshell-workbench.png` is a 3200 × 2000 capture of the Electron app with Codex and Claude conversations in a split layout. The capture used fictional threads in an isolated local database without provider requests. It shows Linux's solid dark backdrop; Windows uses acrylic.
 
-The capture used an isolated local database seeded with fictional threads. No
-conversations were sent to providers, and no app layout, styles, or controls
-were recreated for the image. The Linux build's solid dark backdrop was used;
-Windows uses native acrylic.
+Refresh this asset only when screenshot work is requested under [repository verification policy](../../AGENTS.md#verification). Use a separate user-data profile containing fictional conversations, arrange the split through the app, and capture a 1600 × 1000 window at 2× density.
 
-To refresh it: build the desktop app, launch it with a separate user-data
-profile, seed fictional conversations, arrange two threads using the app's split
-controls, and capture the 1600 × 1000 window at 2× pixel density.
-
-**Never use a profile containing real user conversations for this asset.**
+Use the actual application layout. Keep real conversations, credentials, and personal paths out of the capture.
