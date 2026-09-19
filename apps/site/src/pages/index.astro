@@ -46,16 +46,16 @@ const highlights = [
   description="MeldShell is a desktop app for working with several coding agents at once. Codex, Claude Code and Cursor, across all your projects, in one window."
 >
   <header class="mx-auto max-w-[1200px] px-5 sm:px-8 h-16 flex items-center justify-between text-[14px]">
-    <a href="/" class="flex items-center gap-2.5 display-wide text-[17px]" aria-label="MeldShell">
+    <a href="/" class="flex items-center gap-2.5 font-display [font-variation-settings:'wdth'_118] font-medium tracking-[-0.02em] text-[17px]" aria-label="MeldShell">
       <Wordmark size={20} class="text-ink" />
       MeldShell
     </a>
     <nav class="flex items-center gap-6 text-ink-2" aria-label="Site">
-      <a href={repo} class="flex items-center gap-2 hover:text-ink transition-colors">
+      <a data-motion-link="text" href={repo} class="flex items-center gap-2">
         <BrandIcon name="github" size={16} />
         GitHub
       </a>
-      <a href={releases} class="hover:text-ink transition-colors">Download</a>
+      <a data-motion-link="text" href={releases}>Download</a>
     </nav>
   </header>
 
@@ -71,7 +71,7 @@ const highlights = [
           ))
         }
       </ul>
-      <h1 class="mt-9 display-wide text-[clamp(38px,6.4vw,84px)] leading-[1] tracking-[-0.028em] max-w-[16ch] text-balance">
+      <h1 class="mt-9 font-display [font-variation-settings:'wdth'_118] font-medium tracking-[-0.02em] text-[clamp(38px,6.4vw,84px)] leading-[1] tracking-[-0.028em] max-w-[16ch] text-balance">
         Your coding agents, side by side.
       </h1>
       <p class="mt-7 max-w-[52ch] text-[clamp(17px,1.5vw,20px)] leading-[1.5] text-ink-2 text-balance">
@@ -81,14 +81,15 @@ const highlights = [
       <div class="mt-9 flex flex-col items-center gap-3">
         <a
           href={releases}
-          class="h-12 px-6 inline-flex items-center rounded-control bg-ink text-window text-[16px] font-medium hover:bg-white transition-colors"
+          data-motion-link="download"
+          class="h-12 px-6 inline-flex items-center rounded-control bg-ink text-window text-[16px] font-medium"
           >Download MeldShell</a
         >
         <span class="text-[14px] text-ink-3">Free and open source.</span>
       </div>
     </section>
 
-    <figure class="glass rounded-window p-1.5 sm:p-2">
+    <figure class="bg-[rgb(22_22_23/0.72)] [backdrop-filter:blur(32px)_saturate(1.15)] [@media(prefers-reduced-transparency:reduce)]:bg-window [@media(prefers-reduced-transparency:reduce)]:backdrop-filter-none border border-line [box-shadow:inset_0_1px_0_rgb(255_255_255/0.06),0_1px_2px_rgb(0_0_0/0.3),0_28px_64px_rgb(0_0_0/0.42)] rounded-window p-1.5 sm:p-2">
       <Image
         src={workbench}
         widths={[800, 1200, 1600, 2400]}
@@ -104,7 +105,7 @@ const highlights = [
       {
         highlights.map(({ image, title, body, alt }, index) => (
           <div class="grid md:grid-cols-5 gap-8 md:gap-12 items-center">
-            <figure class:list={["glass rounded-surface p-1.5 md:col-span-3", index % 2 === 1 && "md:order-2"]}>
+            <figure class:list={["bg-[rgb(22_22_23/0.72)] [backdrop-filter:blur(32px)_saturate(1.15)] [@media(prefers-reduced-transparency:reduce)]:bg-window [@media(prefers-reduced-transparency:reduce)]:backdrop-filter-none border border-line [box-shadow:inset_0_1px_0_rgb(255_255_255/0.06),0_1px_2px_rgb(0_0_0/0.3),0_28px_64px_rgb(0_0_0/0.42)] rounded-surface p-1.5 md:col-span-3", index % 2 === 1 && "md:order-2"]}>
               <Image
                 src={image}
                 widths={[600, 900, 1400]}
@@ -114,7 +115,7 @@ const highlights = [
               />
             </figure>
             <div class="md:col-span-2">
-              <h2 class="display-wide text-[clamp(26px,3vw,36px)] leading-[1.1] tracking-[-0.02em] text-balance">
+              <h2 class="font-display [font-variation-settings:'wdth'_118] font-medium tracking-[-0.02em] text-[clamp(26px,3vw,36px)] leading-[1.1] tracking-[-0.02em] text-balance">
                 {title}
               </h2>
               <p class="mt-4 text-[16.5px] leading-[1.5] text-ink-2 max-w-[38ch]">{body}</p>

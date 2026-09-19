@@ -14,7 +14,7 @@ const ogImage = new URL(og.src, Astro.site ?? Astro.url)
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scheme-dark [-webkit-text-size-adjust:100%] [&_:focus-visible]:outline-2 [&_:focus-visible]:outline-ink [&_:focus-visible]:outline-offset-[3px] [&_:focus-visible]:rounded-[3px]">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -32,7 +32,11 @@ const ogImage = new URL(og.src, Astro.site ?? Astro.url)
       href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..600&display=swap"
     />
   </head>
-  <body class="min-h-dvh antialiased">
+  <body class="min-h-dvh bg-desktop text-ink font-sans antialiased">
     <slot />
   </body>
 </html>
+
+<script>
+  import "../scripts/motion"
+</script>

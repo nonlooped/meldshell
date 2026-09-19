@@ -9,26 +9,25 @@ interface Props {
   releases: string
 }
 const { repo, releases } = Astro.props
-const item =
-  "grid place-items-center size-11 rounded-control text-ink-2 hover:bg-hover hover:text-ink transition-colors"
+const item = "grid place-items-center size-11 rounded-control text-ink-2"
 ---
 
-<footer class="mt-24 glass-bar">
+<footer class="mt-24 bg-[rgb(22_22_23/0.72)] [backdrop-filter:blur(32px)_saturate(1.15)] [@media(prefers-reduced-transparency:reduce)]:bg-window [@media(prefers-reduced-transparency:reduce)]:backdrop-filter-none border-t border-line [box-shadow:inset_0_1px_0_rgb(255_255_255/0.05)]">
   <div class="mx-auto max-w-[1200px] px-4 h-16 grid grid-cols-[1fr_auto_1fr] items-center">
     <span class="text-[12px] text-ink-3 hidden sm:block">MeldShell</span>
     <nav class="flex items-center gap-1 col-start-2" aria-label="Footer">
-      <a href="/" class={item} title="MeldShell" aria-label="MeldShell">
+      <a data-motion-link="taskbar" href="/" class={item} title="MeldShell" aria-label="MeldShell">
         <Wordmark size={22} />
       </a>
-      <a href={repo} class={item} title="Source on GitHub" aria-label="Source on GitHub">
+      <a data-motion-link="taskbar" href={repo} class={item} title="Source on GitHub" aria-label="Source on GitHub">
         <BrandIcon name="github" size={22} />
       </a>
-      <a href={releases} class={item} title="Download" aria-label="Download">
+      <a data-motion-link="taskbar" href={releases} class={item} title="Download" aria-label="Download">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 4v11M7 10l5 5 5-5M5 19h14"></path>
         </svg>
       </a>
-      <a href={`${repo}/tree/main/docs`} class={item} title="Documentation" aria-label="Documentation">
+      <a data-motion-link="taskbar" href={`${repo}/tree/main/docs`} class={item} title="Documentation" aria-label="Documentation">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 4.5h9.5L19 9v10.5H5z M14.5 4.5V9H19 M8 13h8M8 16.5h8"></path>
         </svg>
