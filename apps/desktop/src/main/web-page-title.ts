@@ -25,13 +25,13 @@ for (const [address, prefix] of [
 ] as const)
   blocked.addSubnet(address, prefix, "ipv6")
 
-export function publicAddress(address: string): boolean {
+function publicAddress(address: string): boolean {
   const family = isIP(address)
   if (family === 6) return /^[23][0-9a-f]{3}:/i.test(address) && !blocked.check(address, "ipv6")
   return family === 4 && !blocked.check(address, "ipv4")
 }
 
-export function pageUrl(value: string): URL | null {
+function pageUrl(value: string): URL | null {
   if (value.length > 8192) return null
   try {
     const url = new URL(value)

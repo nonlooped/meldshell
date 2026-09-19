@@ -1,7 +1,7 @@
 import type { CanonicalEvent, TranscriptPage, TranscriptQuery } from "@meldshell/contracts"
 import { prepareTranscriptTurns, type TranscriptTurn } from "@meldshell/projection"
 
-export const transcriptMetrics = {
+const transcriptMetrics = {
   requests: 0,
   eventsReceived: 0,
   fetchMs: 0,
