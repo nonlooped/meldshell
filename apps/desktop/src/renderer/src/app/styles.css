@@ -4838,3 +4838,27 @@ select.text-input {
 :root[data-platform="linux"][data-theme="light"] {
   --scrim: #f6f6f8;
 }
+
+.file-diff {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+/* The viewer owns both scroll axes; diff cards must not capture wheel scrolling. */
+.file-diff .event-diff {
+  overflow: visible;
+  width: 100%;
+  max-width: 100%;
+}
+
+.file-diff .diff-code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.file-diff .event-diff-header > span {
+  min-width: 0;
+}

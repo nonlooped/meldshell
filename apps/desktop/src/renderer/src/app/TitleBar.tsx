@@ -129,9 +129,16 @@ export function TitleBar({
             className="tab window-interactive"
             {...(file.id === selectedTabId ? { "data-selected": "" } : {})}
           >
-            <Tabs.Tab value={file.id} className="tab-label" title={file.path}>
+            <Tabs.Tab
+              value={file.id}
+              className="tab-label"
+              title={`${file.path}${file.diffSide ? ` · ${file.diffSide} changes` : ""}`}
+            >
               <FileIcon path={file.path} size={14} />
-              <span className="tab-title">{file.path.split("/").pop()}</span>
+              <span className="tab-title">
+                {file.path.split("/").pop()}
+                {file.diffSide ? ` · ${file.diffSide} changes` : ""}
+              </span>
             </Tabs.Tab>
             <IconButton
               unstyled
