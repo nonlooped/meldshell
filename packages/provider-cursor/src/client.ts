@@ -2,9 +2,27 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { access, readdir } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
-import { StringDecoder } from "node:string_decoder"
+import { Readable, Writable } from "node:stream"
+import {
+  client,
+  ndJsonStream,
+  PROTOCOL_VERSION,
+  type ClientConnection,
+  type ClientContext,
+  type ClientRequestHandler,
+  type RequestPermissionRequest,
+  type RequestPermissionResponse,
+  type SessionNotification,
+  type AnyMessage,
+} from "@agentclientprotocol/sdk"
 import which from "which"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
+import {
+  parseCursorQuestion,
+  parseCursorPlan,
+  type CursorQuestion,
+  type CursorPlan,
+} from "./extensions"
 
 export type RecordValue = Record<string, unknown>
 export const record = (value: unknown): RecordValue =>
@@ -106,57 +124,71 @@ export interface NativeMessage {
   id?: string | number
 }
 export interface ClientCallbacks {
+  /** Observes native calls for persistence only; never handles protocol responses. */
   message: (message: NativeMessage) => void
+  sessionUpdate: (params: SessionNotification) => void
+  requestPermission: ClientRequestHandler<RequestPermissionRequest, RequestPermissionResponse>
+  askQuestion: ClientRequestHandler<CursorQuestion, RecordValue>
+  createPlan: ClientRequestHandler<CursorPlan, RecordValue>
   spawned?: (pid: number) => void
   stopped?: (pid: number) => void
-}
-
-export class CursorRequestError extends Error {
-  constructor(readonly nativeError: unknown) {
-    super(text(record(nativeError).message) || "Cursor rejected the request.")
-  }
 }
 
 /** ACP v1 plus Cursor's unprefixed extensions. Unknown payloads stay intact. */
 export class CursorClient {
   private readonly child: ChildProcessWithoutNullStreams
-  private readonly pending = new Map<
-    number,
-    {
-      resolve: (value: RecordValue) => void
-      reject: (error: Error) => void
-      timer: ReturnType<typeof setTimeout> | undefined
-    }
-  >()
-  private nextId = 0
+  private readonly connection: ClientConnection
   private failure: Error | null = null
   private closing: Promise<void> | null = null
-  constructor(
-    command: CursorCommand,
-    cwd: string,
-    private readonly callbacks: ClientCallbacks,
-  ) {
+  constructor(command: CursorCommand, cwd: string, callbacks: ClientCallbacks) {
     this.child = spawn(command.command, [...command.args, "acp"], {
       cwd,
       windowsHide: true,
       stdio: "pipe",
       env: { ...process.env, CURSOR_INVOKED_AS: "cursor-agent" },
     })
-    const decoder = new StringDecoder("utf8")
-    let buffer = ""
-    this.child.stdout.on("data", (chunk: Buffer) => {
-      buffer += decoder.write(chunk)
-      if (buffer.length > 16 * 1024 * 1024) {
-        this.fail(new Error("Cursor exceeded the ACP message size limit."))
-        void this.close()
-        return
-      }
-      let end: number
-      while ((end = buffer.indexOf("\n")) !== -1) {
-        const line = buffer.slice(0, end).trim()
-        buffer = buffer.slice(end + 1)
-        if (line) this.receive(line)
-      }
+    let lineBytes = 0
+    const stdout = Readable.toWeb(this.child.stdout) as unknown as ReadableStream<Uint8Array>
+    const input = stdout.pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          for (const byte of chunk) {
+            lineBytes = byte === 10 ? 0 : lineBytes + 1
+            if (lineBytes > 16 * 1024 * 1024)
+              throw new Error("Cursor exceeded the ACP message size limit.")
+          }
+          controller.enqueue(chunk)
+        },
+      }),
+    )
+    const stream = ndJsonStream(Writable.toWeb(this.child.stdin), input)
+    // Observe native payloads before SDK validation, without rewriting or routing them.
+    const readable = stream.readable.pipeThrough(
+      new TransformStream<AnyMessage, AnyMessage>({
+        transform(message, controller) {
+          if ("method" in message && typeof message.method === "string")
+            callbacks.message({
+              method: message.method,
+              params: message.params,
+              ...("id" in message && message.id !== null ? { id: message.id } : {}),
+            })
+          controller.enqueue(message)
+        },
+      }),
+    )
+    this.connection = client({ name: "meldshell" })
+      .onRequest("session/request_permission", callbacks.requestPermission)
+      .onRequest("cursor/ask_question", parseCursorQuestion, callbacks.askQuestion)
+      .onRequest("cursor/create_plan", parseCursorPlan, callbacks.createPlan)
+      .onNotification("session/update", ({ params }) => callbacks.sessionUpdate(params))
+      .connect({ readable, writable: stream.writable })
+    void this.connection.closed.then(() => {
+      this.fail(
+        this.connection.signal.reason instanceof Error
+          ? this.connection.signal.reason
+          : new Error("Cursor ACP disconnected. Retry explicitly."),
+      )
+      void this.close()
     })
     this.child.stderr.resume()
     this.child.stdin.on("error", (error) => this.fail(error))
@@ -172,91 +204,43 @@ export class CursorClient {
 
   private fail(error: Error): void {
     this.failure ??= error
-    for (const pending of this.pending.values()) {
-      clearTimeout(pending.timer)
-      pending.reject(this.failure)
-    }
-    this.pending.clear()
+    this.connection.close(this.failure)
   }
 
-  private receive(line: string): void {
-    try {
-      const message = record(JSON.parse(line))
-      if (message.jsonrpc !== "2.0") throw new Error("Invalid Cursor JSON-RPC envelope.")
-      if (typeof message.method === "string") {
-        const id =
-          typeof message.id === "string" || typeof message.id === "number" ? message.id : undefined
-        this.callbacks.message({
-          method: message.method,
-          params: message.params,
-          ...(id === undefined ? {} : { id }),
-        })
-        return
-      }
-      if (typeof message.id !== "number") return
-      const pending = this.pending.get(message.id)
-      if (!pending) return
-      clearTimeout(pending.timer)
-      this.pending.delete(message.id)
-      if (message.error) pending.reject(new CursorRequestError(message.error))
-      else pending.resolve(record(message.result))
-    } catch (cause) {
-      this.fail(cause instanceof Error ? cause : new Error("Invalid Cursor ACP message."))
-      void this.close()
-    }
-  }
-
-  private write(value: unknown): void {
+  /** Adds a host deadline without wrapping the SDK's typed request/notification APIs. */
+  async run<T>(operation: (agent: ClientContext) => Promise<T>, timeoutMs = 20_000): Promise<T> {
     if (this.failure) throw this.failure
-    this.child.stdin.write(`${JSON.stringify(value)}\n`)
-  }
-
-  request(method: string, params: unknown, timeoutMs = 20_000): Promise<RecordValue> {
-    return new Promise((resolve, reject) => {
-      const id = ++this.nextId
-      const timer =
-        timeoutMs > 0
-          ? setTimeout(() => {
-              this.pending.delete(id)
-              reject(new Error(`Cursor ${method} timed out.`))
-            }, timeoutMs)
-          : undefined
-      this.pending.set(id, { resolve, reject, timer })
-      try {
-        this.write({ jsonrpc: "2.0", id, method, params })
-      } catch (cause) {
-        clearTimeout(timer)
-        this.pending.delete(id)
-        reject(cause)
-      }
-    })
-  }
-
-  notify(method: string, params: unknown): void {
-    this.write({ jsonrpc: "2.0", method, params })
-  }
-  respond(id: string | number, result: unknown): void {
-    this.write({ jsonrpc: "2.0", id, result })
-  }
-  reject(id: string | number, message: string, code = -32601): void {
-    this.write({ jsonrpc: "2.0", id, error: { code, message } })
+    const timer =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            this.fail(new Error("Cursor ACP request timed out."))
+            void this.close()
+          }, timeoutMs)
+        : undefined
+    try {
+      return await operation(this.connection.agent)
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   async initialize(): Promise<RecordValue> {
-    const init = await this.request("initialize", {
-      protocolVersion: 1,
-      clientInfo: { name: "meldshell", version: "0.1.0" },
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-        _meta: { parameterizedModelPicker: true },
-      },
-    })
-    if (init.protocolVersion !== 1)
+    const init = await this.run((agent) =>
+      agent.request("initialize", {
+        protocolVersion: PROTOCOL_VERSION,
+        clientInfo: { name: "meldshell", version: "0.1.0" },
+        clientCapabilities: {
+          fs: { readTextFile: false, writeTextFile: false },
+          terminal: false,
+          _meta: { parameterizedModelPicker: true },
+        },
+      }),
+    )
+    if (init.protocolVersion !== PROTOCOL_VERSION)
       throw new Error("This Cursor ACP protocol version is not supported.")
     if (!records(init.authMethods).some((method) => method.id === "cursor_login"))
       throw new Error("The discovered executable does not identify itself as Cursor ACP.")
-    await this.request("authenticate", { methodId: "cursor_login" })
+    await this.run((agent) => agent.request("authenticate", { methodId: "cursor_login" }))
     return init
   }
 

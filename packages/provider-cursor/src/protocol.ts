@@ -1,4 +1,5 @@
 import type { ProviderModelCatalogEntry, TurnDispatch } from "@meldshell/contracts"
+import type { ContentBlock, RequestPermissionResponse } from "@agentclientprotocol/sdk"
 import { readFile } from "node:fs/promises"
 import { extname } from "node:path"
 import { record, records, text, type RecordValue } from "./client"
@@ -31,8 +32,8 @@ export const cursorModels = (session: RecordValue, image: boolean): ProviderMode
 export const cursorPrompt = async (
   dispatch: TurnDispatch,
   images: boolean,
-): Promise<RecordValue[]> => {
-  const prompt: RecordValue[] = [{ type: "text", text: dispatch.text }]
+): Promise<ContentBlock[]> => {
+  const prompt: ContentBlock[] = [{ type: "text", text: dispatch.text }]
   for (const attachment of dispatch.attachments) {
     if (attachment.type === "mention" || attachment.type === "skill") {
       prompt.push({
@@ -63,50 +64,33 @@ export const cursorPrompt = async (
         attachment.value,
       )
       if (!match) throw new Error("Cursor image attachments must contain image data.")
-      prompt.push({ type: "image", mimeType: match[1], data: match[2] })
+      prompt.push({ type: "image", mimeType: match[1]!, data: match[2]! })
     }
   }
   return prompt
 }
 
-const hasStrings = (value: unknown, keys: string[]): boolean =>
-  keys.every((key) => typeof record(value)[key] === "string")
-export const isInteraction = (method: string, params: unknown): boolean => {
-  const p = record(params)
-  if (method === "session/request_permission")
-    return (
-      typeof p.sessionId === "string" &&
-      typeof record(p.toolCall).toolCallId === "string" &&
-      Array.isArray(p.options) &&
-      p.options.length > 0 &&
-      p.options.every((option) => hasStrings(option, ["optionId", "name", "kind"]))
-    )
-  if (method === "cursor/create_plan")
-    return typeof p.toolCallId === "string" && typeof p.plan === "string" && Array.isArray(p.todos)
-  if (method === "cursor/ask_question")
-    return (
-      typeof p.toolCallId === "string" &&
-      Array.isArray(p.questions) &&
-      p.questions.length > 0 &&
-      p.questions.every((value) => {
-        const q = record(value)
-        return (
-          hasStrings(q, ["id", "prompt"]) &&
-          Array.isArray(q.options) &&
-          q.options.every((option) => hasStrings(option, ["id", "label"]))
-        )
-      })
-    )
-  return false
-}
-
-export const interactionResponse = (
+export function interactionResponse(
+  method: "session/request_permission",
+  params: RecordValue,
+  decision: string,
+  answers?: Readonly<Record<string, ReadonlyArray<string>>>,
+  optionId?: string,
+): RequestPermissionResponse
+export function interactionResponse(
   method: string,
   params: RecordValue,
   decision: string,
   answers?: Readonly<Record<string, ReadonlyArray<string>>>,
   optionId?: string,
-): RecordValue => {
+): RecordValue
+export function interactionResponse(
+  method: string,
+  params: RecordValue,
+  decision: string,
+  answers?: Readonly<Record<string, ReadonlyArray<string>>>,
+  optionId?: string,
+): RecordValue {
   if (method === "session/request_permission") {
     if (decision === "cancel") return { outcome: { outcome: "cancelled" } }
     const option = records(params.options).find((entry) => entry.optionId === optionId)
