@@ -1,0 +1,129 @@
+---
+import { Image } from "astro:assets"
+import closeupComposer from "../assets/closeup-composer.png"
+import closeupInbox from "../assets/closeup-inbox.png"
+import closeupSplit from "../assets/closeup-split.png"
+import workbench from "../assets/meldshell-workbench.png"
+import BrandIcon from "../components/BrandIcon.astro"
+import Taskbar from "../components/Taskbar.astro"
+import Wordmark from "../components/Wordmark.astro"
+import Layout from "../layouts/Layout.astro"
+
+const repo = "https://github.com/nonlooped/meldshell"
+const releases = `${repo}/releases`
+
+const agents = [
+  { icon: "openai", name: "Codex" },
+  { icon: "claude", name: "Claude Code" },
+  { icon: "cursor", name: "Cursor" },
+] as const
+
+/* Close-ups are cut from the same capture as the hero, not mocked up. */
+const highlights = [
+  {
+    image: closeupSplit,
+    title: "Watch two side by side",
+    body: "Put one conversation next to another and follow both without switching back and forth. Each keeps its own agent.",
+    alt: "Two conversations open side by side in MeldShell: Codex adding keyboard navigation on the left, Claude Code reviewing session recovery on the right.",
+  },
+  {
+    image: closeupInbox,
+    title: "See who's busy and who's waiting",
+    body: "Every conversation shows its state in the list, so you can tell at a glance which agent is working and which one has finished.",
+    alt: "The MeldShell thread list with pinned and active conversations. Rows show the agent's icon, the project name, and a spinner where an agent is still working.",
+  },
+  {
+    image: closeupComposer,
+    title: "Pick the agent and model per message",
+    body: "Choose who answers as you write. Switch mid-conversation; each agent remembers where it left off.",
+    alt: "Two message composers at the bottom of MeldShell. One is set to GPT 5.4 through Codex, the other to Claude Opus 4.6 through Claude Code.",
+  },
+]
+---
+
+<Layout
+  title="MeldShell — Codex, Claude Code and Cursor, side by side"
+  description="MeldShell is a desktop app for working with several coding agents at once. Codex, Claude Code and Cursor, across all your projects, in one window."
+>
+  <header class="mx-auto max-w-[1200px] px-5 sm:px-8 h-16 flex items-center justify-between text-[14px]">
+    <a href="/" class="flex items-center gap-2.5 display-wide text-[17px]" aria-label="MeldShell">
+      <Wordmark size={20} class="text-ink" />
+      MeldShell
+    </a>
+    <nav class="flex items-center gap-6 text-ink-2" aria-label="Site">
+      <a href={repo} class="flex items-center gap-2 hover:text-ink transition-colors">
+        <BrandIcon name="github" size={16} />
+        GitHub
+      </a>
+      <a href={releases} class="hover:text-ink transition-colors">Download</a>
+    </nav>
+  </header>
+
+  <main class="mx-auto max-w-[1200px] px-5 sm:px-8">
+    <section class="pt-16 sm:pt-24 pb-12 sm:pb-16 flex flex-col items-center text-center">
+      <ul class="flex items-center gap-x-6 sm:gap-x-9 gap-y-3 flex-wrap justify-center" aria-label="Works with">
+        {
+          agents.map(({ icon, name }) => (
+            <li class="flex items-center gap-2.5 text-[15px] text-ink-2">
+              <BrandIcon name={icon} size={22} class="text-ink" />
+              {name}
+            </li>
+          ))
+        }
+      </ul>
+      <h1 class="mt-9 display-wide text-[clamp(38px,6.4vw,84px)] leading-[1] tracking-[-0.028em] max-w-[16ch] text-balance">
+        Your coding agents, side by side.
+      </h1>
+      <p class="mt-7 max-w-[52ch] text-[clamp(17px,1.5vw,20px)] leading-[1.5] text-ink-2 text-balance">
+        MeldShell is a desktop app for working with several coding agents at once. Every project
+        and every conversation, kept together in one window.
+      </p>
+      <div class="mt-9 flex flex-col items-center gap-3">
+        <a
+          href={releases}
+          class="h-12 px-6 inline-flex items-center rounded-control bg-ink text-window text-[16px] font-medium hover:bg-white transition-colors"
+          >Download MeldShell</a
+        >
+        <span class="text-[14px] text-ink-3">Free and open source.</span>
+      </div>
+    </section>
+
+    <figure class="glass rounded-window p-1.5 sm:p-2">
+      <Image
+        src={workbench}
+        widths={[800, 1200, 1600, 2400]}
+        sizes="(min-width: 1264px) 1168px, calc(100vw - 40px)"
+        alt="The MeldShell window. A list of conversations on the left shows which agents are working. Two conversations are open side by side: one with Codex and one with Claude Code."
+        class="rounded-[8px] w-full h-auto"
+        loading="eager"
+        fetchpriority="high"
+      />
+    </figure>
+
+    <section class="mt-28 sm:mt-36 space-y-24 sm:space-y-32" aria-label="Highlights">
+      {
+        highlights.map(({ image, title, body, alt }, index) => (
+          <div class="grid md:grid-cols-5 gap-8 md:gap-12 items-center">
+            <figure class:list={["glass rounded-surface p-1.5 md:col-span-3", index % 2 === 1 && "md:order-2"]}>
+              <Image
+                src={image}
+                widths={[600, 900, 1400]}
+                sizes="(min-width: 768px) 60vw, calc(100vw - 40px)"
+                alt={alt}
+                class="rounded-[7px] w-full h-auto"
+              />
+            </figure>
+            <div class="md:col-span-2">
+              <h2 class="display-wide text-[clamp(26px,3vw,36px)] leading-[1.1] tracking-[-0.02em] text-balance">
+                {title}
+              </h2>
+              <p class="mt-4 text-[16.5px] leading-[1.5] text-ink-2 max-w-[38ch]">{body}</p>
+            </div>
+          </div>
+        ))
+      }
+    </section>
+  </main>
+
+  <Taskbar {repo} {releases} />
+</Layout>

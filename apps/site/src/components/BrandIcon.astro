@@ -1,0 +1,29 @@
+---
+/* Official marks from the same icon packs the desktop app uses. Marks keep their own colors. */
+import claude from "@iconify-icons/logos/claude-icon"
+import cursor from "@iconify-icons/simple-icons/cursor"
+import github from "@iconify-icons/simple-icons/github"
+import openai from "@iconify-icons/simple-icons/openai"
+
+const icons = { claude, cursor, github, openai } as const
+
+interface Props {
+  name: keyof typeof icons
+  size?: number
+  class?: string
+}
+
+const { name, size = 24, class: className } = Astro.props
+const icon = icons[name]
+const width = icon.width ?? 24
+const height = icon.height ?? 24
+---
+
+<svg
+  viewBox={`0 0 ${width} ${height}`}
+  width={size}
+  height={size}
+  class={className}
+  aria-hidden="true"
+  set:html={icon.body}
+/>

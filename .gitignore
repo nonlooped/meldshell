@@ -4,6 +4,7 @@ dist/
 out/
 release/
 .vite/
+.astro/
 *.tsbuildinfo
 .cache/
 
