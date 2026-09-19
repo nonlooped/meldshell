@@ -7,9 +7,16 @@ import { CoreClient } from "./runtime/core-client"
 
 import { runtime } from "./runtime/services"
 import { logStartupTiming } from "./runtime/startup-timing"
-import { confirmAndClose, stopProviders, quitting, markQuitting } from "./runtime/shutdown"
+import {
+  confirmAndClose,
+  stopProviders,
+  quitting,
+  installingUpdate,
+  markQuitting,
+} from "./runtime/shutdown"
 import { createWindow, getMainWindow } from "./window"
 import { registerIpc } from "./ipc"
+import { updateService } from "./updater"
 
 const openWindow = (): void =>
   createWindow((event) => {
@@ -59,6 +66,7 @@ const appListeners = Effect.acquireRelease(
 
 const awaitQuitRequest = Effect.async<void>((resume) => {
   const onBeforeQuit = (event: Event): void => {
+    if (installingUpdate) return
     event.preventDefault()
     markQuitting()
     resume(Effect.void)
@@ -107,6 +115,7 @@ const desktopProgram = Effect.scoped(
       // Register handlers before loading the renderer. Their runtime calls wait for core safely.
       registerIpc()
       openWindow()
+      updateService.start()
     })
     yield* Effect.raceFirst(
       awaitQuitRequest,

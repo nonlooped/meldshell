@@ -82,6 +82,8 @@ The schema includes:
 
 Turn rows retain provider, harness, model, effort, speed, native turn ID, outcome, and worker generation. Native session IDs live in `provider_sessions`; next-turn permission and mode choices live in `thread_settings`.
 
+New threads start with the model, reasoning effort, and speed from the latest submitted turn whose model is still available. They use the catalog default when no usable turn exists. Existing threads retain their own next-turn settings.
+
 [Migrations](../packages/core/src/database/migrations.ts) run transactionally and back up an existing on-disk database before applying pending migrations. Thread deletion cascades through stored history. Workspace removal deletes its MeldShell threads and transcripts, keeps the folder on disk, and rejects removal while work is running.
 
 Search indexes projected messages from finished turns, rather than streaming chunks. A background job processes dirty groups in bounded batches, so recently finished or migrated history may take time to appear. [Search](../packages/core/src/search.ts) supports word-prefix matching, an optional workspace filter, and pages of 50 results across active, pinned, and archived threads.
@@ -96,10 +98,14 @@ Zustand stores open tabs, selection, and settings navigation in memory. Tabs and
 
 React Compiler is enabled, with local opt-outs around virtualized components. Shared projection assembles streamed messages and structured activity for both transcript display and search. Settings, math rendering, and diff rendering load through lazy boundaries; Mermaid also loads dynamically only for diagrams.
 
-## Security and release boundaries
+## Updates, security, and release boundaries
 
 The window enables `sandbox` and `contextIsolation`, disables `nodeIntegration`, and uses a restrictive Content Security Policy. Development loads the local development server; packaged builds load bundled renderer resources. Operating-system access stays behind the preload API.
 
+Installed Windows NSIS and Linux AppImage builds check the public `nonlooped/meldshell` GitHub Releases feed at startup and every four hours. `electron-updater` downloads a newer stable release in the main process and verifies it against the SHA-512 value in electron-builder's release metadata. The renderer receives status through named IPC methods and can request a restart only after the download finishes. Development builds do not contact the update feed. The About screen also supports a manual check.
+
+Publishing must include the installer or AppImage and its matching `latest.yml` or `latest-linux.yml` file from the same build. Do not mix metadata and artifacts from different builds.
+
 Renderer isolation does not replace harness permissions or isolate concurrent edits to a shared workspace. MeldShell has no worktree manager or filesystem locking layer. Claude tool permissions are not an operating-system sandbox.
 
-The manifests use Effect 3.22.1. Exact resolved dependencies are recorded in the lockfile; consult manifests before documenting an upgrade. Windows 11 x64 remains the release target. Packaging unpacks SQLite outside ASAR; Claude Code is not packaged. Certification follows [release.md](release.md).
+The manifests use Effect 3.22.1. Exact resolved dependencies are recorded in the lockfile; consult manifests before documenting an upgrade. Windows 11 x64 and Linux x64 are the release targets. Packaging unpacks SQLite outside ASAR; Claude Code is not packaged. Certification follows [release.md](release.md).

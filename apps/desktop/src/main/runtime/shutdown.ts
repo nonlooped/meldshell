@@ -6,6 +6,7 @@ import { getMainWindow } from "../window"
 
 let closePromptOpen = false
 export let quitting = false
+export let installingUpdate = false
 export const markQuitting = (): void => {
   quitting = true
 }
@@ -21,7 +22,7 @@ export const stopProviders = Effect.gen(function* () {
   yield* core.FinishShutdown()
 })
 
-export const confirmAndClose = Effect.gen(function* () {
+export const prepareToClose = Effect.gen(function* () {
   if (closePromptOpen) return false
   closePromptOpen = true
   const core = yield* CoreClient
@@ -64,8 +65,6 @@ export const confirmAndClose = Effect.gen(function* () {
       { concurrency: 1, discard: true },
     )
     yield* stopProviders
-    quitting = true
-    yield* Effect.sync(() => app.quit())
     return true
   }).pipe(
     Effect.ensuring(
@@ -75,3 +74,19 @@ export const confirmAndClose = Effect.gen(function* () {
     ),
   )
 })
+
+export const confirmAndClose = prepareToClose.pipe(
+  Effect.tap((ready) =>
+    ready
+      ? Effect.sync(() => {
+          quitting = true
+          app.quit()
+        })
+      : Effect.void,
+  ),
+)
+
+export const markInstallingUpdate = (): void => {
+  installingUpdate = true
+  quitting = true
+}

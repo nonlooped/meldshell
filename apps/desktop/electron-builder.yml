@@ -3,6 +3,10 @@ productName: MeldShell
 directories:
   buildResources: build
   output: ../../release
+publish:
+  provider: github
+  owner: nonlooped
+  repo: meldshell
 files:
   - out/**
   - package.json
@@ -23,6 +27,16 @@ win:
     - target: nsis
       arch:
         - x64
+linux:
+  category: Development
+  executableName: meldshell
+  syncDesktopName: true
+  target:
+    - target: AppImage
+      arch:
+        - x64
+appImage:
+  artifactName: ${productName}-${version}-${arch}.${ext}
 nsis:
   artifactName: ${productName}-${version}-setup.${ext}
   allowElevation: false
