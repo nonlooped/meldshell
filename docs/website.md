@@ -6,4 +6,6 @@ Connect the Vercel project named `meldshell` to `nonlooped/meldshell`, with the 
 
 After `npx vercel login`, run `npx vercel link --project meldshell` from the repository root, connect with `npx vercel git connect https://github.com/nonlooped/meldshell.git`, and deploy with `npx vercel --prod`. The GitHub integration must have access to the private repository. Local `.vercel` credentials and project links are ignored by Git.
 
-The project connection and hostname must be confirmed in Vercel before treating deployment as complete. No Vercel token is needed in GitHub Actions when using the Git integration.
+The `fscyts-projects/meldshell` project is connected to GitHub and its production deployment serves `https://meldshell.vercel.app`, verified on 2026-09-19. The project settings also store the site-only install and build commands. No Vercel token is needed in GitHub Actions when using the Git integration.
+
+[.vercelignore](../.vercelignore) limits CLI uploads to the site and root build manifests, excluding desktop installers and local build output. The first successful deployment uploaded 18 files and used Vercel's basic build machine.

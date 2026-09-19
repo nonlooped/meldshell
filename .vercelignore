@@ -1,0 +1,10 @@
+/*
+!/apps
+/apps/*
+!/apps/site
+!/package.json
+!/package-lock.json
+!/vercel.json
+/apps/site/node_modules
+/apps/site/dist
+/apps/site/.astro
