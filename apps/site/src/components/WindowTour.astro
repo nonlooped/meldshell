@@ -1,0 +1,306 @@
+---
+/* The hero capture, annotated. Numbered markers sit on the real screenshot; selecting one
+   spotlights that part of the window and shows what it does. Without JavaScript the
+   descriptions render stacked beneath the image. */
+import { Image } from "astro:assets"
+import workbench from "../assets/meldshell-workbench.png"
+
+interface Props {
+  class?: string
+}
+const { class: className } = Astro.props
+
+/* Regions and marker points are percentages of the capture. */
+const areas = [
+  {
+    title: "Search",
+    body: "Ctrl+K searches the full text of every conversation: your messages, agent replies, commands and their output, and diffs, across active and archived threads. The workspace menu above the list filters both the inbox and search results to one project.",
+    region: { x: 0.6, y: 5, w: 18, h: 7.5 },
+    marker: { x: 18.6, y: 8.75 },
+  },
+  {
+    title: "Inbox",
+    body: "Pinned threads sit above active ones, and archived threads keep their own section. Each row names the agent and project and shows the time since its last activity; a spinner marks an agent that is still working. Selecting a thread that is already open returns to its tab.",
+    region: { x: 0.6, y: 14, w: 18, h: 48.5 },
+    marker: { x: 18.6, y: 38.2 },
+  },
+  {
+    title: "Tabs and splits",
+    body: "A tab holds one thread or a layout of horizontal and vertical splits; the number on a shared tab is its pane count. Drag a thread onto a pane's edge to split, or onto its centre to swap. Closing a tab or pane never stops the work inside it.",
+    region: { x: 5.5, y: 0.6, w: 20.5, h: 3.3 },
+    marker: { x: 26, y: 2.25 },
+  },
+  {
+    title: "Transcript",
+    body: "Replies render in place: Markdown, tables you can copy as CSV, code with line numbers and folding, diffs, Mermaid diagrams and math. \u201cWorking for 32s\u201d folds the agent's reasoning and tool activity so the answer stays readable, and approval requests stay with the thread until you answer them.",
+    region: { x: 20.9, y: 23, w: 36.3, h: 60 },
+    marker: { x: 57.2, y: 53 },
+  },
+  {
+    title: "Composer",
+    body: "Choose the agent and model for each message, set the reasoning effort, and pick the permission mode the agent natively supports: Codex sandbox and approval settings, Claude Code permission modes, or Cursor Agent, Plan and Ask. Anything you send while the agent is working is queued for the next turn.",
+    region: { x: 21.7, y: 85.6, w: 35, h: 12.8 },
+    marker: { x: 56.7, y: 92 },
+  },
+]
+---
+
+<section class:list={["tour", className]} aria-labelledby="tour-heading" data-tour>
+  <h2
+    id="tour-heading"
+    class="font-display [font-variation-settings:'wdth'_118] font-medium text-[clamp(26px,3vw,36px)] leading-[1.1] tracking-[-0.02em] text-balance"
+  >
+    What's in the window
+  </h2>
+
+  <figure class="mt-8 bg-[rgb(22_22_23/0.72)] [backdrop-filter:blur(32px)_saturate(1.15)] [@media(prefers-reduced-transparency:reduce)]:bg-window [@media(prefers-reduced-transparency:reduce)]:backdrop-filter-none border border-line [box-shadow:inset_0_1px_0_rgb(255_255_255/0.06),0_1px_2px_rgb(0_0_0/0.3),0_28px_64px_rgb(0_0_0/0.42)] rounded-window p-1.5 sm:p-2">
+    <div class="stage">
+      <div class="frame">
+        <Image
+          src={workbench}
+          widths={[800, 1200, 1600, 2400]}
+          sizes="(min-width: 1264px) 1168px, calc(100vw - 40px)"
+          alt="The MeldShell window with its main areas numbered: search and workspace filter, the inbox, the tab strip, a transcript pane, and the message composer."
+          class="block w-full h-auto"
+        />
+        <div class="spotlight" data-spotlight hidden></div>
+      </div>
+      {
+        areas.map(({ title, marker }, index) => (
+          <button
+            type="button"
+            class="marker"
+            data-marker={index}
+            style={`left:${marker.x}%;top:${marker.y}%`}
+            aria-label={title}
+            tabindex="-1"
+            hidden
+          >
+            {index + 1}
+          </button>
+        ))
+      }
+    </div>
+  </figure>
+
+  <div class="mt-6 sm:mt-8">
+    <div class="tabs" role="tablist" aria-label="Areas of the window" hidden>
+      {
+        areas.map(({ title }, index) => (
+          <button
+            type="button"
+            id={`tour-tab-${index}`}
+            role="tab"
+            aria-selected={index === 0 ? "true" : "false"}
+            aria-controls={`tour-panel-${index}`}
+            tabindex={index === 0 ? 0 : -1}
+          >
+            <span class="number">{index + 1}</span>
+            {title}
+          </button>
+        ))
+      }
+    </div>
+    <div class="panels">
+      {
+        areas.map(({ title, body, region }, index) => (
+          <div
+            id={`tour-panel-${index}`}
+            class="panel"
+            data-tour-panel
+            data-region={`${region.x} ${region.y} ${region.w} ${region.h}`}
+          >
+            <h3 class="text-[18px] font-medium text-ink">
+              <span class="number panel-number" aria-hidden="true">{index + 1}</span>
+              {title}
+            </h3>
+            <p class="mt-3 text-[16.5px] leading-[1.5] text-ink-2 max-w-[68ch]">{body}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  [hidden] {
+    display: none;
+  }
+  .stage {
+    position: relative;
+  }
+  .frame {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+  }
+  .spotlight {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: var(--w);
+    height: var(--h);
+    border-radius: 6px;
+    border: 1px solid rgb(255 255 255 / 0.55);
+    box-shadow: 0 0 0 200vmax rgb(22 22 23 / 0.62);
+    pointer-events: none;
+    transition:
+      left 0.35s cubic-bezier(0.2, 0, 0, 1),
+      top 0.35s cubic-bezier(0.2, 0, 0, 1),
+      width 0.35s cubic-bezier(0.2, 0, 0, 1),
+      height 0.35s cubic-bezier(0.2, 0, 0, 1);
+  }
+  .spotlight[hidden] {
+    display: none;
+  }
+  .marker {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: var(--color-ink);
+    color: var(--color-window);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow:
+      0 0 0 2px rgb(22 22 23 / 0.9),
+      0 4px 12px rgb(0 0 0 / 0.45);
+    cursor: pointer;
+    transition:
+      scale 0.15s,
+      background-color 0.15s;
+  }
+  .marker:hover {
+    scale: 1.12;
+  }
+  .marker[aria-current="true"] {
+    background: var(--color-white);
+    scale: 1.12;
+  }
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  [role="tab"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 40px;
+    padding: 0 14px 0 8px;
+    border-radius: var(--radius-surface);
+    border: 1px solid transparent;
+    color: var(--color-ink-2);
+    font-size: 15px;
+    cursor: pointer;
+    transition:
+      background-color 0.15s,
+      color 0.15s;
+  }
+  [role="tab"]:hover {
+    background: var(--color-hover);
+    color: var(--color-ink);
+  }
+  [role="tab"][aria-selected="true"] {
+    background: var(--color-selected);
+    border-color: var(--color-line-strong);
+    color: var(--color-ink);
+  }
+  .number {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-ink-4);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  [aria-selected="true"] .number {
+    background: var(--color-ink);
+    color: var(--color-window);
+  }
+  .panel-number {
+    display: inline-grid;
+    margin-right: 10px;
+    vertical-align: -5px;
+  }
+  .tour[data-enhanced] .panel-number {
+    display: none;
+  }
+  .tour[data-enhanced] .panels {
+    margin-top: 20px;
+    min-height: 6.5em;
+  }
+  .panel + .panel {
+    margin-top: 28px;
+  }
+  .tour[data-enhanced] .panel + .panel {
+    margin-top: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spotlight,
+    .marker,
+    [role="tab"] {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-tour]").forEach((tour) => {
+    const tabs = Array.from(tour.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+    const panels = Array.from(tour.querySelectorAll<HTMLElement>("[data-tour-panel]"))
+    const markers = Array.from(tour.querySelectorAll<HTMLButtonElement>("[data-marker]"))
+    const spotlight = tour.querySelector<HTMLElement>("[data-spotlight]")!
+
+    const select = (selected: number) => {
+      tabs.forEach((tab, index) => {
+        const active = index === selected
+        tab.setAttribute("aria-selected", String(active))
+        tab.tabIndex = active ? 0 : -1
+        panels[index].hidden = !active
+        markers[index].setAttribute("aria-current", String(active))
+      })
+      const [x, y, w, h] = panels[selected].dataset.region!.split(" ")
+      spotlight.style.setProperty("--x", `${x}%`)
+      spotlight.style.setProperty("--y", `${y}%`)
+      spotlight.style.setProperty("--w", `${w}%`)
+      spotlight.style.setProperty("--h", `${h}%`)
+    }
+
+    tabs.forEach((tab, index) => {
+      panels[index].setAttribute("role", "tabpanel")
+      panels[index].setAttribute("aria-labelledby", tab.id)
+      panels[index].tabIndex = 0
+      tab.addEventListener("click", () => select(index))
+      tab.addEventListener("keydown", (event) => {
+        let next = index
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % tabs.length
+        else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index - 1 + tabs.length) % tabs.length
+        else if (event.key === "Home") next = 0
+        else if (event.key === "End") next = tabs.length - 1
+        else return
+        event.preventDefault()
+        select(next)
+        tabs[next].focus()
+      })
+      markers[index].addEventListener("click", () => {
+        select(index)
+        tabs[index].focus({ preventScroll: true })
+      })
+      markers[index].hidden = false
+    })
+
+    select(0)
+    spotlight.hidden = false
+    tour.querySelector<HTMLElement>('[role="tablist"]')!.hidden = false
+    tour.dataset.enhanced = "true"
+  })
+</script>
