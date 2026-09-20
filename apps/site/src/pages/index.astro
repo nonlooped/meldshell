@@ -7,6 +7,7 @@ import workbench from "../assets/meldshell-workbench.png"
 import BrandIcon from "../components/BrandIcon.astro"
 import Taskbar from "../components/Taskbar.astro"
 import Wordmark from "../components/Wordmark.astro"
+import WindowTour from "../components/WindowTour.astro"
 import Layout from "../layouts/Layout.astro"
 
 const repo = "https://github.com/nonlooped/meldshell"
@@ -125,6 +126,8 @@ const highlights = [
         ))
       }
     </section>
+
+    <WindowTour class="mt-28 sm:mt-36" />
   </main>
 
   <Taskbar {repo} {releases} />
