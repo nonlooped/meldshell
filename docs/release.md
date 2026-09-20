@@ -4,7 +4,7 @@ Use this checklist for an installer candidate. Routine edits follow [AGENTS.md](
 
 ## Build and assemble
 
-[Release installers](../.github/workflows/release.yml) runs for a stable `vX.Y.Z` tag matching root and desktop package versions. Its Linux validation job runs the aggregate check and tests. Native Windows and Linux runners build NSIS x64 and AppImage x64 artifacts. The final job assembles installers, updater metadata, blockmaps, and SHA256SUMS into one draft GitHub Release.
+[Release installers](../.github/workflows/release.yml) runs for a stable `vX.Y.Z` tag matching root and desktop package versions. Its Linux validation job runs unused-code, lint, formatting, type, and test checks. Native Windows and Linux runners build and package NSIS x64 and AppImage x64 artifacts. The final job assembles installers, updater metadata, blockmaps, and SHA256SUMS into one draft GitHub Release.
 
 A rerun can replace draft assets but refuses to overwrite a published release. Tagging and publishing are external actions; perform them within the authorization for the release task.
 
