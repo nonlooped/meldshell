@@ -4,5 +4,5 @@
   "installCommand": "npm ci --workspace=@meldshell/site --include-workspace-root=false --ignore-scripts --no-audit --no-fund",
   "buildCommand": "npm run build --workspace=@meldshell/site",
   "outputDirectory": "apps/site/dist",
-  "ignoreCommand": "test -n \"$VERCEL_GIT_PREVIOUS_SHA\" && git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- apps/site package.json package-lock.json vercel.json"
+  "ignoreCommand": "test -n \"$VERCEL_GIT_PREVIOUS_SHA\" && git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- apps/site package.json package-lock.json vercel.json .vercelignore"
 }
