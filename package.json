@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "npm run build --workspace=@meldshell/desktop",
-    "check": "npm run check:fast && npm run build && npm run knip",
+    "check": "npm run knip && npm run check:fast && npm run build",
     "dev": "npm run dev --workspace=@meldshell/desktop",
     "format": "biome format --write .",
     "format:check": "biome format .",

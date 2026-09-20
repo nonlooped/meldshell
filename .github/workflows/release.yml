@@ -35,10 +35,16 @@ jobs:
               throw new Error("Tag must match the stable version in root and desktop package.json");
             }
           '
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: npm rebuild better-sqlite3
-      - run: npm run check
-      - run: npm test
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check unused code
+        run: npm run knip
+      - name: Rebuild native test dependency
+        run: npm rebuild better-sqlite3
+      - name: Lint, format, and typecheck
+        run: npm run check:fast
+      - name: Test
+        run: npm test
 
   package:
     needs: validate
@@ -101,7 +107,7 @@ jobs:
           set -euo pipefail
           version="${RELEASE_TAG#v}"
           test -s "release/MeldShell-${version}-setup.exe"
-          test -s "release/MeldShell-${version}-x64.AppImage"
+          test -s "release/MeldShell-${version}-x86_64.AppImage"
           test -s release/latest.yml
           test -s release/latest-linux.yml
           cd release
