@@ -6,7 +6,7 @@ Use this document for the Astro site in `apps/site`. [vercel.json](../vercel.jso
 
 The recorded Vercel project is `fscyts-projects/meldshell`, connected to `nonlooped/meldshell`, with the repository root as Root Directory and `main` as production branch. Its deployment at [meldshell.vercel.app](https://meldshell.vercel.app) was reported verified on September 19, 2026; this documentation rewrite did not recheck the remote configuration.
 
-The Git integration produces main-branch deployments and pull-request previews. The ignore command compares site files, root manifests, lockfile, and Vercel configuration with the previous successful deployment. Missing history triggers a build.
+The Git integration produces main-branch deployments and pull-request previews. The ignore command compares site files, root manifests, lockfile, and deployment configuration with the previous successful deployment. Missing history triggers a build. Keep `/.git` in the [`.vercelignore`](../.vercelignore) allowlist because Vercel applies that filter before running the ignore command.
 
 The integration needs repository access. It does not require a Vercel token in GitHub Actions. Check the live project before changing connections or settings.
 
