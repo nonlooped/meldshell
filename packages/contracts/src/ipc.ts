@@ -94,6 +94,23 @@ const request = <Invoke extends (...args: never[]) => Promise<unknown>>(
 
 /** The whitelist and signatures for renderer invocation methods. */
 export const requests = {
+  getRemoteStatus:
+    request<
+      () => Promise<{
+        linked: boolean
+        account: { id: string; email: string; name: string } | null
+        siteURL: string | null
+        status: string
+        linking: { userCode: string; verificationURL: string } | null
+        error: string | null
+      }>
+    >("meldshell:remote-status"),
+  linkRemote:
+    request<() => Promise<{ userCode: string; verificationURL: string }>>("meldshell:link-remote"),
+  openRemotePage: request<(page: "sign-in" | "dashboard") => Promise<void>>(
+    "meldshell:open-remote-page",
+  ),
+  unlinkRemote: request<() => Promise<void>>("meldshell:unlink-remote"),
   getWebPageTitle: request<(url: string) => Promise<string | null>>("meldshell:get-web-page-title"),
   listDirectory: request<(input: WorkspaceFileInput) => Promise<readonly DirectoryEntry[]>>(
     "meldshell:list-directory",

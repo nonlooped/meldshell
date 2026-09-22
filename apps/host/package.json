@@ -1,0 +1,17 @@
+{
+  "name": "@meldshell/headless",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --import tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@meldshell/host": "*",
+    "@meldshell/provider-codex": "*",
+    "@meldshell/provider-claude": "*",
+    "@meldshell/provider-cursor": "*",
+    "tsx": "4.23.13"
+  }
+}

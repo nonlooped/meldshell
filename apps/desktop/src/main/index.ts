@@ -2,10 +2,8 @@ import { electronApp, is, optimizer } from "@electron-toolkit/utils"
 import { app, BrowserWindow, type Event } from "electron"
 import contextMenu from "electron-context-menu"
 import { Effect } from "effect"
-import { CodexProvider, ClaudeProvider, CursorProvider } from "./runtime/worker-provider"
-import { CoreClient } from "./runtime/core-client"
 
-import { runtime } from "./runtime/services"
+import { runtime, desktopHost } from "./runtime/services"
 import { logStartupTiming } from "./runtime/startup-timing"
 import {
   confirmAndClose,
@@ -75,12 +73,7 @@ const awaitQuitRequest = Effect.async<void>((resume) => {
   return Effect.sync(() => app.off("before-quit", onBeforeQuit))
 })
 
-const startApplication = Effect.gen(function* () {
-  yield* CoreClient
-  yield* CodexProvider
-  yield* ClaudeProvider
-  yield* CursorProvider
-})
+const startApplication = Effect.promise(() => desktopHost.start())
 
 const disposeRuntime = Effect.tryPromise({
   try: () => runtime.dispose(),
@@ -124,15 +117,7 @@ const desktopProgram = Effect.scoped(
         catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
       }).pipe(Effect.andThen(Effect.never)),
     )
-    yield* Effect.promise(() =>
-      runtime.runPromise(
-        Effect.gen(function* () {
-          const core = yield* CoreClient
-          yield* core.BeginShutdown()
-          yield* stopProviders
-        }),
-      ),
-    )
+    yield* stopProviders
   }),
 ).pipe(
   Effect.tapErrorCause((cause) =>

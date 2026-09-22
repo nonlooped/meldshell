@@ -25,8 +25,12 @@
     "postinstall": "npm run install:electron && npm run rebuild:native",
     "rebuild:native": "npm run rebuild:native --workspace=@meldshell/desktop",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "node --import tsx --test \"tests/**/*.test.ts\" \"packages/**/*.test.ts\" \"packages/**/*.test.mjs\" \"apps/desktop/src/**/*.test.ts\" \"apps/desktop/src/**/*.test.mjs\"",
-    "check:fast": "npm run lint && npm run format:check && npm run typecheck"
+    "test": "node --import tsx --test \"tests/**/*.test.ts\" \"tests/**/*.test.mjs\" \"packages/**/*.test.ts\" \"packages/**/*.test.mjs\" \"apps/desktop/src/**/*.test.ts\" \"apps/desktop/src/**/*.test.mjs\" \"apps/control/src/**/*.test.ts\" \"apps/site/src/remote/**/*.test.ts\"",
+    "check:fast": "npm run lint && npm run format:check && npm run typecheck",
+    "host": "npm run start --workspace=@meldshell/headless --",
+    "control": "npm run start --workspace=@meldshell/control",
+    "dev:all": "node --env-file-if-exists=apps/site/.env scripts/dev-all.mjs",
+    "dev:host": "node --env-file-if-exists=apps/site/.env scripts/dev-host.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
@@ -34,6 +38,7 @@
     "@effect/sql": "0.52.1",
     "@effect/sql-sqlite-node": "0.53.0",
     "@types/node": "24.10.1",
+    "concurrently": "10.0.5",
     "effect": "3.22.1",
     "knip": "6.34.0",
     "tsx": "4.23.13",

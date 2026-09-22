@@ -1,7 +1,6 @@
 import { handleGeneratedText } from "./generated-text"
 import { logStartupTiming } from "./startup-timing"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
-import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import {
   ProviderStatus as ProviderStatusSchema,
@@ -17,10 +16,10 @@ import {
   type TurnDispatch,
   type ProviderWorkerInput,
 } from "@meldshell/contracts"
-import { BrowserWindow, Notification, utilityProcess, type UtilityProcess } from "electron"
+import { HostPlatform, type HostProcess } from "./platform"
 import { Context, Effect, Either, Layer, Ref, Runtime, Schedule, Schema, type Scope } from "effect"
 import { CoreClient } from "./core-client"
-import { DesktopEvents } from "./desktop-events"
+import { HostEvents } from "./events"
 import { interruptWithRecovery } from "./interrupt-turn"
 import { isRuntimeDelta, mergeRuntimeDelta } from "./runtime-deltas"
 
@@ -56,7 +55,7 @@ const messageText = (cause: unknown): string =>
     : String(cause)
 
 const deliverCommand = (
-  child: UtilityProcess,
+  child: HostProcess,
   message: ProviderWorkerInput,
   label: string,
 ): Effect.Effect<void, Error> =>
@@ -101,7 +100,7 @@ const deliverCommand = (
     }),
   )
 
-const requestUsage = (child: UtilityProcess, label: string): Effect.Effect<CodexUsage, Error> =>
+const requestUsage = (child: HostProcess, label: string): Effect.Effect<CodexUsage, Error> =>
   Effect.async<CodexUsage, Error>((resume) => {
     const requestId = randomUUID()
     const finish = (result: Effect.Effect<CodexUsage, Error>): void => {
@@ -151,8 +150,7 @@ const requestUsage = (child: UtilityProcess, label: string): Effect.Effect<Codex
 
 const providerRuntime = (
   config: ProviderConfig,
-  getWindow: () => BrowserWindow | null,
-): Effect.Effect<ProviderService, never, CoreClient | DesktopEvents | Scope.Scope> =>
+): Effect.Effect<ProviderService, never, CoreClient | HostEvents | HostPlatform | Scope.Scope> =>
   Effect.gen(function* () {
     const probingStatus = (): ProviderStatus => ({
       ...(config.harness === "cursor"
@@ -166,29 +164,30 @@ const providerRuntime = (
       detail: `Connecting to ${config.label}...`,
       checkedAt: new Date().toISOString(),
     })
+    const platform = yield* HostPlatform
     const core = yield* CoreClient
-    const desktopEvents = yield* DesktopEvents
+    const hostEvents = yield* HostEvents
     const runtime = yield* Effect.runtime<never>()
     const scope = yield* Effect.scope
     const runFork = (effect: Effect.Effect<void>): void => {
       Runtime.runFork(runtime)(effect.pipe(Effect.forkIn(scope)))
     }
-    const processRef = yield* Ref.make<UtilityProcess | null>(null)
+    const processRef = yield* Ref.make<HostProcess | null>(null)
     const statusRef = yield* Ref.make(probingStatus())
-    type RuntimeTask = { effect: Effect.Effect<void>; input?: RuntimeEventInput }
-    const descendants = new WeakMap<UtilityProcess, Set<number>>()
-    const generations = new WeakMap<UtilityProcess, string>()
+    type RuntimeTask = { effect: Effect.Effect<void>; input?: RuntimeEventInput | undefined }
+    const descendants = new WeakMap<HostProcess, Set<number>>()
+    const generations = new WeakMap<HostProcess, string>()
     let stopping = false
     let draining = false
     const tasks: RuntimeTask[] = []
     const publishStatus = (status: ProviderStatus): Effect.Effect<void> =>
       Ref.set(statusRef, status).pipe(
-        Effect.andThen(desktopEvents.publish({ _tag: "ProviderStatusChanged", status })),
+        Effect.andThen(hostEvents.publish({ _tag: "ProviderStatusChanged", status })),
       )
 
     const bindDispatch = (
       dispatch: TurnDispatch | null,
-      child: UtilityProcess | null,
+      child: HostProcess | null,
     ): Effect.Effect<void, Error> =>
       Effect.gen(function* () {
         if (dispatch !== null && dispatch.harness !== config.harness)
@@ -243,25 +242,16 @@ const providerRuntime = (
       method: string,
     ): Effect.Effect<void> =>
       Effect.sync(() => {
-        const window = getWindow()
-        if (window?.isFocused()) return
         const thread = snapshot.threads.find((candidate) => candidate.id === threadId)
         if (thread === undefined) return
         const approval = snapshot.approvals.some((candidate) => candidate.threadId === threadId)
-        const completed = method === "turn/completed"
-        if (!approval && !completed) return
-        const notification = new Notification({
+        if (!approval && method !== "turn/completed") return
+        platform.notify({
           title: approval ? `${config.label} needs approval` : `${config.label} turn finished`,
           body: thread.title,
+          threadId,
+          onClick: () => runFork(hostEvents.publish({ _tag: "AttentionRequested", threadId })),
         })
-        notification.on("click", () => {
-          const currentWindow = getWindow()
-          if (currentWindow?.isMinimized()) currentWindow.restore()
-          currentWindow?.show()
-          currentWindow?.focus()
-          runFork(desktopEvents.publish({ _tag: "AttentionRequested", threadId }))
-        })
-        notification.show()
       })
 
     const persistRuntimeEvent = (input: RuntimeEventInput): Effect.Effect<void> =>
@@ -274,7 +264,7 @@ const providerRuntime = (
         ),
         Effect.tap((result) =>
           result.changed
-            ? desktopEvents
+            ? hostEvents
                 .publish({
                   _tag: "RuntimeChanged",
                   threadId: input.threadId,
@@ -387,7 +377,7 @@ const providerRuntime = (
       enqueue(
         core.SyncProviderCatalog(decodedCatalog.right).pipe(
           Effect.tap(() => publishStatus(decodedStatus.right)),
-          Effect.tap(() => desktopEvents.publish({ _tag: "RuntimeChanged", threadId: "" })),
+          Effect.tap(() => hostEvents.publish({ _tag: "RuntimeChanged", threadId: "" })),
           Effect.asVoid,
           Effect.catchAll((cause) =>
             publishStatus({
@@ -400,7 +390,7 @@ const providerRuntime = (
       )
     }
 
-    const handleRuntimeEvent = (record: Record<string, unknown>, owner: UtilityProcess): void => {
+    const handleRuntimeEvent = (record: Record<string, unknown>, owner: HostProcess): void => {
       const input = Schema.decodeUnknownEither(RuntimeEventInputSchema)(record.input)
       if (Either.isLeft(input)) {
         console.error(`${config.label} returned an invalid runtime event.`)
@@ -426,7 +416,7 @@ const providerRuntime = (
       enqueue(
         core.SetThreadTitle(input.right).pipe(
           Effect.tap(() =>
-            desktopEvents.publish({
+            hostEvents.publish({
               _tag: "RuntimeChanged",
               threadId: input.right.threadId,
             }),
@@ -452,7 +442,7 @@ const providerRuntime = (
       enqueue(
         core.SetProviderSession(input.right).pipe(
           Effect.tap(() =>
-            desktopEvents.publish({
+            hostEvents.publish({
               _tag: "RuntimeChanged",
               threadId: input.right.threadId,
             }),
@@ -497,7 +487,7 @@ const providerRuntime = (
         console.error("Could not generate a thread title.", record.message)
     }
 
-    const handleWorkerMessage = (message: unknown, owner: UtilityProcess): void => {
+    const handleWorkerMessage = (message: unknown, owner: HostProcess): void => {
       const record =
         typeof message === "object" && message !== null
           ? (message as Record<string, unknown>)
@@ -539,10 +529,7 @@ const providerRuntime = (
         Effect.acquireUseRelease(
           Effect.try({
             try: () => {
-              const child = utilityProcess.fork(join(__dirname, config.worker), [], {
-                serviceName: `MeldShell ${config.label}`,
-                stdio: "pipe",
-              })
+              const child = platform.fork(config.worker, `MeldShell ${config.label}`)
               generations.set(child, randomUUID())
               descendants.set(child, new Set())
               child.stdout?.pipe(process.stdout)
@@ -579,7 +566,7 @@ const providerRuntime = (
                             : core.ReconcileWorker({ generation: generations.get(child)! }),
                         ),
                         Effect.andThen(
-                          desktopEvents.publish({ _tag: "RuntimeChanged", threadId: "" }),
+                          hostEvents.publish({ _tag: "RuntimeChanged", threadId: "" }),
                         ),
                         Effect.catchAll(Effect.logError),
                       ),
@@ -700,7 +687,7 @@ const providerRuntime = (
               yield* core
                 .ReconcileWorker({ generation })
                 .pipe(Effect.mapError((cause) => new Error(messageText(cause))))
-              yield* desktopEvents.publish({ _tag: "RuntimeChanged", threadId })
+              yield* hostEvents.publish({ _tag: "RuntimeChanged", threadId })
             }),
         ),
       shutdown,
@@ -719,36 +706,34 @@ const providerRuntime = (
     }
   })
 
-export const codexProviderLive = (
-  getWindow: () => BrowserWindow | null,
-): Layer.Layer<CodexProvider, never, CoreClient | DesktopEvents> =>
+export const codexProviderLive = (): Layer.Layer<
+  CodexProvider,
+  never,
+  CoreClient | HostEvents | HostPlatform
+> =>
   Layer.scoped(
     CodexProvider,
-    providerRuntime(
-      {
-        provider: "openai",
-        harness: "codex",
-        label: "Codex",
-        worker: "codex-worker.js",
-      },
-      getWindow,
-    ),
+    providerRuntime({
+      provider: "openai",
+      harness: "codex",
+      label: "Codex",
+      worker: "codex-worker.js",
+    }),
   )
 
-export const claudeProviderLive = (
-  getWindow: () => BrowserWindow | null,
-): Layer.Layer<ClaudeProvider, never, CoreClient | DesktopEvents> =>
+export const claudeProviderLive = (): Layer.Layer<
+  ClaudeProvider,
+  never,
+  CoreClient | HostEvents | HostPlatform
+> =>
   Layer.scoped(
     ClaudeProvider,
-    providerRuntime(
-      {
-        provider: "anthropic",
-        harness: "claude-code",
-        label: "Claude Code",
-        worker: "claude-worker.js",
-      },
-      getWindow,
-    ),
+    providerRuntime({
+      provider: "anthropic",
+      harness: "claude-code",
+      label: "Claude Code",
+      worker: "claude-worker.js",
+    }),
   )
 
 export class CursorProvider extends Context.Tag("MeldShell/CursorProvider")<
@@ -756,15 +741,19 @@ export class CursorProvider extends Context.Tag("MeldShell/CursorProvider")<
   ProviderService
 >() {}
 
-export const cursorProviderLive = (
-  getWindow: () => BrowserWindow | null,
-): Layer.Layer<CursorProvider, never, CoreClient | DesktopEvents> =>
+export const cursorProviderLive = (): Layer.Layer<
+  CursorProvider,
+  never,
+  CoreClient | HostEvents | HostPlatform
+> =>
   Layer.scoped(
     CursorProvider,
-    providerRuntime(
-      { provider: "cursor", harness: "cursor", label: "Cursor", worker: "cursor-worker.js" },
-      getWindow,
-    ),
+    providerRuntime({
+      provider: "cursor",
+      harness: "cursor",
+      label: "Cursor",
+      worker: "cursor-worker.js",
+    }),
   )
 
 export const providerFor = (

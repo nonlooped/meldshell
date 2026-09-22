@@ -9,20 +9,23 @@ A workspace identifies a local folder. A thread belongs to one workspace; each t
 Each harness has a separate native session inside a MeldShell thread. Switching back resumes that session without copying another harness's messages.
 
 ```text
-Sandboxed React renderer
-  | named preload methods and change notifications
-Electron main
+Sandboxed React renderer          Browser clients (remote)
+  | named preload methods            | account service relay
+Electron main or headless Node ------'
+  host (packages/host), in process
   |-- core utility process: SQLite, catalog, threads, queue, search, recovery
   |-- Codex utility process: codex app-server subprocess
   |-- Claude utility process: SDK queries and installed Claude child processes
   `-- Cursor utility process: workspace-local ACP subprocesses
 ```
 
-[Main supervision](../apps/desktop/src/main/runtime/worker-provider.ts) owns worker generations, delivery acknowledgments, persistence routing, attention, restart, and shutdown. Each provider package owns its native protocol, session behavior, and event mapping. [provider-runtime](../packages/provider-runtime/src) shares process-tree shutdown and worker-envelope handling.
+[Host supervision](../packages/host/src/worker-provider.ts) owns worker generations, delivery acknowledgments, persistence routing, attention, restart, and shutdown. Each provider package owns its native protocol, session behavior, and event mapping. [provider-runtime](../packages/provider-runtime/src) shares process-tree shutdown and worker-envelope handling.
 
-The [core worker](../apps/desktop/src/main/workers/core.ts) is the sole application database writer. It admits up to eight RPC handlers and serializes mutation handlers and background search refreshes through one writer gate. SQLite's connection semaphore excludes reads during write transactions; multi-query snapshots also use transactions.
+The [core worker](../packages/host/src/core-server.ts) is the sole application database writer. It admits up to eight RPC handlers and serializes mutation handlers and background search refreshes through one writer gate. SQLite's connection semaphore excludes reads during write transactions; multi-query snapshots also use transactions.
 
 The renderer has no Node.js access or direct provider connection. Main owns operating-system integration, window management, dialogs, notifications, and shutdown.
+
+The [host](../packages/host/src/host.ts) runs in the Electron main process or in the [headless entry point](../apps/host/src/index.ts). Its [operation table](../packages/host/src/api.ts) serves both desktop IPC and relayed browser commands; operations outside it, such as adding a workspace or updating the app, stay desktop-only. Host events are coalesced every 32 ms before they reach any client. See [Remote control](remote-control.md) for accounts and the relay.
 
 ## IPC and startup
 
@@ -54,11 +57,11 @@ Submissions during active work commit to `queued_inputs`. Normal promotion joins
 
 Before dispatch, a turn receives its worker generation. Failed delivery or an ambiguous acknowledgment triggers reconciliation, not automatic replay. A disconnected worker's running turns fail. Application startup interrupts remaining running turns and clears stale approvals while preserving queued input. A later explicit submission can resume the native session; there is no dedicated retry/resume UI action.
 
-Workers restart with backoff. Renderer reloads do not control their lifetime. Intentional close with active work requests confirmation, interrupts turns, and terminates child process trees. See [interrupt-turn.ts](../apps/desktop/src/main/runtime/interrupt-turn.ts) for escalation and timeout handling.
+Workers restart with backoff. Renderer reloads do not control their lifetime. Intentional close with active work requests confirmation, interrupts turns, and terminates child process trees. See [interrupt-turn.ts](../packages/host/src/interrupt-turn.ts) for escalation and timeout handling.
 
 ## Storage and search
 
-[core-client.ts](../apps/desktop/src/main/runtime/core-client.ts) selects `meldshell.sqlite` under Electron user data. [Persistence setup](../packages/core/src/database/persistence.ts) enables foreign keys, WAL, full synchronous writes, and a busy timeout.
+[core-client.ts](../packages/host/src/core-client.ts) opens `meldshell.sqlite` in the host data directory: Electron user data, `MELDSHELL_DATA_DIR`, or the headless `--data-dir`. An OS-released [ownership lock](../packages/host/src/ownership.ts) admits one core writer per directory. [Persistence setup](../packages/core/src/database/persistence.ts) enables foreign keys, WAL, full synchronous writes, and a busy timeout.
 
 The schema stores workspaces, threads, turns, events, queues, provider/model catalogs, per-thread settings, approvals, preferences, and search documents. `provider_sessions` is keyed by thread and harness. Turn rows preserve submitted settings, native turn ID, outcome, and worker generation; next-turn choices live in `thread_settings`.
 
@@ -78,7 +81,7 @@ Whole-turn projection preserves message integrity but allows a large turn to exc
 
 Zustand holds tabs, split layouts, selection, and settings navigation in memory. Tabs and unsent drafts do not survive restart. Theme, transcript size, reduced motion, send shortcut, archived visibility, and title-model selection are database-backed.
 
-React Compiler has local opt-outs for virtualized components. Settings, math, diffs, and Mermaid use lazy loading. File and Git queries stay with their views; main-process [workspace files](../apps/desktop/src/main/workspace-files.ts) and [Git](../apps/desktop/src/main/git.ts) implement their operating-system operations.
+React Compiler has local opt-outs for virtualized components. Settings, math, diffs, and Mermaid use lazy loading. File and Git queries stay with their views; host-side [workspace files](../packages/host/src/workspace-files.ts) and [Git](../packages/host/src/git.ts) implement their operating-system operations.
 
 ## Security and distribution
 
