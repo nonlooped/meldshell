@@ -1,0 +1,258 @@
+---
+import AccountPage from "../components/AccountPage.astro"
+---
+
+<AccountPage title="Your devices" description="Open a computer running MeldShell." variant="page">
+  <Fragment slot="nav">
+    <span class="who" id="who"></span>
+    <button type="button" class="btn btn-ghost btn-sm" id="sign-out">Sign out</button>
+  </Fragment>
+
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1>Your devices</h1>
+      <p class="lede" id="summary">Loading your computers…</p>
+    </div>
+    <button type="button" class="btn btn-sm" id="add" hidden aria-controls="setup" aria-expanded="false">Add a computer</button>
+  </div>
+
+  <p class="notice mt-6" data-tone="error" role="alert" id="error"></p>
+
+  <div id="loading" class="devices mt-8" aria-hidden="true">
+    <div class="device skeleton"></div>
+    <div class="device skeleton"></div>
+  </div>
+  <ul id="devices" class="devices mt-8" aria-label="Computers" hidden></ul>
+
+  <section id="setup" class="setup mt-10" hidden aria-labelledby="setup-title">
+    <div class="setup-head">
+      <span class="pill" id="setup-badge">Getting started</span>
+      <h2 id="setup-title">Connect a computer</h2>
+      <p class="lede">Remote access works through MeldShell on the computer where your workspaces live. Connect it once and it appears here.</p>
+    </div>
+    <ol class="steps">
+      <li>
+        <strong>Open MeldShell on that computer</strong>
+        <span>Keep it running while you work remotely. Your agents run there, not in this browser.</span>
+      </li>
+      <li>
+        <strong>Go to Settings → Account &amp; devices</strong>
+        <span>Choose <em>Sign in with your browser</em>, then open the link it shows.</span>
+      </li>
+      <li>
+        <strong>Confirm the code</strong>
+        <span>Check the code matches and choose <em>Connect this computer</em>.</span>
+      </li>
+    </ol>
+    <div class="waiting" role="status" id="waiting">
+      <span class="spinner" aria-hidden="true"></span>
+      Waiting for a computer to connect. This page updates by itself.
+    </div>
+    <details class="server">
+      <summary>Setting up a server without a screen?</summary>
+      <p class="muted">Run the headless host as the user that owns your workspaces and provider logins, then open the link it prints:</p>
+      <pre><code>npm run host -- link --control <span id="control-url"></span> --data-dir /var/lib/meldshell
+npm run host -- --data-dir /var/lib/meldshell --workspace /srv/project</code></pre>
+    </details>
+  </section>
+
+  <p slot="after" class="muted mt-12 max-w-2xl">
+    Closing this page never stops your agents. Traffic passes through the MeldShell relay, whose operator can read forwarded prompts and output; provider credentials stay on your computers.
+  </p>
+
+  <dialog id="revoke-dialog" aria-labelledby="revoke-title">
+    <form method="dialog" class="grid gap-4">
+      <h2 id="revoke-title">Remove this computer?</h2>
+      <p class="muted" id="revoke-body"></p>
+      <div class="flex justify-end gap-2">
+        <button class="btn btn-ghost" value="cancel" autofocus>Cancel</button>
+        <button class="btn btn-danger" value="confirm">Remove access</button>
+      </div>
+    </form>
+  </dialog>
+
+  <style is:global>
+    .account .devices { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); list-style: none; padding: 0; }
+    .account .device { display: grid; gap: 1rem; padding: 1.1rem 1.1rem 1rem; border: 1px solid var(--color-line); border-radius: var(--radius-surface); background: var(--color-raised); transition: border-color .15s; }
+    .account .device[data-state=online] { border-color: var(--color-line-strong); }
+    .account .device.skeleton { height: 8.5rem; background: linear-gradient(90deg, var(--color-hover), rgb(255 255 255 / .07), var(--color-hover)); background-size: 200% 100%; animation: account-shimmer 1.4s ease-in-out infinite; }
+    @keyframes account-shimmer { to { background-position: -200% 0; } }
+    @media (prefers-reduced-motion: reduce) { .account .device.skeleton { animation: none; } }
+    .account .device-top { display: flex; align-items: flex-start; gap: .85rem; }
+    .account .device-icon { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--radius-row); background: var(--color-hover); color: var(--color-ink-2); flex: none; }
+    .account .device[data-state=online] .device-icon { color: var(--color-ink); }
+    .account .device h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account .device-meta { font-size: .8125rem; color: var(--color-ink-3); margin-top: .2rem; }
+    .account .device-actions { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+    .account .device-actions .btn-primary { flex: 1; max-width: 12rem; }
+    .account .offline-hint { font-size: .8125rem; color: var(--color-ink-3); line-height: 1.5; }
+
+    .account .setup { max-width: 44rem; display: grid; gap: 1.75rem; padding: clamp(1.25rem, 4vw, 2rem); border: 1px dashed var(--color-line-strong); border-radius: var(--radius-surface); }
+    .account .setup-head { display: grid; gap: .6rem; justify-items: start; }
+    .account .setup-head h2 { font-size: 1.35rem; }
+    .account .steps { list-style: none; padding: 0; counter-reset: step; display: grid; gap: 1.1rem; }
+    .account .steps li { counter-increment: step; display: grid; grid-template-columns: 1.9rem 1fr; column-gap: .9rem; row-gap: .2rem; }
+    .account .steps li::before { content: counter(step); grid-row: span 2; display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 50%; border: 1px solid var(--color-line-strong); font-size: .8125rem; color: var(--color-ink-2); }
+    .account .steps strong { font-weight: 500; padding-top: .3rem; }
+    .account .steps span { grid-column: 2; font-size: .875rem; color: var(--color-ink-2); line-height: 1.55; }
+    .account .steps em { font-style: normal; color: var(--color-ink); }
+    .account .waiting { display: flex; align-items: center; gap: .7rem; font-size: .875rem; color: var(--color-ink-2); }
+    .account .server summary { font-size: .875rem; color: var(--color-ink-2); }
+    .account .server[open] summary { margin-bottom: .75rem; }
+    .account .server pre { margin-top: .75rem; padding: .9rem 1rem; overflow-x: auto; font: .8125rem/1.7 var(--font-mono); border-radius: var(--radius-row); background: rgb(0 0 0 / .3); border: 1px solid var(--color-line); }
+
+    .account dialog { margin: auto; width: min(26rem, calc(100vw - 2rem)); padding: 1.5rem; color: var(--color-ink); background: #1f1f21; border: 1px solid var(--color-line-strong); border-radius: var(--radius-window); box-shadow: 0 30px 80px rgb(0 0 0 / .5); }
+    .account dialog::backdrop { background: rgb(0 0 0 / .55); backdrop-filter: blur(2px); }
+  </style>
+
+  <script>
+    import { accountRequest, describe, listDevices, relativeTime, requireSession, ServiceUnavailable, signOut, type Device } from "../remote/accounts"
+
+    const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
+    const list = $<HTMLUListElement>("#devices")
+    const error = $("#error")
+    const setup = $("#setup")
+    const add = $<HTMLButtonElement>("#add")
+    const dialog = $<HTMLDialogElement>("#revoke-dialog")
+    $("#control-url").textContent = import.meta.env.PUBLIC_CONTROL_URL || location.origin
+
+    const icon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M2 20h20"/></svg>`
+    let devices: Device[] | null = null
+    let previous = ""
+    let setupOpen = false
+
+    function render() {
+      if (!devices) return
+      // Re-render when the list changes or relative times move to a new minute.
+      const fingerprint = JSON.stringify(devices) + Math.floor(Date.now() / 60_000)
+      if (fingerprint === previous) return
+      previous = fingerprint
+      const online = devices.filter((device) => device.online).length
+      $("#loading").hidden = true
+      list.hidden = devices.length === 0
+      add.hidden = devices.length === 0
+      setup.hidden = devices.length > 0 && !setupOpen
+      $("#setup-badge").textContent = devices.length ? "Another computer" : "Getting started"
+      $("#waiting").hidden = devices.length > 0
+      $("#summary").textContent = devices.length === 0
+        ? "You’re signed in. Connect a computer to control it from here."
+        : online === 0
+          ? devices.length === 1
+            ? "Your computer is offline. Open MeldShell on it to reach it from here."
+            : `None of your ${devices.length} computers are online. Open MeldShell on one to reach it.`
+          : `${online} of ${devices.length} online. Choose a computer to open its inbox.`
+      list.replaceChildren(...[...devices].sort((a, b) => Number(b.online) - Number(a.online)).map(renderDevice))
+    }
+
+    function renderDevice(device: Device) {
+      const state = device.online ? "online" : "offline"
+      const item = document.createElement("li")
+      item.className = "device"
+      item.dataset.state = state
+      const top = document.createElement("div")
+      top.className = "device-top"
+      const glyph = document.createElement("span")
+      glyph.className = "device-icon"
+      glyph.innerHTML = icon
+      const copy = document.createElement("div")
+      copy.className = "min-w-0 flex-1"
+      const name = document.createElement("h2")
+      name.textContent = device.name
+      name.title = device.name
+      const meta = document.createElement("p")
+      meta.className = "device-meta"
+      meta.textContent = device.online ? "Ready now" : device.lastSeen ? `Last seen ${relativeTime(device.lastSeen)}` : "Hasn’t connected yet"
+      copy.append(name, meta)
+      const pill = document.createElement("span")
+      pill.className = "pill"
+      pill.dataset.state = state
+      pill.innerHTML = `<span class="dot" aria-hidden="true"></span>${device.online ? "Online" : "Offline"}`
+      top.append(glyph, copy, pill)
+
+      const actions = document.createElement("div")
+      actions.className = "device-actions"
+      if (device.online) {
+        const open = document.createElement("a")
+        open.className = "btn btn-primary"
+        open.href = `/workspace?device=${encodeURIComponent(device.id)}`
+        open.textContent = "Open"
+        open.setAttribute("aria-label", `Open ${device.name}`)
+        actions.append(open)
+      } else {
+        const hint = document.createElement("p")
+        hint.className = "offline-hint"
+        hint.textContent = "Open MeldShell on this computer to reconnect."
+        actions.append(hint)
+      }
+      const remove = document.createElement("button")
+      remove.type = "button"
+      remove.className = "btn btn-ghost btn-sm"
+      remove.textContent = "Remove"
+      remove.setAttribute("aria-label", `Remove ${device.name}`)
+      remove.addEventListener("click", () => confirmRevoke(device, remove))
+      actions.append(remove)
+      item.append(top, actions)
+      return item
+    }
+
+    function confirmRevoke(device: Device, trigger: HTMLButtonElement) {
+      $("#revoke-body").textContent = `${device.name} will disconnect from your account and any open browser sessions. Its agents and conversations aren’t affected. To use it remotely again, sign in from MeldShell on that computer.`
+      dialog.returnValue = ""
+      dialog.showModal()
+      dialog.addEventListener("close", () => {
+        trigger.focus()
+        if (dialog.returnValue !== "confirm") return
+        trigger.disabled = true
+        trigger.setAttribute("aria-busy", "true")
+        void accountRequest(`/api/remote/v1/devices/${encodeURIComponent(device.id)}`, undefined, "DELETE")
+          .then(poll)
+          .catch((cause) => {
+            error.textContent = describe(cause)
+            trigger.disabled = false
+            trigger.removeAttribute("aria-busy")
+          })
+      }, { once: true })
+    }
+
+    let refreshing = false
+    async function poll() {
+      if (refreshing) return
+      refreshing = true
+      try {
+        devices = await listDevices()
+        error.textContent = ""
+        render()
+      } catch (cause) {
+        error.textContent = cause instanceof ServiceUnavailable ? `${describe(cause)} Retrying…` : describe(cause)
+      } finally {
+        refreshing = false
+      }
+    }
+
+    add.addEventListener("click", () => {
+      setupOpen = !setupOpen
+      add.setAttribute("aria-expanded", String(setupOpen))
+      add.textContent = setupOpen ? "Hide instructions" : "Add a computer"
+      setup.hidden = !setupOpen
+      if (setupOpen) setup.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+    $("#sign-out").addEventListener("click", () => {
+      void signOut().catch((cause) => { error.textContent = describe(cause) })
+    })
+
+    let timer: ReturnType<typeof setInterval> | undefined
+    void requireSession()
+      .then(async (session) => {
+        $("#who").textContent = session.user.email
+        await poll()
+        timer = setInterval(() => { if (!document.hidden) void poll() }, 2_000)
+      })
+      .catch((cause) => {
+        $("#loading").hidden = true
+        $("#summary").textContent = ""
+        error.textContent = describe(cause)
+      })
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) void poll() })
+    window.addEventListener("pagehide", () => clearInterval(timer), { once: true })
+  </script>
+</AccountPage>

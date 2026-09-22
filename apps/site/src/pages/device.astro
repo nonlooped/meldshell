@@ -1,0 +1,146 @@
+---
+import AccountPage from "../components/AccountPage.astro"
+---
+
+<AccountPage title="Connect this computer" description="Connect MeldShell to your account.">
+  <a slot="nav" href="/dashboard">Your devices</a>
+
+  <section id="confirm" class="grid gap-5">
+    <div>
+      <h1>Connect this computer?</h1>
+      <p class="lede">MeldShell asked to join your account. Check the code matches the one shown in the app.</p>
+    </div>
+
+    <div id="code-display" hidden>
+      <div class="code" id="code-groups" aria-live="polite"></div>
+      <p class="muted text-center mt-3">Doesn’t match? <button type="button" class="link" id="edit-code">Enter the code yourself</button></p>
+    </div>
+
+    <form id="device" class="grid gap-5" novalidate>
+      <label class="field" id="code-field" hidden>
+        Code shown in MeldShell
+        <input class="code-input" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" required maxlength="32" placeholder="ABCD-EFGH" />
+      </label>
+
+      <div class="notice" id="account" role="status">
+        <span class="spinner" aria-hidden="true"></span><span>Checking your account…</span>
+      </div>
+
+      <p class="notice" data-tone="error" role="alert" id="error"></p>
+
+      <div class="grid gap-2">
+        <button type="submit" class="btn btn-primary btn-block" id="approve" disabled>Connect this computer</button>
+        <button type="button" class="btn btn-ghost btn-block" id="deny" disabled>Don’t connect</button>
+      </div>
+
+      <details>
+        <summary class="muted">What will this allow?</summary>
+        <p class="muted mt-2">While MeldShell runs on that computer, your account can open its workspaces, send prompts, and answer approvals from any browser. Provider logins stay on the computer. You can remove access any time from Your devices.</p>
+        <p class="muted mt-2">Only continue if you started this from MeldShell on a computer you own.</p>
+      </details>
+    </form>
+  </section>
+
+  <section id="done" class="result" hidden>
+    <span class="result-icon" id="done-icon" aria-hidden="true"></span>
+    <h1 id="done-title"></h1>
+    <p class="lede" id="done-body"></p>
+    <a class="btn btn-primary" href="/dashboard" id="done-action">Go to your devices</a>
+  </section>
+
+  <script>
+    import { accountRequest, describe, requireSession, signOut } from "../remote/accounts"
+
+    const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
+    const form = $<HTMLFormElement>("#device")
+    const input = form.querySelector<HTMLInputElement>("input")!
+    const error = $("#error")
+    const approve = $<HTMLButtonElement>("#approve")
+    const deny = $<HTMLButtonElement>("#deny")
+    const fromLink = new URL(location.href).searchParams.get("user_code") ?? ""
+    const normalize = (value: string) => value.trim().toUpperCase()
+
+    function showCode(value: string) {
+      const groups = value.replace(/[^A-Za-z0-9]/g, "").match(/.{1,4}/g) ?? [value]
+      $("#code-groups").replaceChildren(...groups.map((group) => Object.assign(document.createElement("span"), { textContent: group })))
+      $("#code-groups").setAttribute("aria-label", `Code ${value}`)
+    }
+    if (fromLink) {
+      input.value = normalize(fromLink)
+      showCode(input.value)
+      $("#code-display").hidden = false
+    } else $("#code-field").hidden = false
+    $("#edit-code").addEventListener("click", () => {
+      $("#code-display").hidden = true
+      $("#code-field").hidden = false
+      input.value = ""
+      input.focus()
+    })
+
+    let ready = false
+    const setButtons = (disabled: boolean) => { approve.disabled = disabled; deny.disabled = disabled }
+    void requireSession()
+      .then((session) => {
+        ready = true
+        const account = $("#account")
+        account.replaceChildren()
+        const text = document.createElement("span")
+        text.append("Connecting to ", Object.assign(document.createElement("strong"), { textContent: session.user.email, className: "text-ink font-medium" }), ". ")
+        const other = Object.assign(document.createElement("button"), { type: "button", className: "link", textContent: "Use another account" })
+        other.addEventListener("click", () => { void signOut(location.pathname + location.search).catch((cause) => { error.textContent = describe(cause) }) })
+        text.append(other)
+        account.append(text)
+        setButtons(false)
+      })
+      .catch((cause) => {
+        $("#account").hidden = true
+        error.textContent = describe(cause)
+      })
+
+    function finish(kind: "approved" | "denied") {
+      $("#confirm").hidden = true
+      $("#done").hidden = false
+      const approved = kind === "approved"
+      const icon = $("#done-icon")
+      icon.dataset.tone = approved ? "success" : ""
+      icon.innerHTML = approved
+        ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>`
+        : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>`
+      $("#done-title").textContent = approved ? "Computer connected" : "Not connected"
+      $("#done-body").textContent = approved
+        ? "Go back to MeldShell — it finishes on its own in a few seconds. The computer will then show up in Your devices."
+        : "Nothing was shared. You can start again anytime from Settings → Account & devices in MeldShell."
+      $("#done-action").textContent = approved ? "Go to your devices" : "Back to your devices"
+      document.title = `${approved ? "Computer connected" : "Not connected"} — MeldShell`
+    }
+
+    async function decide(allow: boolean) {
+      if (!ready) return
+      const code = normalize(input.value)
+      if (!code) {
+        error.textContent = "Enter the code shown in MeldShell."
+        input.focus()
+        return
+      }
+      const button = allow ? approve : deny
+      setButtons(true)
+      button.setAttribute("aria-busy", "true")
+      error.textContent = ""
+      try {
+        await accountRequest(`/api/auth/device?user_code=${encodeURIComponent(code)}`)
+        await accountRequest(`/api/auth/device/${allow ? "approve" : "deny"}`, { userCode: code })
+        finish(allow ? "approved" : "denied")
+      } catch (cause) {
+        const message = describe(cause)
+        error.textContent = /expired|invalid|not found/i.test(message)
+          ? "This code has expired or doesn’t exist. In MeldShell, start signing in again to get a new one."
+          : message
+        setButtons(false)
+      } finally {
+        button.removeAttribute("aria-busy")
+      }
+    }
+    form.addEventListener("submit", (event) => { event.preventDefault(); void decide(true) })
+    deny.addEventListener("click", () => { void decide(false) })
+  </script>
+</AccountPage>

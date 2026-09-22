@@ -1,0 +1,108 @@
+---
+/* Shell for the account pages. `card` centers a single task (sign in, connect, reset);
+   `page` gives the device list a wider working column. */
+import Layout from "../layouts/Layout.astro"
+import Wordmark from "./Wordmark.astro"
+
+interface Props {
+  title: string
+  description: string
+  variant?: "card" | "page"
+}
+const { title, description, variant = "card" } = Astro.props
+---
+
+<Layout title={`${title} — MeldShell`} description={description}>
+  <div class="account" data-variant={variant}>
+    <header class="account-header">
+      <a href="/" class="brand" aria-label="MeldShell home"><Wordmark size={20} /><span>MeldShell</span></a>
+      <nav aria-label="Account"><slot name="nav" /></nav>
+    </header>
+    <main>
+      {variant === "card" ? <div class="card"><slot /></div> : <slot />}
+      <slot name="after" />
+    </main>
+  </div>
+</Layout>
+
+<style is:global>
+  .account { min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; }
+  .account [hidden] { display: none !important; }
+  .account-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: 100%; max-width: 64rem; margin: 0 auto; padding: 1.25rem 1rem; }
+  @media (min-width: 640px) { .account-header { padding: 1.5rem 1.5rem; } }
+  .account .brand { display: inline-flex; align-items: center; gap: .6rem; font: 600 .95rem var(--font-display); letter-spacing: -.01em; border-radius: var(--radius-control); }
+  .account-header nav { display: flex; align-items: center; gap: .25rem; font-size: .875rem; color: var(--color-ink-2); min-width: 0; }
+  .account-header nav a:not(.btn) { padding: .4rem .6rem; border-radius: var(--radius-control); }
+  .account-header nav a:not(.btn):hover { color: var(--color-ink); background: var(--color-hover); }
+  .account .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-3); padding: 0 .5rem; max-width: 16rem; }
+
+  .account main { width: 100%; margin: 0 auto; padding: 1rem 1rem 4rem; }
+  .account[data-variant=card] main { max-width: 27rem; display: grid; align-content: start; gap: 1.25rem; padding-top: clamp(1rem, 8vh, 5rem); }
+  .account[data-variant=page] main { max-width: 64rem; }
+  @media (min-width: 640px) { .account main { padding-left: 1.5rem; padding-right: 1.5rem; } }
+
+  .account .card { display: grid; gap: 1.25rem; padding: clamp(1.25rem, 5vw, 2rem); border: 1px solid var(--color-line); border-radius: var(--radius-window); background: var(--color-raised); box-shadow: inset 0 1px 0 rgb(255 255 255 / .04), 0 24px 60px rgb(0 0 0 / .25); }
+  .account h1 { font: 600 clamp(1.5rem, 4vw, 1.9rem)/1.2 var(--font-display); letter-spacing: -.02em; }
+  .account[data-variant=page] h1 { font-size: clamp(1.75rem, 4vw, 2.4rem); }
+  .account h2 { font: 600 1.05rem/1.3 var(--font-display); }
+  .account .lede { color: var(--color-ink-2); line-height: 1.6; font-size: .9375rem; margin-top: .5rem; }
+  .account .muted { color: var(--color-ink-3); font-size: .8125rem; line-height: 1.6; }
+  .account .muted a, .account .link { color: var(--color-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--color-ink-4); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+  .account .muted a:hover, .account .link:hover { text-decoration-color: var(--color-ink); }
+
+  .account form { display: grid; gap: 1rem; }
+  .account .field { display: grid; gap: .45rem; font-size: .8125rem; font-weight: 500; color: var(--color-ink-2); }
+  .account .field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+  .account .field-head .link { font-weight: 400; font-size: .8125rem; color: var(--color-ink-2); }
+  .account .field .hint { font-weight: 400; color: var(--color-ink-3); font-size: .75rem; }
+  .account input { width: 100%; height: 2.75rem; padding: 0 .85rem; font-size: 1rem; color: var(--color-ink); background: rgb(0 0 0 / .25); border: 1px solid var(--color-line-strong); border-radius: var(--radius-row); transition: border-color .15s, box-shadow .15s; }
+  .account input:focus { outline: none; border-color: var(--color-ink-2); box-shadow: 0 0 0 3px rgb(255 255 255 / .08); }
+  .account input:user-invalid { border-color: var(--color-deleted); }
+  .account .password { position: relative; }
+  .account .password input { padding-right: 4.5rem; }
+  .account .password button { position: absolute; right: .35rem; top: 50%; translate: 0 -50%; height: 2rem; padding: 0 .6rem; font-size: .75rem; color: var(--color-ink-2); border-radius: var(--radius-control); cursor: pointer; }
+  .account .password button:hover { color: var(--color-ink); background: var(--color-hover); }
+
+  .account .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; height: 2.5rem; padding: 0 1rem; font-size: .875rem; font-weight: 500; border: 1px solid var(--color-line-strong); border-radius: var(--radius-row); background: rgb(255 255 255 / .03); color: var(--color-ink); cursor: pointer; white-space: nowrap; transition: background-color .15s, border-color .15s, opacity .15s; }
+  .account .btn:hover:not(:disabled) { background: var(--color-hover); border-color: var(--color-ink-4); }
+  .account .btn-primary { background: var(--color-ink); border-color: transparent; color: var(--color-desktop); font-weight: 600; }
+  .account .btn-primary:hover:not(:disabled) { background: var(--color-white); border-color: transparent; }
+  .account .btn-ghost { background: transparent; border-color: transparent; color: var(--color-ink-2); }
+  .account .btn-ghost:hover:not(:disabled) { color: var(--color-ink); border-color: transparent; }
+  .account .btn-danger { color: var(--color-deleted); }
+  .account .btn-sm { height: 2rem; padding: 0 .75rem; font-size: .8125rem; }
+  .account .btn-block { width: 100%; }
+  .account .btn:disabled { opacity: .55; cursor: default; }
+  .account .btn[aria-busy=true]::before { content: ""; width: .85rem; height: .85rem; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: account-spin .8s linear infinite; }
+  @keyframes account-spin { to { rotate: 1turn; } }
+  @media (prefers-reduced-motion: reduce) { .account .btn[aria-busy=true]::before, .account .spinner { animation-duration: 3s; } }
+
+  .account .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; border-radius: calc(var(--radius-row) + 2px); background: rgb(0 0 0 / .25); border: 1px solid var(--color-line); }
+  .account .tabs button { height: 2.1rem; border-radius: var(--radius-control); font-size: .8125rem; font-weight: 500; color: var(--color-ink-2); cursor: pointer; }
+  .account .tabs button[aria-selected=true] { background: var(--color-selected); color: var(--color-ink); box-shadow: inset 0 0 0 1px var(--color-line); }
+  .account .divider { display: flex; align-items: center; gap: .75rem; color: var(--color-ink-3); font-size: .75rem; }
+  .account .divider::before, .account .divider::after { content: ""; flex: 1; height: 1px; background: var(--color-line); }
+
+  .account .notice { display: flex; gap: .6rem; align-items: flex-start; padding: .7rem .85rem; border-radius: var(--radius-row); font-size: .8125rem; line-height: 1.55; background: var(--color-hover); color: var(--color-ink-2); border: 1px solid var(--color-line); }
+  .account .notice[data-tone=error] { color: var(--color-deleted); border-color: color-mix(in srgb, var(--color-deleted) 35%, transparent); background: color-mix(in srgb, var(--color-deleted) 7%, transparent); }
+  .account .notice[data-tone=success] { color: var(--color-added); border-color: color-mix(in srgb, var(--color-added) 35%, transparent); background: color-mix(in srgb, var(--color-added) 7%, transparent); }
+  .account .notice:empty { display: none; }
+
+  .account .pill { display: inline-flex; align-items: center; gap: .4rem; height: 1.5rem; padding: 0 .6rem; border-radius: 999px; font-size: .75rem; font-weight: 500; background: var(--color-hover); color: var(--color-ink-2); white-space: nowrap; }
+  .account .dot { width: .45rem; height: .45rem; border-radius: 50%; background: var(--color-ink-4); flex: none; }
+  .account [data-state=online] .dot { background: var(--color-added); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-added) 20%, transparent); }
+  .account [data-state=online].pill { color: var(--color-ink); }
+
+  .account .result { display: grid; gap: 1rem; justify-items: start; }
+  .account .result-icon { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 50%; background: var(--color-hover); color: var(--color-ink); }
+  .account .result-icon[data-tone=success] { color: var(--color-added); background: color-mix(in srgb, var(--color-added) 12%, transparent); }
+  .account .result-icon[data-tone=error] { color: var(--color-deleted); background: color-mix(in srgb, var(--color-deleted) 12%, transparent); }
+  .account .spinner { width: 1rem; height: 1rem; border-radius: 50%; border: 2px solid var(--color-ink-4); border-top-color: var(--color-ink); animation: account-spin .8s linear infinite; flex: none; }
+
+  .account .code { display: flex; justify-content: center; gap: .5rem; flex-wrap: wrap; font: 500 clamp(1.4rem, 7vw, 1.9rem)/1 var(--font-mono); letter-spacing: .12em; }
+  .account .code span { padding: .7rem .8rem .7rem .95rem; border-radius: var(--radius-row); border: 1px solid var(--color-line-strong); background: rgb(0 0 0 / .25); }
+  .account input.code-input { font-family: var(--font-mono); font-size: 1.35rem; letter-spacing: .2em; text-align: center; text-transform: uppercase; height: 3.25rem; }
+
+  .account :is(button, a, input, summary):focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; }
+  .account summary { cursor: pointer; }
+</style>

@@ -9,3 +9,17 @@
 /apps/site/node_modules
 /apps/site/dist
 /apps/site/.astro
+
+!/apps/desktop
+/apps/desktop/*
+!/apps/desktop/package.json
+!/apps/desktop/src
+/apps/desktop/src/*
+!/apps/desktop/src/renderer
+!/packages
+/packages/*
+!/packages/contracts
+!/packages/projection
+/packages/contracts/node_modules
+/packages/projection/node_modules
+!/tsconfig.base.json
