@@ -107,6 +107,56 @@ function ThreadPane({
   return <>{children}</>
 }
 
+function useRemotePhone() {
+  const [phone, setPhone] = useState(
+    () => window.meldshell.platform === "web" && window.innerWidth < 640,
+  )
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 639px)")
+    const update = () => setPhone(window.meldshell.platform === "web" && query.matches)
+    query.addEventListener("change", update)
+    return () => query.removeEventListener("change", update)
+  }, [])
+  return phone
+}
+
+function usePhonePanels(
+  phone: boolean,
+  inbox: ReturnType<typeof usePanelRef>,
+  files: ReturnType<typeof usePanelRef>,
+) {
+  useEffect(
+    () =>
+      useTabStore.subscribe((state, previous) => {
+        if (
+          phone &&
+          (state.selectedThreadTabId !== previous.selectedThreadTabId ||
+            state.selectedFileId !== previous.selectedFileId)
+        ) {
+          inbox.current?.collapse()
+          files.current?.collapse()
+        }
+      }),
+    [phone, inbox, files],
+  )
+}
+
+function toggleSidebar(phone: boolean, other: ReturnType<typeof usePanelRef>, toggle: () => void) {
+  if (phone) other.current?.collapse()
+  toggle()
+}
+
+function remoteLayout(phone: boolean, inboxWidth: number, filesWidth: number) {
+  return {
+    orientation: phone ? ("vertical" as const) : ("horizontal" as const),
+    inboxMin: phone ? "160px" : "252px",
+    inboxMax: phone ? "45%" : "420px",
+    threadMin: phone ? "0px" : "400px",
+    inboxWidth: phone ? "100%" : inboxWidth,
+    filesWidth: phone ? "100%" : filesWidth,
+  }
+}
+
 function useSidebar(initialWidth: number, initiallyCollapsed = false) {
   const panelRef = usePanelRef()
   const elementRef = useRef<HTMLDivElement>(null)
@@ -204,9 +254,12 @@ export function App(): React.JSX.Element {
   const [newThreadWorkspaceId, setNewThreadWorkspaceId] = useState("")
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [switcherQuery, setSwitcherQuery] = useState("")
-  const inbox = useSidebar(304)
+  const remotePhone = useRemotePhone()
+  const inbox = useSidebar(304, remotePhone)
   // Source control opens on request: the thread pane owns the window until the operator asks.
   const sourceControl = useSidebar(300, true)
+  usePhonePanels(remotePhone, inbox.panelRef, sourceControl.panelRef)
+  const layout = remoteLayout(remotePhone, inbox.width, sourceControl.width)
 
   const { snapshotQuery, threadPagesQuery, snapshot } = useAppData()
 
@@ -377,8 +430,10 @@ export function App(): React.JSX.Element {
           sidebarsVisible={!settingsOpen}
           inboxCollapsed={inbox.collapsed}
           sourceControlCollapsed={sourceControl.collapsed}
-          onToggleInbox={inbox.toggle}
-          onToggleSourceControl={sourceControl.toggle}
+          onToggleInbox={() => toggleSidebar(remotePhone, sourceControl.panelRef, inbox.toggle)}
+          onToggleSourceControl={() =>
+            toggleSidebar(remotePhone, inbox.panelRef, sourceControl.toggle)
+          }
         />
 
         {settingsOpen ? (
@@ -396,7 +451,7 @@ export function App(): React.JSX.Element {
             onChangeAppSettings={(input) => appSettingsMutation.mutate(input)}
           />
         ) : (
-          <Group className="min-h-0" orientation="horizontal">
+          <Group className="min-h-0" orientation={layout.orientation}>
             <SidebarPanel
               id="inbox"
               panelRef={inbox.panelRef}
@@ -406,15 +461,15 @@ export function App(): React.JSX.Element {
               collapsible
               collapsedSize={0}
               defaultSize={inbox.defaultSize}
-              minSize="252px"
-              maxSize="420px"
+              minSize={layout.inboxMin}
+              maxSize={layout.inboxMax}
               groupResizeBehavior="preserve-pixel-size"
               onResize={inbox.onResize}
             >
               <aside
                 className="grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto] [padding:10px_8px_8px]"
                 inert={inbox.collapsed}
-                style={{ width: inbox.width }}
+                style={{ width: layout.inboxWidth }}
               >
                 <Inbox
                   showSettled={snapshot.settings.showSettled ?? true}
@@ -467,7 +522,7 @@ export function App(): React.JSX.Element {
               className="relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]"
             />
 
-            <Panel id="thread" minSize="400px">
+            <Panel id="thread" minSize={layout.threadMin}>
               <main className="grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]">
                 <FileOrThread file={selectedFile}>
                   <ThreadPane
@@ -503,7 +558,7 @@ export function App(): React.JSX.Element {
               groupResizeBehavior="preserve-pixel-size"
               onResize={sourceControl.onResize}
             >
-              <div className="h-full" style={{ width: sourceControl.width }}>
+              <div className="h-full" style={{ width: layout.filesWidth }}>
                 <FilesSidebar
                   threadId={selectedThread?.id}
                   key={activeWorkspaceId}

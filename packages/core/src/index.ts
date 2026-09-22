@@ -24,6 +24,7 @@ export {
   submitTurn,
   recordRuntimeEvent,
   resolveApproval,
+  getApprovalHarness,
   interruptTurn,
   getActiveTurnCount,
   beginShutdown,

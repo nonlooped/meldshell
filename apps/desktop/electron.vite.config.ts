@@ -7,6 +7,7 @@ const bundledMainPackages = [
   "@meldshell/contracts",
   "@meldshell/projection",
   "@meldshell/core",
+  "@meldshell/host",
   "@meldshell/provider-runtime",
   "@meldshell/provider-codex",
   "@meldshell/provider-claude",

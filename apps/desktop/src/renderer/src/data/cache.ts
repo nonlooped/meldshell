@@ -26,6 +26,11 @@ export function invalidateThread(
   threadId: string,
   snapshotChanged = true,
 ): void {
+  if (threadId === "*") {
+    // A remote client reconnected; open transcripts may have missed changes.
+    void client.invalidateQueries()
+    return
+  }
   if (snapshotChanged) {
     void client.invalidateQueries({ queryKey: queryKeys.snapshot })
     void client.invalidateQueries({ queryKey: queryKeys.threads })

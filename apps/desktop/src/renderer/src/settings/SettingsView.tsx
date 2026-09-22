@@ -1,3 +1,4 @@
+import { RemoteAccess } from "./RemoteAccess"
 import { FadeDiv } from "../ui/motion"
 import { useState } from "react"
 import { Tabs } from "@base-ui-components/react/tabs"
@@ -7,7 +8,16 @@ import type {
   SetAppSettingsInput,
   UpsertModelInput,
 } from "@meldshell/contracts"
-import { Settings, Palette, ArrowLeft, Boxes, Gauge, Info, MessagesSquare } from "lucide-react"
+import {
+  Settings,
+  Palette,
+  ArrowLeft,
+  Boxes,
+  Gauge,
+  Info,
+  MessagesSquare,
+  Monitor,
+} from "lucide-react"
 import desktopPackage from "../../../../package.json"
 import { modelsForProvider } from "../data/catalog"
 import { useViewStore, type SettingsSection } from "../app/view-store"
@@ -43,6 +53,13 @@ const SECTIONS: ReadonlyArray<{
   readonly title: string
   readonly caption: string
 }> = [
+  {
+    id: "account",
+    label: "Account & devices",
+    icon: <Monitor size={16} />,
+    title: "Account & devices",
+    caption: "Continue your work from another device.",
+  },
   {
     id: "general",
     label: "General",
@@ -118,6 +135,7 @@ export function SettingsView({
 
   return (
     <Tabs.Root
+      data-settings-layout
       className="grid h-full min-h-0 grid-cols-[212px_minmax(0,_1fr)]"
       orientation="vertical"
       value={section}
@@ -176,14 +194,16 @@ export function SettingsView({
         >
           <FadeDiv className="w-[min(840px,_100%)]">
             {settingsError && <p role="alert">{settingsError}</p>}
-            {section === "general" || section === "appearance" ? (
+            {(section === "general" || section === "appearance") && (
               <Preferences
                 section={section}
                 settings={snapshot.settings}
                 onChange={onChangeAppSettings}
                 pending={settingsPending}
               />
-            ) : section === "usage" ? (
+            )}
+            {section === "account" && <RemoteAccess />}
+            {section === "usage" && (
               <div className="flex flex-col">
                 {snapshot.providers
                   .filter((provider) =>
@@ -193,14 +213,16 @@ export function SettingsView({
                     <SubscriptionUsage key={provider.id} provider={provider} />
                   ))}
               </div>
-            ) : section === "threads" ? (
+            )}
+            {section === "threads" && (
               <ThreadTitleCard
                 snapshot={snapshot}
                 pending={settingsPending}
                 onChangeTitleModel={(titleModelId) => onChangeAppSettings({ titleModelId })}
               />
-            ) : section === "providers" ? (
-              snapshot.providers.length === 0 ? (
+            )}
+            {section === "providers" &&
+              (snapshot.providers.length === 0 ? (
                 <p className="settings-empty [padding:28px_0] text-[var(--text-tertiary)] text-[12.5px] text-center">
                   No providers are configured.
                 </p>
@@ -221,8 +243,8 @@ export function SettingsView({
                     onResetCatalog={() => setResetOpen(true)}
                   />
                 ))
-              )
-            ) : (
+              ))}
+            {section === "about" && (
               <section className="max-w-[720px]">
                 <div className="flex items-center gap-[14px] [padding:4px_0_28px] [&_h3]:m-0 [&_h3]:[font-family:var(--font-display)] [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:[margin:3px_0_0] [&_p]:text-[var(--text-tertiary)] [&_p]:text-[11.5px]">
                   <MeldMark className="w-[36px] h-[36px] flex-[0_0_36px] text-[var(--text-primary)]" />

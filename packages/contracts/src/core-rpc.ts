@@ -76,6 +76,11 @@ export class CoreRpcs extends RpcGroup.make(
   }),
   snapshotRpc("SetProviderSession", ProviderSessionInput),
   snapshotRpc("ResolveApproval", Schema.Struct({ approvalId: Schema.String })),
+  Rpc.make("GetApprovalHarness", {
+    payload: Schema.Struct({ approvalId: Schema.String }),
+    success: Schema.NullOr(Schema.String),
+    error: CoreError,
+  }),
   Rpc.make("InterruptTurn", {
     payload: Schema.Struct({ threadId: Schema.String }),
     success: Schema.NullOr(InterruptedTurn),

@@ -7,7 +7,7 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import { Effect, ManagedRuntime } from "effect"
 import { initializeDatabase } from "../packages/core/src/database/persistence.ts"
 import { addWorkspace } from "../packages/core/src/workspaces.ts"
-import { getGitSnapshot } from "../apps/desktop/src/main/git.ts"
+import { getGitSnapshot } from "../packages/host/src/git.ts"
 
 test("workspace paths retain native separators, roots, and POSIX backslashes", async (t) => {
   const runtime = ManagedRuntime.make(SqliteClient.layer({ filename: ":memory:" }))

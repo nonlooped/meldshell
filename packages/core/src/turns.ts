@@ -284,6 +284,16 @@ export const resolveApproval = (approvalId: string) =>
     return yield* getSnapshot
   })
 
+/** The harness of the turn that raised an approval, independent of later model selection. */
+export const getApprovalHarness = (approvalId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows = yield* sql<{ readonly harness: string }>`
+      SELECT t.harness FROM approvals a JOIN turns t ON t.id = a.turn_id WHERE a.id = ${approvalId}
+    `
+    return rows[0]?.harness ?? null
+  })
+
 export const interruptTurn = (threadId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient

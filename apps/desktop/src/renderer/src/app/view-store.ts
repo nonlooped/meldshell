@@ -1,6 +1,13 @@
 import { create } from "zustand"
 
-export type SettingsSection = "general" | "appearance" | "providers" | "usage" | "threads" | "about"
+export type SettingsSection =
+  | "account"
+  | "general"
+  | "appearance"
+  | "providers"
+  | "usage"
+  | "threads"
+  | "about"
 
 interface ViewStore {
   /** Settings takes over the whole workbench; open tabs stay untouched behind it. */
