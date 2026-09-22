@@ -17,6 +17,7 @@ User instructions take precedence over skills. Keep skills within the requested 
 - [Contributing](CONTRIBUTING.md): setup, check selection, or schema regeneration.
 - [Release](docs/release.md): installer preparation and candidate certification.
 - [Website](docs/website.md): site builds and deployment.
+- [Remote control](docs/remote-control.md): accounts, relay, device linking, and headless hosts.
 - [Documentation maintenance](docs/agent-documentation.md): changes to instructions, skills, or documentation.
 
 [Roadmap](docs/roadmap.md) describes open product work. The competitive analysis and release records are dated evidence, not implementation instructions or certification of this checkout.
