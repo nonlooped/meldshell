@@ -23,3 +23,6 @@
 /packages/contracts/node_modules
 /packages/projection/node_modules
 !/tsconfig.base.json
+!/scripts
+/scripts/*
+!/scripts/vercel-ignore.sh
