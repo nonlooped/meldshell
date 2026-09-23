@@ -21,7 +21,7 @@ import {
 import desktopPackage from "../../../../package.json"
 import { modelsForProvider } from "../data/catalog"
 import { useViewStore, type SettingsSection } from "../app/view-store"
-import { AppDialog, Button } from "../ui/controls"
+import { AppDialog, Button, IconButton } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
 import { kbdClasses } from "../ui/styles"
 import { ModelDialog } from "./ModelDialog"
@@ -151,13 +151,15 @@ export function SettingsView({
       }}
       style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)` }}
     >
-      {/*
-        The nav is laid out exactly like the inbox, and Back occupies the same footer slot the
-        Settings entry does, so the same click target toggles between the two views.
-      */}
-      <aside className="grid min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto] [padding:20px_12px_10px] border-r-[1px] border-r-[color:var(--line-subtle)]">
-        <div className="[padding:0_10px_20px] [&_h1]:m-0 [&_h1]:[font-family:var(--font-display)] [&_h1]:text-[15px] [&_h1]:font-semibold [&_h1]:tracking-[-0.01em] [&_h1]:leading-[22px]">
-          <h1>Settings</h1>
+      {/* The heading doubles as the way back, so leaving sits where the eye starts; Escape also works. */}
+      <aside className="grid min-h-0 grid-rows-[auto_minmax(0,_1fr)] [padding:14px_12px_10px] border-r-[1px] border-r-[color:var(--line-subtle)]">
+        <div className="flex items-center gap-[6px] [padding:0_4px_14px]">
+          <IconButton label="Close settings (Esc)" onClick={closeSettings}>
+            <ArrowLeft size={16} strokeWidth={1.75} />
+          </IconButton>
+          <h1 className="m-0 [font-family:var(--font-display)] text-[15px] font-semibold tracking-[-0.01em] leading-[22px]">
+            Settings
+          </h1>
         </div>
 
         <Tabs.List className={settingsNavItemsClasses} aria-label="Settings sections">
@@ -168,18 +170,6 @@ export function SettingsView({
             </Tabs.Tab>
           ))}
         </Tabs.List>
-
-        <div className="pt-[8px] mt-[6px] border-t-[1px] border-t-[color:var(--line-subtle)] [&_.button]:h-[42px] [&_.button]:pr-[12px] [&_.button]:pl-[12px]">
-          <Button
-            variant="ghost"
-            block
-            icon={<ArrowLeft size={15} strokeWidth={1.75} />}
-            className="justify-start!"
-            onClick={closeSettings}
-          >
-            Back
-          </Button>
-        </div>
       </aside>
 
       <Tabs.Panel
@@ -199,7 +189,7 @@ export function SettingsView({
           key={section}
           className="min-h-0 [padding:0_40px_48px] [@media(max-width:_880px)]:pr-[24px] [@media(max-width:_880px)]:pl-[24px] [@media(max-width:_680px)]:pr-[16px] [@media(max-width:_680px)]:pl-[16px] overflow-y-auto [scrollbar-gutter:stable]"
         >
-          <FadeDiv className="w-[min(840px,_100%)]">
+          <FadeDiv className="w-[min(720px,_100%)] [margin:0_auto]">
             {settingsError && <p role="alert">{settingsError}</p>}
             {(section === "general" || section === "appearance") && (
               <Preferences
@@ -386,17 +376,14 @@ const settingsNavItemsClasses = [
   "[&_button]:text-[12.5px] [&_button]:text-left [&_button:hover]:bg-[var(--surface-hover)]",
   "[&_button:hover]:text-[var(--text-primary)] [&_button[data-selected]]:bg-[var(--surface-selected)]",
   "[&_button[data-selected]]:text-[var(--text-primary)]",
-  "[&_button[data-selected]::before]:absolute [&_button[data-selected]::before]:top-[10px]",
-  "[&_button[data-selected]::before]:bottom-[10px] [&_button[data-selected]::before]:left-[0]",
-  "[&_button[data-selected]::before]:w-[2px] [&_button[data-selected]::before]:rounded-[2px]",
-  "[&_button[data-selected]::before]:bg-[var(--accent)] [&_button[data-selected]::before]:[content:'']",
+  "[&_button[data-selected]]:[box-shadow:inset_0_0_0_1px_var(--line-subtle)]",
 ].join(" ")
 
 const settingsHeaderClasses = [
-  "flex items-center justify-between gap-[16px] w-[min(840px,_calc(100%_-_80px))] min-h-0",
-  "[padding:32px_0_24px] [margin:0_40px] [&_h2]:m-0 [&_h2]:[font-family:var(--font-display)]",
+  "flex items-center justify-between gap-[16px] w-[min(720px,_calc(100%_-_80px))] min-h-0",
+  "[padding:32px_0_24px] [margin:0_auto] [&_h2]:m-0 [&_h2]:[font-family:var(--font-display)]",
   "[&_h2]:text-[23px] [&_h2]:font-semibold [&_h2]:tracking-[-0.01em] [&_p]:[margin:6px_0_0]",
   "[&_p]:text-[var(--text-secondary)] [&_p]:text-[12.5px]",
-  "[@media(max-width:_880px)]:w-[calc(100%_-_48px)] [@media(max-width:_880px)]:mx-[24px]",
+  "[@media(max-width:_880px)]:w-[calc(100%_-_48px)]",
   "[@media(max-width:_680px)]:w-[calc(100%_-_32px)] [@media(max-width:_680px)]:pt-[24px]",
 ].join(" ")

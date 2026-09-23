@@ -53,8 +53,7 @@ export function ModelPicker({
       }}
     >
       <Combobox.Trigger
-        data-motion="background-color border-color color opacity"
-        className={chipClasses}
+        className={`motion-colors ${chipClasses}`}
         aria-label="Change model"
         title={label(selected)}
       >
@@ -102,7 +101,7 @@ export function ModelPicker({
                     items={group.items}
                     key={group.provider.id}
                   >
-                    <Combobox.GroupLabel className="flex items-center gap-[7px] [padding:8px_8px_6px] text-[var(--text-secondary)] text-[11px] font-medium">
+                    <Combobox.GroupLabel className="sticky top-[-4px] z-[1] flex items-center gap-[7px] [margin:0_-6px] [padding:8px_14px_6px] bg-[var(--surface-menu)] text-[var(--text-secondary)] text-[11px] font-medium [@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-overlay)]">
                       <ProviderIcon provider={group.provider} size={14} />
                       <span>{group.provider.displayName}</span>
                       {group.provider.harness === "codex" && (
@@ -155,11 +154,10 @@ const popupClasses = [
 ].join(" ")
 
 const modelPickerSearchClasses = [
-  "flex items-center shrink-0 gap-[8px] m-[10px] [padding:8px_10px] border-[1px] border-[color:var(--line)]",
-  "rounded-[var(--radius-sm)] bg-[var(--surface-hover)] text-[var(--text-secondary)] [&_input]:min-w-0",
-  "[&_input]:w-full [&_input]:border-0 [&_input]:outline-none [&_input]:bg-transparent",
-  "[&_input]:text-[var(--text-primary)] [&_input]:[font:inherit] [&_input]:text-[12px]",
-  "[&:focus-within]:[border-color:var(--text-secondary)]",
+  "flex items-center shrink-0 gap-[9px] [padding:11px_14px] border-b-[1px] border-b-[color:var(--line-subtle)]",
+  "text-[var(--text-tertiary)] [&_input]:min-w-0 [&_input]:w-full [&_input]:p-0 [&_input]:border-0",
+  "[&_input]:outline-none [&_input]:bg-transparent [&_input]:text-[var(--text-primary)]",
+  "[&_input]:[font:inherit] [&_input]:text-[12.5px] [&_input::placeholder]:text-[var(--text-tertiary)]",
 ].join(" ")
 
 const modelPickerOptionClasses = [
@@ -168,6 +166,6 @@ const modelPickerOptionClasses = [
   "text-left [&[data-selected]]:bg-[var(--surface-active)] [&[data-selected]]:text-[var(--text-primary)]",
   "[&_.model-item-name]:min-w-0 [&_.model-item-name]:[overflow-wrap:anywhere]",
   "[&:hover]:bg-[var(--surface-hover)] [&[data-highlighted]]:bg-[var(--surface-hover)]",
-  "[&[data-highlighted]]:[outline:1px_solid_var(--accent)] [&[data-highlighted]]:[outline-offset:-1px]",
-  "[&:focus-visible]:[outline:1px_solid_var(--accent)] [&:focus-visible]:[outline-offset:-1px]",
+  "[&[data-highlighted]]:text-[var(--text-primary)]",
+  "[&:focus-visible]:[outline:1px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:-1px]",
 ].join(" ")

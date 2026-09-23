@@ -287,7 +287,6 @@ export const AppOpacity = Schema.Number.pipe(Schema.int(), Schema.between(20, 10
 
 export const AppSettings = Schema.Struct({
   opacity: Schema.optional(AppOpacity),
-  sendShortcut: Schema.optional(Schema.Literal("ctrl-enter", "enter")),
   showSettled: Schema.optional(Schema.Boolean),
   theme: Schema.optional(Schema.Literal("dark", "light", "system")),
   transcriptSize: Schema.optional(Schema.Literal("small", "medium", "large")),
@@ -472,7 +471,6 @@ export type SetThreadSettingsInput = typeof SetThreadSettingsInput.Type
 
 export const SetAppSettingsInput = Schema.Struct({
   opacity: Schema.optional(AppOpacity),
-  sendShortcut: Schema.optional(Schema.Literal("ctrl-enter", "enter")),
   showSettled: Schema.optional(Schema.Boolean),
   theme: Schema.optional(Schema.Literal("dark", "light", "system")),
   transcriptSize: Schema.optional(Schema.Literal("small", "medium", "large")),

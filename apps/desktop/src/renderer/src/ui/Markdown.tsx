@@ -43,7 +43,7 @@ function MarkdownImage({ src, alt, node }: { src?: string; alt?: string; node?: 
   return (
     <button
       type="button"
-      className="markdown-image-button inline-block p-0 border-0 bg-transparent cursor-zoom-in max-w-full [&:focus-visible]:[outline:2px_solid_var(--accent)] [&:focus-visible]:[outline-offset:2px]"
+      className="markdown-image-button inline-block p-0 border-0 bg-transparent cursor-zoom-in max-w-full [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]"
       aria-label={`Enlarge ${alt || "image"}`}
     >
       {image}
@@ -175,14 +175,16 @@ const eventMarkdownClasses = [
   "leading-[1.65] event-markdown whitespace-normal [&_>_:first-child]:mt-[0] [&_>_:last-child]:mb-[0]",
   "[&_p]:[margin:0_0_0.7em] [&_a]:text-[var(--color-info)]",
   "[&_a]:[text-decoration-color:color-mix(in_srgb,_var(--color-info)_50%,_transparent)]",
-  "[&_a]:[text-underline-offset:3px] [&_code:not(pre_code)]:[padding:1px_4px]",
-  "[&_code:not(pre_code)]:border-[1px] [&_code:not(pre_code)]:border-[color:var(--line-subtle)]",
-  "[&_code:not(pre_code)]:rounded-[var(--radius-sm)] [&_code:not(pre_code)]:bg-[var(--surface-hover)]",
-  "[&_code:not(pre_code)]:[font-family:var(--font-mono)] [&_code:not(pre_code)]:text-[0.9em]",
+  "[&_a]:[text-underline-offset:3px] [&_code:not(pre_code)]:[padding:1px_5px]",
+  "[&_code:not(pre_code)]:rounded-[var(--radius-sm)] [&_code:not(pre_code)]:text-[var(--text-primary)]",
+  "[&_code:not(pre_code)]:[background:color-mix(in_srgb,_var(--text-primary)_7%,_transparent)]",
+  "[&_code:not(pre_code)]:[box-decoration-break:clone] [&_code:not(pre_code)]:[-webkit-box-decoration-break:clone]",
+  "[&_code:not(pre_code)]:[font-family:var(--font-mono)] [&_code:not(pre_code)]:text-[0.86em]",
+  "[&_strong]:font-semibold [&_strong]:text-[var(--text-primary)]",
   "[&_.markdown-table]:max-w-full [&_.markdown-table]:overflow-x-auto [&_.markdown-table]:[margin:1em_0]",
   "[&_.markdown-table]:border-[1px] [&_.markdown-table]:border-[color:var(--line)] [&_.markdown-table]:rounded-[var(--radius)]",
   "[&_.markdown-table]:max-h-[400px] [&_.markdown-table]:overflow-auto [&_.markdown-table]:mt-[0]",
-  "[&_.markdown-table:focus-visible]:[outline:1px_solid_var(--accent)]",
+  "[&_.markdown-table:focus-visible]:[outline:1px_solid_var(--focus-ring)]",
   "[&_.markdown-table:focus-visible]:[outline-offset:2px] [&_table]:w-full",
   "[&_table]:[border-collapse:collapse] [&_table]:[overflow-wrap:normal] [&_th]:min-w-[10rem]",
   "[&_th]:[padding:9px_12px] [&_th]:border-b-[1px] [&_th]:border-b-[color:var(--line)] [&_th]:[vertical-align:top]",

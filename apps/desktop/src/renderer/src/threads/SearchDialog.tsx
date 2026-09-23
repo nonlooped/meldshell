@@ -76,9 +76,7 @@ export function SearchDialog({
       >
         <div className="search-controls grid grid-cols-[1fr_170px] gap-[10px] m-[20px]">
           <Combobox.Input
-            data-motion="background-color border-color box-shadow"
-            data-motion-duration="0.2"
-            className={textInputClasses}
+            className={`motion-colors motion-duration-200 ${textInputClasses}`}
             autoFocus
             aria-label="Search transcripts"
             placeholder="Search messages, replies, and tool output…"
@@ -122,9 +120,8 @@ export function SearchDialog({
               <Combobox.List aria-label="Transcript matches">
                 {(result: TranscriptSearchResult) => (
                   <Combobox.Item
-                    data-motion="background-color border-color color box-shadow"
                     value={result}
-                    className={searchResultClasses}
+                    className={`motion-colors ${searchResultClasses}`}
                     key={`${result.thread.id}:${result.turnId}:${result.eventId}`}
                   >
                     <span className="text-[10.5px] text-[var(--text-tertiary)]">

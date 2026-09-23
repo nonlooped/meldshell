@@ -42,18 +42,15 @@ const resetDate = (seconds: number | null | undefined): Date | null => {
 }
 
 /**
- * Near resets read as a countdown, which is what the operator plans around; later ones name the
- * day, since counting days and hours is harder than reading "Thu 9:00 AM".
+ * Every reset reads as a countdown so the column compares at a glance; `resetTitle` carries the
+ * exact date and time.
  */
 export function resetLabel(seconds: number | null | undefined, now = Date.now()): string {
   const date = resetDate(seconds)
   if (date == null) return "Reset time unknown"
   const until = date.getTime() - now
   if (until <= 0) return "Reset due"
-  if (until < DAY) return `Resets in ${durationLabel(until)}`
-  if (until < 6 * DAY)
-    return `Resets ${date.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`
-  return `Resets ${date.toLocaleString(undefined, { month: "short", day: "numeric" })}`
+  return `Resets in ${durationLabel(until)}`
 }
 
 export function resetTitle(seconds: number | null | undefined): string | undefined {

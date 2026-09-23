@@ -66,9 +66,7 @@ function SplitPicker({
       actions={<Button onClick={onClose}>Cancel</Button>}
     >
       <input
-        data-motion="background-color border-color box-shadow"
-        data-motion-duration="0.2"
-        className={textInputClasses}
+        className={`motion-colors motion-duration-200 ${textInputClasses}`}
         aria-label="Find a thread to open beside this one"
         placeholder="Find a thread…"
         value={query}
@@ -124,10 +122,9 @@ function ThreadTileHeader({
         align="end"
         trigger={
           <BaseButton
-            data-motion="background-color border-color color opacity"
             render={<Pressable />}
             type="button"
-            className={iconButtonClasses}
+            className={`motion-colors ${iconButtonClasses}`}
             aria-label={`Pane layout for ${thread.title}`}
           >
             <MoreHorizontal size={15} strokeWidth={1.75} />
@@ -255,8 +252,7 @@ function LayoutNode({
         <LayoutNode key={node.first.id} node={node.first} split {...props} />
       </Panel>
       <Separator
-        data-motion="background-color"
-        className={paneSeparatorClasses}
+        className={`motion-colors ${paneSeparatorClasses}`}
         aria-label="Resize thread panes"
       />
       <Panel id={node.second.id} defaultSize={`${100 - node.ratio}%`} minSize="15%">

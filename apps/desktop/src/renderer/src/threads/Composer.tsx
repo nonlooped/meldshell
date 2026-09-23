@@ -1,6 +1,7 @@
-import { chipClasses, kbdClasses } from "../ui/styles"
-import { FadeDiv, PopPresence, Pressable, Swap } from "../ui/motion"
-import { useLayoutEffect, useRef, useState } from "react"
+import { chipClasses } from "../ui/styles"
+import { PopPresence, Pressable, Swap, useMotionPreference } from "../ui/motion"
+import { Fragment, useLayoutEffect, useRef, useState } from "react"
+import { AnimatePresence, motion } from "motion/react"
 import { Notice } from "../ui/Notice"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { ComposerAttachment } from "@meldshell/contracts/ipc"
@@ -17,7 +18,7 @@ import {
   FolderPen,
   Paperclip,
   RefreshCw,
-  ShieldCheck,
+  ShieldAlert,
   X,
   ArrowUp,
   ListPlus,
@@ -26,6 +27,7 @@ import {
 import { effortLabel, resolveSelection, selectableModels } from "../data/catalog"
 import { FileIcon } from "../ui/FileIcon"
 import { ModelPicker } from "./ModelPicker"
+import { dropText, launchFromText } from "../ui/flight"
 import {
   Button,
   IconButton,
@@ -82,73 +84,90 @@ const LevelIcon = ({ index, count }: { index: number; count: number }): React.JS
 const SandboxIcon = ({ mode }: { mode: SandboxMode }): React.JSX.Element => {
   if (mode === "read-only") return <Eye size={14} strokeWidth={1.7} />
   if (mode === "workspace-write") return <FolderPen size={14} strokeWidth={1.7} />
-  return <ShieldCheck size={14} strokeWidth={1.7} />
+  return <ShieldAlert size={14} strokeWidth={1.7} />
 }
 
-const SpeedIcon = ({ speed }: { speed: keyof typeof SPEED_LABEL }): React.JSX.Element => (
-  <svg
-    className="flex-none [stroke:currentColor] stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]"
-    width="14"
-    height="14"
-    viewBox="0 0 16 16"
-    fill="none"
-    aria-hidden="true"
-  >
-    <path d="M2.25 11.75a5.9 5.9 0 0 1 11.5 0" />
-    <path d={speed === "fast" ? "M8 10.75 11.35 6.4" : "M8 10.75 6.25 7.55"} />
-    <circle cx="8" cy="10.75" r="0.8" fill="currentColor" stroke="none" />
-  </svg>
-)
+function AttachmentChip({
+  attachment,
+  onRemove,
+}: {
+  attachment: ComposerAttachment
+  onRemove: () => void
+}): React.JSX.Element {
+  return (
+    <>
+      <span
+        className="grid w-[48px] h-[48px] flex-[0_0_48px] overflow-hidden rounded-[var(--radius-sm)] bg-[var(--surface-active)] place-items-center [&_img]:w-full [&_img]:h-full [&_img]:object-contain"
+        aria-hidden="true"
+      >
+        {attachment.previewUrl || attachment.type === "image" ? (
+          <img src={attachment.previewUrl ?? attachment.value} alt="" />
+        ) : attachment.type === "localImage" ? (
+          <ImageIcon size={22} />
+        ) : (
+          <FileIcon path={attachment.name ?? attachment.value} size={22} />
+        )}
+      </span>
+      <span className="flex flex-1 min-w-0 flex-col gap-[3px]">
+        <span
+          className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+          title={attachment.name ?? attachment.value}
+        >
+          {attachment.name ?? (attachment.type === "image" ? "Pasted image" : attachment.value)}
+        </span>
+        <span className="text-[var(--text-tertiary)] text-[11px]">
+          {attachment.type === "image" || attachment.type === "localImage"
+            ? "Image"
+            : attachment.type === "skill"
+              ? "Skill"
+              : "File"}
+        </span>
+      </span>
+      <IconButton unstyled label={`Remove ${attachment.name ?? "attachment"}`} onClick={onRemove}>
+        <X size={11} />
+      </IconButton>
+    </>
+  )
+}
 
 function ComposerAttachments({
   attachments,
   onRemoveAttachment,
-}: Pick<ComposerProps, "attachments" | "onRemoveAttachment">): React.JSX.Element | null {
-  if (attachments.length === 0) return null
+}: Pick<ComposerProps, "attachments" | "onRemoveAttachment">): React.JSX.Element {
+  const reduced = useMotionPreference()
   return (
-    <div
-      className="flex gap-[8px] overflow-x-auto p-[8px] border-b-[1px] border-b-[color:var(--line-subtle)]"
-      aria-label="Turn attachments"
-    >
-      {attachments.map((attachment, index) => (
-        <FadeDiv duration={0.2} className={attachmentChipClasses} key={index}>
-          <span
-            className="grid w-[48px] h-[48px] flex-[0_0_48px] overflow-hidden rounded-[var(--radius-sm)] bg-[var(--surface-active)] place-items-center [&_img]:w-full [&_img]:h-full [&_img]:object-contain"
-            aria-hidden="true"
-          >
-            {attachment.previewUrl || attachment.type === "image" ? (
-              <img src={attachment.previewUrl ?? attachment.value} alt="" />
-            ) : attachment.type === "localImage" ? (
-              <ImageIcon size={22} />
-            ) : (
-              <FileIcon path={attachment.name ?? attachment.value} size={22} />
-            )}
-          </span>
-          <span className="flex flex-1 min-w-0 flex-col gap-[3px]">
-            <span
-              className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-              title={attachment.name ?? attachment.value}
-            >
-              {attachment.name ?? (attachment.type === "image" ? "Pasted image" : attachment.value)}
-            </span>
-            <span className="text-[var(--text-tertiary)] text-[11px]">
-              {attachment.type === "image" || attachment.type === "localImage"
-                ? "Image"
-                : attachment.type === "skill"
-                  ? "Skill"
-                  : "File"}
-            </span>
-          </span>
-          <IconButton
-            unstyled
-            label={`Remove ${attachment.name ?? "attachment"}`}
-            onClick={() => onRemoveAttachment(index)}
-          >
-            <X size={11} />
-          </IconButton>
-        </FadeDiv>
-      ))}
-    </div>
+    <AnimatePresence initial={false}>
+      {attachments.length > 0 && (
+        <motion.div
+          key="attachments"
+          className="relative flex gap-[8px] overflow-x-auto p-[8px] border-b-[1px] border-b-[color:var(--line-subtle)]"
+          aria-label="Turn attachments"
+          initial={reduced ? false : { opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: reduced ? 0 : 0.2 }}
+        >
+          <AnimatePresence initial={false} mode="popLayout">
+            {attachments.map((attachment, index) => (
+              <motion.div
+                layout={!reduced}
+                className={attachmentChipClasses}
+                key={`${attachment.type}:${attachment.value}`}
+                initial={reduced ? false : { opacity: 0, scale: 0.94 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: reduced ? 1 : 0.9 }}
+                transition={{ duration: reduced ? 0 : 0.2 }}
+              >
+                <AttachmentChip
+                  attachment={attachment}
+                  onRemove={() => onRemoveAttachment(index)}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
@@ -160,7 +179,6 @@ function sendTitle({
   loadingAttachments,
   hasContent,
   running,
-  sendShortcutLabel,
 }: {
   sending: boolean
   providerReady: boolean
@@ -169,15 +187,14 @@ function sendTitle({
   loadingAttachments: boolean
   hasContent: boolean
   running: boolean
-  sendShortcutLabel: string
 }): string {
   if (sending) return "Sending message…"
   if (!providerReady) return `${providerName} is unavailable`
   if (!hasSelection) return "Enable a model in Settings"
   if (loadingAttachments) return "Adding attachments…"
   if (!hasContent) return "Write a message or attach a file"
-  if (running) return `Queue for the next turn (${sendShortcutLabel})`
-  return `Send to ${providerName} (${sendShortcutLabel})`
+  if (running) return "Queue for the next turn (Enter)"
+  return `Send to ${providerName} (Enter)`
 }
 
 function ReasoningSettings({
@@ -203,26 +220,28 @@ function ReasoningSettings({
     <DropdownMenu
       trigger={
         <BaseButton
-          data-motion="background-color border-color color opacity"
           render={<Pressable />}
           type="button"
-          className={chipClasses}
+          className={`motion-colors ${chipClasses}`}
           aria-label="Change reasoning effort and speed"
         >
-          <span
-            className={
-              "flex h-[14px] items-center gap-[3px] text-[var(--text-tertiary)] [&_>_svg]:flex-none"
-            }
-          >
-            {efforts.length > 0 && <LevelIcon index={selectedEffortIndex} count={efforts.length} />}
-            {supportsFast && <SpeedIcon speed={selection.speed} />}
-          </span>
+          {efforts.length > 0 && (
+            <span className="flex-none text-[var(--text-tertiary)]">
+              <LevelIcon index={selectedEffortIndex} count={efforts.length} />
+            </span>
+          )}
           <span className="overflow-hidden text-ellipsis">
             {selection.reasoningEffort === null
-              ? "Reasoning"
-              : effortLabel(selection.reasoningEffort)}
-            {supportsFast && ` · ${SPEED_LABEL[selection.speed]}`}
+              ? efforts.length > 0
+                ? "Reasoning"
+                : SPEED_LABEL[selection.speed]
+              : `${effortLabel(selection.reasoningEffort)} effort`}
           </span>
+          {efforts.length > 0 && supportsFast && selection.speed === "fast" && (
+            <span className="flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[10.5px] leading-[1.3]">
+              Fast
+            </span>
+          )}
           <ChevronDown
             size={13}
             strokeWidth={1.75}
@@ -278,9 +297,6 @@ function ReasoningSettings({
                 value={index === 0 ? "standard" : "fast"}
               >
                 {label}
-                <span className="grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] text-[var(--text-secondary)] place-items-center">
-                  <SpeedIcon speed={index === 0 ? "standard" : "fast"} />
-                </span>
               </MenuChoice>
             ))}
           </MenuGroup>
@@ -383,6 +399,8 @@ function ComposerSettings({
         options.find((option) => option.sandbox === selection.sandbox) ??
         options.find((option) => option.id === "ask")!)
       : options.find((option) => option.sandbox === selection.sandbox)!
+  // Every harness lists its least guarded permission last; it stays visibly distinct when chosen.
+  const riskiest = options[options.length - 1]!
   const visible = selectableModels(snapshot).filter((model) => !model.hidden)
   return (
     <>
@@ -402,10 +420,10 @@ function ComposerSettings({
       <DropdownMenu
         trigger={
           <BaseButton
-            data-motion="background-color border-color color opacity"
             render={<Pressable />}
             type="button"
-            className={chipClasses}
+            className={`motion-colors ${chipClasses} ${riskyChipClasses}`}
+            data-risky={selected.id === riskiest.id}
             aria-label={
               toolPermissions
                 ? `Change ${isClaude ? "Claude" : "Cursor"} permissions`
@@ -438,12 +456,20 @@ function ComposerSettings({
         >
           <MenuGroup label={toolPermissions ? "Tool permissions" : "Filesystem access"}>
             {options.map((option) => (
-              <MenuChoice key={option.id} value={option.id}>
-                {option.label}
-                <span className="grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] text-[var(--text-secondary)] place-items-center">
-                  <SandboxIcon mode={option.sandbox} />
-                </span>
-              </MenuChoice>
+              <Fragment key={option.id}>
+                {option === riskiest && <MenuSeparator />}
+                <MenuChoice
+                  value={option.id}
+                  className={option === riskiest ? "text-[var(--color-modified)]!" : undefined}
+                >
+                  {option.label}
+                  <span
+                    className={`grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] place-items-center ${option === riskiest ? "text-inherit" : "text-[var(--text-secondary)]"}`}
+                  >
+                    <SandboxIcon mode={option.sandbox} />
+                  </span>
+                </MenuChoice>
+              </Fragment>
             ))}
           </MenuGroup>
         </MenuRadioGroup>
@@ -482,9 +508,12 @@ export function Composer({
   onAddAttachments,
   onRemoveAttachment,
 }: ComposerProps): React.JSX.Element {
-  const enterToSend = snapshot.settings.sendShortcut === "enter"
-  const sendShortcutLabel = enterToSend ? "Enter" : "Ctrl+Enter"
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sendButtonRef = useRef<HTMLSpanElement>(null)
+  const reduced = useMotionPreference()
+  // The queue label keeps its last count while it leaves.
+  const lastQueuedCount = useRef(queuedCount)
+  if (queuedCount > 0) lastQueuedCount.current = queuedCount
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
   const [loadingAttachments, setLoadingAttachments] = useState(false)
   const attachmentReadsPending = useRef(0)
@@ -496,6 +525,16 @@ export function Composer({
     (draft.trim().length > 0 || attachments.length > 0) &&
     !sending &&
     !loadingAttachments
+
+  const send = (): void => {
+    const textarea = textareaRef.current
+    if (textarea !== null && !reduced && draft.trim()) {
+      // A queued prompt waits for its turn, so it joins the queue instead of the transcript.
+      if (running && sendButtonRef.current !== null) dropText(textarea, sendButtonRef.current)
+      else launchFromText(`prompt:${threadId}`, textarea)
+    }
+    onSend()
+  }
 
   const addAttachments = async (
     read: () => Promise<ReadonlyArray<ComposerAttachment>>,
@@ -545,11 +584,7 @@ export function Composer({
         </Notice>
       )}
 
-      <div
-        data-motion="background-color border-color box-shadow"
-        data-motion-duration="0.2"
-        className={composerClasses}
-      >
+      <div className={`motion-colors motion-duration-200 ${composerClasses}`}>
         <ComposerAttachments attachments={attachments} onRemoveAttachment={onRemoveAttachment} />
         {loadingAttachments && (
           <div className="text-[var(--text-tertiary)] text-[11px] p-[8px]" role="status">
@@ -567,7 +602,7 @@ export function Composer({
           rows={2}
           placeholder={`Ask ${providerName} to work in this workspace…`}
           aria-label={`Message ${providerName}`}
-          aria-keyshortcuts={enterToSend ? "Enter" : "Control+Enter"}
+          aria-keyshortcuts="Enter"
           onChange={(event) => onDraftChange(event.target.value)}
           onPaste={(event) => {
             const images = Array.from(event.clipboardData.files).filter((file) =>
@@ -606,21 +641,19 @@ export function Composer({
               !event.nativeEvent.isComposing &&
               !event.shiftKey &&
               !event.altKey &&
-              (event.ctrlKey || enterToSend) &&
               canSend &&
               attachmentReadsPending.current === 0
             ) {
               event.preventDefault()
-              onSend()
+              send()
             }
           }}
         />
 
-        <div className="flex items-center flex-wrap gap-[6px] [padding:7px_8px_8px] border-t-[1px] border-t-[color:var(--line-subtle)] [@container(max-width:_620px)]:gap-[4px] [@container(max-width:_620px)]:[&_.chip]:px-[6px]">
+        <div className="flex items-center flex-wrap gap-[6px] [padding:2px_8px_8px] [@container(max-width:_620px)]:gap-[4px] [@container(max-width:_620px)]:[&_.chip]:px-[6px]">
           <IconButton
-            data-motion="background-color border-color color opacity"
             unstyled
-            className={chipClasses}
+            className={`motion-colors ${chipClasses}`}
             label="Attach image, file, or skill"
             disabled={loadingAttachments || sending}
             onClick={() => void addAttachments(() => window.meldshell.selectAttachments())}
@@ -637,25 +670,12 @@ export function Composer({
           <span className="flex-[1_1_auto] min-w-[8px]" />
 
           <div className="flex flex-none items-center gap-[6px] ml-[auto]">
-            {!running && queuedCount === 0 && (
-              <span
-                className="inline-flex items-center gap-[3px] mr-[5px] text-[var(--text-tertiary)] text-[10px] whitespace-nowrap [@container(max-width:_620px)]:hidden"
-                aria-hidden="true"
-              >
-                {!enterToSend && (
-                  <>
-                    <kbd className={kbdClasses}>Ctrl</kbd>
-                    <span>+</span>
-                  </>
-                )}
-                <kbd className={kbdClasses}>Enter</kbd>
+            <PopPresence show={queuedCount > 0}>
+              <span className="inline-flex gap-[3px] text-[var(--text-tertiary)] text-[10.5px] tabular-nums whitespace-nowrap">
+                <Swap id={String(lastQueuedCount.current)}>{lastQueuedCount.current}</Swap>
+                queued {lastQueuedCount.current === 1 ? "message" : "messages"}
               </span>
-            )}
-            {queuedCount > 0 && (
-              <span className="text-[var(--text-tertiary)] text-[10.5px] tabular-nums whitespace-nowrap">
-                {queuedCount} queued {queuedCount === 1 ? "message" : "messages"}
-              </span>
-            )}
+            </PopPresence>
 
             <PopPresence show={running}>
               <IconButton
@@ -669,32 +689,32 @@ export function Composer({
               </IconButton>
             </PopPresence>
 
-            <IconButton
-              data-motion="background-color border-color color opacity"
-              unstyled
-              className={sendButtonClasses}
-              disabled={!canSend}
-              aria-label={running ? "Queue message" : "Send message"}
-              label={sendTitle({
-                sending,
-                providerReady,
-                providerName,
-                hasSelection: selection !== null,
-                loadingAttachments,
-                hasContent: draft.trim().length > 0 || attachments.length > 0,
-                running,
-                sendShortcutLabel,
-              })}
-              onClick={() => onSend()}
-            >
-              <Swap id={running ? "queue" : "send"}>
-                {running ? (
-                  <ListPlus size={15} strokeWidth={2.25} />
-                ) : (
-                  <ArrowUp size={16} strokeWidth={2.25} />
-                )}
-              </Swap>
-            </IconButton>
+            <span ref={sendButtonRef} className="inline-flex">
+              <IconButton
+                unstyled
+                className={`motion-colors ${sendButtonClasses}`}
+                disabled={!canSend}
+                aria-label={running ? "Queue message" : "Send message"}
+                label={sendTitle({
+                  sending,
+                  providerReady,
+                  providerName,
+                  hasSelection: selection !== null,
+                  loadingAttachments,
+                  hasContent: draft.trim().length > 0 || attachments.length > 0,
+                  running,
+                })}
+                onClick={send}
+              >
+                <Swap id={running ? "queue" : "send"}>
+                  {running ? (
+                    <ListPlus size={15} strokeWidth={2.25} />
+                  ) : (
+                    <ArrowUp size={16} strokeWidth={2.25} />
+                  )}
+                </Swap>
+              </IconButton>
+            </span>
           </div>
         </div>
       </div>
@@ -727,10 +747,19 @@ const composerClasses = [
   "[&_textarea::placeholder]:text-[var(--text-tertiary)]",
 ].join(" ")
 
+const riskyChipClasses = [
+  "[&[data-risky='true']]:text-[var(--color-modified)]",
+  "[&[data-risky='true']]:[background:color-mix(in_srgb,_var(--color-modified)_9%,_transparent)]",
+  "[&[data-risky='true']]:[border-color:color-mix(in_srgb,_var(--color-modified)_24%,_transparent)]",
+  "[&[data-risky='true']:hover:not(:disabled)]:text-[var(--color-modified)]",
+  "[&[data-risky='true']:hover:not(:disabled)]:[background:color-mix(in_srgb,_var(--color-modified)_14%,_transparent)]",
+  "[&[data-risky='true']_svg]:text-inherit",
+].join(" ")
+
 const sendButtonClasses = [
   "[display:inline-grid] w-[30px] h-[30px] flex-[0_0_30px] border-0 rounded-[50%] bg-[var(--accent)]",
   "text-[var(--accent-foreground)] cursor-default place-items-center",
-  "[&:disabled]:bg-[var(--surface-active)] [&:disabled]:text-[var(--text-disabled)]",
+  "[&:disabled]:bg-[var(--surface-active)] [&:disabled]:text-[var(--text-tertiary)]",
   "[&:hover:not(:disabled)]:bg-[var(--accent-hover)]",
   "[&:hover:not(:disabled)]:[box-shadow:0_0_0_3px_var(--surface-active)]",
   "[&:active:not(:disabled)]:bg-[var(--text-secondary)]",

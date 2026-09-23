@@ -77,10 +77,7 @@ function RailTick({
           onClick={onJump}
           className="group flex items-center h-[9px] w-[22px] p-0 border-0 bg-transparent cursor-pointer"
         >
-          <span
-            data-motion="width background-color"
-            className="block h-[2px] rounded-full w-[8px] bg-[var(--text-disabled)] group-hover:w-[16px] group-hover:bg-[var(--text-secondary)] group-aria-[current]:w-[14px] group-aria-[current]:bg-[var(--text-primary)]"
-          />
+          <span className="motion-width block h-[2px] rounded-full w-[8px] bg-[var(--text-disabled)] group-hover:w-[16px] group-hover:bg-[var(--text-secondary)] group-aria-[current]:w-[14px] group-aria-[current]:bg-[var(--text-primary)]" />
         </button>
       }
     >

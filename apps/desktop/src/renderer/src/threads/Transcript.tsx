@@ -1,4 +1,12 @@
-import { FadeDiv, GradientSpinner, PopPresence, Shimmer, useMotionPreference } from "../ui/motion"
+import {
+  CollapsiblePanel,
+  FadeDiv,
+  GradientSpinner,
+  PopPresence,
+  Shimmer,
+  Swap,
+  useMotionPreference,
+} from "../ui/motion"
 import { motion } from "motion/react"
 import { queryKeys } from "../data/cache"
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
@@ -13,8 +21,9 @@ import { ToolOutput } from "./ToolOutput"
 import { fileChangePatches } from "./file-change-diffs"
 import { toolDetails } from "./tool-details"
 import { commandLabel } from "./command-summary"
-import { workSummary } from "./work-summary"
+import { primaryWork, workSummary, type Work } from "./work-summary"
 import { MessageRail } from "./MessageRail"
+import { landFlight } from "../ui/flight"
 import { Notice } from "../ui/Notice"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { refreshTranscript, type TranscriptWindow } from "../data/transcript"
@@ -27,7 +36,11 @@ import {
   ChevronRight,
   CircleAlert,
   FileCode2,
+  FilePen,
+  FileText,
+  Globe,
   ListChecks,
+  Search,
   Terminal,
   Wrench,
 } from "lucide-react"
@@ -44,13 +57,21 @@ function Message({
   event,
   className = "",
   children,
+  arrivingIn,
+  flash,
 }: {
   readonly event: CanonicalEvent
   readonly className?: string
   readonly children?: ReactNode
+  /** The thread whose latest composer send may have produced this new user message. */
+  readonly arrivingIn?: string
+  /** Changes each time the reader jumps to this message, briefly marking where they landed. */
+  readonly flash?: number
 }): React.JSX.Element {
   const [copyState, setCopyState] = useState("idle")
   const [showTime, setShowTime] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const reduced = useMotionPreference()
   const text = fallbackText(event)
   const date = new Date(event.createdAt)
   const fullTime = date.toLocaleString()
@@ -61,14 +82,33 @@ function Message({
     return () => window.clearTimeout(timer)
   }, [copyState])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: The prompt flies only when the message first mounts.
+  useLayoutEffect(() => {
+    const bubble = rootRef.current?.querySelector<HTMLElement>(":scope > .event-markdown")
+    if (arrivingIn === undefined || bubble == null) return
+    return landFlight(`prompt:${arrivingIn}`, bubble, { match: text, content: true })
+  }, [])
+
+  useEffect(() => {
+    const bubble = rootRef.current?.querySelector<HTMLElement>(":scope > .event-markdown")
+    if (flash === undefined || reduced || bubble == null) return
+    const ring = getComputedStyle(bubble).getPropertyValue("--accent")
+    const animation = bubble.animate(
+      [{ boxShadow: `0 0 0 2px ${ring}` }, { boxShadow: "0 0 0 2px transparent" }],
+      { duration: 1400, easing: "ease-out" },
+    )
+    return () => animation.cancel()
+  }, [flash, reduced])
+
   return (
     <div
+      ref={rootRef}
       className={`min-w-0 [&:hover_>_.message-actions]:opacity-[1] [&:focus-within_>_.message-actions]:opacity-[1] [&_>_.turn-changes]:mt-[14px] ${className}`}
     >
       <Markdown text={text} />
       {event.kind === "user" && <MessageAttachments payload={event.payload} />}
       {children}
-      <div data-motion="opacity" className={workingSectionClasses}>
+      <div className={`motion-colors ${workingSectionClasses}`}>
         <IconButton
           unstyled
           label={copyState === "copied" ? "Copied" : "Copy message"}
@@ -81,7 +121,9 @@ function Message({
             }
           }}
         >
-          {copyState === "copied" ? <Check size={13} /> : <Copy size={13} />}
+          <Swap id={copyState === "copied" ? "copied" : "copy"}>
+            {copyState === "copied" ? <Check size={13} /> : <Copy size={13} />}
+          </Swap>
         </IconButton>
         <Toggle
           className="message-time"
@@ -236,10 +278,7 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
   }
   return (
     <Collapsible.Root className="work-item" defaultOpen={false}>
-      <Collapsible.Trigger
-        data-motion="background-color border-color color box-shadow"
-        className={workItemTriggerClasses}
-      >
+      <Collapsible.Trigger className={`motion-colors ${workItemTriggerClasses}`}>
         {iconFor(event)}
         <span className="work-item-title" title={toolSummary(event)}>
           {toolSummary(event)}
@@ -257,15 +296,11 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
         )}
         {tool.parent && <span title={tool.parent}>Subagent</span>}
         <ChevronRight
-          data-motion="transform background-color"
-          data-motion-duration="0.2"
-          className={
-            "disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
-          }
+          className={`motion-transform motion-duration-200 ${"disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"}`}
           size={13}
         />
       </Collapsible.Trigger>
-      <Collapsible.Panel className="grid gap-[10px] min-w-0 [margin:6px_6px_16px_26px]">
+      <CollapsiblePanel className="grid gap-[10px] min-w-0 [margin:6px_6px_16px_26px]">
         <ToolBody
           event={event}
           tool={tool}
@@ -309,7 +344,7 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
             )}
           </dl>
         )}
-      </Collapsible.Panel>
+      </CollapsiblePanel>
     </Collapsible.Root>
   )
 }
@@ -331,6 +366,13 @@ function WorkingSection({
   readonly turn: TranscriptTurn
   readonly live: boolean
 }): React.JSX.Element | null {
+  const [open, setOpen] = useState(!turn.complete)
+  const [complete, setComplete] = useState(turn.complete)
+  // A finishing turn folds its working log into the summary.
+  if (turn.complete !== complete) {
+    setComplete(turn.complete)
+    setOpen(!turn.complete)
+  }
   if (turn.workingEvents.length === 0)
     return live && turn.finalResponse === null ? (
       <FadeDiv
@@ -343,23 +385,19 @@ function WorkingSection({
     ) : null
 
   return (
-    <Collapsible.Root className="text-[var(--text-tertiary)]" defaultOpen={!turn.complete}>
-      <Collapsible.Trigger
-        data-motion="background-color border-color color box-shadow"
-        className="[list-style:none] flex min-h-[28px] items-center gap-[6px] [padding:3px_6px_3px_2px] rounded-[var(--radius-sm)] cursor-pointer text-[11px] font-medium w-full border-0 bg-transparent text-inherit [font:inherit] text-left [&::-webkit-details-marker]:hidden [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)]"
-      >
+    <Collapsible.Root className="text-[var(--text-tertiary)]" open={open} onOpenChange={setOpen}>
+      <Collapsible.Trigger className="motion-colors [list-style:none] flex min-h-[28px] items-center gap-[6px] [padding:3px_6px_3px_2px] rounded-[var(--radius-sm)] cursor-pointer text-[11px] font-medium w-full border-0 bg-transparent text-inherit [font:inherit] text-left [&::-webkit-details-marker]:hidden [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)]">
         <ChevronRight
-          data-motion="transform background-color"
-          data-motion-duration="0.2"
-          className={
-            "disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
-          }
+          className={`motion-transform motion-duration-200 ${"disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"}`}
           size={14}
         />
         {turn.complete ? (
-          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-            {workSummary(turn.workingEvents) || "Worked"}
-          </span>
+          <>
+            <WorkIcon work={primaryWork(turn.workingEvents)} />
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+              {workSummary(turn.workingEvents) || "Worked"}
+            </span>
+          </>
         ) : (
           <>
             <GradientSpinner size={11} />
@@ -368,11 +406,11 @@ function WorkingSection({
             </Shimmer>
           </>
         )}
-        <span className="flex-none font-normal text-[var(--text-disabled)] [font-variant-numeric:tabular-nums]">
+        <span className="flex-none font-normal text-[var(--text-tertiary)] opacity-[0.8] [font-variant-numeric:tabular-nums]">
           {formatDuration(turn.durationMs)}
         </span>
       </Collapsible.Trigger>
-      <Collapsible.Panel className="flex flex-col gap-[1px] [margin:3px_0_1px_7px] [padding:3px_0_3px_12px] border-l-[1px] border-l-[color:var(--line-subtle)]">
+      <CollapsiblePanel className="flex flex-col gap-[1px] [margin:3px_0_1px_7px] [padding:3px_0_3px_12px] border-l-[1px] border-l-[color:var(--line-subtle)]">
         {turn.workingEvents.map((event) => {
           if (turn.complete && event.method === "turn/diff/updated") return null
           if (isFailure(event)) return null
@@ -386,19 +424,40 @@ function WorkingSection({
             )
           return <ToolLine key={event.id} event={event} />
         })}
-      </Collapsible.Panel>
+      </CollapsiblePanel>
     </Collapsible.Root>
   )
+}
+
+const workIcons: Readonly<Record<Work, typeof Terminal>> = {
+  edit: FilePen,
+  command: Terminal,
+  fetch: Globe,
+  search: Search,
+  read: FileText,
+  tool: Wrench,
+  plan: ListChecks,
+  thought: Brain,
+}
+
+function WorkIcon({ work }: { work: Work | null }) {
+  if (work === null) return null
+  const Icon = workIcons[work]
+  return <Icon size={12} strokeWidth={1.75} className="flex-none" aria-hidden="true" />
 }
 
 const settle = [0.16, 1, 0.3, 1] as const
 
 function TurnRow({
+  threadId,
   turn,
   entering = false,
   live = false,
+  flash,
 }: {
+  readonly threadId: string
   readonly turn: TranscriptTurn
+  readonly flash?: number
   /** The thread's latest turn while the provider is still working on it. */
   readonly live?: boolean
   /** A turn appended while the thread is open rises into place once. */
@@ -413,25 +472,23 @@ function TurnRow({
     <MarkdownSources value={sources}>
       <MarkdownStreaming value={!turn.complete}>
         <motion.article
-          className="transcript-turn select-text flex flex-col gap-[14px]"
+          className="transcript-turn select-text flex flex-col gap-[10px]"
           initial={entering && !reduced ? { opacity: 0, y: 4 } : false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: settle }}
         >
-          {turn.userMessages.map((event) => (
+          {turn.userMessages.map((event, index) => (
             <Message
               key={event.id}
               event={event}
+              arrivingIn={entering && !reduced && index === 0 ? threadId : undefined}
+              flash={index === 0 ? flash : undefined}
               className={
-                "[&_>_.message-actions]:justify-end [&_>_.event-markdown]:[padding:12px_16px] [&_>_.event-markdown]:border-[1px] [&_>_.event-markdown]:border-[color:var(--line-subtle)] [&_>_.event-markdown]:rounded-[var(--radius-lg)] [&_>_.event-markdown]:bg-[var(--surface-hover)] [&_>_.event-markdown]:text-[var(--text-primary)] w-[fit-content] max-w-[min(78%,_680px)] ml-[auto]"
+                "[&_>_.message-actions]:justify-end [&_>_.event-markdown]:[padding:12px_16px] [&_>_.event-markdown]:border-[1px] [&_>_.event-markdown]:border-[color:var(--line-subtle)] [&_>_.event-markdown]:rounded-[var(--radius-lg)] [&_>_.event-markdown]:bg-[var(--surface-hover)] [&_>_.event-markdown]:text-[var(--text-primary)] w-[fit-content] max-w-[min(78%,_680px)] ml-[auto] relative [&_>_.message-actions]:absolute [&_>_.message-actions]:bottom-[0] [&_>_.message-actions]:right-[calc(100%_+_4px)] [&_>_.message-actions]:mt-[0] [&_>_.message-actions]:flex-row-reverse [&_>_.message-actions]:flex-nowrap [&_>_.message-actions]:whitespace-nowrap"
               }
             />
           ))}
-          <WorkingSection
-            key={turn.complete ? "complete" : "working"}
-            turn={turn}
-            live={live && !turn.complete}
-          />
+          <WorkingSection turn={turn} live={live && !turn.complete} />
           {turn.workingEvents.filter(isFailure).map((event) => (
             <Notice
               key={event.id}
@@ -488,7 +545,14 @@ export function Transcript({
   "use no memo"
   const scrollRef = useRef<HTMLDivElement>(null)
   const [showLatest, setShowLatest] = useState(false)
+  const [jump, setJump] = useState<{ readonly turnId: string; readonly at: number } | null>(null)
   const reduced = useMotionPreference()
+  // A row remounted by scrolling should not replay the landing mark.
+  useEffect(() => {
+    if (jump === null) return
+    const timer = window.setTimeout(() => setJump(null), 1500)
+    return () => window.clearTimeout(timer)
+  }, [jump])
   const client = useQueryClient()
   const key = queryKeys.transcript(threadId)
   const current = () => client.getQueryData<TranscriptWindow>(key)
@@ -575,7 +639,7 @@ export function Transcript({
           aria-live="polite"
         >
           <div
-            className="relative w-full max-w-[860px] [margin:0_auto]"
+            className="relative w-full max-w-[720px] [margin:0_auto]"
             style={{ height: virtualizer.getTotalSize() }}
           >
             {virtualizer.getVirtualItems().map((item) => {
@@ -586,13 +650,15 @@ export function Transcript({
                   key={turn.id}
                   ref={virtualizer.measureElement}
                   data-index={item.index}
-                  className="absolute top-[0] left-[0] w-full pb-[26px] [&[data-search-match]_.transcript-turn]:border-l-[2px] [&[data-search-match]_.transcript-turn]:border-l-[color:var(--text-secondary)] [&[data-search-match]_.transcript-turn]:pl-[16px]"
+                  className="absolute top-[0] left-[0] w-full pb-[44px] [&[data-search-match]_.transcript-turn]:border-l-[2px] [&[data-search-match]_.transcript-turn]:border-l-[color:var(--text-secondary)] [&[data-search-match]_.transcript-turn]:pl-[16px]"
                   data-search-match={turn.id === targetTurnId || undefined}
                   style={{ transform: `translateY(${item.start}px)` }}
                 >
                   <TurnRow
+                    threadId={threadId}
                     turn={turn}
                     entering={turn.id === enteringTurn}
+                    flash={jump?.turnId === turn.id ? jump.at : undefined}
                     live={running && item.index === turns.length - 1}
                   />
                 </div>
@@ -609,12 +675,14 @@ export function Transcript({
                   ?.index ?? 0)
               : turns.length - 1
           }
-          onJump={(index) =>
+          onJump={(index) => {
             virtualizer.scrollToIndex(index, {
               align: "start",
               behavior: reduced ? "auto" : "smooth",
             })
-          }
+            const turn = turns[index]
+            if (turn !== undefined) setJump({ turnId: turn.id, at: Date.now() })
+          }}
         />
         <div className="absolute z-[2] bottom-[12px] inset-x-[16px] flex justify-center pointer-events-none">
           <PopPresence show={showLatest}>

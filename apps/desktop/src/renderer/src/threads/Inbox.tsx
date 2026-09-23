@@ -1,5 +1,4 @@
-import { GradientSpinner, useMotionPreference } from "../ui/motion"
-import { motion } from "motion/react"
+import { GradientSpinner, PopPresence, TextSwap } from "../ui/motion"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { useRef, useState } from "react"
 import type { Provider, Thread, Workspace } from "@meldshell/contracts"
@@ -7,6 +6,7 @@ import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   Archive,
   ChevronDown,
+  ChevronsUpDown,
   Columns2,
   Folder,
   FolderPlus,
@@ -25,6 +25,7 @@ import { useThreadDraggable } from "../app/thread-drag"
 import type { SplitEdge } from "../app/thread-layout"
 import { Button, DropdownMenu, MenuAction, MenuChoice, MenuRadioGroup } from "../ui/controls"
 import { kbdClasses } from "../ui/styles"
+import { relativeAge } from "../ui/relative-age"
 
 type InboxRow =
   | {
@@ -85,8 +86,7 @@ function InboxThread({
   const draggable = useThreadDraggable(thread.id, "inbox")
   return (
     <div
-      data-motion="background-color border-color color box-shadow"
-      className={threadRowClasses}
+      className={`motion-colors ${threadRowClasses}`}
       data-status={thread.status}
       data-activity={thread.activity}
       {...(selectedThreadId === thread.id ? { "data-selected": "" } : {})}
@@ -102,8 +102,8 @@ function InboxThread({
       >
         {thread.status === "active" ? (
           <>
-            <span className="thread-title overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium">
-              {thread.title}
+            <span className="thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium">
+              <TextSwap text={thread.title} />
             </span>
             <span className={threadContextClasses}>
               <ProviderIcon provider={providersByThreadId.get(thread.id)} size={13} />
@@ -112,7 +112,7 @@ function InboxThread({
                   {workspaceNames.get(thread.workspaceId) ?? "Unknown workspace"}
                 </span>
               )}
-              {thread.activity === "running" && (
+              <PopPresence className="inline-flex shrink-0" show={thread.activity === "running"}>
                 <span
                   className="thread-activity [&[data-attention]]:text-[var(--color-modified)] [&[data-activity='failed']]:text-[var(--color-deleted)] [&[data-activity='running']]:text-[var(--color-info)]"
                   data-activity="running"
@@ -122,8 +122,8 @@ function InboxThread({
                 >
                   <GradientSpinner />
                 </span>
-              )}
-              {thread.activity === "approval" && (
+              </PopPresence>
+              <PopPresence className="inline-flex shrink-0" show={thread.activity === "approval"}>
                 <span
                   className="thread-activity [&[data-attention]]:text-[var(--color-modified)] [&[data-activity='failed']]:text-[var(--color-deleted)] [&[data-activity='running']]:text-[var(--color-info)]"
                   data-activity={thread.activity}
@@ -132,13 +132,13 @@ function InboxThread({
                   <CircleAlert size={12} aria-hidden="true" />
                   Needs approval
                 </span>
-              )}
-              {thread.activity === "queued" && (
+              </PopPresence>
+              <PopPresence className="inline-flex shrink-0" show={thread.activity === "queued"}>
                 <span className="thread-activity [&[data-attention]]:text-[var(--color-modified)] [&[data-activity='failed']]:text-[var(--color-deleted)] [&[data-activity='running']]:text-[var(--color-info)]">
                   Queued
                 </span>
-              )}
-              {thread.activity === "failed" && (
+              </PopPresence>
+              <PopPresence className="inline-flex shrink-0" show={thread.activity === "failed"}>
                 <span
                   className="thread-activity [&[data-attention]]:text-[var(--color-modified)] [&[data-activity='failed']]:text-[var(--color-deleted)] [&[data-activity='running']]:text-[var(--color-info)]"
                   data-activity={thread.activity}
@@ -146,12 +146,15 @@ function InboxThread({
                 >
                   Failed
                 </span>
-              )}
-              {unseen && ["completed", "idle", "interrupted"].includes(thread.activity) && (
+              </PopPresence>
+              <PopPresence
+                className="inline-flex shrink-0"
+                show={unseen && ["completed", "idle", "interrupted"].includes(thread.activity)}
+              >
                 <UnseenMark />
-              )}
+              </PopPresence>
               <time dateTime={thread.updatedAt} title={new Date(thread.updatedAt).toLocaleString()}>
-                {formatThreadAge(thread.updatedAt)}
+                {relativeAge(thread.updatedAt)}
               </time>
             </span>
           </>
@@ -160,11 +163,11 @@ function InboxThread({
             <span className="flex-[0_0_14px] text-[var(--text-tertiary)]">
               <ProviderIcon provider={providersByThreadId.get(thread.id)} size={14} />
             </span>
-            <span className="thread-title overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium">
-              {thread.title}
+            <span className="thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium">
+              <TextSwap text={thread.title} />
             </span>
             <time dateTime={thread.updatedAt} title={new Date(thread.updatedAt).toLocaleString()}>
-              {formatThreadAge(thread.updatedAt)}
+              {relativeAge(thread.updatedAt)}
             </time>
           </>
         )}
@@ -173,9 +176,8 @@ function InboxThread({
         align="end"
         trigger={
           <BaseButton
-            data-motion="background-color color opacity border-color"
             type="button"
-            className={iconButtonClasses}
+            className={`motion-colors ${iconButtonClasses}`}
             aria-label={`Actions for ${thread.title}`}
           >
             <MoreHorizontal size={15} strokeWidth={1.75} />
@@ -215,15 +217,11 @@ function InboxThread({
 }
 
 function UnseenMark() {
-  const reduced = useMotionPreference()
   return (
     <span className="thread-activity text-[var(--color-info)]">
-      <motion.span
+      <span
         aria-hidden="true"
         className="block w-[6px] h-[6px] rounded-full bg-[var(--color-info)]"
-        initial={reduced ? false : { scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: "spring", stiffness: 520, damping: 18 }}
       />
       Done
     </span>
@@ -332,61 +330,60 @@ export function Inbox({
 
   return (
     <>
-      <div className="pb-[8px] border-b-[1px] border-b-[color:var(--line-subtle)] mb-[4px]">
-        <div className="flex items-center gap-[2px] [padding:0_3px] [&_.inbox-search]:gap-[6px] [&_.inbox-search]:px-[8px]">
-          <BaseButton
-            data-motion="background-color border-color color opacity box-shadow"
-            data-motion-duration="0.2"
-            type="button"
-            className={inboxSearchClasses}
-            onClick={onSearch}
-            aria-label="Search transcripts"
-            aria-keyshortcuts="Control+k"
-          >
-            <Search size={15} strokeWidth={1.7} aria-hidden="true" />
-            <span>Search</span>
-            <kbd className={kbdClasses}>Ctrl K</kbd>
-          </BaseButton>
-          <Button
-            variant="ghost"
-            className="shrink-0"
-            onClick={onNewThread}
-            icon={<SquarePen size={16} strokeWidth={1.7} />}
-          >
-            New thread
-          </Button>
-        </div>
-
-        <div className="flex h-[36px] items-center gap-[4px] [padding:0_3px_0_8px]">
-          <DropdownMenu
-            align="start"
-            trigger={
-              <BaseButton type="button" className={workspaceSelectorClasses}>
-                <Folder size={15} strokeWidth={1.65} />
-                <span>{selectedWorkspaceName}</span>
-                <ChevronDown size={13} strokeWidth={1.7} />
-              </BaseButton>
-            }
-          >
-            <MenuRadioGroup
-              value={workspaceId}
-              onValueChange={(value) => setWorkspaceId(String(value))}
+      <div className="flex flex-col gap-[2px] [padding:0_3px_8px] border-b-[1px] border-b-[color:var(--line-subtle)] mb-[4px]">
+        <Button
+          variant="primary"
+          block
+          className="mb-[6px]"
+          onClick={onNewThread}
+          aria-keyshortcuts="Control+n"
+          icon={<SquarePen size={15} strokeWidth={1.8} />}
+        >
+          New thread
+        </Button>
+        <BaseButton
+          type="button"
+          className={`motion-colors ${inboxSearchClasses}`}
+          onClick={onSearch}
+          aria-label="Search transcripts"
+          aria-keyshortcuts="Control+k"
+        >
+          <Search size={15} strokeWidth={1.7} aria-hidden="true" />
+          <span>Search</span>
+          <kbd className={kbdClasses}>Ctrl K</kbd>
+        </BaseButton>
+        <DropdownMenu
+          align="start"
+          trigger={
+            <BaseButton
+              type="button"
+              className={`motion-colors ${workspaceSelectorClasses}`}
+              aria-label={`Show threads from: ${selectedWorkspaceName}`}
             >
-              <MenuChoice value="all">All workspaces</MenuChoice>
-              {workspaces.map((workspace) => (
-                <MenuChoice key={workspace.id} value={workspace.id}>
-                  {workspace.name}
-                </MenuChoice>
-              ))}
-            </MenuRadioGroup>
-            <MenuAction icon={<FolderPlus size={14} />} onClick={onAddWorkspace}>
-              Add workspace
-            </MenuAction>
-            <MenuAction icon={<Settings size={14} />} onClick={onManageWorkspaces}>
-              Manage workspaces
-            </MenuAction>
-          </DropdownMenu>
-        </div>
+              <Folder size={15} strokeWidth={1.65} />
+              <span>{selectedWorkspaceName}</span>
+              <ChevronsUpDown size={13} strokeWidth={1.7} />
+            </BaseButton>
+          }
+        >
+          <MenuRadioGroup
+            value={workspaceId}
+            onValueChange={(value) => setWorkspaceId(String(value))}
+          >
+            <MenuChoice value="all">All workspaces</MenuChoice>
+            {workspaces.map((workspace) => (
+              <MenuChoice key={workspace.id} value={workspace.id}>
+                {workspace.name}
+              </MenuChoice>
+            ))}
+          </MenuRadioGroup>
+          <MenuAction icon={<FolderPlus size={14} />} onClick={onAddWorkspace}>
+            Add workspace
+          </MenuAction>
+          <MenuAction icon={<Settings size={14} />} onClick={onManageWorkspaces}>
+            Manage workspaces
+          </MenuAction>
+        </DropdownMenu>
       </div>
 
       <div
@@ -468,29 +465,13 @@ export function Inbox({
   )
 }
 
-const formatThreadAge = (timestamp: string): string => {
-  const elapsedSeconds = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000),
-  )
-  if (elapsedSeconds < 60) return "now"
-  if (elapsedSeconds < 3_600) return `${Math.floor(elapsedSeconds / 60)}m`
-  if (elapsedSeconds < 86_400) return `${Math.floor(elapsedSeconds / 3_600)}h`
-  if (elapsedSeconds < 604_800) return `${Math.floor(elapsedSeconds / 86_400)}d`
-  if (elapsedSeconds < 2_592_000) return `${Math.floor(elapsedSeconds / 604_800)}w`
-  return `${Math.floor(elapsedSeconds / 2_592_000)}mo`
-}
-
 const threadRowClasses = [
   "relative flex h-[calc(100%_-_4px)] [margin:2px_0] items-stretch rounded-[var(--radius)]",
   "text-[var(--text-secondary)] [&[data-status='active']]:min-h-[56px]",
   "[&[data-status='settled']]:min-h-[36px] [&[data-status='settled']]:text-[var(--text-secondary)]",
   "[&:hover]:bg-[var(--surface-hover)] [&[data-status='settled']:hover]:text-[var(--text-secondary)]",
-  "[&[data-selected]]:bg-[var(--surface-active)] [&[data-selected]]:text-[var(--text-primary)]",
-  "[&[data-selected]::before]:absolute [&[data-selected]::before]:top-[12px]",
-  "[&[data-selected]::before]:bottom-[12px] [&[data-selected]::before]:left-[0]",
-  "[&[data-selected]::before]:w-[2px] [&[data-selected]::before]:rounded-[2px]",
-  "[&[data-selected]::before]:bg-[var(--accent)] [&[data-selected]::before]:[content:'']",
+  "[&[data-selected]]:bg-[var(--surface-selected)] [&[data-selected]]:text-[var(--text-primary)]",
+  "[&[data-selected]]:[box-shadow:inset_0_0_0_1px_var(--line-subtle)]",
   "[&[data-selected]_.thread-context]:text-[var(--text-secondary)]",
   "[&[data-status='settled']_.thread-open]:flex-row [&[data-status='settled']_.thread-open]:items-center",
   "[&[data-status='settled']_.thread-open]:gap-[9px]",
@@ -502,7 +483,7 @@ const threadRowClasses = [
   "[&[data-status='settled']_.thread-title]:flex-[1_1_auto]",
   "[&[data-status='settled']_.thread-title]:font-normal [&[data-status='settled']_time]:min-w-[30px]",
   "[&[data-status='settled']_time]:shrink-0 [&[data-status='settled']_time]:text-[var(--text-tertiary)]",
-  "[&[data-status='settled']_time]:text-[10.5px] [&[data-status='settled']_time]:tabular-nums",
+  "[&[data-status='settled']_time]:text-[11px] [&[data-status='settled']_time]:tabular-nums",
   "[&[data-status='settled']_time]:text-right",
   "[&[data-status='settled']:is(:hover,_:focus-within,_[data-selected])_time]:opacity-[0]",
   "[&[data-status='settled']:has(.row-menu-trigger[data-popup-open])_time]:opacity-[0]",
@@ -516,7 +497,7 @@ const threadRowClasses = [
 
 const threadContextClasses = [
   "thread-context [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap flex",
-  "min-w-0 items-center gap-[6px] pr-[0] text-[var(--text-tertiary)] text-[10.5px] [&_time]:ml-[auto]",
+  "min-w-0 items-center gap-[6px] pr-[0] text-[var(--text-tertiary)] text-[11px] [&_time]:ml-[auto]",
   "[&_time]:tabular-nums [&_time]:shrink-0 [&_>_svg]:shrink-0 [&_.thread-workspace]:min-w-0",
   "[&_.thread-activity]:inline-flex [&_.thread-activity]:shrink-0 [&_.thread-activity]:items-center",
   "[&_.thread-activity]:gap-[4px]",
@@ -534,27 +515,20 @@ const iconButtonClasses = [
 ].join(" ")
 
 const inboxSearchClasses = [
-  "inbox-search flex h-[34px] min-w-0 flex-[1_1_auto] items-center gap-[9px] [padding:0_10px]",
-  "rounded-[var(--radius)] text-[var(--text-secondary)] [&:focus-within]:bg-[var(--surface-hover)]",
-  "[&:focus-within]:[box-shadow:inset_0_0_0_1px_var(--line-strong)]",
-  "[&:focus-within]:text-[var(--text-secondary)]",
-  "[&:has(input:focus-visible)]:[outline:2px_solid_var(--accent)]",
-  "[&:has(input:focus-visible)]:[outline-offset:-2px] [&_input]:w-full [&_input]:min-w-0 [&_input]:p-0",
-  "[&_input]:border-0 [&_input]:[outline:0] [&_input]:bg-transparent",
-  "[&_input]:text-[var(--text-primary)] [&_input]:text-[12.5px]",
-  "[&_input::placeholder]:text-[var(--text-tertiary)] [&_input::-webkit-search-cancel-button]:hidden",
-  "[&_kbd]:text-[10px] [&_kbd]:shrink-0 w-full",
-  "border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-[var(--surface-hover)] [padding:0_10px]",
-  "[font:inherit] text-left cursor-pointer text-[var(--text-secondary)] [&_span]:flex-1",
-  "[&_span]:text-[11.5px] [&_span]:whitespace-nowrap [&:hover]:bg-[var(--surface-active)]",
-  "[&:hover]:[border-color:var(--line-strong)] [&:hover]:text-[var(--text-primary)]",
+  "flex h-[32px] min-w-0 w-full items-center gap-[9px] [padding:0_10px] border-0 rounded-[var(--radius)]",
+  "bg-transparent text-[var(--text-secondary)] text-left cursor-default [font:inherit]",
+  "[&_svg]:flex-none [&_svg]:text-[var(--text-tertiary)] [&_span]:flex-1 [&_span]:text-[12.5px]",
+  "[&_kbd]:text-[10px] [&_kbd]:shrink-0 [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]",
+  "[&:hover_svg]:text-[var(--text-secondary)]",
 ].join(" ")
 
 const workspaceSelectorClasses = [
-  "flex min-w-0 flex-[1_1_auto] items-center gap-[9px] [padding:6px_2px] border-0 bg-transparent",
+  "flex h-[32px] min-w-0 w-full items-center gap-[9px] [padding:0_8px_0_10px] mt-[4px] border-[1px]",
+  "border-[color:var(--line)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.12)]",
   "text-[var(--text-secondary)] cursor-default text-left [&_svg]:flex-none",
-  "[&_svg]:text-[var(--text-tertiary)] [&_span]:min-w-0 [&_span]:flex-[1_1_auto]",
-  "[&_span]:overflow-hidden [&_span]:text-[var(--text-secondary)] [&_span]:text-ellipsis",
-  "[&_span]:whitespace-nowrap [&:hover]:text-[var(--text-primary)]",
-  "[&:hover_span]:text-[var(--text-primary)] [&:hover_svg]:text-[var(--text-secondary)]",
+  "[&_svg]:text-[var(--text-tertiary)] [&_span]:min-w-0 [&_span]:flex-[1_1_auto] [&_span]:text-[12.5px]",
+  "[&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap",
+  "[&:hover]:[border-color:var(--line-strong)] [&:hover]:text-[var(--text-primary)]",
+  "[&[data-popup-open]]:[border-color:var(--line-strong)] [&[data-popup-open]]:text-[var(--text-primary)]",
+  "[:root[data-theme='light']_&]:bg-[var(--surface-raised)]",
 ].join(" ")

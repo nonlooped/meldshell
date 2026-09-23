@@ -43,11 +43,10 @@ export function ThreadTitleCard({
           align="end"
           trigger={
             <BaseButton
-              data-motion="background-color border-color color opacity"
               render={<Pressable />}
               type="button"
               disabled={pending}
-              className={`${buttonClasses} justify-between!`}
+              className={`motion-colors ${buttonClasses} justify-between!`}
               data-block="true"
               aria-label="Change the model that names threads"
             >

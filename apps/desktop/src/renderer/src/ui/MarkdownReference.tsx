@@ -207,12 +207,16 @@ function WebPageLink({
   )
 }
 
+// File references read as links rather than inline code: no chip, an underline that firms up on hover.
 const referenceChipClasses = [
-  "inline-flex items-center gap-[5px] max-w-full [vertical-align:baseline] [padding:1px_5px]",
-  "border-[1px] border-[color:var(--line)] rounded-[var(--radius-sm)] bg-[var(--surface-hover)]",
-  "text-[var(--text-primary)] [font:0.88em_var(--font-mono)] cursor-pointer [&_>_span]:overflow-hidden",
+  "inline-flex items-center gap-[4px] max-w-full [vertical-align:baseline] [padding:0_1px]",
+  "border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-primary)]",
+  "[font:0.86em_var(--font-mono)] cursor-pointer [&_>_span]:overflow-hidden",
   "[&_>_span]:text-ellipsis [&_>_span]:whitespace-nowrap [&_svg]:shrink-0",
-  "[&:focus-visible]:[outline:2px_solid_var(--accent)] [&:focus-visible]:[outline-offset:2px]",
+  "[&:is(button)_>_span:first-of-type]:underline [&_>_span]:[text-underline-offset:3px]",
+  "[&_>_span]:[text-decoration-color:var(--line-strong)]",
+  "[&:is(button):hover_>_span]:[text-decoration-color:currentColor] [&:is(button):hover]:text-[var(--color-info)]",
+  "[&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]",
 ].join(" ")
 
 const referencePreviewClasses = [

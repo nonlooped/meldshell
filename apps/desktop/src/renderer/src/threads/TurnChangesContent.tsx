@@ -1,4 +1,5 @@
 import { Collapsible } from "@base-ui-components/react/collapsible"
+import { CollapsiblePanel } from "../ui/motion"
 import { ChevronRight } from "lucide-react"
 import type { CanonicalEvent } from "@meldshell/contracts"
 import { turnChangePatches } from "./file-change-diffs"
@@ -28,12 +29,8 @@ function FileChangeRow({ path, patch }: { path: string; patch: string }) {
     <Collapsible.Root className="turn-change-file">
       <Collapsible.Trigger className={turnChangeTriggerClasses}>
         <ChevronRight
-          data-motion="transform background-color"
-          data-motion-duration="0.2"
           size={13}
-          className={
-            "disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
-          }
+          className={`motion-transform motion-duration-200 ${"disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"}`}
           aria-hidden="true"
         />
         <FileIcon path={path} />
@@ -51,13 +48,13 @@ function FileChangeRow({ path, patch }: { path: string; patch: string }) {
         )}
         {files.length > 0 && <Counts {...diffLineCounts(files)} />}
       </Collapsible.Trigger>
-      <Collapsible.Panel
+      <CollapsiblePanel
         className={
           "[&_>_.event-diff]:[margin:4px_0_10px] [&_>_.event-diff]:rounded-[0] [&_>_.event-diff]:border-x-0"
         }
       >
         <ChangeDiff path={path} patch={patch} showHeader={false} />
-      </Collapsible.Panel>
+      </CollapsiblePanel>
     </Collapsible.Root>
   )
 }
@@ -97,6 +94,6 @@ const turnChangeTriggerClasses = [
   "flex items-center gap-[8px] min-h-[32px] w-full [padding:4px_6px] border-0 bg-transparent text-left",
   "cursor-pointer rounded-[var(--radius-sm)] text-[var(--text-secondary)] text-[12px]",
   "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]",
-  "[&:focus-visible]:[outline:1px_solid_var(--accent)] [&:focus-visible]:[outline-offset:2px]",
+  "[&:focus-visible]:[outline:1px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]",
   "[&_>_svg]:shrink-0 [&_.file-icon]:shrink-0",
 ].join(" ")

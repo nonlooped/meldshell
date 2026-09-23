@@ -428,6 +428,35 @@ function connectionMessage(
   return detail ?? `Could not connect to ${name}. Try refreshing.`
 }
 
+/** Explains the bar's two layers once for the whole page. */
+function UsageLegend(): React.JSX.Element {
+  return (
+    <p className="flex flex-wrap items-center gap-x-[16px] gap-y-[4px] m-0 [padding:2px_2px_0] text-[var(--text-tertiary)] text-[11.5px] leading-[1.5]">
+      <span className="inline-flex items-center gap-[6px]">
+        <span
+          aria-hidden="true"
+          className="w-[14px] h-[6px] rounded-[3px] bg-[var(--text-primary)]"
+        />
+        Used
+      </span>
+      <span className="inline-flex items-center gap-[6px]">
+        <span
+          aria-hidden="true"
+          className="w-[14px] h-[6px] rounded-[3px] bg-[var(--line-strong)]"
+        />
+        Time elapsed in the window
+      </span>
+      <span className="inline-flex items-center gap-[6px]">
+        <span
+          aria-hidden="true"
+          className="w-[14px] h-[6px] rounded-[3px] bg-[var(--color-modified)]"
+        />
+        Used faster than time elapsed
+      </span>
+    </p>
+  )
+}
+
 /** Providers that cannot report usage collapse to one line each, below the ones that can. */
 function DisconnectedProviders({
   entries,
@@ -482,6 +511,7 @@ export function SubscriptionUsage({
       {connected.map((entry) => (
         <ProviderSection key={entry.provider.id} entry={entry} now={now} />
       ))}
+      {connected.some(isReady) && <UsageLegend />}
       {disconnected.length > 0 && <DisconnectedProviders entries={disconnected} />}
     </div>
   )

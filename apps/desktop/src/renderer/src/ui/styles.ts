@@ -61,8 +61,10 @@ export const buttonClasses = [
   "[&[data-variant='primary']]:text-[var(--accent-foreground)]",
   "[&[data-variant='primary']:hover:not(:disabled)]:bg-[var(--accent-hover)]",
   "[&[data-variant='primary']:hover:not(:disabled)]:[border-color:transparent]",
-  "[&[data-variant='primary']:disabled]:bg-[var(--surface-active)]",
-  "[&[data-variant='primary']:disabled]:text-[var(--text-disabled)]",
+  "[&[data-variant='primary']:disabled]:bg-[var(--surface-hover)]",
+  "[&[data-variant='primary']:disabled]:[border-color:var(--line-subtle)]",
+  "[&[data-variant='primary']:disabled]:text-[var(--text-tertiary)]",
+  "[&[data-variant='primary']:disabled]:opacity-[1]",
   "[&[data-variant='ghost']]:[border-color:transparent] [&[data-variant='ghost']]:bg-transparent",
   "[&[data-variant='ghost']]:text-[var(--text-secondary)]",
   "[&[data-variant='ghost']:hover:not(:disabled)]:bg-[var(--surface-hover)]",
@@ -70,6 +72,20 @@ export const buttonClasses = [
   "[&[data-variant='ghost']:hover:not(:disabled)]:text-[var(--text-primary)]",
   "[&[data-size='sm']]:h-[26px] [&[data-size='sm']]:[padding:0_9px] [&[data-size='sm']]:text-[12px]",
   "[&[data-block='true']]:w-full",
+].join(" ")
+
+/**
+ * Tabs within a panel, matching the title bar's tabs: selection is a raised surface with a hairline,
+ * not an underline.
+ */
+export const panelTabsClasses = [
+  "flex shrink-0 items-center gap-[2px] [padding:7px_8px] border-b-[1px] border-b-[color:var(--line-subtle)]",
+  "[&_button]:inline-flex [&_button]:h-[28px] [&_button]:items-center [&_button]:[padding:0_10px]",
+  "[&_button]:border-[1px] [&_button]:border-[color:transparent] [&_button]:rounded-[var(--radius)]",
+  "[&_button]:bg-transparent [&_button]:text-[var(--text-tertiary)] [&_button]:text-[12px]",
+  "[&_button]:cursor-default [&_button:hover]:bg-[var(--surface-hover)]",
+  "[&_button:hover]:text-[var(--text-secondary)] [&_button[data-active]]:[border-color:var(--line-subtle)]",
+  "[&_button[data-active]]:bg-[var(--surface-selected)] [&_button[data-active]]:text-[var(--text-primary)]",
 ].join(" ")
 
 /** A keycap for shortcut hints; sized in `em` so it follows the surrounding label. */

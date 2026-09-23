@@ -92,10 +92,9 @@ export function ModelDialog({
           >
             {REASONING_EFFORTS.map((effort) => (
               <Toggle
-                data-motion="background-color color"
                 key={effort}
                 value={effort}
-                className="h-[26px] [padding:0_10px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-transparent text-[var(--text-tertiary)] cursor-default text-[11.5px] [&:hover]:text-[var(--text-secondary)] [&[data-pressed]]:[border-color:transparent] [&[data-pressed]]:bg-[var(--accent)] [&[data-pressed]]:text-[var(--accent-foreground)] [&[data-pressed]]:font-medium"
+                className="motion-colors h-[26px] [padding:0_10px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-transparent text-[var(--text-tertiary)] cursor-default text-[11.5px] [&:hover]:text-[var(--text-secondary)] [&[data-pressed]]:[border-color:transparent] [&[data-pressed]]:bg-[var(--accent)] [&[data-pressed]]:text-[var(--accent-foreground)] [&[data-pressed]]:font-medium"
               >
                 {effortLabel(effort)}
               </Toggle>
