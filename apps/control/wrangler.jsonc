@@ -14,6 +14,9 @@
   "vars": {
     "BETTER_AUTH_URL": "https://meldshell.nonlooped.xyz"
   },
+  "secrets": {
+    "required": ["BETTER_AUTH_SECRET"]
+  },
   // Secrets: BETTER_AUTH_SECRET, and GOOGLE_/DISCORD_CLIENT_ID and _CLIENT_SECRET per provider.
   "d1_databases": [
     {
