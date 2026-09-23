@@ -18,4 +18,4 @@ Preserve native payloads when mapping canonical events. Process, session, and re
 
 Regenerate changed Codex app-server schemas with the supported CLI and commit them under `packages/provider-codex/schema`. Consult the CLI's schema-generation help before changing generated files.
 
-For installer work, use the [release checklist](docs/release.md). For rules, skills, or documentation changes, use [documentation maintenance](docs/agent-documentation.md).
+For installer work, use the [release checklist](docs/release.md).

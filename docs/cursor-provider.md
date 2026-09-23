@@ -79,8 +79,4 @@ Credentials stay inside the worker and are never written or refreshed by MeldShe
 
 The card refreshes each minute and displays Cursor/Auto, API, and overall percentages independently, with billing-cycle end as reset time. Missing pools remain unavailable; malformed responses fail. Spending amounts do not determine percentages. On-demand spending and legacy request counts are not mapped.
 
-## Recorded evidence
-
-The September 6, 2026 research record observed Windows CLI `2026.08.31-4057e58` initialize, authenticate, and create a session without a prompt. It advertised ACP v1, `cursor_login`, session loading/listing, image input, Agent/Plan/Ask, and model/mode selectors. It did not advertise audio or embedded context. These are dated observations, not fixed capabilities.
-
-Transport/interaction fixtures exercise local protocol behavior without model inference. Live inference and installer certification were not established by that record. Use [Release](release.md) for candidate-specific checks.
+Transport and interaction fixtures exercise local protocol behavior without model inference. Use [Release](release.md) for candidate-specific checks.
