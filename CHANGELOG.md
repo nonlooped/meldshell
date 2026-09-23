@@ -4,6 +4,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-23
+
 ### Changed
 
 - Pilot typed Effect RPC for remote snapshot reads while preserving relay authentication and the no-resend rule for commands.
@@ -46,5 +48,6 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/nonlooped/meldshell/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/nonlooped/meldshell/releases/tag/v0.2.0
