@@ -140,7 +140,7 @@ export function SearchDialog({
                           : "Active"}
                     </span>
                     <strong>{result.thread.title}</strong>
-                    <span className="[display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden text-[12px] leading-[1.6] text-[var(--text-secondary)] whitespace-normal [overflow-wrap:anywhere] [&_mark]:text-[var(--text-primary)] [&_mark]:bg-[var(--surface-active)] [&_mark]:font-semibold [&_mark]:rounded-[2px]">
+                    <span className="[display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden text-[12px] leading-[1.6] text-[var(--text-secondary)] whitespace-normal [overflow-wrap:anywhere] [&_mark]:text-[var(--text-primary)] [&_mark]:bg-[var(--surface-active)] [&_mark]:font-medium [&_mark]:rounded-[2px]">
                       {result.snippet
                         .replace(/\s+/g, " ")
                         .split(/(\[match\].*?\[\/match\])/gs)

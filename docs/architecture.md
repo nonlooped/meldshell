@@ -75,11 +75,11 @@ New threads inherit model, effort, and speed from the most recent submitted turn
 
 React Query owns snapshots, thread pages, provider state, usage, and transcripts. Runtime notifications invalidate affected queries. Streaming-only changes invalidate the affected transcript; lifecycle changes retain broader invalidation. Main briefly coalesces compatible text deltas before persistence.
 
-Thread lists page before calculating indexed counts and activity. [Transcript.tsx](../apps/desktop/src/renderer/src/threads/Transcript.tsx) loads a recent, turn-complete window and virtualizes turns. Earlier windows load on request or for search navigation. Streaming fetches events after the last sequence and reprojects touched turns.
+Thread lists page before calculating indexed counts and activity. [Transcript.tsx](../apps/desktop/src/renderer/src/threads/Transcript.tsx) reads the full transcript in bounded forward pages and virtualizes turns. Streaming fetches events after the last sequence and reprojects touched turns.
 
-Whole-turn projection preserves message integrity but allows a large turn to exceed the nominal page size. Loaded older windows remain cached. `transcriptMetrics` in renderer `data/transcript.ts` exposes fetch counts, event counts, and projection timings.
+The renderer merges all fetched pages before projection so page boundaries do not split displayed messages. Loaded turns remain cached. `transcriptMetrics` in renderer `data/transcript.ts` exposes fetch counts, event counts, and projection timings.
 
-Zustand holds tabs, split layouts, selection, and settings navigation in memory. Tabs and unsent drafts do not survive restart. Theme, transcript size, reduced motion, send shortcut, archived visibility, and title-model selection are database-backed.
+Zustand holds tabs, split layouts, selection, and settings navigation in memory. Tabs, unsent drafts, and out-of-view completion marks do not survive restart. Theme, transcript size, reduced motion, sounds, send shortcut, archived visibility, and title-model selection are database-backed.
 
 React Compiler has local opt-outs for virtualized components. Settings, math, diffs, and Mermaid use lazy loading. File and Git queries stay with their views; host-side [workspace files](../packages/host/src/workspace-files.ts) and [Git](../packages/host/src/git.ts) implement their operating-system operations.
 

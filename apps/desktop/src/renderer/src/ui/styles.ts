@@ -58,10 +58,10 @@ export const buttonClasses = [
   "[&:active:not(:disabled)]:bg-[var(--surface-active)] [&:disabled]:text-[var(--text-disabled)]",
   "[&:disabled]:cursor-default [&:disabled]:opacity-[0.6]",
   "[&[data-variant='primary']]:[border-color:transparent] [&[data-variant='primary']]:bg-[var(--accent)]",
-  "[&[data-variant='primary']]:text-[var(--accent-foreground)] [&[data-variant='primary']]:font-semibold",
+  "[&[data-variant='primary']]:text-[var(--accent-foreground)]",
   "[&[data-variant='primary']:hover:not(:disabled)]:bg-[var(--accent-hover)]",
   "[&[data-variant='primary']:hover:not(:disabled)]:[border-color:transparent]",
-  "[&[data-variant='primary']:disabled]:[background:rgba(255,_255,_255,_0.09)]",
+  "[&[data-variant='primary']:disabled]:bg-[var(--surface-active)]",
   "[&[data-variant='primary']:disabled]:text-[var(--text-disabled)]",
   "[&[data-variant='ghost']]:[border-color:transparent] [&[data-variant='ghost']]:bg-transparent",
   "[&[data-variant='ghost']]:text-[var(--text-secondary)]",
@@ -70,4 +70,12 @@ export const buttonClasses = [
   "[&[data-variant='ghost']:hover:not(:disabled)]:text-[var(--text-primary)]",
   "[&[data-size='sm']]:h-[26px] [&[data-size='sm']]:[padding:0_9px] [&[data-size='sm']]:text-[12px]",
   "[&[data-block='true']]:w-full",
+].join(" ")
+
+/** A keycap for shortcut hints; sized in `em` so it follows the surrounding label. */
+export const kbdClasses = [
+  "inline-flex h-[1.7em] min-w-[1.7em] items-center justify-center [padding:0_0.45em]",
+  "border-[1px] border-[color:var(--line)] border-b-[color:var(--line-strong)] rounded-[4px]",
+  "bg-[var(--surface-hover)] text-[var(--text-tertiary)] [font-family:var(--font-mono)]",
+  "text-[0.95em] leading-none whitespace-nowrap",
 ].join(" ")

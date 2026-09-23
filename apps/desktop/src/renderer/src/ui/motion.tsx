@@ -1,6 +1,6 @@
 import { installStyleMotion } from "./style-motion"
 import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react"
-import { MotionConfig, motion, type HTMLMotionProps } from "motion/react"
+import { AnimatePresence, MotionConfig, motion, type HTMLMotionProps } from "motion/react"
 import { LoaderCircle } from "lucide-react"
 
 const ReducedMotion = createContext(false)
@@ -121,6 +121,91 @@ export function ActivitySpinner() {
       animate={{ rotate: reduced ? 0 : 360 }}
       transition={reduced ? { duration: 0 } : { duration: 1.8, ease: "linear", repeat: Infinity }}
     />
+  )
+}
+
+const spinRows = ["var(--spin-top)", "var(--spin-middle)", "var(--spin-bottom)"]
+
+/** Working indicator: a 3×3 dot matrix whose pulse rises from the bottom-center cell. */
+export function GradientSpinner({ size = 12 }: { size?: number }) {
+  const reduced = useMotionPreference()
+  const cell = size / 4
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-grid flex-none grid-cols-3"
+      style={{ width: size, height: size, gap: cell / 2 }}
+    >
+      {spinRows.flatMap((color, row) =>
+        [0, 1, 2].map((column) => {
+          // Distance from the wave origin becomes a phase lead of up to three quarters.
+          const phase = (2 - row + Math.abs(column - 1)) / 4
+          return (
+            <span
+              key={`${row}-${column}`}
+              className={`rounded-full ${reduced ? "" : "animate-gspin"}`}
+              style={{ background: color, animationDelay: `${-phase * 750}ms` }}
+            />
+          )
+        }),
+      )}
+    </span>
+  )
+}
+
+/** A highlight that sweeps across running text; still text when motion is reduced. */
+export function Shimmer({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const reduced = useMotionPreference()
+  if (reduced) return <span className={className}>{children}</span>
+  return (
+    <span
+      className={`animate-shimmer bg-clip-text text-transparent [background-size:300%_100%] [background-image:linear-gradient(90deg,var(--text-tertiary)_38%,var(--text-primary)_50%,var(--text-tertiary)_62%)] ${className}`}
+    >
+      {children}
+    </span>
+  )
+}
+
+/** Crossfades keyed content in place, e.g. an icon that changes meaning. */
+export function Swap({ id, children }: { id: string; children: ReactNode }) {
+  const reduced = useMotionPreference()
+  return (
+    <AnimatePresence initial={false} mode="popLayout">
+      <motion.span
+        key={id}
+        className="grid place-items-center"
+        initial={reduced ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: reduced ? 0 : -6, transition: { duration: reduced ? 0 : 0.16 } }}
+        transition={{ duration: 0.16 }}
+      >
+        {children}
+      </motion.span>
+    </AnimatePresence>
+  )
+}
+
+/** Springs a control in and out as it appears and disappears. */
+export function PopPresence({ show, children }: { show: boolean; children: ReactNode }) {
+  const reduced = useMotionPreference()
+  return (
+    <AnimatePresence initial={false}>
+      {show && (
+        <motion.span
+          className="inline-flex"
+          initial={reduced ? false : { opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{
+            opacity: 0,
+            scale: reduced ? 1 : 0.6,
+            transition: { duration: reduced ? 0 : 0.14 },
+          }}
+          transition={{ type: "spring", stiffness: 520, damping: 30 }}
+        >
+          {children}
+        </motion.span>
+      )}
+    </AnimatePresence>
   )
 }
 

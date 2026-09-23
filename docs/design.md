@@ -12,11 +12,13 @@ Chrome uses neutral tones with a contrasting accent for selection, focus, and pr
 
 Use installed system display, text, and monospace fonts for their existing roles. Reading text is larger than controls and metadata. Use sentence-case labels and reserve compact uppercase styling for existing hierarchy needs.
 
+Use regular and medium weights for UI text. Reserve semibold for display-font headings at 15px and above, Markdown table headers, and hero numerals. Show selection, emphasis, and primary actions with color, surface, or an indicator, not with a heavier weight that makes labels reflow.
+
 ## Workbench
 
 The tab strip selects views; the inbox finds threads; the content area shows threads or files. Closing a view never interrupts work.
 
-The inbox lists pinned threads before active threads and an optional Archived section. Archived status is named `settled` in storage. Filter by workspace rather than grouping threads beneath workspace headings. Show workspace names where they disambiguate rows. Empty draft threads stay out of the inbox until submission.
+The inbox lists pinned threads before active threads and an optional Archived section. Archived status is named `settled` in storage. Filter by workspace rather than grouping threads beneath workspace headings. Show workspace names where they disambiguate rows. Empty draft threads stay out of the inbox until submission. A thread that finishes out of view shows a Done mark until it is opened; that state lasts for the session only. When Sounds is enabled, a soft chime plays when a thread out of view finishes, fails, or asks for approval.
 
 Search opens full-text matches with workspace filtering and paged snippets. Selecting a result opens its matching turn. The thread switcher is a separate action.
 
@@ -24,7 +26,7 @@ The composer keeps attachments, next-turn settings, queue state, stop, and send 
 
 Files and Changes share a workspace sidebar. File and diff tabs use the content area. Git controls expose staged/working changes, commit actions, push, and history. Represent these as workspace operations; they are not proof that one thread owns every changed file.
 
-Settings replaces workbench content while retaining open tabs in memory. Workspace management is reached from the workspace menu. Model selection uses provider headings and searchable rows; catalogs and account usage remain provider-specific.
+Settings replaces workbench content while retaining open tabs in memory. Workspace management is reached from the workspace menu. Model selection uses provider headings and searchable rows; catalogs and account usage remain provider-specific. Subscription usage aligns every allowance in one grid: bars fill with use over a lighter band for elapsed window time, and a provider's header names its most constrained allowance only when it needs attention. Providers that cannot report usage collapse to one line.
 
 ## Split thread layouts
 
@@ -46,15 +48,15 @@ Base UI provides focus, navigation, dismissal, portals, and ARIA behavior throug
 
 Icons share a thin optical weight except for product and file marks. Icon-only controls need an accessible name and tooltip.
 
-Use compact buttons and inputs, menus for choices, switches for enablement, and dialogs for decisions. Put recoverable errors beside the control that resolves them. Durable approvals and attention requests stay with the thread even if an operating-system notification draws attention to them.
+Use compact buttons and inputs, menus for choices, switches for enablement, and dialogs for decisions. Put recoverable errors beside the control that resolves them. Failures use the shared tinted notice card, whose message wraps in full and can be copied. Durable approvals and attention requests stay with the thread even if an operating-system notification draws attention to them.
 
 ## Density and motion
 
 Keep controls compact while giving transcripts a comfortable reading width. Running threads have room for title, context, and activity; archived rows are quieter. The inbox resizes within bounds that preserve the reading area.
 
-User messages form compact blocks. Agent output uses structured reasoning, commands, diffs, plans, and tool activity. Containers and borders should clarify those relationships.
+User messages form compact blocks. A collapsed turn summarizes its work ("Ran 3 commands · edited 2 files"). At wide pane widths a prompt rail beside the transcript marks each user message, highlights the one being read, previews it on hover, and jumps to it. Agent output uses structured reasoning, commands, diffs, plans, and tool activity. Containers and borders should clarify those relationships.
 
-Motion communicates activity or a state change. Use shared Motion helpers and `data-motion` for control interpolation. Keep virtualized row positions free of animation. Running indicators may move continuously; reduced motion and background/unfocused windows suppress motion as defined by existing helpers.
+Motion communicates activity or a state change. Use shared Motion helpers and `data-motion` for control interpolation. Keep virtualized row positions free of animation. The running indicator is a small dot matrix in the `--spin-*` sunrise tints, the one colored exception in chrome; a running turn's work summary shimmers. Newly appended turns rise in once. Running indicators may move continuously; reduced motion and background/unfocused windows suppress motion as defined by existing helpers.
 
 ## Keyboard behavior
 

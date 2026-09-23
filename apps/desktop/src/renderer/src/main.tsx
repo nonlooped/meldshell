@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 import { Tooltip } from "@base-ui-components/react/tooltip"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ErrorBoundary } from "react-error-boundary"
+import { LucideProvider } from "lucide-react"
 import { App } from "./app/App"
 import { ThreadDragProvider } from "./app/thread-drag"
 import { MeldMark } from "./ui/MeldMark"
@@ -26,28 +27,31 @@ if (root === null) {
   throw new Error("MeldShell could not find its renderer root.")
 }
 
+// Icons share one thin optical weight; a component passes strokeWidth only to depart from it.
 createRoot(root).render(
-  <Tooltip.Provider delay={420} closeDelay={80}>
-    <ErrorBoundary
-      fallbackRender={({ resetErrorBoundary }) => (
-        <FadeMain className={centeredStateClasses}>
-          <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
-          <h2>The MeldShell interface stopped</h2>
-          <p>Your stored threads and background processes are still separate from this view.</p>
-          <Button variant="primary" onClick={resetErrorBoundary}>
-            Reload interface
-          </Button>
-        </FadeMain>
-      )}
-      onReset={() => window.location.reload()}
-    >
-      <QueryClientProvider client={queryClient}>
-        <ThreadDragProvider>
-          <App />
-        </ThreadDragProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
-  </Tooltip.Provider>,
+  <LucideProvider strokeWidth={1.75}>
+    <Tooltip.Provider delay={420} closeDelay={80}>
+      <ErrorBoundary
+        fallbackRender={({ resetErrorBoundary }) => (
+          <FadeMain className={centeredStateClasses}>
+            <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
+            <h2>The MeldShell interface stopped</h2>
+            <p>Your stored threads and background processes are still separate from this view.</p>
+            <Button variant="primary" onClick={resetErrorBoundary}>
+              Reload interface
+            </Button>
+          </FadeMain>
+        )}
+        onReset={() => window.location.reload()}
+      >
+        <QueryClientProvider client={queryClient}>
+          <ThreadDragProvider>
+            <App />
+          </ThreadDragProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </Tooltip.Provider>
+  </LucideProvider>,
 )
 
 const centeredStateClasses = [

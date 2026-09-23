@@ -292,6 +292,8 @@ export const AppSettings = Schema.Struct({
   theme: Schema.optional(Schema.Literal("dark", "light", "system")),
   transcriptSize: Schema.optional(Schema.Literal("small", "medium", "large")),
   reduceMotion: Schema.optional(Schema.Boolean),
+  /** Chimes when a thread finishes or needs attention out of view. */
+  sounds: Schema.optional(Schema.Boolean),
 
   /** A `ProviderModel` id, or `CURRENT_TITLE_MODEL`. */
   titleModelId: Schema.String,
@@ -475,6 +477,7 @@ export const SetAppSettingsInput = Schema.Struct({
   theme: Schema.optional(Schema.Literal("dark", "light", "system")),
   transcriptSize: Schema.optional(Schema.Literal("small", "medium", "large")),
   reduceMotion: Schema.optional(Schema.Boolean),
+  sounds: Schema.optional(Schema.Boolean),
 
   titleModelId: Schema.optional(Schema.String),
 })

@@ -23,10 +23,15 @@ import { modelsForProvider } from "../data/catalog"
 import { useViewStore, type SettingsSection } from "../app/view-store"
 import { AppDialog, Button } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
+import { kbdClasses } from "../ui/styles"
 import { ModelDialog } from "./ModelDialog"
 import { ProviderCard } from "./ProviderCard"
 import { ThreadTitleCard } from "./ThreadTitleCard"
-import { SubscriptionUsage } from "./SubscriptionUsage"
+import {
+  hasSubscriptionUsage,
+  SubscriptionUsage,
+  SubscriptionUsageRefresh,
+} from "./SubscriptionUsage"
 import { UpdateSettings } from "./UpdateSettings"
 
 import { Preferences } from "./Preferences"
@@ -132,6 +137,7 @@ export function SettingsView({
   const [resetOpen, setResetOpen] = useState(false)
 
   const active = SECTIONS.find((entry) => entry.id === section) ?? SECTIONS[0]
+  const usageProviders = snapshot.providers.filter(hasSubscriptionUsage)
 
   return (
     <Tabs.Root
@@ -186,6 +192,7 @@ export function SettingsView({
             <h2>{active?.title}</h2>
             <p>{active?.caption}</p>
           </div>
+          {section === "usage" && <SubscriptionUsageRefresh providers={usageProviders} />}
         </div>
 
         <div
@@ -203,17 +210,7 @@ export function SettingsView({
               />
             )}
             {section === "account" && <RemoteAccess />}
-            {section === "usage" && (
-              <div className="flex flex-col">
-                {snapshot.providers
-                  .filter((provider) =>
-                    ["codex", "claude-code", "cursor"].includes(provider.harness),
-                  )
-                  .map((provider) => (
-                    <SubscriptionUsage key={provider.id} provider={provider} />
-                  ))}
-              </div>
-            )}
+            {section === "usage" && <SubscriptionUsage providers={usageProviders} />}
             {section === "threads" && (
               <ThreadTitleCard
                 snapshot={snapshot}
@@ -288,23 +285,23 @@ export function SettingsView({
                   </div>
                 </div>
                 <UpdateSettings />
-                <div className="mt-[32px] max-w-[380px] [&_h3]:text-[12px] [&_h3]:font-medium [&_h3]:text-[var(--text-secondary)] [&_p]:flex [&_p]:justify-between [&_p]:text-[12px] [&_kbd]:[font:10px_var(--font-mono)] [&_kbd]:text-[var(--text-tertiary)]">
+                <div className="mt-[32px] max-w-[380px] [&_h3]:text-[12px] [&_h3]:font-medium [&_h3]:text-[var(--text-secondary)] [&_p]:flex [&_p]:items-center [&_p]:justify-between [&_p]:m-0 [&_p]:[padding:8px_0] [&_p+p]:border-t-[1px] [&_p+p]:border-t-[color:var(--line-subtle)] [&_p]:text-[12px] [&_kbd]:text-[10.5px]">
                   <h3>Keyboard shortcuts</h3>
                   <p>
                     <span>Search transcripts</span>
-                    <kbd>Ctrl+K</kbd>
+                    <kbd className={kbdClasses}>Ctrl+K</kbd>
                   </p>
                   <p>
                     <span>Open thread</span>
-                    <kbd>Ctrl+P</kbd>
+                    <kbd className={kbdClasses}>Ctrl+P</kbd>
                   </p>
                   <p>
                     <span>New thread</span>
-                    <kbd>Ctrl+N</kbd>
+                    <kbd className={kbdClasses}>Ctrl+N</kbd>
                   </p>
                   <p>
                     <span>Settings</span>
-                    <kbd>Ctrl+,</kbd>
+                    <kbd className={kbdClasses}>Ctrl+,</kbd>
                   </p>
                 </div>
               </section>
@@ -388,7 +385,7 @@ const settingsNavItemsClasses = [
   "[&_button]:bg-transparent [&_button]:text-[var(--text-secondary)] [&_button]:cursor-default",
   "[&_button]:text-[12.5px] [&_button]:text-left [&_button:hover]:bg-[var(--surface-hover)]",
   "[&_button:hover]:text-[var(--text-primary)] [&_button[data-selected]]:bg-[var(--surface-selected)]",
-  "[&_button[data-selected]]:text-[var(--text-primary)] [&_button[data-selected]]:font-semibold",
+  "[&_button[data-selected]]:text-[var(--text-primary)]",
   "[&_button[data-selected]::before]:absolute [&_button[data-selected]::before]:top-[10px]",
   "[&_button[data-selected]::before]:bottom-[10px] [&_button[data-selected]::before]:left-[0]",
   "[&_button[data-selected]::before]:w-[2px] [&_button[data-selected]::before]:rounded-[2px]",

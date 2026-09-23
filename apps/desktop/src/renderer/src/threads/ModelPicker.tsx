@@ -102,7 +102,7 @@ export function ModelPicker({
                     items={group.items}
                     key={group.provider.id}
                   >
-                    <Combobox.GroupLabel className="flex items-center gap-[7px] [padding:8px_8px_6px] text-[var(--text-secondary)] text-[11px] font-semibold">
+                    <Combobox.GroupLabel className="flex items-center gap-[7px] [padding:8px_8px_6px] text-[var(--text-secondary)] text-[11px] font-medium">
                       <ProviderIcon provider={group.provider} size={14} />
                       <span>{group.provider.displayName}</span>
                       {group.provider.harness === "codex" && (

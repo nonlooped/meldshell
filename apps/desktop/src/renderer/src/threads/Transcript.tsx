@@ -1,6 +1,7 @@
-import { FadeDiv } from "../ui/motion"
+import { FadeDiv, GradientSpinner, PopPresence, Shimmer, useMotionPreference } from "../ui/motion"
+import { motion } from "motion/react"
 import { queryKeys } from "../data/cache"
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Collapsible } from "@base-ui-components/react/collapsible"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { Button as BaseButton } from "@base-ui-components/react/button"
@@ -12,13 +13,11 @@ import { ToolOutput } from "./ToolOutput"
 import { fileChangePatches } from "./file-change-diffs"
 import { toolDetails } from "./tool-details"
 import { commandLabel } from "./command-summary"
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
-import {
-  mergeTranscript,
-  readTranscriptPage,
-  refreshTranscript,
-  type TranscriptWindow,
-} from "../data/transcript"
+import { workSummary } from "./work-summary"
+import { MessageRail } from "./MessageRail"
+import { Notice } from "../ui/Notice"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { refreshTranscript, type TranscriptWindow } from "../data/transcript"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   ArrowDown,
@@ -315,14 +314,33 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
   )
 }
 
+// Final errors surface as cards; retrying errors stay in the working log.
+const isFailure = (event: CanonicalEvent): boolean =>
+  event.kind === "error" && toolDetails(event).failed
+
 const formatDuration = (durationMs: number): string => {
   const seconds = Math.max(1, Math.round(durationMs / 1_000))
   if (seconds < 60) return `${seconds}s`
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
 }
 
-function WorkingSection({ turn }: { readonly turn: TranscriptTurn }): React.JSX.Element | null {
-  if (turn.workingEvents.length === 0) return null
+function WorkingSection({
+  turn,
+  live,
+}: {
+  readonly turn: TranscriptTurn
+  readonly live: boolean
+}): React.JSX.Element | null {
+  if (turn.workingEvents.length === 0)
+    return live && turn.finalResponse === null ? (
+      <FadeDiv
+        className="flex min-h-[28px] items-center gap-[6px] [padding:3px_6px_3px_4px] text-[11px] font-medium"
+        role="status"
+      >
+        <GradientSpinner size={11} />
+        <Shimmer>Thinking</Shimmer>
+      </FadeDiv>
+    ) : null
 
   return (
     <Collapsible.Root className="text-[var(--text-tertiary)]" defaultOpen={!turn.complete}>
@@ -338,11 +356,26 @@ function WorkingSection({ turn }: { readonly turn: TranscriptTurn }): React.JSX.
           }
           size={14}
         />
-        <span>Working for {formatDuration(turn.durationMs)}</span>
+        {turn.complete ? (
+          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            {workSummary(turn.workingEvents) || "Worked"}
+          </span>
+        ) : (
+          <>
+            <GradientSpinner size={11} />
+            <Shimmer className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+              {workSummary(turn.workingEvents) || "Working"}
+            </Shimmer>
+          </>
+        )}
+        <span className="flex-none font-normal text-[var(--text-disabled)] [font-variant-numeric:tabular-nums]">
+          {formatDuration(turn.durationMs)}
+        </span>
       </Collapsible.Trigger>
       <Collapsible.Panel className="flex flex-col gap-[1px] [margin:3px_0_1px_7px] [padding:3px_0_3px_12px] border-l-[1px] border-l-[color:var(--line-subtle)]">
         {turn.workingEvents.map((event) => {
           if (turn.complete && event.method === "turn/diff/updated") return null
+          if (isFailure(event)) return null
           if (event.kind === "assistant")
             return (
               <Markdown
@@ -358,7 +391,20 @@ function WorkingSection({ turn }: { readonly turn: TranscriptTurn }): React.JSX.
   )
 }
 
-function TurnRow({ turn }: { readonly turn: TranscriptTurn }): React.JSX.Element {
+const settle = [0.16, 1, 0.3, 1] as const
+
+function TurnRow({
+  turn,
+  entering = false,
+  live = false,
+}: {
+  readonly turn: TranscriptTurn
+  /** The thread's latest turn while the provider is still working on it. */
+  readonly live?: boolean
+  /** A turn appended while the thread is open rises into place once. */
+  readonly entering?: boolean
+}): React.JSX.Element {
+  const reduced = useMotionPreference()
   const sources = sourceTitles([
     ...turn.workingEvents.map((event) => event.payload),
     turn.finalResponse?.payload,
@@ -366,17 +412,33 @@ function TurnRow({ turn }: { readonly turn: TranscriptTurn }): React.JSX.Element
   return (
     <MarkdownSources value={sources}>
       <MarkdownStreaming value={!turn.complete}>
-        <article className="transcript-turn select-text flex flex-col gap-[14px]">
+        <motion.article
+          className="transcript-turn select-text flex flex-col gap-[14px]"
+          initial={entering && !reduced ? { opacity: 0, y: 4 } : false}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: settle }}
+        >
           {turn.userMessages.map((event) => (
             <Message
               key={event.id}
               event={event}
               className={
-                "[&_>_.message-actions]:justify-end [&_>_.event-markdown]:[padding:12px_16px] [&_>_.event-markdown]:border-[1px] [&_>_.event-markdown]:border-[color:var(--line-subtle)] [&_>_.event-markdown]:rounded-[var(--radius)] [&_>_.event-markdown]:bg-[var(--surface-hover)] [&_>_.event-markdown]:text-[var(--text-primary)] w-[fit-content] max-w-[min(78%,_680px)] ml-[auto]"
+                "[&_>_.message-actions]:justify-end [&_>_.event-markdown]:[padding:12px_16px] [&_>_.event-markdown]:border-[1px] [&_>_.event-markdown]:border-[color:var(--line-subtle)] [&_>_.event-markdown]:rounded-[var(--radius-lg)] [&_>_.event-markdown]:bg-[var(--surface-hover)] [&_>_.event-markdown]:text-[var(--text-primary)] w-[fit-content] max-w-[min(78%,_680px)] ml-[auto]"
               }
             />
           ))}
-          <WorkingSection key={turn.complete ? "complete" : "working"} turn={turn} />
+          <WorkingSection
+            key={turn.complete ? "complete" : "working"}
+            turn={turn}
+            live={live && !turn.complete}
+          />
+          {turn.workingEvents.filter(isFailure).map((event) => (
+            <Notice
+              key={event.id}
+              title="The provider reported an error"
+              message={toolDetails(event).error || fallbackText(event)}
+            />
+          ))}
           {turn.finalResponse !== null ? (
             <Message
               event={turn.finalResponse}
@@ -389,17 +451,36 @@ function TurnRow({ turn }: { readonly turn: TranscriptTurn }): React.JSX.Element
           ) : (
             turn.complete && <TurnChanges events={turn.workingEvents} />
           )}
-        </article>
+        </motion.article>
       </MarkdownStreaming>
     </MarkdownSources>
   )
+}
+
+/** The turn appended since the last commit. Turns from first load or older pages never animate in. */
+function useEnteringTurn(turns: ReadonlyArray<TranscriptTurn> | undefined): string | null {
+  const seen = useRef<Set<string> | null>(null)
+  const entering = useRef<string | null>(null)
+  const lastId = turns?.at(-1)?.id
+  if (turns !== undefined) {
+    if (seen.current === null) seen.current = new Set(turns.map((turn) => turn.id))
+    else if (lastId !== undefined && !seen.current.has(lastId)) entering.current = lastId
+    for (const turn of turns) seen.current.add(turn.id)
+  }
+  // The row mounted with its entrance; a later remount from scrolling should not replay it.
+  useEffect(() => {
+    entering.current = null
+  })
+  return entering.current
 }
 
 export function Transcript({
   threadId,
   targetTurnId,
   workspace,
+  running = false,
 }: {
+  readonly running?: boolean
   readonly targetTurnId?: string
   readonly threadId: string
   readonly workspace?: Workspace
@@ -407,6 +488,7 @@ export function Transcript({
   "use no memo"
   const scrollRef = useRef<HTMLDivElement>(null)
   const [showLatest, setShowLatest] = useState(false)
+  const reduced = useMotionPreference()
   const client = useQueryClient()
   const key = queryKeys.transcript(threadId)
   const current = () => client.getQueryData<TranscriptWindow>(key)
@@ -417,23 +499,8 @@ export function Transcript({
     // second deep traversal of every historical native payload on each delta.
     structuralSharing: false,
   })
-  const older = useMutation({
-    mutationFn: async () => {
-      const beforeSequence = current()?.olderCursor
-      if (beforeSequence == null) return
-      const page = await readTranscriptPage(window.meldshell.getTranscript, {
-        threadId,
-        beforeSequence,
-        limit: 200,
-      })
-      if (page.nextCursor !== null && page.nextCursor >= beforeSequence)
-        throw new Error("Transcript cursor did not advance.")
-      client.setQueryData<TranscriptWindow>(key, (previous) =>
-        previous ? mergeTranscript(previous, page.events, page.nextCursor) : previous,
-      )
-    },
-  })
   const turns = query.data?.turns ?? []
+  const enteringTurn = useEnteringTurn(query.data?.turns)
   // TanStack Virtual exposes imperative measurements, so the compiler opt-out stays local.
   const virtualizer = useVirtualizer({
     count: turns.length,
@@ -456,25 +523,10 @@ export function Transcript({
   })
 
   const hasTurns = turns.length > 0
-  const targetIndex = turns.findIndex((turn) => turn.id === targetTurnId)
-  // Search is an explicit request to walk older windows, not streaming work.
-  useEffect(() => {
-    if (
-      targetTurnId &&
-      targetIndex < 0 &&
-      query.data?.olderCursor != null &&
-      !older.isPending &&
-      !older.isError
-    )
-      older.mutate()
-  }, [
-    targetTurnId,
-    targetIndex,
-    query.data?.olderCursor,
-    older.isPending,
-    older.isError,
-    older.mutate,
-  ])
+  const targetIndex = useMemo(
+    () => turns.findIndex((turn) => turn.id === targetTurnId),
+    [turns, targetTurnId],
+  )
   useEffect(() => {
     if (targetIndex >= 0) virtualizer.scrollToIndex(targetIndex, { align: "start" })
     else if (hasTurns) virtualizer.scrollToEnd()
@@ -492,7 +544,7 @@ export function Transcript({
         This transcript could not be read from disk.
       </div>
     )
-  if (turns.length === 0 && query.data?.olderCursor == null)
+  if (turns.length === 0)
     return (
       <div className="transcript-origin [padding:0_clamp(24px,_7vw,_104px)_12px]">
         <FadeDiv className="w-full max-w-[680px] [margin:0_auto]">
@@ -511,29 +563,15 @@ export function Transcript({
 
   return (
     <MarkdownWorkspace value={workspace}>
-      <div className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,_1fr)]">
+      <div className="@container relative grid min-h-0 min-w-0 grid-rows-[minmax(0,_1fr)]">
         {query.isError && (
           <Button variant="ghost" size="sm" onClick={() => void query.refetch()}>
             Retry transcript updates
           </Button>
         )}
-        {query.data?.olderCursor != null && (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={older.isPending}
-            onClick={() => older.mutate()}
-          >
-            {older.isPending
-              ? "Loading earlier messages…"
-              : older.isError
-                ? "Retry loading earlier messages"
-                : "Load earlier messages"}
-          </Button>
-        )}
         <div
           ref={scrollRef}
-          className="transcript min-h-0 [padding:36px_clamp(24px,_7vw,_104px)] overflow-y-auto [scrollbar-gutter:stable]"
+          className="transcript min-h-0 [padding:36px_clamp(24px,_7vw,_104px)] overflow-y-auto [scrollbar-gutter:stable] [mask-image:linear-gradient(to_bottom,transparent,black_28px,black_calc(100%_-_28px),transparent)]"
           aria-live="polite"
         >
           <div
@@ -552,22 +590,44 @@ export function Transcript({
                   data-search-match={turn.id === targetTurnId || undefined}
                   style={{ transform: `translateY(${item.start}px)` }}
                 >
-                  <TurnRow turn={turn} />
+                  <TurnRow
+                    turn={turn}
+                    entering={turn.id === enteringTurn}
+                    live={running && item.index === turns.length - 1}
+                  />
                 </div>
               )
             })}
           </div>
         </div>
-        {showLatest && (
-          <BaseButton
-            type="button"
-            className="absolute z-[2] bottom-[12px] left-[50%] [transform:translateX(-50%)] flex items-center gap-[6px] max-w-[calc(100%_-_32px)] [padding:7px_12px] border-[1px] border-[color:var(--line-strong)] rounded-[999px] bg-[var(--surface-menu)] text-[var(--text-primary)] text-[12px] whitespace-nowrap cursor-pointer [&:hover]:bg-[var(--surface-overlay)]"
-            onClick={() => virtualizer.scrollToEnd()}
-          >
-            <ArrowDown size={14} aria-hidden="true" />
-            Scroll to latest
-          </BaseButton>
-        )}
+        <MessageRail
+          turns={turns}
+          readingIndex={
+            // At the end, a short final turn can start below the reading line; it is still the one being read.
+            showLatest
+              ? (virtualizer.getVirtualItemForOffset((virtualizer.scrollOffset ?? 0) + 120)
+                  ?.index ?? 0)
+              : turns.length - 1
+          }
+          onJump={(index) =>
+            virtualizer.scrollToIndex(index, {
+              align: "start",
+              behavior: reduced ? "auto" : "smooth",
+            })
+          }
+        />
+        <div className="absolute z-[2] bottom-[12px] inset-x-[16px] flex justify-center pointer-events-none">
+          <PopPresence show={showLatest}>
+            <BaseButton
+              type="button"
+              className="pointer-events-auto flex items-center gap-[6px] [box-shadow:var(--shadow-raised)] [padding:7px_12px] border-[1px] border-[color:var(--line-strong)] rounded-[999px] bg-[var(--surface-menu)] text-[var(--text-primary)] text-[12px] whitespace-nowrap cursor-pointer [&:hover]:bg-[var(--surface-overlay)]"
+              onClick={() => virtualizer.scrollToEnd()}
+            >
+              <ArrowDown size={14} aria-hidden="true" />
+              Scroll to latest
+            </BaseButton>
+          </PopPresence>
+        </div>
       </div>
     </MarkdownWorkspace>
   )

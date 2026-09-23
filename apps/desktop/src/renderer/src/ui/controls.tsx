@@ -12,7 +12,7 @@ import { Menu } from "@base-ui-components/react/menu"
 import { Select } from "@base-ui-components/react/select"
 import { Switch as BaseSwitch } from "@base-ui-components/react/switch"
 import { Tooltip } from "@base-ui-components/react/tooltip"
-import { Check, ChevronDown } from "lucide-react"
+import { Check, ChevronDown, X } from "lucide-react"
 
 /*
  * MeldShell owns every pixel of its controls; Base UI contributes only behaviour (focus capture,
@@ -112,18 +112,20 @@ export function ContentTooltip({
   open,
   onOpenChange,
   className = "",
+  side = "top",
 }: {
   trigger: ReactElement<Record<string, unknown>>
   children: ReactNode
   open: boolean
   onOpenChange: (open: boolean) => void
   className?: string
+  side?: "top" | "right"
 }) {
   return (
     <Tooltip.Root open={open} onOpenChange={onOpenChange}>
       <Tooltip.Trigger render={trigger} />
       <Tooltip.Portal>
-        <Tooltip.Positioner className="z-[300]" side="top" sideOffset={8}>
+        <Tooltip.Positioner className="z-[300]" side={side} sideOffset={8}>
           <Tooltip.Popup
             render={<MotionSurface kind="tooltip" />}
             className={`[padding:5px_8px] border-[1px] border-[color:var(--line)] rounded-[var(--radius-sm)] bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] [box-shadow:var(--shadow-popup)] text-[var(--text-primary)] text-[11.5px] [@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none] ${className}`}
@@ -436,7 +438,7 @@ interface MenuGroupProps {
 export function MenuGroup({ label, children }: MenuGroupProps): React.JSX.Element {
   return (
     <Menu.Group>
-      <Menu.GroupLabel className="[padding:9px_9px_5px] text-[var(--text-tertiary)] text-[11px] font-semibold">
+      <Menu.GroupLabel className="[padding:9px_9px_5px] text-[var(--text-tertiary)] text-[11px] font-medium">
         {label}
       </Menu.GroupLabel>
       {children}
@@ -476,10 +478,10 @@ export function AppDialog({
                 data-motion="background-color border-color color opacity"
                 render={<Pressable />}
                 type="button"
-                className="absolute top-[10px] right-[10px] grid w-[26px] h-[26px] border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default text-[15px] leading-[1] place-items-center [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
+                className="absolute top-[14px] right-[12px] grid w-[26px] h-[26px] border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
                 aria-label="Close dialog"
               >
-                ×
+                <X size={15} />
               </BaseButton>
             }
           />
@@ -502,7 +504,8 @@ export function AppDialog({
 
 const switchClasses = [
   "switch relative w-[34px] h-[19px] flex-[0_0_34px] p-0 border-[1px] border-[color:var(--line-strong)]",
-  "rounded-[20px] [background:rgba(0,_0,_0,_0.27)] cursor-default",
+  "rounded-[20px] [background:rgba(0,_0,_0,_0.27)] [:root[data-theme='light']_&:not([data-checked])]:bg-[var(--surface-active)]",
+  "cursor-default",
   "[&[data-checked]]:[border-color:transparent] [&[data-checked]]:bg-[var(--accent)]",
   "[&:disabled]:opacity-[0.45] [&[data-checked]_.switch-thumb]:bg-[var(--accent-foreground)]",
   "[&[data-checked]_.switch-thumb]:[transform:translateX(17px)]",
@@ -512,7 +515,7 @@ const selectPopupClasses = [
   "popup min-w-[190px] max-h-[var(--available-height,_420px)] overflow-y-auto p-[5px]",
   "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-lg)] bg-[var(--surface-menu)]",
   "[backdrop-filter:blur(32px)]",
-  "[box-shadow:0_4px_16px_rgba(0,_0,_0,_0.16),_inset_0_1px_0_var(--line-subtle)]",
+  "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
   "text-[var(--text-primary)] outline-none [transform-origin:var(--transform-origin)]",
   "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
   "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-overlay)]",
@@ -524,7 +527,7 @@ const menuPopupClasses = [
   "popup min-w-[190px] max-h-[var(--available-height,_420px)] overflow-y-auto p-[5px]",
   "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-lg)] bg-[var(--surface-menu)]",
   "[backdrop-filter:blur(32px)]",
-  "[box-shadow:0_4px_16px_rgba(0,_0,_0,_0.16),_inset_0_1px_0_var(--line-subtle)]",
+  "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
   "text-[var(--text-primary)] outline-none [transform-origin:var(--transform-origin)]",
   "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
   "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-overlay)]",

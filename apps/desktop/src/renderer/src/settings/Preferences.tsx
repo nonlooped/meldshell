@@ -176,6 +176,17 @@ export function Preferences({
               onCheckedChange={(reduceMotion) => onChange({ reduceMotion })}
             />
           </SettingRow>
+          <SettingRow
+            label="Sounds"
+            description="Play a soft chime when a thread you aren't watching finishes or needs your attention."
+          >
+            <Switch
+              label="Sounds"
+              checked={settings.sounds ?? true}
+              disabled={pending}
+              onCheckedChange={(sounds) => onChange({ sounds })}
+            />
+          </SettingRow>
         </>
       )}
     </section>

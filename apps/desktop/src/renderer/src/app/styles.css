@@ -6,6 +6,30 @@
 @import "react-diff-view/style/index.css" layer(base);
 @source "../";
 
+/* Activity motion shared by the working indicator and running labels. */
+@theme {
+  --animate-gspin: gspin 750ms linear infinite;
+  --animate-shimmer: shimmer 3.4s linear infinite;
+  @keyframes gspin {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    45%,
+    92% {
+      opacity: 0.1;
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+}
+
 /* Preflight is omitted to preserve native controls and Markdown document defaults.
  * Shared theme tokens, native document defaults, and platform scrollbars.
  * Component styling lives in Tailwind utilities alongside the markup. */
@@ -37,6 +61,9 @@
     --color-deleted: #ed9393;
     --color-renamed: #b8a1ed;
     --color-info: #88b9ed;
+    --spin-top: #b6d3ef;
+    --spin-middle: #edb185;
+    --spin-bottom: #f888a0;
 
     --font-text: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
     --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -193,6 +220,9 @@
     --color-deleted: #b53e46;
     --color-renamed: #7650af;
     --color-info: #2869aa;
+    --spin-top: #4f8cc9;
+    --spin-middle: #d7803f;
+    --spin-bottom: #e0536f;
     --shadow-popup: 0 8px 28px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.06);
     --shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.08);
   }

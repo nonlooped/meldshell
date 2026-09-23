@@ -31,7 +31,7 @@ export function ToolOutput({
   return (
     <section className={toolOutputClasses} aria-label={label} data-error={error || undefined}>
       <div className={toolOutputHeaderClasses}>
-        <span className="tool-output-label mr-[auto] font-semibold">{label}</span>
+        <span className="tool-output-label mr-[auto] font-medium">{label}</span>
         <SelectField
           className="tool-output-language [&:focus-visible]:[outline:1px_solid_var(--accent)] [&:focus-visible]:[outline-offset:-2px]"
           label={`${label} syntax language`}
@@ -112,13 +112,14 @@ const toolOutputClasses = [
   "[&_.token.number]:text-[var(--color-modified)] [&_.token.function]:text-[var(--color-modified)]",
   "[&_.token.class-name]:text-[var(--color-modified)] [&_.token.property]:text-[var(--color-info)]",
   "[&_.token.attr-name]:text-[var(--color-info)] min-w-0 overflow-hidden border-[1px] border-[color:var(--line)]",
-  "rounded-[var(--radius-sm)] [&[data-error]]:[border-color:var(--color-deleted)]",
+  "rounded-[var(--radius)] [&[data-error]]:[border-color:color-mix(in_srgb,var(--color-deleted)_45%,transparent)]",
   "[&[data-error]_.tool-output-label]:text-[var(--color-deleted)]",
 ].join(" ")
 
 const toolOutputHeaderClasses = [
   "flex items-center gap-[8px] min-h-[32px] [padding:3px_8px_3px_12px]",
-  "border-b-[1px] border-b-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[11px]",
+  "border-b-[1px] border-b-[color:var(--line-subtle)] bg-[var(--surface-hover)] text-[var(--text-secondary)] text-[11px]",
+  "[[data-error]_>_&]:[background:color-mix(in_srgb,var(--color-deleted)_7%,transparent)]",
   "[&_.tool-output-language]:min-w-0 [&_.tool-output-language]:max-w-[150px]",
   "[&_.tool-output-language]:min-h-[26px] [&_.tool-output-language]:border-[1px] [&_.tool-output-language]:border-[color:var(--line)]",
   "[&_.tool-output-language]:rounded-[var(--radius-sm)] [&_.tool-output-language]:bg-transparent",

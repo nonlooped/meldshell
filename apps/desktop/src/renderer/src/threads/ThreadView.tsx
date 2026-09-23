@@ -4,7 +4,7 @@ import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/con
 import { useThreadActions } from "../data/mutations"
 import { useSelectedProvider } from "../data/providers"
 import { emptyDraft, useThreadDrafts } from "../app/thread-drafts"
-import { Button } from "../ui/controls"
+import { ErrorToast } from "../ui/Notice"
 import { Composer } from "./Composer"
 import { Transcript } from "./Transcript"
 
@@ -62,6 +62,7 @@ export function ThreadView({
       <FadeDiv className={threadContentClasses}>
         <Transcript
           threadId={thread.id}
+          running={thread.activity === "running"}
           workspace={snapshot.workspaces.find((workspace) => workspace.id === thread.workspaceId)}
           targetTurnId={
             searchTarget?.thread.id === thread.id
@@ -103,23 +104,14 @@ export function ThreadView({
         />
       </FadeDiv>
       {error && (
-        <FadeDiv
-          duration={0.2}
-          className="fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] flex items-center gap-[20px] [padding:12px_18px] max-w-[80vw] bg-[var(--surface-overlay)] text-[var(--text-primary)] border-[1px] border-[color:var(--line-strong)] rounded-[var(--radius)] text-[12px] [box-shadow:var(--shadow-popup)]"
-          role="alert"
-        >
-          {error}
-          <Button
-            size="sm"
-            onClick={() => {
-              update(thread.id, { error: null })
-              threadSettingsMutation.reset()
-              interruptMutation.reset()
-            }}
-          >
-            Dismiss
-          </Button>
-        </FadeDiv>
+        <ErrorToast
+          message={error}
+          onDismiss={() => {
+            update(thread.id, { error: null })
+            threadSettingsMutation.reset()
+            interruptMutation.reset()
+          }}
+        />
       )}
     </div>
   )

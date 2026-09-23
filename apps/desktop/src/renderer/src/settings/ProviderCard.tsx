@@ -121,7 +121,7 @@ export function ProviderCard({
         </SettingRow>
 
         <div className="overflow-x-auto border-t-[1px] border-t-[color:var(--line-subtle)]">
-          <div className="flex h-[42px] items-center justify-between text-[var(--text-primary)] text-[12px] font-semibold [&_span:last-child]:text-[var(--text-tertiary)] [&_span:last-child]:text-[10.5px] [&_span:last-child]:font-normal">
+          <div className="flex h-[42px] items-center justify-between text-[var(--text-primary)] text-[12px] font-medium [&_span:last-child]:text-[var(--text-tertiary)] [&_span:last-child]:text-[10.5px] [&_span:last-child]:font-normal">
             <span>Models</span>
             <span>{models.length} in catalog</span>
           </div>
@@ -217,7 +217,7 @@ export function ProviderCard({
 const modelTableHeaderClasses = [
   "grid items-center gap-[12px] min-w-[440px] grid-cols-[minmax(100px,_1fr)_188px_56px_52px_56px_28px]",
   "p-0 h-[30px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-tertiary)] text-[11px]",
-  "font-semibold [&_span:not(:first-child)]:[justify-self:center] [&_span:not(:first-child)]:text-center",
+  "font-medium [&_span:not(:first-child)]:[justify-self:center] [&_span:not(:first-child)]:text-center",
   "[@container(max-width:_700px)]:grid-cols-[minmax(100px,_1fr)_86px_32px_40px_44px_28px]",
   "[@container(max-width:_700px)]:gap-[8px]",
 ].join(" ")
