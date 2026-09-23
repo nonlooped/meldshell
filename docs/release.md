@@ -2,6 +2,14 @@
 
 Use this checklist for an installer candidate. Routine edits follow [AGENTS.md](../AGENTS.md#verification). A recorded result applies only to its exact artifact.
 
+## Versioning
+
+MeldShell has one app version, kept in the root and desktop `package.json` files and the lockfile. Tags are `vX.Y.Z` and follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0.0, a minor bump marks new features or incompatible changes to stored data, settings, or remote protocols, and a patch bump marks fixes only. 1.0.0 marks the first public release.
+
+Every user-visible change adds an entry under `## [Unreleased]` in [CHANGELOG.md](../CHANGELOG.md), using the Keep a Changelog groups `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Write each entry for users, not in terms of the implementation. Internal refactors, tests, CI, and documentation need no entry.
+
+To cut a release from a clean, up-to-date `main`, run `npm run release -- <patch|minor|major|X.Y.Z>`. The script moves the Unreleased entries under the new version and date, bumps every version field, commits `chore(release): vX.Y.Z`, and creates an annotated tag. Push both with `git push --atomic origin main vX.Y.Z`. A [test](../tests/changelog.test.ts) keeps the version fields and changelog consistent.
+
 ## Build and assemble
 
 [Release installers](../.github/workflows/release.yml) runs for a stable `vX.Y.Z` tag matching root and desktop package versions. Its Linux validation job runs unused-code, lint, formatting, type, and test checks. Native Windows and Linux runners build and package NSIS x64 and AppImage x64 artifacts. The final job assembles installers, updater metadata, blockmaps, and SHA256SUMS into one draft GitHub Release.

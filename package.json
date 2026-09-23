@@ -24,6 +24,7 @@
     "package:linux": "npm run package:linux --workspace=@meldshell/desktop",
     "postinstall": "npm run install:electron && npm run rebuild:native",
     "rebuild:native": "npm run rebuild:native --workspace=@meldshell/desktop",
+    "release": "node scripts/release.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "node --import tsx --test \"tests/**/*.test.ts\" \"tests/**/*.test.mjs\" \"packages/**/*.test.ts\" \"packages/**/*.test.mjs\" \"apps/desktop/src/**/*.test.ts\" \"apps/desktop/src/**/*.test.mjs\" \"apps/control/src/**/*.test.ts\" \"apps/site/src/remote/**/*.test.ts\"",
     "check:fast": "npm run lint && npm run format:check && npm run typecheck",

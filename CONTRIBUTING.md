@@ -18,4 +18,8 @@ Preserve native payloads when mapping canonical events. Process, session, and re
 
 Regenerate changed Codex app-server schemas with the supported CLI and commit them under `packages/provider-codex/schema`. Consult the CLI's schema-generation help before changing generated files.
 
+## Versions and changelog
+
+Add an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) with every user-visible change. Releases are cut with `npm run release`; see [versioning](docs/release.md#versioning).
+
 For installer work, use the [release checklist](docs/release.md).
