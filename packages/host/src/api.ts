@@ -113,9 +113,13 @@ export const hostOperations: Record<string, Operation> = {
       workspaceId: Schema.String,
       path: Schema.String,
       side: Schema.optional(Schema.Literal("staged", "unstaged")),
+      context: Schema.optional(Schema.Literal("full")),
     }),
     true,
-    (input) => withWorkspace(input.workspaceId, (path) => getGitDiff(path, input.path, input.side)),
+    (input) =>
+      withWorkspace(input.workspaceId, (path) =>
+        getGitDiff(path, input.path, input.side, input.context),
+      ),
   ),
   [C.IPC.getGitCommitDiff]: operation(
     Schema.Struct({ workspaceId: Schema.String, hash: Schema.String }),

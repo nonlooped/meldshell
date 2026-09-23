@@ -137,9 +137,15 @@ export const requests = {
     "meldshell:get-git-snapshot",
   ),
   getGitDiff:
-    request<(input: { workspaceId: string; path: string; side?: GitDiffSide }) => Promise<string>>(
-      "meldshell:get-git-diff",
-    ),
+    request<
+      (input: {
+        workspaceId: string
+        path: string
+        side?: GitDiffSide
+        /** Includes every unchanged line so a viewer can fold and expand context itself. */
+        context?: "full"
+      }) => Promise<string>
+    >("meldshell:get-git-diff"),
   renameWorkspace: request<(input: { workspaceId: string; name: string }) => Promise<AppSnapshot>>(
     "meldshell:rename-workspace",
   ),

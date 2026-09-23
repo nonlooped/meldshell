@@ -9,11 +9,15 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - A sent prompt flies from the composer into its place in the transcript.
 - A prompt sent while a thread is running drops into the queue button, and the queue count springs in.
 - Collapsible sections grow open and fold shut, and a finished turn folds its working log into its summary.
+- Staging or unstaging a file flies it between the Git lists, and removed rows fold away.
 - Closing a tab narrows it away; renamed thread titles crossfade in the inbox and tabs.
 - Inbox status badges spring in and out, attachment chips animate out when removed, and copy buttons swap to their confirmation.
 - Jumping to a prompt from the prompt rail briefly rings its message.
+- The diff viewer folds unchanged lines behind expandable rows, offers unified and split layouts, and can toggle line wrapping.
+- The file tree shows Git status letters, indent guides, and more specific file icons.
 - Subscription usage explains its bars with a legend.
 - A Retry now action reconnects an offline computer to the relay immediately.
+- The file tree supports arrow-key navigation and announces itself as a tree to assistive technology.
 - Left and Right arrow keys page through images in the image viewer.
 
 ### Fixed
@@ -29,6 +33,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Enter sends a message and Shift+Enter adds a line; the send shortcut setting and composer keycaps are removed.
 - Mark each provider's least restricted permission in amber, show reasoning speed only when Fast is on, and remove the composer's toolbar divider.
 - Keep model picker provider headings in view while scrolling.
+- Explain why Commit is unavailable, show stage and discard actions on hover, and show branch labels and commit ages in the graph.
 - Center settings content, move the way back to the top of settings, and show the relay privacy note as a callout.
 - Show every subscription reset as a countdown, with the exact time on hover.
 - Host the website, account API, and relay together at meldshell.nonlooped.xyz on Cloudflare: the site on Pages, and the account API and relay in a Worker with Durable Objects and D1, instead of Vercel and a self-hosted Node service.

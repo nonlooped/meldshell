@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { diffLineCounts, parseFileDiffs } from "./diff-model.ts"
+import { diffLineCounts, foldDiff, parseFileDiffs } from "./diff-model.ts"
 import { fileChangePatches } from "../threads/file-change-diffs.ts"
 
 test("provider additions retain zero old lines and newline markers after the lazy split", () => {
@@ -18,4 +18,68 @@ test("provider additions retain zero old lines and newline markers after the laz
 
 test("incomplete streamed patches retain the raw-text fallback", () => {
   assert.deepEqual(parseFileDiffs("--- src/a.ts\n+++ src/a.ts\n@@ -1,2 +1,2 @@\n-old\n+new\n"), [])
+})
+
+const fullContextPatch = (lines, changedAt) =>
+  [
+    "diff --git a/a.ts b/a.ts",
+    "--- a/a.ts",
+    "+++ b/a.ts",
+    `@@ -1,${lines} +1,${lines} @@`,
+    ...Array.from({ length: lines }, (_, index) =>
+      index + 1 === changedAt ? `-old ${changedAt}\n+new ${changedAt}` : ` line ${index + 1}`,
+    ),
+    "",
+  ].join("\n")
+
+test("long unchanged runs fold around a change and keep their line numbers", () => {
+  const [file] = parseFileDiffs(fullContextPatch(30, 15))
+  const segments = foldDiff(file.hunks, new Set())
+  assert.deepEqual(
+    segments.map((segment) => (segment.kind === "gap" ? `gap ${segment.lines}` : "hunk")),
+    ["gap 11", "hunk", "gap 12"],
+  )
+  const hunk = segments[1].hunk
+  assert.equal(hunk.oldStart, 12)
+  assert.equal(hunk.newStart, 12)
+  assert.equal(hunk.changes[0].oldLineNumber, 12)
+  assert.equal(hunk.changes.length, 8)
+  assert.equal(hunk.content, "@@ -12,7 +12,7 @@")
+})
+
+test("an expanded gap shows its lines in place", () => {
+  const [file] = parseFileDiffs(fullContextPatch(30, 15))
+  const [top] = foldDiff(file.hunks, new Set())
+  const segments = foldDiff(file.hunks, new Set([top.key]))
+  assert.equal(segments[0].kind, "hunk")
+  assert.equal(segments[0].hunk.oldStart, 1)
+  assert.deepEqual(
+    segments.map((segment) => segment.kind),
+    ["hunk", "gap"],
+  )
+})
+
+test("lines between patch hunks become fixed gaps", () => {
+  const [file] = parseFileDiffs(
+    [
+      "diff --git a/a.ts b/a.ts",
+      "--- a/a.ts",
+      "+++ b/a.ts",
+      "@@ -5,3 +5,3 @@",
+      " a",
+      "-b",
+      "+c",
+      " d",
+      "@@ -40,2 +40,3 @@",
+      " e",
+      "+f",
+      " g",
+      "",
+    ].join("\n"),
+  )
+  const segments = foldDiff(file.hunks, new Set())
+  assert.deepEqual(
+    segments.map((segment) => (segment.kind === "gap" ? [segment.lines, segment.key] : "hunk")),
+    [[4, null], "hunk", [32, null], "hunk"],
+  )
 })

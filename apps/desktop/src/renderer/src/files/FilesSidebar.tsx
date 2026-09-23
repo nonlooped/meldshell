@@ -1,6 +1,7 @@
 import { Tabs } from "@base-ui-components/react/tabs"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Collapsible } from "@base-ui-components/react/collapsible"
+import { CollapsiblePanel } from "../ui/motion"
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import type { Workspace } from "@meldshell/contracts"
@@ -10,6 +11,7 @@ import { GitSidebar } from "./GitSidebar"
 import { FileIcon } from "../ui/FileIcon"
 import { Button, IconButton } from "../ui/controls"
 import { useTabStore } from "../app/tab-store"
+import { panelTabsClasses } from "../ui/styles"
 
 function statusKind(status: string): string {
   if (status === "!!") return "ignored"
@@ -18,6 +20,79 @@ function statusKind(status: string): string {
   if (status.includes("D")) return "deleted"
   if (/[RC]/.test(status)) return "renamed"
   return status ? "modified" : "clean"
+}
+
+const statusLetters: Readonly<Record<string, string>> = {
+  added: "A",
+  modified: "M",
+  deleted: "D",
+  renamed: "R",
+  conflict: "!",
+}
+
+/** Guides mark each ancestor level under its chevron. */
+function indentGuides(depth: number): React.CSSProperties {
+  if (depth === 0) return {}
+  const levels = Array.from({ length: depth }, (_, level) => level)
+  return {
+    backgroundImage: levels
+      .map(() => "linear-gradient(var(--line-subtle), var(--line-subtle))")
+      .join(", "),
+    backgroundSize: "1px 100%",
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: levels.map((level) => `${16 + level * 14}px 0`).join(", "),
+  }
+}
+
+/**
+ * Tree keyboard navigation: Up and Down move between visible rows, Right opens a folder or enters
+ * it, Left closes a folder or returns to its parent, and Home and End jump to the ends.
+ */
+function moveInTree(event: React.KeyboardEvent<HTMLElement>) {
+  const item = (event.target as HTMLElement).closest<HTMLElement>('[role="treeitem"]')
+  if (item === null) return
+  // Rows in a folder that is folding shut are on their way out.
+  const items = Array.from(
+    event.currentTarget.querySelectorAll<HTMLElement>('[role="treeitem"]'),
+  ).filter((candidate) => candidate.closest("[data-ending-style]") === null)
+  const index = items.indexOf(item)
+  const level = Number(item.getAttribute("aria-level"))
+  const expanded = item.getAttribute("aria-expanded")
+  const focus = (target: HTMLElement | null | undefined) => {
+    if (!target) return
+    event.preventDefault()
+    target.focus()
+  }
+  switch (event.key) {
+    case "ArrowDown":
+      return focus(items[index + 1])
+    case "ArrowUp":
+      return focus(items[index - 1])
+    case "Home":
+      return focus(items[0])
+    case "End":
+      return focus(items.at(-1))
+    case "ArrowRight": {
+      if (expanded === "false") {
+        event.preventDefault()
+        item.click()
+        return
+      }
+      const next = items[index + 1]
+      if (expanded === "true" && next && Number(next.getAttribute("aria-level")) > level)
+        focus(next)
+      return
+    }
+    case "ArrowLeft": {
+      if (expanded === "true") {
+        event.preventDefault()
+        item.click()
+        return
+      }
+      const parent = item.closest("li")?.parentElement?.closest("li")
+      return focus(parent?.querySelector<HTMLElement>(':scope > [role="treeitem"]'))
+    }
+  }
 }
 
 function FileRow({
@@ -31,14 +106,18 @@ function FileRow({
 }) {
   const [expanded, setExpanded] = useState(false)
   const openFile = useTabStore((state) => state.openFile)
+  const kind = statusKind(entry.status)
+  const letter = statusLetters[kind]
   const row = (
     <BaseButton
       type="button"
+      role="treeitem"
+      aria-level={depth + 1}
       className={
-        "flex items-center gap-[6px] w-full min-h-[28px] [padding:3px_10px] border-0 bg-transparent text-inherit text-left cursor-pointer [&:hover]:bg-[var(--surface-hover)] [&_>_svg]:shrink-0 [&_>_svg]:w-[12px] [&_>_.file-icon]:w-[16px]"
+        "flex items-center gap-[6px] w-full h-[24px] [padding:0_10px] border-0 bg-transparent text-inherit text-left cursor-pointer [&:hover]:bg-[var(--surface-hover)] [&_>_svg]:shrink-0 [&_>_svg]:w-[12px] [&_>_.file-icon]:w-[16px]"
       }
-      style={{ paddingLeft: 10 + depth * 14 }}
-      title={`${entry.path}${entry.status ? ` (${statusKind(entry.status)})` : ""}`}
+      style={{ paddingLeft: 10 + depth * 14, ...indentGuides(depth) }}
+      title={`${entry.path}${entry.status ? ` (${kind})` : ""}`}
       onClick={entry.directory ? undefined : () => openFile(workspaceId, entry.path)}
     >
       {entry.directory ? (
@@ -51,23 +130,39 @@ function FileRow({
         <span className="shrink-0 w-[12px]" />
       )}
       <FileIcon path={entry.path} directory={entry.directory} expanded={expanded} />
-      <span className={explorerNameClasses} data-kind={statusKind(entry.status)}>
+      <span className={explorerNameClasses} data-kind={kind}>
         {entry.name}
       </span>
+      {letter !== undefined &&
+        (entry.directory ? (
+          <span
+            className={`${statusMarkClasses} w-[6px] h-[6px] mr-[4px] rounded-full bg-current`}
+            data-kind={kind}
+            aria-hidden="true"
+          />
+        ) : (
+          <span
+            className={`${statusMarkClasses} w-[14px] text-center [font:500_10.5px_var(--font-mono)]`}
+            data-kind={kind}
+            aria-hidden="true"
+          >
+            {letter}
+          </span>
+        ))}
     </BaseButton>
   )
-  if (!entry.directory) return <li>{row}</li>
+  if (!entry.directory) return <li role="none">{row}</li>
   return (
-    <Collapsible.Root render={<li />} open={expanded} onOpenChange={setExpanded}>
+    <Collapsible.Root render={<li role="none" />} open={expanded} onOpenChange={setExpanded}>
       <Collapsible.Trigger render={row} />
-      <Collapsible.Panel>
+      <CollapsiblePanel>
         <Directory
           workspaceId={workspaceId}
           path={entry.path}
           depth={depth + 1}
           inheritedStatus={entry.status}
         />
-      </Collapsible.Panel>
+      </CollapsiblePanel>
     </Collapsible.Root>
   )
 }
@@ -112,7 +207,12 @@ function Directory({
       </div>
     )
   return (
-    <ul className="[list-style:none] p-0 m-0" aria-label={path || "Workspace files"}>
+    <ul
+      className="[list-style:none] p-0 m-0"
+      role={depth === 0 ? "tree" : "group"}
+      aria-label={path || "Workspace files"}
+      onKeyDown={depth === 0 ? moveInTree : undefined}
+    >
       {query.data.slice(0, limit).map((entry) => (
         <FileRow
           key={entry.path}
@@ -125,12 +225,15 @@ function Directory({
         />
       ))}
       {query.data.length === 0 && (
-        <li className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
+        <li
+          role="none"
+          className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
+        >
           Empty folder
         </li>
       )}
       {query.data.length > limit && (
-        <li>
+        <li role="none">
           <Button size="sm" variant="ghost" onClick={() => setLimit(limit + 300)}>
             Show more ({query.data.length - limit} remaining)
           </Button>
@@ -150,7 +253,7 @@ export function FilesSidebar({
   const client = useQueryClient()
   return (
     <Tabs.Root defaultValue="files" className="flex flex-col h-full min-h-0 overflow-hidden">
-      <Tabs.List className={workspaceSidebarTabsClasses} aria-label="Workspace sidebar">
+      <Tabs.List className={panelTabsClasses} aria-label="Workspace sidebar">
         <Tabs.Tab value="files">Files</Tabs.Tab>
         <Tabs.Tab value="changes">Changes</Tabs.Tab>
       </Tabs.List>
@@ -190,7 +293,7 @@ export function FilesSidebar({
 }
 
 const explorerNameClasses = [
-  "overflow-hidden text-ellipsis whitespace-nowrap [&[data-kind='added']]:text-[var(--color-added)]",
+  "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap [&[data-kind='added']]:text-[var(--color-added)]",
   "[&[data-kind='modified']]:text-[var(--color-modified)]",
   "[&[data-kind='renamed']]:text-[var(--color-renamed)]",
   "[&[data-kind='deleted']]:text-[var(--color-deleted)]",
@@ -198,10 +301,8 @@ const explorerNameClasses = [
   "[&[data-kind='ignored']]:text-[var(--text-tertiary)]",
 ].join(" ")
 
-const workspaceSidebarTabsClasses = [
-  "flex gap-[16px] [padding:0_12px] border-b-[1px] border-b-[color:var(--line)] shrink-0",
-  "[&_button]:[background:none] [&_button]:border-0 [&_button]:border-b-[2px] [&_button]:border-b-[color:transparent]",
-  "[&_button]:text-[var(--text-secondary)] [&_button]:[padding:10px_0] [&_button]:cursor-pointer",
-  "[&_button[data-active]]:text-[var(--text-primary)]",
-  "[&_button[data-active]]:[border-bottom-color:currentColor]",
+const statusMarkClasses = [
+  "ml-[auto] shrink-0 opacity-[0.85] [&[data-kind='added']]:text-[var(--color-added)]",
+  "[&[data-kind='modified']]:text-[var(--color-modified)] [&[data-kind='renamed']]:text-[var(--color-renamed)]",
+  "[&[data-kind='deleted']]:text-[var(--color-deleted)] [&[data-kind='conflict']]:text-[var(--color-deleted)]",
 ].join(" ")

@@ -1,5 +1,8 @@
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { Collapsible } from "@base-ui-components/react/collapsible"
+import { CollapsiblePanel, useMotionPreference } from "../ui/motion"
+import { launchFlight, landFlight } from "../ui/flight"
+import { AnimatePresence, motion } from "motion/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import type { Workspace } from "@meldshell/contracts"
@@ -20,6 +23,7 @@ import { FileIcon } from "../ui/FileIcon"
 import { useTabStore } from "../app/tab-store"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { type GraphRow, layoutGraph } from "./git-graph"
+import { relativeAge } from "../ui/relative-age"
 const graphColors = [
   "var(--color-info)",
   "var(--color-added)",
@@ -27,6 +31,26 @@ const graphColors = [
   "var(--color-renamed)",
   "var(--color-deleted)",
 ]
+
+/** The ref worth a label: the checked-out branch first, then any branch, then a tag. */
+function primaryRef(refs: string): { name: string; head: boolean; more: number } | null {
+  const names = refs
+    .split(", ")
+    .map((ref) => ref.trim())
+    .filter(Boolean)
+  if (names.length === 0) return null
+  const head = names.find((ref) => ref.startsWith("HEAD -> "))
+  const chosen =
+    head?.slice("HEAD -> ".length) ??
+    names.find((ref) => ref !== "HEAD" && !ref.startsWith("tag: ")) ??
+    names.find((ref) => ref.startsWith("tag: "))?.slice("tag: ".length) ??
+    names[0]!
+  return {
+    name: chosen,
+    head: head !== undefined || names.includes("HEAD"),
+    more: names.length - 1,
+  }
+}
 
 function laneColor(lane: number): string {
   return graphColors[lane % graphColors.length]!
@@ -77,18 +101,32 @@ function FileRow({
 }): React.JSX.Element {
   const openDiff = useTabStore((state) => state.openDiff)
   const slash = change.path.lastIndexOf("/")
+  const rowRef = useRef<HTMLDivElement>(null)
+  const reduced = useMotionPreference()
+  const flightKey = (to: GitDiffSide) => `git:${workspaceId}:${to}:${change.path}`
+  // A file staged or unstaged here flies into its row in the other list.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Only a newly mounted row can be a landing.
+  useLayoutEffect(() => {
+    if (rowRef.current === null || reduced) return
+    return landFlight(flightKey(side), rowRef.current)
+  }, [])
   return (
-    <div className="git-file-entry">
+    <motion.div
+      ref={rowRef}
+      className="git-file-entry overflow-hidden"
+      exit={reduced ? undefined : { height: 0, opacity: 0 }}
+      transition={{ duration: 0.18 }}
+    >
       <div
         className={
-          "flex items-center gap-[0] pr-[6px] [&_.git-file]:flex-1 [&_.git-file]:min-w-0 [&_.git-file]:pr-[6px] [&_>_.icon-button]:shrink-0"
+          "flex items-center gap-[0] pr-[6px] [&_.git-file]:flex-1 [&_.git-file]:min-w-0 [&_.git-file]:pr-[6px] [&_>_.icon-button]:shrink-0 [&_>_.icon-button]:opacity-[0] [&:hover_>_.icon-button]:opacity-[1] [&:focus-within_>_.icon-button]:opacity-[1] [@media(hover:_none)]:[&_>_.icon-button]:opacity-[1] [&:hover]:bg-[var(--surface-hover)]"
         }
       >
         <button
           type="button"
           onClick={() => openDiff(workspaceId, change.path, side)}
           className={
-            "git-file [&:hover]:bg-[var(--surface-hover)] flex items-center gap-[7px] w-full h-[28px] border-0 [padding:0_14px] bg-transparent text-left cursor-pointer [&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)]"
+            "git-file flex items-center gap-[7px] w-full h-[28px] border-0 [padding:0_14px] bg-transparent text-left cursor-pointer [&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)]"
           }
           title={`${change.originalPath ? `${change.originalPath} → ` : ""}${change.path} · ${statusLabel(change)}`}
           aria-label={`${change.path}, ${statusLabel(change)}`}
@@ -107,7 +145,16 @@ function FileRow({
         <IconButton
           label={`${side === "staged" ? "Unstage" : "Stage"} ${change.path}`}
           disabled={busy}
-          onClick={() => onAction(change.path, side === "staged" ? "unstage" : "stage")}
+          onClick={() => {
+            const rect = rowRef.current?.getBoundingClientRect()
+            if (rect !== undefined && !reduced)
+              launchFlight(
+                flightKey(side === "staged" ? "unstaged" : "staged"),
+                rect.left,
+                rect.top,
+              )
+            onAction(change.path, side === "staged" ? "unstage" : "stage")
+          }}
         >
           {side === "staged" ? <Minus size={14} /> : <Plus size={14} />}
         </IconButton>
@@ -121,7 +168,7 @@ function FileRow({
           </IconButton>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -322,6 +369,12 @@ function CommitSection({
   })
   const disabled = busy || mutation.isPending
   const canCommit = !disabled && staged && !conflicts && Boolean(message.trim())
+  // A disabled Commit names what it is waiting for instead of looking broken.
+  const blocker = conflicts
+    ? "Resolve conflicts to commit"
+    : !staged
+      ? "Stage changes to commit"
+      : null
   return (
     <section className="[padding:10px_12px] shrink-0" aria-label="Commit changes">
       <div
@@ -332,7 +385,8 @@ function CommitSection({
         <TextField
           className="git-commit-message w-full min-w-0"
           aria-label="Commit message"
-          placeholder={`Message on ${data.branch} (Ctrl+Enter to commit)`}
+          placeholder="Commit message"
+          title={`Commit to ${data.branch} with Ctrl+Enter`}
           value={message}
           disabled={disabled}
           onValueChange={setMessage}
@@ -352,9 +406,14 @@ function CommitSection({
         </IconButton>
       </div>
       <div className={"flex items-center gap-[6px] mt-[8px] [&_>_.button:first-child]:flex-1"}>
-        <Button variant="primary" disabled={!canCommit} onClick={() => mutation.mutate("commit")}>
-          <Check size={14} />
-          Commit
+        <Button
+          variant="primary"
+          disabled={!canCommit}
+          title={canCommit ? `Commit to ${data.branch} (Ctrl+Enter)` : undefined}
+          onClick={() => mutation.mutate("commit")}
+        >
+          {blocker === null && <Check size={14} />}
+          {blocker ?? "Commit"}
         </Button>
         <DropdownMenu
           align="end"
@@ -433,12 +492,8 @@ function ChangesSection({
       <div className="flex items-center shrink-0 pr-[6px] [&_.git-section-heading]:flex-1 [&_.git-section-heading]:min-w-0">
         <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-medium [&:hover]:bg-[var(--surface-hover)]">
           <ChevronRight
-            data-motion="transform background-color"
-            data-motion-duration="0.2"
             size={13}
-            className={
-              "disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
-            }
+            className={`motion-transform motion-duration-200 ${"disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"}`}
           />
           <span>Changes</span>
           <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
@@ -449,36 +504,44 @@ function ChangesSection({
           <RefreshCw size={14} />
         </IconButton>
       </div>
+      {/* Resizable sections already fold to their headings, so these panels only hide. */}
       <Collapsible.Panel className="flex-1 min-h-0 overflow-x-auto pb-[8px] overflow-y-auto [scrollbar-gutter:stable]">
+        {changes.length === 0 && (
+          <p className="[margin:10px_14px] leading-[1.6] text-[var(--text-tertiary)]">
+            No changes in this workspace.
+          </p>
+        )}
         {(["staged", "unstaged"] as const).map((side) => {
           const files = changes.filter((change) =>
             side === "staged"
               ? change.status !== "??" && change.status[0] !== " " && !/U|AA|DD/.test(change.status)
               : change.status[1] !== " " || /U|AA|DD/.test(change.status),
           )
+          // An empty list keeps only its heading, so it reads as one quiet line.
+          if (changes.length === 0) return null
           return (
             <div key={side}>
-              <div className="flex items-center gap-[6px] [padding:7px_14px] text-[11px] font-medium">
+              <div
+                className={`flex items-center gap-[6px] [padding:7px_14px] text-[11px] font-medium ${files.length === 0 ? "text-[var(--text-tertiary)]" : ""}`}
+              >
                 {side === "staged" ? "Staged changes" : "Unstaged changes"}
                 <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
                   {files.length}
                 </span>
               </div>
-              {files.length === 0 ? (
-                <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
-                  No {side} changes.
-                </p>
-              ) : (
-                files.map((change) => (
-                  <FileRow
-                    key={change.path}
-                    workspaceId={workspaceId}
-                    change={change}
-                    side={side}
-                    busy={busy}
-                    onAction={onAction}
-                  />
-                ))
+              {files.length === 0 ? null : (
+                <AnimatePresence initial={false}>
+                  {files.map((change) => (
+                    <FileRow
+                      key={change.path}
+                      workspaceId={workspaceId}
+                      change={change}
+                      side={side}
+                      busy={busy}
+                      onAction={onAction}
+                    />
+                  ))}
+                </AnimatePresence>
               )}
             </div>
           )
@@ -514,12 +577,8 @@ function GraphSection({
     >
       <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-medium [&:hover]:bg-[var(--surface-hover)]">
         <ChevronRight
-          data-motion="transform background-color"
-          data-motion-duration="0.2"
           size={13}
-          className={
-            "disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
-          }
+          className={`motion-transform motion-duration-200 ${"disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"}`}
         />
         <span>Graph</span>
         <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
@@ -614,11 +673,12 @@ function CommitRow({
   graphWidth: number
 }): React.JSX.Element {
   const { commit, lane, edges, incoming } = row
+  const ref = primaryRef(commit.refs)
   return (
     <Collapsible.Root render={<li />}>
       <Collapsible.Trigger
         className="w-full border-0 bg-transparent text-left cursor-pointer pl-[0] flex items-center gap-[6px] h-[28px] pr-[12px] [&:hover]:bg-[var(--surface-hover)] [&[aria-expanded='true']]:bg-[var(--surface-hover)]"
-        title={`${commit.subject}\n${commit.author} · ${commit.date}\n${commit.hash}\n${commit.refs}`}
+        title={`${commit.subject}\n${commit.author} · ${new Date(commit.date).toLocaleString()}\n${commit.hash.slice(0, 7)}${commit.refs ? `\n${commit.refs}` : ""}`}
       >
         <svg
           width={graphWidth}
@@ -641,34 +701,51 @@ function CommitRow({
         <span className="flex-1 min-w-[50px] overflow-hidden text-ellipsis whitespace-nowrap">
           {commit.subject}
         </span>
-        {commit.refs && (
-          <span className="max-w-[100px] overflow-hidden text-ellipsis whitespace-nowrap border-[1px] border-[color:var(--line-strong)] rounded-[var(--radius-sm)] [padding:1px_4px] text-[10px] text-[var(--color-info)]">
-            {commit.refs}
+        {ref !== null && (
+          <span
+            className="inline-flex max-w-[96px] shrink-0 items-center gap-[4px] h-[18px] [padding:0_6px] rounded-[9px] bg-[color-mix(in_srgb,var(--color-info)_12%,transparent)] text-[10.5px] text-[var(--color-info)]"
+            title={commit.refs}
+          >
+            {ref.head && (
+              <span
+                aria-label="HEAD"
+                className="w-[5px] h-[5px] shrink-0 rounded-full bg-current"
+              />
+            )}
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+              {ref.name}
+            </span>
+            {ref.more > 0 && <span className="shrink-0 opacity-[0.7]">+{ref.more}</span>}
           </span>
         )}
-        <span className="[font-family:var(--font-mono)] text-[var(--text-tertiary)] text-[10px]">
-          {commit.hash.slice(0, 7)}
-        </span>
+        <time
+          dateTime={commit.date}
+          className="shrink-0 min-w-[24px] text-right text-[var(--text-tertiary)] text-[10.5px] tabular-nums"
+        >
+          {relativeAge(commit.date)}
+        </time>
       </Collapsible.Trigger>
-      <Collapsible.Panel
-        className="[&_.event-diff]:border-0 [&_.event-diff]:rounded-[0] max-h-[480px] overflow-auto border-y-[1px] border-y-[color:var(--line-subtle)] [&_.work-item-output]:m-0 [&_.work-item-output]:whitespace-pre-wrap [&_.work-item-output]:[overflow-wrap:anywhere]"
-        role="region"
-        aria-label={`Changes in ${commit.hash.slice(0, 7)}`}
-        tabIndex={0}
-      >
-        <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
-          {commit.subject}
-          <br />
-          {commit.author} · {commit.date.slice(0, 10)}
-          {commit.parents.length > 1 && (
-            <>
-              <br />
-              Compared with first parent
-            </>
-          )}
-        </p>
-        <CommitDiff workspaceId={workspaceId} hash={commit.hash} />
-      </Collapsible.Panel>
+      <CollapsiblePanel>
+        <div
+          className="[&_.event-diff]:border-0 [&_.event-diff]:rounded-[0] max-h-[480px] overflow-auto border-y-[1px] border-y-[color:var(--line-subtle)] [&_.work-item-output]:m-0 [&_.work-item-output]:whitespace-pre-wrap [&_.work-item-output]:[overflow-wrap:anywhere]"
+          role="region"
+          aria-label={`Changes in ${commit.hash.slice(0, 7)}`}
+          tabIndex={0}
+        >
+          <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
+            {commit.subject}
+            <br />
+            {commit.author} · {commit.date.slice(0, 10)}
+            {commit.parents.length > 1 && (
+              <>
+                <br />
+                Compared with first parent
+              </>
+            )}
+          </p>
+          <CommitDiff workspaceId={workspaceId} hash={commit.hash} />
+        </div>
+      </CollapsiblePanel>
     </Collapsible.Root>
   )
 }

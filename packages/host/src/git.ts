@@ -138,6 +138,7 @@ export async function getGitDiff(
   workspacePath: string,
   path: string,
   side?: GitDiffSide,
+  context?: "full",
 ): Promise<string> {
   const { root, head } = await repository(workspacePath)
   // Only paths currently reported by Git may cross this read boundary.
@@ -150,6 +151,7 @@ export async function getGitDiff(
     "--no-color",
     "--src-prefix=a/",
     "--dst-prefix=b/",
+    ...(context === "full" ? ["--unified=1000000"] : []),
   ]
   const paths = ["--", path, ...(change.originalPath ? [change.originalPath] : [])]
   if (side)

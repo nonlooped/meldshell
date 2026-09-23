@@ -1,19 +1,61 @@
-import { Fragment, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Decoration, Diff, Hunk } from "react-diff-view"
 import { ErrorBoundary } from "react-error-boundary"
-import { diffLineCounts, parseFileDiffs, type FileDiff } from "./diff-model"
+import { diffLineCounts, foldDiff, parseFileDiffs, type FileDiff } from "./diff-model"
 import { diffTokens, visibleDiffHunks } from "./diff-highlighting"
 import { FileIcon } from "./FileIcon"
 import { Button } from "./controls"
 
 const pageSize = 400
 
-function FileChanges({ file, showHeader }: { file: FileDiff; showHeader: boolean }) {
+export type DiffViewType = "unified" | "split"
+
+function FileChanges({
+  file,
+  showHeader,
+  viewType,
+}: {
+  file: FileDiff
+  showHeader: boolean
+  viewType: DiffViewType
+}) {
   const [limit, setLimit] = useState(pageSize)
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
   const name = file.type === "delete" ? file.oldPath : file.newPath
-  const hunks = useMemo(() => visibleDiffHunks(file.hunks, limit), [file.hunks, limit])
+  const segments = useMemo(() => foldDiff(file.hunks, expanded), [file.hunks, expanded])
+  const folded = useMemo(
+    () => segments.flatMap((segment) => (segment.kind === "hunk" ? [segment.hunk] : [])),
+    [segments],
+  )
+  const hunks = useMemo(() => visibleDiffHunks(folded, limit), [folded, limit])
   const tokens = useMemo(() => diffTokens(hunks, name), [hunks, name])
-  const total = file.hunks.reduce((count, hunk) => count + hunk.changes.length, 0)
+  const total = folded.reduce((count, hunk) => count + hunk.changes.length, 0)
+  // Segments render in order until the page's last visible hunk.
+  let hunkIndex = 0
+  const rendered = segments.flatMap((segment, index) => {
+    if (hunkIndex >= hunks.length) return []
+    if (segment.kind === "gap")
+      return [
+        <Decoration key={`gap:${index}`}>
+          {segment.key === null ? (
+            <span className={gapClasses}>⋯ {unchangedLines(segment.lines)}</span>
+          ) : (
+            <button
+              type="button"
+              className={`${gapClasses} w-full border-0 text-left cursor-pointer [&:hover]:text-[var(--text-primary)] [&:hover]:bg-[var(--surface-active)]`}
+              onClick={() => {
+                const key = segment.key
+                if (key !== null) setExpanded((previous) => new Set(previous).add(key))
+              }}
+            >
+              ⋯ Show {unchangedLines(segment.lines)}
+            </button>
+          )}
+        </Decoration>,
+      ]
+    const hunk = hunks[hunkIndex++]!
+    return [<Hunk key={`${hunk.oldStart}:${hunk.newStart}`} hunk={hunk} />]
+  })
   const { insertions, deletions } = diffLineCounts([file])
   return (
     <section className={eventDiffClasses} aria-label={`Changes to ${name}`}>
@@ -34,21 +76,8 @@ function FileChanges({ file, showHeader }: { file: FileDiff; showHeader: boolean
           {file.patch}
         </pre>
       ) : (
-        <Diff viewType="unified" diffType={file.type} hunks={hunks} tokens={tokens}>
-          {(visible) =>
-            visible.map((hunk, index) => (
-              <Fragment key={`${hunk.oldStart}:${hunk.newStart}`}>
-                {index > 0 && (
-                  <Decoration>
-                    <span className="block [padding:4px_10px] bg-[var(--surface-hover)] text-[var(--text-tertiary)] [font-family:var(--font-text)] text-[11px]">
-                      Lines {hunk.oldStart} → {hunk.newStart}
-                    </span>
-                  </Decoration>
-                )}
-                <Hunk hunk={hunk} />
-              </Fragment>
-            ))
-          }
+        <Diff viewType={viewType} diffType={file.type} hunks={hunks} tokens={tokens}>
+          {() => rendered}
         </Diff>
       )}
       {total > limit && (
@@ -77,10 +106,12 @@ export function ChangeDiff({
   path,
   patch,
   showHeader = true,
+  viewType = "unified",
 }: {
   readonly path: string
   readonly patch: string
   readonly showHeader?: boolean
+  readonly viewType?: DiffViewType
 }): React.JSX.Element {
   const files = useMemo(() => parseFileDiffs(patch), [patch])
   const fallback = (
@@ -99,11 +130,18 @@ export function ChangeDiff({
               key={`${index}:${file.patch}`}
               file={file}
               showHeader={showHeader || files.length > 1}
+              viewType={viewType}
             />
           ))}
     </ErrorBoundary>
   )
 }
+
+const unchangedLines = (lines: number): string =>
+  `${lines.toLocaleString()} unchanged ${lines === 1 ? "line" : "lines"}`
+
+const gapClasses =
+  "block [padding:4px_10px] bg-[var(--surface-hover)] text-[var(--text-tertiary)] [font-family:var(--font-text)] text-[11px]"
 
 const eventDiffClasses = [
   "event-diff [--diff-background-color:transparent] [--diff-text-color:var(--text-primary)]",
@@ -123,13 +161,8 @@ const eventDiffClasses = [
   "[&_.diff]:text-[inherit] [&_.diff]:font-normal [&_.diff-line]:leading-[1.65]",
   "[&_.diff-gutter-col]:w-[4.5ch] [&_.diff-gutter]:px-[0.5ch] [&_.diff-gutter]:cursor-default",
   "[&_.diff-gutter-normal]:text-[var(--text-tertiary)] [&_.diff-code]:relative",
-  "[&_.diff-code]:px-[20px_8px] [&_.diff-code]:whitespace-pre [&_.diff-code]:[overflow-wrap:normal]",
+  "[&_.diff-code]:[padding-inline:10px_8px] [&_.diff-code]:whitespace-pre [&_.diff-code]:[overflow-wrap:normal]",
   "[&_.diff-code]:[word-break:normal] [&_.diff-code]:font-normal [&_.diff-code]:[tab-size:2]",
-  "[&_.diff-code-insert::before]:absolute [&_.diff-code-insert::before]:left-[5px]",
-  "[&_.diff-code-insert::before]:select-none [&_.diff-code-insert::before]:[content:'+']",
-  "[&_.diff-code-insert::before]:text-[var(--color-added)] [&_.diff-code-delete::before]:absolute",
-  "[&_.diff-code-delete::before]:left-[5px] [&_.diff-code-delete::before]:select-none",
-  "[&_.diff-code-delete::before]:[content:'−'] [&_.diff-code-delete::before]:text-[var(--color-deleted)]",
   "[&_.diff-code-insert]:border-l-[2px] [&_.diff-code-insert]:border-l-[color:var(--color-added)]",
   "[&_.diff-code-delete]:border-l-[2px] [&_.diff-code-delete]:border-l-[color:var(--color-deleted)]",
   "[&_.token.comment]:text-[var(--text-tertiary)] [&_.token.prolog]:text-[var(--text-tertiary)]",
