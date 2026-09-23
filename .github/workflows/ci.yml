@@ -6,39 +6,77 @@ on:
   push:
     branches: [main]
     paths-ignore: ['docs/**', '**/*.md']
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Superseded pull request runs are cancelled; every other run keeps its own verdict.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
+env:
+  npm_config_audit: 'false'
+  npm_config_fund: 'false'
+
 jobs:
-  check:
+  static:
+    name: Static checks
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
           cache: npm
-      - name: Install dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Check unused code
+      # Electron and native rebuilds are unnecessary here; better-sqlite3 ships N-API prebuilds.
+      - run: npm ci --ignore-scripts
+      - name: Unused code
         run: npm run knip
-      - name: Rebuild native test dependency
-        run: npm rebuild better-sqlite3
-      - name: Lint, format, and typecheck
-        run: npm run check:fast
-      - name: Build desktop
-        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Format
+        run: npm run format:check
+      - name: Typecheck
+        run: npm run typecheck
+
+  build-test:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
       - name: Test
         run: npm test
+      - name: Build desktop
+        run: npm run build
       - name: Build website
         run: npm run build --workspace=@meldshell/site
+
+  test-windows:
+    name: Test (Windows)
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Test
+        run: npm test

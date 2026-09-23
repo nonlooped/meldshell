@@ -8,7 +8,7 @@ Follow [AGENTS.md's verification policy](AGENTS.md#verification). Commands live 
 
 Biome handles supported source formatting and linting, including a cognitive-complexity limit of 20. It does not format Markdown or YAML. Generated Codex schemas and lockfiles are excluded. React Compiler diagnostics come from builds.
 
-`check:fast` combines lint, formatting, and workspace typechecks. `check` adds the desktop build and Knip; it does not run `npm test`. Choose these aggregate commands only under the repository verification policy. The [release workflow](.github/workflows/release.yml) runs the full check and tests separately.
+`check:fast` combines lint, formatting, and workspace typechecks. `check` adds the desktop build and Knip; it does not run `npm test`. Choose these aggregate commands only under the repository verification policy. [CI](.github/workflows/ci.yml) runs all of them, plus tests on Windows, for every pull request and `main` push.
 
 Authenticated provider checks can consume account quota. UI and manual verification follow the repository policy; report unverified behavior explicitly.
 
