@@ -1,7 +1,8 @@
 name: Release
 
-# A stable vX.Y.Z tag on main (cut with `npm run release`) builds, verifies, and drafts a GitHub
-# Release whose notes are that version's CHANGELOG.md entries. A manual run builds the same
+# A stable vX.Y.Z tag on main (cut with `npm run release`) builds, verifies, and publishes a GitHub
+# Release whose notes are that version's CHANGELOG.md entries. Before 1.0, minor versions are
+# normal releases and nonzero patch versions are prereleases. A manual run builds the same
 # installers from any ref as workflow artifacts without releasing.
 on:
   push:
@@ -26,6 +27,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,7 +49,8 @@ jobs:
               if (!/^\d+\.\d+\.\d+$/.test(desktop.version)) throw new Error(`${desktop.version} is not a stable version`);
               if (process.env.GITHUB_REF_NAME !== `v${desktop.version}`) throw new Error(`Tag must be v${desktop.version}`);
             }
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${desktop.version}\n`);
+            const [major, , patch] = desktop.version.split(".").map(Number);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${desktop.version}\nprerelease=${major === 0 && patch > 0}\n`);
           '
       - name: Require tagged commit on main
         if: github.ref_type == 'tag'
@@ -109,7 +112,7 @@ jobs:
           compression-level: 0
 
   release:
-    name: Draft GitHub Release
+    name: Publish GitHub Release
     if: github.ref_type == 'tag'
     needs: [version, checks, package]
     runs-on: ubuntu-24.04
@@ -121,6 +124,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       RELEASE_TAG: ${{ github.ref_name }}
       VERSION: ${{ needs.version.outputs.version }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -145,7 +149,7 @@ jobs:
           grep -q "^version: $VERSION$" latest-linux.yml
           sha256sum -- *.exe *.AppImage > SHA256SUMS.txt
           cat SHA256SUMS.txt
-      - name: Create or update draft
+      - name: Stage, upload, and publish release
         run: |
           node scripts/release.mjs notes "$VERSION" > "$RUNNER_TEMP/notes.md"
           if is_draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null); then
@@ -156,4 +160,9 @@ jobs:
           fi
           cd release
           gh release upload "$RELEASE_TAG" ./*.exe ./*.AppImage ./*.blockmap ./latest*.yml SHA256SUMS.txt --clobber
-          echo "Draft release: $(gh release view "$RELEASE_TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PRERELEASE" = true ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false
+          fi
+          echo "Published release: $(gh release view "$RELEASE_TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
