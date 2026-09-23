@@ -2,6 +2,15 @@
 
 Use this checklist for an installer candidate. Routine edits follow [AGENTS.md](../AGENTS.md#verification). A recorded result applies only to its exact artifact.
 
+## Remote service cutover
+
+When a release changes the account API or relay, put the compatible site and account worker in production before tagging a desktop build that points to them. The Worker configuration is [apps/control/wrangler.jsonc](../apps/control/wrangler.jsonc), and the Pages configuration is [apps/site/wrangler.jsonc](../apps/site/wrangler.jsonc).
+
+1. Confirm the D1 database ID and configure the Worker secrets: `BETTER_AUTH_SECRET` (at least 32 characters), plus both client ID and secret for each enabled Google or Discord provider. Register `https://meldshell.nonlooped.xyz/api/auth/callback/google` and `/api/auth/callback/discord` with those providers.
+2. Apply D1 migrations and deploy the account Worker with `npm run deploy --workspace=@meldshell/control`. This command changes the production database; review its pending migrations first.
+3. Build the site with `npm run build --workspace=@meldshell/site`, then deploy `apps/site/dist` to the `meldshell` Pages project. Its `/api/*` Function needs the `CONTROL` service binding to `meldshell-control`.
+4. Route `meldshell.nonlooped.xyz` to Pages. Confirm `/api/remote/v1/config` returns the enabled providers, and complete a real sign-in and device link before tagging. A successful static home page alone does not verify the account API.
+
 ## Versioning
 
 MeldShell has one app version, kept in the root and desktop `package.json` files and the lockfile. Tags are `vX.Y.Z` and follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0.0, a minor bump marks new features or incompatible changes to stored data, settings, or remote protocols, and a patch bump marks fixes only. 1.0.0 marks the first public release.

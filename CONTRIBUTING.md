@@ -14,7 +14,7 @@ Authenticated provider checks can consume account quota. UI and manual verificat
 
 ## Provider changes
 
-Preserve native payloads when mapping canonical events. Process, session, and recovery constraints are in [Architecture](docs/architecture.md); provider-specific behavior is in [Claude](docs/claude-provider.md) and [Cursor](docs/cursor-provider.md).
+Preserve native payloads when mapping canonical events. Review process, session, and recovery behavior in the [host](packages/host/src/host.ts) and [contracts](packages/contracts/src/ipc.ts); provider implementations live under [packages](packages).
 
 Regenerate changed Codex app-server schemas with the supported CLI and commit them under `packages/provider-codex/schema`. Consult the CLI's schema-generation help before changing generated files.
 

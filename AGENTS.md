@@ -10,14 +10,14 @@ User instructions take precedence over skills. Keep skills within the requested 
 
 ## Read by task
 
-- [Architecture](docs/architecture.md): process boundaries, IPC, persistence, recovery, or provider integration.
-- [Claude](docs/claude-provider.md) and [Cursor](docs/cursor-provider.md): the selected provider's protocol, permissions, sessions, and limitations.
-- [Design](docs/design.md): desktop UI changes. Renderer tokens and shared components own exact values.
+- [Host and contracts](packages/host/src/host.ts) and [IPC](packages/contracts/src/ipc.ts): process boundaries, persistence, recovery, and provider integration.
+- [Provider implementations](packages): the selected provider's protocol, permissions, sessions, and limitations.
+- [Renderer styles](apps/desktop/src/renderer/src/app/styles.css): desktop UI changes. Renderer tokens and shared components own exact values.
 - [Markdown renderer](apps/desktop/src/renderer/src/ui/Markdown.tsx): Markdown, file references, diagrams, math, or rich output.
 - [Contributing](CONTRIBUTING.md): setup, check selection, or schema regeneration.
 - [Release](docs/release.md): versioning, changelog entries, installer preparation, and candidate certification.
-- [Site deployment configuration](vercel.json): website builds and deployment; see [Remote control](docs/remote-control.md) for the account service.
-- [Remote control](docs/remote-control.md): accounts, relay, device linking, and headless hosts.
+- [Site deployment configuration](apps/site/wrangler.jsonc) and [account worker configuration](apps/control/wrangler.jsonc): Cloudflare Pages, Worker, D1, and relay setup.
+- [Remote contracts](packages/contracts/src/remote.ts) and [account worker](apps/control/src/index.ts): accounts, relay, device linking, and headless hosts.
 
 ## Verification
 

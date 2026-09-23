@@ -32,9 +32,9 @@ See [Contributing](CONTRIBUTING.md) for development checks and [Release](docs/re
 
 | Task | Reference |
 | --- | --- |
-| Change processes, storage, IPC, or recovery | [Architecture](docs/architecture.md) |
-| Work on provider behavior | [Claude](docs/claude-provider.md), [Cursor](docs/cursor-provider.md) |
-| Change desktop UI or transcript output | [Design](docs/design.md), [Markdown renderer](apps/desktop/src/renderer/src/ui/Markdown.tsx) |
-| Build or deploy the site | [Site deployment configuration](vercel.json), [Remote control](docs/remote-control.md) |
+| Change processes, storage, IPC, or recovery | [Host](packages/host/src/host.ts), [contracts](packages/contracts/src/ipc.ts) |
+| Work on provider behavior | [Provider packages](packages) |
+| Change desktop UI or transcript output | [Renderer styles](apps/desktop/src/renderer/src/app/styles.css), [Markdown renderer](apps/desktop/src/renderer/src/ui/Markdown.tsx) |
+| Build or deploy the site | [Pages configuration](apps/site/wrangler.jsonc), [account worker](apps/control/wrangler.jsonc) |
 | See what changed between versions | [Changelog](CHANGELOG.md) |
 | Work as an agent | [AGENTS.md](AGENTS.md) |
