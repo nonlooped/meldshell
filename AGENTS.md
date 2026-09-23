@@ -13,14 +13,11 @@ User instructions take precedence over skills. Keep skills within the requested 
 - [Architecture](docs/architecture.md): process boundaries, IPC, persistence, recovery, or provider integration.
 - [Claude](docs/claude-provider.md) and [Cursor](docs/cursor-provider.md): the selected provider's protocol, permissions, sessions, and limitations.
 - [Design](docs/design.md): desktop UI changes. Renderer tokens and shared components own exact values.
-- [Transcript rendering](docs/markdown-rendering.md): Markdown, file references, diagrams, math, or rich output.
+- [Markdown renderer](apps/desktop/src/renderer/src/ui/Markdown.tsx): Markdown, file references, diagrams, math, or rich output.
 - [Contributing](CONTRIBUTING.md): setup, check selection, or schema regeneration.
 - [Release](docs/release.md): installer preparation and candidate certification.
-- [Website](docs/website.md): site builds and deployment.
+- [Site deployment configuration](vercel.json): website builds and deployment; see [Remote control](docs/remote-control.md) for the account service.
 - [Remote control](docs/remote-control.md): accounts, relay, device linking, and headless hosts.
-- [Documentation maintenance](docs/agent-documentation.md): changes to instructions, skills, or documentation.
-
-[Roadmap](docs/roadmap.md) describes open product work. The competitive analysis and release records are dated evidence, not implementation instructions or certification of this checkout.
 
 ## Verification
 

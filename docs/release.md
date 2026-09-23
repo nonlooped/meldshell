@@ -36,12 +36,13 @@ Use fresh operating-system user profiles. Run the provider matrix on Windows and
 | Worker failure | Affected work settles, other providers continue, and reconnect does not replay ambiguous submissions |
 | Usage | All configured provider cards refresh or show an account-appropriate unavailable/error state |
 | Forced exit | Running turns become interrupted; queued input survives restart |
-| Attention | Completion and approval notifications focus the correct thread |
+| Attention | Completion and approval notifications focus the correct thread; out-of-view completion marks clear on viewing, and optional sounds respect the preference |
+| Remote control | A linked desktop and headless host appear only to their account; browser prompts, queues, questions, approvals, files, and Git operations reach the right host; reconnect and revocation preserve host work |
 | Workspace lifecycle | Rename/pin persist; active work blocks removal; removal keeps disk files |
 | Search/preferences | Matches open the right turn, archives remain searchable, preferences survive restart; temporary tabs/drafts are accurately represented |
 | Files/Git | Previews and line links open correctly; staging, unstaging, discard, commit, push, and history reflect the test repository |
 | Layout/accessibility | Keyboard navigation, split panes, themes, reduced motion, transparency fallback, and text scaling remain usable |
-| History/scale | Recent windows, older-history loading, and search navigation preserve complete turns; measure the 10,000-thread target and large-turn limits |
+| History/scale | Forward-paged full-history loading and search navigation preserve complete turns; measure the 10,000-thread target, long-history fetch cost, and large-turn limits |
 | Updates | Both platforms check, download, and restart; up-to-date/feed-error states recover; cancelling the active-turn warning keeps the app running; development stays offline from the feed |
 | Uninstall | Windows per-user uninstall needs no elevation and retains user data unless separately removed |
 
@@ -49,6 +50,6 @@ Use a disposable repository for Git operations and a separate application profil
 
 ## Record and publish
 
-Record source commit and local changes, artifact names, sizes, SHA-256 hashes, operating-system versions, installed provider versions, commands, and each matrix result under `docs/releases`. Mark skipped and failing checks explicitly.
+Keep a candidate record with the source commit and local changes, artifact names, sizes, SHA-256 hashes, operating-system versions, installed provider versions, commands, and each matrix result. Mark skipped and failing checks explicitly.
 
-Only describe a candidate as verified to the extent its record supports. Unsigned Windows installers may trigger SmartScreen. The [0.1.0 record](releases/0.1.0.md) is historical and cannot certify this checkout.
+Only describe a candidate as verified to the extent its record supports. Unsigned Windows installers may trigger SmartScreen.

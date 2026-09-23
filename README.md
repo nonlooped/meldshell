@@ -11,8 +11,9 @@ Each MeldShell thread keeps a separate native session for each harness. Switchin
 - SQLite history, durable queues, worker recovery, and native session resume.
 - Workspace files, file previews, diffs, Git staging, commits, push, and history.
 - Provider catalogs, account usage where available, and appearance preferences.
+- Remote browser access to a linked desktop or headless host.
 
-Windows 11 x64 NSIS and Linux x64 AppImage are the configured release targets. Windows uses acrylic; Linux uses a solid backdrop. Release targets and implemented features do not imply completed certification. See the [release checklist](docs/release.md) and [historical candidate record](docs/releases/0.1.0.md).
+Windows 11 x64 NSIS and Linux x64 AppImage are the configured release targets. Windows uses acrylic; Linux uses a solid backdrop. Release targets and implemented features do not imply completed certification. See the [release checklist](docs/release.md).
 
 ## Run from source
 
@@ -31,10 +32,8 @@ See [Contributing](CONTRIBUTING.md) for development checks and [Release](docs/re
 
 | Task | Reference |
 | --- | --- |
-| Understand capabilities and open work | [Roadmap](docs/roadmap.md) |
 | Change processes, storage, IPC, or recovery | [Architecture](docs/architecture.md) |
 | Work on provider behavior | [Claude](docs/claude-provider.md), [Cursor](docs/cursor-provider.md) |
-| Change desktop UI or transcript output | [Design](docs/design.md), [Markdown](docs/markdown-rendering.md) |
-| Build or deploy the site | [Website](docs/website.md) |
+| Change desktop UI or transcript output | [Design](docs/design.md), [Markdown renderer](apps/desktop/src/renderer/src/ui/Markdown.tsx) |
+| Build or deploy the site | [Site deployment configuration](vercel.json), [Remote control](docs/remote-control.md) |
 | Work as an agent | [AGENTS.md](AGENTS.md) |
-| Maintain rules and skills | [Documentation maintenance](docs/agent-documentation.md) |

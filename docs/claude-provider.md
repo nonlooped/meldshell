@@ -1,6 +1,6 @@
 # Claude Code integration
 
-Use this document for Claude discovery, sessions, permissions, model controls, and limitations. The implementation lives in [provider-claude](../packages/provider-claude/src/index.ts), its [worker](../packages/provider-claude/src/worker-runtime.ts), and the [desktop supervisor](../apps/desktop/src/main/runtime/worker-provider.ts).
+Use this document for Claude discovery, sessions, permissions, model controls, and limitations. The implementation lives in [provider-claude](../packages/provider-claude/src/index.ts), its [worker](../packages/provider-claude/src/worker-runtime.ts), and the shared [host supervisor](../packages/host/src/worker-provider.ts).
 
 ## Connection and credentials
 
@@ -55,6 +55,6 @@ Claude evaluates configured rules before MeldShell's approval callback, so alrea
 
 Dedicated controls for MCP authentication/elicitation, plugin management, command discovery, checkpoint rewind, session import/fork, live steering, and background-task management are absent.
 
-This document describes the integration; it does not certify authenticated behavior. Use the [release checklist](release.md) for candidate checks. The older 0.1.0 artifact record does not verify subsequent Claude changes.
+This document describes the integration; it does not certify authenticated behavior. Use the [release checklist](release.md) for candidate checks.
 
 For dependency changes, consult primary [SDK documentation](https://code.claude.com/docs/en/agent-sdk/overview), [permissions](https://code.claude.com/docs/en/agent-sdk/permissions), [sessions](https://code.claude.com/docs/en/agent-sdk/sessions), [user input](https://code.claude.com/docs/en/agent-sdk/user-input), [model configuration](https://code.claude.com/docs/en/model-config), and [project instructions](https://code.claude.com/docs/en/agent-sdk/modifying-system-prompts).
