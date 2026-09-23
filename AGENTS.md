@@ -15,7 +15,7 @@ User instructions take precedence over skills. Keep skills within the requested 
 - [Design](docs/design.md): desktop UI changes. Renderer tokens and shared components own exact values.
 - [Markdown renderer](apps/desktop/src/renderer/src/ui/Markdown.tsx): Markdown, file references, diagrams, math, or rich output.
 - [Contributing](CONTRIBUTING.md): setup, check selection, or schema regeneration.
-- [Release](docs/release.md): installer preparation and candidate certification.
+- [Release](docs/release.md): versioning, changelog entries, installer preparation, and candidate certification.
 - [Site deployment configuration](vercel.json): website builds and deployment; see [Remote control](docs/remote-control.md) for the account service.
 - [Remote control](docs/remote-control.md): accounts, relay, device linking, and headless hosts.
 
@@ -28,6 +28,10 @@ Visual verification and manual testing belong to the user unless explicitly requ
 Run repository-wide lint, builds, typechecks, suites, or aggregate checks only when requested or when targeted checks cannot cover the impact; state the reason first. Release certification follows its checklist. Batch checks after coherent changes, then finish once relevant checks pass. Repeat only for new changes, failures, or unresolved risks.
 
 Report what changed, what was checked, and any remaining failure or verification limit.
+
+## Changelog
+
+A user-visible change adds an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) in the same change. Do not edit released sections or version fields by hand; `npm run release` does that.
 
 ## Dependency documentation
 

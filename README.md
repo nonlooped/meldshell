@@ -36,4 +36,5 @@ See [Contributing](CONTRIBUTING.md) for development checks and [Release](docs/re
 | Work on provider behavior | [Claude](docs/claude-provider.md), [Cursor](docs/cursor-provider.md) |
 | Change desktop UI or transcript output | [Design](docs/design.md), [Markdown renderer](apps/desktop/src/renderer/src/ui/Markdown.tsx) |
 | Build or deploy the site | [Site deployment configuration](vercel.json), [Remote control](docs/remote-control.md) |
+| See what changed between versions | [Changelog](CHANGELOG.md) |
 | Work as an agent | [AGENTS.md](AGENTS.md) |
