@@ -109,7 +109,8 @@ export function attachRelay(
       let refusal: [number, string] = [4003, "Not authorized"]
       if (url.pathname === "/api/remote/v1/host") {
         const credential = request.headers.authorization?.replace(/^Bearer /, "") ?? ""
-        if (devices.authenticate(deviceId, credential)) accept = (ws) => hostConnected(ws, deviceId)
+        if (await devices.authenticate(deviceId, credential))
+          accept = (ws) => hostConnected(ws, deviceId)
       } else if (url.pathname === "/api/remote/v1/client") {
         if (!origins.includes(request.headers.origin ?? "")) return socket.destroy()
         const session = await sessionFor(request)

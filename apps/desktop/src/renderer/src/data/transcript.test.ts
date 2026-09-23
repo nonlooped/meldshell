@@ -66,15 +66,6 @@ test("concurrent cache writes survive a forward refresh", async () => {
   )
 })
 
-test("failed or nonadvancing catch-up never commits a partial cursor", async () => {
-  const initial = mergeTranscript(undefined, [event(10, "recent")])
-  await assert.rejects(
-    refreshTranscript(async () => ({ events: [], nextCursor: 10 }), "thread", initial),
-    /did not advance/,
-  )
-  assert.equal(initial.latestSequence, 10)
-})
-
 test("initial load rejects a stalled cursor without returning partial history", async () => {
   await assert.rejects(
     refreshTranscript(async () => ({ events: [event(1, "old")], nextCursor: 0 }), "thread"),

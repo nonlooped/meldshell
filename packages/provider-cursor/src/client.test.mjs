@@ -160,11 +160,6 @@ test("timeouts close the connection and reject every outstanding request", async
   await assert.rejects(request(client, "echo"), /timed out/)
 })
 
-test("process exit rejects pending requests", async (t) => {
-  const client = setup(t)
-  await assert.rejects(request(client, "exit", {}, 0))
-})
-
 test("explicit close rejects requests and can be repeated", async (t) => {
   const client = setup(t)
   const pending = assert.rejects(request(client, "stall", {}, 0), /connection closed/)

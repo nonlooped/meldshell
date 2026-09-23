@@ -12,12 +12,14 @@ const Register = Schema.Struct({
 })
 export async function createControlServer(database: DatabaseSync, config: AccountConfig) {
   const auth = await createAccounts(database, config)
-  const devices = new Devices(database)
+  const devices = new Devices(database, auth)
   const origins = [config.siteURL, config.baseURL]
   const json = (value: unknown, status = 200) =>
     Response.json(value, { status, headers: { "Cache-Control": "no-store" } })
   const handler = async (request: Request): Promise<Response> => {
     const url = new URL(request.url)
+    // Device keys are managed only through the device lifecycle endpoints.
+    if (url.pathname.startsWith("/api/auth/api-key/")) return json({ error: "Not found" }, 404)
     if (url.pathname.startsWith("/api/auth/")) return auth.handler(request)
     if (url.pathname === "/api/remote/v1/config") return json({ google: !!config.google })
     const origin = request.headers.get("origin")
@@ -39,12 +41,14 @@ export async function createControlServer(database: DatabaseSync, config: Accoun
       const existing = devices.get(input.deviceId)
       if (existing && existing.account_id !== session.user.id)
         return json({ error: "Device cannot be registered" }, 403)
+      const registered = await devices.register(session.user.id, input.deviceId, input.name)
       relay.revoke(input.deviceId)
-      return json(devices.register(session.user.id, input.deviceId, input.name))
+      return json(registered)
     }
     if (url.pathname.startsWith("/api/remote/v1/devices/") && request.method === "DELETE") {
       const id = url.pathname.split("/").at(-1)!
-      if (!devices.revoke(session.user.id, id)) return json({ error: "Device not found" }, 404)
+      if (!(await devices.revoke(session.user.id, id)))
+        return json({ error: "Device not found" }, 404)
       relay.revoke(id)
       return json({ revoked: true })
     }

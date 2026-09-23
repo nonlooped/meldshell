@@ -59,6 +59,10 @@ A device is online while its host holds a relay connection. Relay heartbeats eve
 
 Commands are validated at the relay and host. Frames are limited to 8 MB and send buffers to 16 MB; a slow client is disconnected instead of stalling the host. On reconnect, a browser refetches current state and open transcripts through the existing sequence cursors.
 
+Snapshot reads pilot a shared Effect RPC contract inside the v1 relay envelope; deploy the browser and host from the same release. Other operations retain their existing command protocol. The relay still authenticates connections and routes responses by client and request.
+
+Device credentials use Better Auth's API key plugin. A device record binds a stable device ID to one key ID; user-created keys cannot acquire that binding. Startup imports existing credential hashes transactionally, including revocation state, so linked hosts keep their credentials. API key HTTP endpoints are not exposed; device registration and removal own rotation and revocation. Presence remains in the device table.
+
 Commands are never resent automatically. If the connection drops before a result arrives, the browser reports it and the draft remains; check the conversation before sending again. Approvals are answered once across clients, using the running turn's harness, and stay pending if delivery to the provider fails. Browser attachments are images sent as content. Adding workspaces and updating the app remain desktop-only.
 
 ## Tests and manual acceptance
@@ -71,4 +75,4 @@ Deferred: native mobile apps, cross-device history sync, cloud-queued commands, 
 
 ## Dependency references
 
-The integration follows Better Auth's [installation](https://better-auth.com/docs/installation), [Google](https://better-auth.com/docs/authentication/google), [device authorization](https://better-auth.com/docs/plugins/device-authorization), and [migration](https://better-auth.com/docs/concepts/database#programmatic-migrations) documentation. Reconnection uses [partysocket](https://github.com/cloudflare/partykit/tree/main/packages/partysocket).
+The integration follows Better Auth's [installation](https://better-auth.com/docs/installation), [Google](https://better-auth.com/docs/authentication/google), [device authorization](https://better-auth.com/docs/plugins/device-authorization), [API keys](https://better-auth.com/docs/plugins/api-key), and [migration](https://better-auth.com/docs/concepts/database#programmatic-migrations) documentation. Reconnection uses [partysocket](https://github.com/cloudflare/partykit/tree/main/packages/partysocket).

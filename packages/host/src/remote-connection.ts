@@ -1,3 +1,5 @@
+import { executeRemoteRpc } from "./remote-rpc"
+import { REMOTE_RPC_METHOD } from "@meldshell/contracts"
 import ReconnectingWebSocket from "partysocket/ws"
 import WS from "ws"
 import { MAX_FRAME_BYTES, MAX_BUFFER_BYTES, type RemoteResult } from "@meldshell/contracts"
@@ -73,7 +75,7 @@ export function connectRelay(
     else if (credential) status = "Offline; reconnecting"
   })
   socket.addEventListener("message", (event) => {
-    let frame: { type?: unknown; clientId?: unknown; command?: { id?: string } }
+    let frame: { type?: unknown; clientId?: unknown; command?: { id?: string; method?: string } }
     try {
       frame = JSON.parse(String(event.data))
     } catch {
@@ -81,7 +83,11 @@ export function connectRelay(
     }
     const { clientId } = frame
     if (frame.type !== "command" || typeof clientId !== "string") return socket.reconnect(1008)
-    void execute(frame.command).then((result) => send({ ...result, clientId }))
+    const result =
+      frame.command?.method === REMOTE_RPC_METHOD
+        ? executeRemoteRpc(frame.command, execute)
+        : execute(frame.command)
+    void result.then((result) => send({ ...result, clientId }))
   })
   /** Connects, reconnects, or disconnects to match the stored credential. */
   const sync = async () => {

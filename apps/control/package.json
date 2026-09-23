@@ -10,12 +10,13 @@
     "test": "node --import tsx --test src/*.test.ts"
   },
   "dependencies": {
-    "better-auth": "1.7.5",
-    "nodemailer": "10.0.10",
-    "ws": "8.21.3",
+    "@better-auth/api-key": "1.7.5",
     "@meldshell/contracts": "*",
+    "better-auth": "1.7.5",
+    "effect": "3.22.1",
+    "nodemailer": "10.0.10",
     "tsx": "4.23.13",
-    "effect": "3.22.1"
+    "ws": "8.21.3"
   },
   "devDependencies": {
     "@types/nodemailer": "8.0.2",
