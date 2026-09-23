@@ -1,0 +1,9 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Cloudflare Pages project for the static site. Its /api function forwards to the account worker
+  // (apps/control), which must be deployed first.
+  "name": "meldshell",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-09-01",
+  "services": [{ "binding": "CONTROL", "service": "meldshell-control" }]
+}

@@ -1,4 +1,5 @@
-export const accountURL = import.meta.env.PUBLIC_CONTROL_URL || window.location.origin
+/** The site serves the account API and relay under /api on its own origin. */
+export const accountURL = window.location.origin
 
 /** Thrown when the account service cannot be reached, so pages can retry instead of failing. */
 export class ServiceUnavailable extends Error {}
@@ -20,7 +21,7 @@ export async function accountRequest(
   } catch {
     throw new ServiceUnavailable(
       import.meta.env.DEV
-        ? "Can’t reach the account service. Keep npm run dev:all running, then try again."
+        ? "Can’t reach the account worker. Keep npm run dev:all running, then try again."
         : "Can’t reach MeldShell accounts. Check your connection and try again.",
     )
   }

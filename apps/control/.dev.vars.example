@@ -1,0 +1,10 @@
+# Copy to .dev.vars for `npm run dev --workspace=@meldshell/control`. The site's dev server proxies
+# /api to this worker, so the site origin is also the account origin.
+BETTER_AUTH_URL=http://localhost:4321
+# Generate with: openssl rand -base64 32
+BETTER_AUTH_SECRET=
+# Register BETTER_AUTH_URL/api/auth/callback/google and .../callback/discord as redirect URIs.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=

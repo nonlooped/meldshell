@@ -1,7 +1,16 @@
 import { snapshotRpc } from "./rpc"
 import ReconnectingWebSocket from "partysocket/ws"
 import { selectBrowserImages } from "./attachments"
-import { IPC, createInvoker, MAX_FRAME_BYTES, type MeldShellApi } from "@meldshell/contracts"
+import {
+  IPC,
+  createInvoker,
+  HEARTBEAT_INTERVAL_MS,
+  HEARTBEAT_PING,
+  HEARTBEAT_PONG,
+  HEARTBEAT_TIMEOUT_MS,
+  MAX_FRAME_BYTES,
+  type MeldShellApi,
+} from "@meldshell/contracts"
 import { accountURL } from "./accounts"
 
 type Listener = (...args: unknown[]) => void
@@ -39,7 +48,19 @@ export function remoteApi(
     shouldReconnectOnClose: (event) => event.code !== 4003,
   })
   const rpc = snapshotRpc((text) => socket.send(text))
+  // Browsers cannot see protocol pings, so a silent half-open socket is detected here instead.
+  let heard = Date.now()
+  const heartbeat = setInterval(() => {
+    if (socket.readyState !== socket.OPEN) return
+    if (Date.now() - heard > HEARTBEAT_TIMEOUT_MS) socket.reconnect(4000, "Heartbeat timed out")
+    else socket.send(HEARTBEAT_PING)
+  }, HEARTBEAT_INTERVAL_MS)
+  socket.addEventListener("open", () => {
+    heard = Date.now()
+  })
   socket.addEventListener("message", ({ data }) => {
+    heard = Date.now()
+    if (data === HEARTBEAT_PONG) return
     const frame = JSON.parse(data)
     if (frame.type === "connected") {
       status("Connected", "connected")
@@ -70,6 +91,7 @@ export function remoteApi(
   window.addEventListener(
     "pagehide",
     () => {
+      clearInterval(heartbeat)
       socket.close()
       void rpc.dispose()
     },
@@ -111,6 +133,7 @@ export function remoteApi(
     linkRemote: unsupported,
     openRemotePage: unsupported,
     unlinkRemote: unsupported,
+    retryRemote: unsupported,
     gitFileAction: (input) =>
       input.action === "restore" &&
       !confirm(`Discard unstaged changes to ${input.path} on the host?`)

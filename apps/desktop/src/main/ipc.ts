@@ -10,8 +10,10 @@ import { getMainWindow, applyAppearance } from "./window"
 import { updateService } from "./updater"
 import { getWebPageTitle } from "./web-page-title"
 
+// The site serves the account API; development uses the site dev server, which proxies it.
 const controlURL =
-  import.meta.env.VITE_CONTROL_URL || (import.meta.env.DEV ? "http://localhost:3001" : "")
+  import.meta.env.VITE_CONTROL_URL ||
+  (import.meta.env.DEV ? "http://localhost:4321" : "https://meldshell.nonlooped.xyz")
 
 const selectAttachments = Effect.gen(function* () {
   const options: Electron.OpenDialogOptions = {
@@ -103,7 +105,6 @@ export const registerIpc = (): void => {
   const remote = async () => (await desktopHost.start()).remote
   ipcMain.handle(IPC.getRemoteStatus, async () => (await remote()).status())
   ipcMain.handle(IPC.linkRemote, async () => {
-    if (!controlURL) throw new Error("This build has no account service configured.")
     return (await remote()).link(controlURL)
   })
   ipcMain.handle(IPC.openRemotePage, async (_event, raw: unknown) => {
@@ -113,4 +114,5 @@ export const registerIpc = (): void => {
     await shell.openExternal(url)
   })
   ipcMain.handle(IPC.unlinkRemote, async () => (await remote()).unlink())
+  ipcMain.handle(IPC.retryRemote, async () => (await remote()).retry())
 }

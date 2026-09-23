@@ -28,9 +28,16 @@
         "ws"
       ]
     },
+    "apps/control": {
+      "entry": ["test/*.test.ts"],
+      // `cloudflare:workers` is a Workers runtime module, not a package.
+      "ignoreDependencies": ["cloudflare"]
+    },
     "apps/site": {
+      // Pages runs the /api function, which forwards to the account worker.
+      "entry": ["functions/**/*.ts"],
       // The remote workspace page bundles the desktop renderer, whose imports resolve against
-      // the site's install on Vercel. Its tsconfig extends the Electron toolkit preset.
+      // the site's install on Pages. Its tsconfig extends the Electron toolkit preset.
       "ignoreDependencies": [
         "@base-ui-components/react",
         "@electron-toolkit/tsconfig",

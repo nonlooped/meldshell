@@ -5,6 +5,7 @@ out/
 release/
 .vite/
 .astro/
+.wrangler/
 .vercel/
 *.tsbuildinfo
 .cache/
@@ -25,6 +26,9 @@ release/
 .env
 .env.*
 !.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 *.p12
 *.pfx
 

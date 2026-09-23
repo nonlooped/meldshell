@@ -26,12 +26,12 @@
     "rebuild:native": "npm run rebuild:native --workspace=@meldshell/desktop",
     "release": "node scripts/release.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "node --import tsx --test \"tests/**/*.test.ts\" \"tests/**/*.test.mjs\" \"packages/**/*.test.ts\" \"packages/**/*.test.mjs\" \"apps/desktop/src/**/*.test.ts\" \"apps/desktop/src/**/*.test.mjs\" \"apps/control/src/**/*.test.ts\" \"apps/site/src/remote/**/*.test.ts\"",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\" \"tests/**/*.test.mjs\" \"packages/**/*.test.ts\" \"packages/**/*.test.mjs\" \"apps/desktop/src/**/*.test.ts\" \"apps/desktop/src/**/*.test.mjs\" \"apps/control/test/**/*.test.ts\" \"apps/site/src/remote/**/*.test.ts\"",
     "check:fast": "npm run lint && npm run format:check && npm run typecheck",
     "host": "npm run start --workspace=@meldshell/headless --",
-    "control": "npm run start --workspace=@meldshell/control",
-    "dev:all": "node --env-file-if-exists=apps/site/.env scripts/dev-all.mjs",
-    "dev:host": "node --env-file-if-exists=apps/site/.env scripts/dev-host.mjs"
+    "control": "npm run dev --workspace=@meldshell/control",
+    "dev:all": "node scripts/dev-all.mjs",
+    "dev:host": "node scripts/dev-host.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
