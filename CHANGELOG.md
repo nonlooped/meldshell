@@ -11,6 +11,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Use library-maintained public IP classification for web titles, including embedded IPv4 checks.
 - Use Effect's database migrator with legacy history conversion and pre-migration backups.
 
+### Fixed
+
+- Closing the app or headless host now waits for the database process to stop, so an immediate restart on Windows no longer finds the database locked.
+
 ## [0.2.0] - 2026-09-23
 
 ### Added
