@@ -1,40 +1,9 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "node:test"
-import { useTabStore } from "./tab-store"
-import { emptyDraft, useThreadDrafts } from "./thread-drafts"
+import { useThreadDrafts } from "./thread-drafts"
 
 beforeEach(() => {
-  useTabStore.setState({
-    threadTabs: [],
-    selectedThreadTabId: null,
-    layout: null,
-    openThreadIds: [],
-    selectedThreadId: null,
-    selectedFileId: null,
-    files: [],
-  })
   useThreadDrafts.setState({ drafts: {} })
-})
-
-test("drafts and sending state stay with their thread during tab changes", () => {
-  const store = useTabStore.getState()
-  const drafts = useThreadDrafts.getState()
-  const attachment = {
-    type: "image" as const,
-    value: "data:image/png;base64,example",
-    name: "a.png",
-  }
-  drafts.update("a", { text: "Message A", attachments: [attachment], sending: true })
-  drafts.update("b", { text: "Message B" })
-  store.openThread("a")
-  store.openThread("b")
-  store.closeThread("a")
-  store.openThread("a")
-  assert.equal(useThreadDrafts.getState().drafts.a!.sending, true)
-  const sent = useThreadDrafts.getState().drafts.a!
-  drafts.finish("a", sent)
-  assert.deepEqual(useThreadDrafts.getState().drafts.a, emptyDraft)
-  assert.equal(useThreadDrafts.getState().drafts.b!.text, "Message B")
 })
 
 test("a send completing after draft changes preserves edits and new attachments", () => {

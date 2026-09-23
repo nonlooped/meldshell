@@ -43,9 +43,6 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     case "error":
       send({ id, error: { code: -32601, message: "Unsupported", data: params } })
       break
-    case "exit":
-      process.exit(3)
-      break
     case "oversized":
       process.stdout.write("x".repeat(16 * 1024 * 1024 + 1))
       break

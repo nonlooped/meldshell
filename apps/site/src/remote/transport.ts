@@ -1,3 +1,4 @@
+import { snapshotRpc } from "./rpc"
 import ReconnectingWebSocket from "partysocket/ws"
 import { selectBrowserImages } from "./attachments"
 import { IPC, createInvoker, MAX_FRAME_BYTES, type MeldShellApi } from "@meldshell/contracts"
@@ -37,6 +38,7 @@ export function remoteApi(
     maxReconnectionDelay: 15_000,
     shouldReconnectOnClose: (event) => event.code !== 4003,
   })
+  const rpc = snapshotRpc((text) => socket.send(text))
   socket.addEventListener("message", ({ data }) => {
     const frame = JSON.parse(data)
     if (frame.type === "connected") {
@@ -44,6 +46,7 @@ export function remoteApi(
       emit(IPC.runtimeChanged, ["*", true])
     } else if (frame.type === "event") emit(frame.channel, frame.args)
     else if (frame.type === "result") {
+      if (frame.id.startsWith("rpc_")) return rpc.receive(frame)
       const entry = pending.get(frame.id)
       pending.delete(frame.id)
       if (frame.ok) entry?.resolve(frame.value)
@@ -57,13 +60,21 @@ export function remoteApi(
         new Error("The connection dropped before this was confirmed. Check the conversation."),
       )
     pending.clear()
+    rpc.disconnect()
     if (event.code === 4003)
       status("Access to this computer ended. Return to your devices to reconnect.", "ended")
     else if (event.code === 1012)
       status("This computer went offline. Agents keep running there; waiting for it…", "offline")
     else status("Connection lost. Agents keep running on the host; reconnecting…", "reconnecting")
   })
-  window.addEventListener("pagehide", () => socket.close(), { once: true })
+  window.addEventListener(
+    "pagehide",
+    () => {
+      socket.close()
+      void rpc.dispose()
+    },
+    { once: true },
+  )
 
   const invoke = (method: string, args: readonly unknown[]) =>
     new Promise<unknown>((resolve, reject) => {
@@ -78,6 +89,7 @@ export function remoteApi(
   const api = createInvoker((channel, ...args) => invoke(channel, args))
   return {
     ...api,
+    getSnapshot: rpc.getSnapshot,
     platform: "web",
     addWorkspace: unsupported,
     selectAttachments: selectBrowserImages,

@@ -1,3 +1,4 @@
+import * as Migrator from "@effect/sql/Migrator"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { Effect } from "effect"
 import { repairWorkspacePaths } from "./workspace-paths"
@@ -228,8 +229,6 @@ const preserveSettings = Effect.gen(function* () {
 
 export const runMigrations = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  yield* sql`CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`
-  const applied = yield* sql<{ version: number }>`SELECT version FROM schema_migrations`
   const migrations = [
     { version: 2, apply: legacySchema },
     { version: 3, apply: preserveSettings },
@@ -270,21 +269,50 @@ export const runMigrations = Effect.gen(function* () {
     },
     { version: 7, apply: repairWorkspacePaths },
   ]
-  const pending = migrations.filter(
-    (migration) => !applied.some((row) => row.version === migration.version),
+  const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table'`
+  const has = (name: string) => tables.some((table) => table.name === name)
+  const converted = has("effect_sql_migrations")
+  const applied = converted
+    ? yield* sql<{ version: number }>`SELECT migration_id AS version FROM effect_sql_migrations`
+    : has("schema_migrations")
+      ? yield* sql<{ version: number }>`SELECT version FROM schema_migrations`
+      : []
+  const latest = Math.max(0, ...applied.map((row) => row.version))
+  if (
+    latest > migrations.at(-1)!.version ||
+    migrations.some(
+      (migration) =>
+        migration.version <= latest && !applied.some((row) => row.version === migration.version),
+    )
   )
-  const existing = yield* sql`SELECT name FROM sqlite_master WHERE name = 'threads'`
-  if (pending.length > 0 && existing.length > 0) {
+    return yield* new Migrator.MigrationError({
+      reason: "bad-state",
+      message: "Unsupported or incomplete migration history",
+    })
+  if ((!converted || latest < migrations.at(-1)!.version) && has("threads")) {
     const databases = yield* sql<{ name: string; file: string }>`PRAGMA database_list`
     const file = databases.find((database) => database.name === "main")?.file
     if (file) yield* sql`VACUUM INTO ${`${file}.backup-${Date.now()}`}`
   }
-  for (const migration of pending) {
+  // Convert history atomically before handing version tracking to Effect. The legacy
+  // table stays intact for inspection; it is no longer written or consulted afterwards.
+  if (!converted)
     yield* sql.withTransaction(
       Effect.gen(function* () {
-        yield* migration.apply
-        yield* sql`INSERT INTO schema_migrations(version, applied_at) VALUES (${migration.version}, ${new Date().toISOString()})`
+        yield* sql`CREATE TABLE effect_sql_migrations (
+      migration_id INTEGER PRIMARY KEY NOT NULL, created_at DATETIME NOT NULL DEFAULT current_timestamp,
+      name VARCHAR(255) NOT NULL
+    )`
+        if (has("schema_migrations"))
+          yield* sql`INSERT INTO effect_sql_migrations(migration_id, created_at, name)
+      SELECT version, applied_at, 'legacy_' || version FROM schema_migrations`
       }),
     )
-  }
+  yield* Migrator.make({})({
+    loader: Migrator.fromRecord(
+      Object.fromEntries(
+        migrations.map((migration) => [`${migration.version}_schema`, migration.apply]),
+      ),
+    ),
+  })
 })

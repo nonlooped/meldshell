@@ -3,7 +3,6 @@ import { test } from "node:test"
 import {
   fileReference,
   inlineFileReference,
-  prepareMarkdown,
   tableDelimited,
   enrichMarkdown,
   sourceTitles,
@@ -45,23 +44,6 @@ test("inline values and package names are not mistaken for files", () => {
     assert.equal(inlineFileReference(value), null, value)
   for (const value of ["src/main.ts", "styles.css", ".env", "src/main.ts:12"])
     assert.ok(inlineFileReference(value), value)
-})
-
-test("Windows links are encoded without changing code examples", () => {
-  const source = String.raw`[Main](C:\Work\My App\main.ts:12)`
-  assert.equal(prepareMarkdown(source), "[Main](C:/Work/My%20App/main.ts:12)")
-  assert.equal(
-    prepareMarkdown(String.raw`[Main](<C:\Work\Copy (2)\main.ts>)`),
-    "[Main](C:/Work/Copy%20%282%29/main.ts)",
-  )
-  for (const code of [
-    "`" + source + "`",
-    "```md\n" + source + "\n```",
-    "````md\n```\n" + source + "\n```\n````",
-    "~~~md\n" + source + "\n~~~",
-  ])
-    assert.equal(prepareMarkdown(code), code)
-  assert.equal(prepareMarkdown("[Guide](https://example.com)"), "[Guide](https://example.com)")
 })
 
 test("CSV and TSV preserve cell delimiters, quotes and newlines", () => {

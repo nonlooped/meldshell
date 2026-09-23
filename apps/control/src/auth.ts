@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite"
 import { betterAuth, type BetterAuthOptions } from "better-auth"
 import { getMigrations } from "better-auth/db/migration"
+import { apiKey } from "@better-auth/api-key"
 import { bearer, deviceAuthorization } from "better-auth/plugins"
 
 export interface AccountConfig {
@@ -66,6 +67,13 @@ export async function createAccounts(database: DatabaseSync, config: AccountConf
     },
     plugins: [
       bearer(),
+      apiKey({
+        configId: "device",
+        maximumNameLength: 100,
+        enableSessionForAPIKeys: false,
+        rateLimit: { enabled: false },
+        startingCharactersConfig: { shouldStore: false, charactersLength: 0 },
+      }),
       deviceAuthorization({
         verificationUri: `${config.siteURL}/device`,
         validateClient: (clientId) => clientId === "meldshell-host",

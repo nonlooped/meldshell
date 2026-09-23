@@ -1,34 +1,16 @@
 import { lookup } from "node:dns/promises"
 import { get as getHttp } from "node:http"
 import { get as getHttps } from "node:https"
-import { BlockList, isIP } from "node:net"
+import { isIP } from "node:net"
+import { Address4, Address6 } from "ip-address"
 import { Parser } from "htmlparser2"
 
-const blocked = new BlockList()
-for (const [address, prefix] of [
-  ["0.0.0.0", 8],
-  ["10.0.0.0", 8],
-  ["100.64.0.0", 10],
-  ["127.0.0.0", 8],
-  ["169.254.0.0", 16],
-  ["172.16.0.0", 12],
-  ["192.0.0.0", 24],
-  ["192.168.0.0", 16],
-  ["198.18.0.0", 15],
-  ["224.0.0.0", 3],
-] as const)
-  blocked.addSubnet(address, prefix, "ipv4")
-for (const [address, prefix] of [
-  ["2001::", 32],
-  ["2001:db8::", 32],
-  ["2002::", 16],
-] as const)
-  blocked.addSubnet(address, prefix, "ipv6")
-
-function publicAddress(address: string): boolean {
+// Only literal host addresses reach this policy; DNS answers and every redirect use it.
+export function publicAddress(address: string): boolean {
   const family = isIP(address)
-  if (family === 6) return /^[23][0-9a-f]{3}:/i.test(address) && !blocked.check(address, "ipv6")
-  return family === 4 && !blocked.check(address, "ipv4")
+  if (family === 4) return new Address4(address).isGlobal()
+  if (family === 6) return new Address6(address).isGlobal()
+  return false
 }
 
 function pageUrl(value: string): URL | null {

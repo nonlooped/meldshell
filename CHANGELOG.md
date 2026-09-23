@@ -4,6 +4,13 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Changed
+
+- Pilot typed Effect RPC for remote snapshot reads while preserving relay authentication and the no-resend rule for commands.
+- Manage linked-device credentials with Better Auth API keys, migrating existing credentials without relinking.
+- Use library-maintained public IP classification for web titles, including embedded IPv4 checks.
+- Use Effect's database migrator with legacy history conversion and pre-migration backups.
+
 ## [0.2.0] - 2026-09-23
 
 ### Added

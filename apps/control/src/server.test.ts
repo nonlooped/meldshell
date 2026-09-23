@@ -1,9 +1,10 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { DatabaseSync } from "node:sqlite"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { WebSocket } from "ws"
 import { createControlServer } from "./server"
+import { createAccounts } from "./auth"
 import { Devices } from "./devices"
 
 const config = {
@@ -66,11 +67,21 @@ test("Better Auth email sessions isolate devices; relay rejects other accounts a
   })
   assert.equal(register.status, 200)
   const device = await register.json()
+  const genericKey = await fetch(`${base}/api/auth/api-key/create`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${alice.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ configId: "device", name: "Laptop" }),
+  })
+  assert.equal(genericKey.status, 404)
+  assert.equal(
+    await service.auth.api.getSession({ headers: new Headers({ "x-api-key": device.credential }) }),
+    null,
+  )
   assert.deepEqual(
     service.devices.list(bob.id, () => false),
     [],
   )
-  assert.equal(service.devices.authenticate(deviceId, device.credential), alice.id)
+  assert.equal(await service.devices.authenticate(deviceId, device.credential), alice.id)
   const host = await openSocket(
     `${base.replace("http:", "ws:")}/api/remote/v1/host?device=${deviceId}`,
     { Authorization: `Bearer ${device.credential}` },
@@ -115,7 +126,7 @@ test("Better Auth email sessions isolate devices; relay rejects other accounts a
   })
   assert.equal(revoked.status, 200)
   assert.equal(await closed, 4003)
-  assert.equal(service.devices.authenticate(deviceId, device.credential), null)
+  assert.equal(await service.devices.authenticate(deviceId, device.credential), null)
   assert.equal(
     await closeCode(`${base.replace("http:", "ws:")}/api/remote/v1/host?device=${deviceId}`, {
       Authorization: `Bearer ${device.credential}`,
@@ -124,20 +135,54 @@ test("Better Auth email sessions isolate devices; relay rejects other accounts a
   )
 })
 
-test("credentials are hashed and last seen survives disconnects", () => {
+test("device credentials migrate, rotate, reject unrelated keys and preserve presence", async () => {
   const db = new DatabaseSync(":memory:")
-  db.exec("CREATE TABLE user(id TEXT PRIMARY KEY); INSERT INTO user VALUES ('account')")
-  const devices = new Devices(db, () => 1000)
-  const credential = devices.register("account", "device", "VPS").credential
-  assert.ok(!Buffer.from(devices.get("device")!.credential_hash).toString().includes(credential))
-  assert.equal(devices.authenticate("device", credential), "account")
-  assert.equal(devices.authenticate("device", "wrong"), null)
+  const auth = await createAccounts(db, config)
+  const user = await auth.api.signUpEmail({
+    body: { name: "Owner", email: "migration@example.com", password: "long-enough-password" },
+  })
+  const account = user.user.id
+  db.exec(`CREATE TABLE devices (id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES user(id),
+    name TEXT NOT NULL, credential_hash BLOB NOT NULL, last_seen INTEGER, revoked_at INTEGER)`)
+  const legacy = "existing-device-secret-that-must-keep-working"
+  db.prepare("INSERT INTO devices VALUES ('device', ?, 'VPS', ?, 500, NULL)").run(
+    account,
+    createHash("sha256").update(legacy).digest(),
+  )
+  db.prepare("INSERT INTO devices VALUES ('revoked', ?, 'Old', ?, 500, 600)").run(
+    account,
+    createHash("sha256").update("revoked-secret").digest(),
+  )
+  const devices = new Devices(db, auth, () => 1000)
+  assert.equal(await devices.authenticate("device", legacy), account)
+  assert.equal(await devices.authenticate("revoked", "revoked-secret"), null)
+  assert.equal(await devices.authenticate("device", "wrong"), null)
+  const impostor = await auth.api.createApiKey({
+    body: { configId: "device", userId: account, name: "VPS" },
+  })
+  assert.equal(await devices.authenticate("device", impostor.key), null)
+  await devices.register(account, "device", "x".repeat(100))
+  const credential = (await devices.register(account, "device", "VPS")).credential
+  assert.equal(await devices.authenticate("device", legacy), null)
+  assert.equal(await devices.authenticate("device", credential), account)
+  assert.equal(
+    db.prepare("SELECT key FROM apikey WHERE id = ?").get(devices.get("device")!.key_id)?.key,
+    createHash("sha256").update(credential).digest("base64url"),
+  )
   devices.seen("device")
   assert.deepEqual(
-    devices.list("account", () => false),
+    devices.list(account, () => false),
     [{ id: "device", name: "VPS", lastSeen: 1000, online: false }],
   )
-  assert.throws(() => devices.register("other", "device", "VPS"), /another account/)
+  await assert.rejects(devices.register("other", "device", "VPS"), /another account/)
+  assert.equal(await devices.revoke(account, "device"), true)
+  assert.equal(await devices.authenticate("device", credential), null)
+  assert.deepEqual(
+    devices.list(account, () => false),
+    [],
+  )
+  // Restart does not import the legacy hashes again.
+  assert.equal(await new Devices(db, auth).authenticate("device", legacy), null)
   db.close()
 })
 
