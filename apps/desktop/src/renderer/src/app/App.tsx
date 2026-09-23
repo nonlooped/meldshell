@@ -31,12 +31,14 @@ import { WorkspaceManager } from "../workspaces/WorkspaceManager"
 import { TitleBar } from "./TitleBar"
 import { AppScale } from "./AppScale"
 import { AppDialog, Button, DropdownMenu, MenuChoice, MenuRadioGroup } from "../ui/controls"
+import { ErrorToast } from "../ui/Notice"
 import { handleAppShortcut } from "./app-shortcuts"
 import { useTabStore, type FileTab } from "./tab-store"
 import { visibleThreads } from "./thread-layout"
 import { useViewStore } from "./view-store"
 import { ThreadWorkbench } from "./ThreadWorkbench"
 import { useThreadDrafts } from "./thread-drafts"
+import { useThreadSignals, useWatchedThreadIds } from "./thread-signals"
 
 import { SettingsView } from "../settings/SettingsView"
 
@@ -52,21 +54,12 @@ function MutationErrors({
   const error = mutations.find((mutation) => mutation.error !== null)?.error
   if (!error) return null
   return (
-    <FadeDiv
-      duration={0.2}
-      className="fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] flex items-center gap-[20px] [padding:12px_18px] max-w-[80vw] bg-[var(--surface-overlay)] text-[var(--text-primary)] border-[1px] border-[color:var(--line-strong)] rounded-[var(--radius)] text-[12px] [box-shadow:var(--shadow-popup)]"
-      role="alert"
-    >
-      {error.message}
-      <Button
-        size="sm"
-        onClick={() => {
-          for (const mutation of mutations) mutation.reset()
-        }}
-      >
-        Dismiss
-      </Button>
-    </FadeDiv>
+    <ErrorToast
+      message={error.message}
+      onDismiss={() => {
+        for (const mutation of mutations) mutation.reset()
+      }}
+    />
   )
 }
 
@@ -401,6 +394,11 @@ export function App(): React.JSX.Element {
     snapshot.workspaces.map((workspace) => [workspace.id, workspace.name]),
   )
   const selectedThread = allThreads.find((thread) => thread.id === selectedThreadId) ?? null
+  const unseenThreadIds = useThreadSignals(
+    snapshot.threads,
+    useWatchedThreadIds(),
+    snapshot.settings.sounds ?? true,
+  )
   const activeWorkspaceId = tabWorkspaceId(selectedFile, selectedThread)
   const openThreads = openThreadIds.flatMap((id) => {
     const thread = allThreads.find((candidate) => candidate.id === id)
@@ -481,6 +479,7 @@ export function App(): React.JSX.Element {
                   workspaceNames={workspaceNames}
                   providersByThreadId={providersByThreadId}
                   selectedThreadId={selectedThreadId}
+                  unseenThreadIds={unseenThreadIds}
                   onNewThread={requestNewThread}
                   onAddWorkspace={() => addWorkspaceMutation.mutate()}
                   onOpen={(threadId) => {

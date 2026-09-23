@@ -431,7 +431,7 @@ function ChangesSection({
       onOpenChange={onOpenChange}
     >
       <div className="flex items-center shrink-0 pr-[6px] [&_.git-section-heading]:flex-1 [&_.git-section-heading]:min-w-0">
-        <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-semibold [&:hover]:bg-[var(--surface-hover)]">
+        <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-medium [&:hover]:bg-[var(--surface-hover)]">
           <ChevronRight
             data-motion="transform background-color"
             data-motion-duration="0.2"
@@ -458,7 +458,7 @@ function ChangesSection({
           )
           return (
             <div key={side}>
-              <div className="flex items-center gap-[6px] [padding:7px_14px] text-[11px] font-semibold">
+              <div className="flex items-center gap-[6px] [padding:7px_14px] text-[11px] font-medium">
                 {side === "staged" ? "Staged changes" : "Unstaged changes"}
                 <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
                   {files.length}
@@ -512,7 +512,7 @@ function GraphSection({
       open={open}
       onOpenChange={onOpenChange}
     >
-      <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-semibold [&:hover]:bg-[var(--surface-hover)]">
+      <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-medium [&:hover]:bg-[var(--surface-hover)]">
         <ChevronRight
           data-motion="transform background-color"
           data-motion-duration="0.2"

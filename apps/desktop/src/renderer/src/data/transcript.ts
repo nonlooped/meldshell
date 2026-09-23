@@ -15,10 +15,9 @@ export interface TranscriptWindow {
   readonly projected: ReadonlyMap<string, readonly TranscriptTurn[]>
   readonly turns: readonly TranscriptTurn[]
   readonly latestSequence: number
-  readonly olderCursor: number | null
 }
 
-export async function readTranscriptPage(
+async function readTranscriptPage(
   read: (input: TranscriptQuery) => Promise<TranscriptPage>,
   input: TranscriptQuery,
 ): Promise<TranscriptPage> {
@@ -38,9 +37,8 @@ export async function readTranscriptPage(
 export function mergeTranscript(
   previous: TranscriptWindow | undefined,
   events: readonly CanonicalEvent[],
-  olderCursor = previous?.olderCursor ?? null,
 ): TranscriptWindow {
-  if (previous && events.length === 0 && olderCursor === previous.olderCursor) return previous
+  if (previous && events.length === 0) return previous
   const start = performance.now()
   const groups = new Map(previous?.groups)
   const changed = new Map<string, CanonicalEvent[]>()
@@ -64,7 +62,7 @@ export function mergeTranscript(
   }
   const turns = [...projected.values()].flat().sort((a, b) => a.sequence - b.sequence)
   transcriptMetrics.projectionMs += performance.now() - start
-  return { groups, projected, turns, latestSequence, olderCursor }
+  return { groups, projected, turns, latestSequence }
 }
 
 export async function refreshTranscript(
@@ -73,12 +71,8 @@ export async function refreshTranscript(
   previous?: TranscriptWindow,
   current: () => TranscriptWindow | undefined = () => previous,
 ): Promise<TranscriptWindow> {
-  if (!previous) {
-    const page = await readTranscriptPage(read, { threadId, limit: 200 })
-    return mergeTranscript(undefined, page.events, page.nextCursor)
-  }
   const events: CanonicalEvent[] = []
-  let afterSequence = previous.latestSequence
+  let afterSequence = previous?.latestSequence ?? 0
   while (true) {
     const page = await readTranscriptPage(read, { threadId, afterSequence, limit: 200 })
     events.push(...page.events)

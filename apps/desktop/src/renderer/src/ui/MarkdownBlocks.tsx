@@ -345,7 +345,7 @@ export function ToolImageGallery({ images }: { images: readonly string[] }) {
       {gallery.map((image, i) => (
         <figure
           key={`${i}:${image.src}`}
-          className="min-w-0 m-0 [&_figcaption]:mb-[8px] [&_figcaption]:text-[var(--text-secondary)] [&_figcaption]:text-[11px] [&_figcaption]:font-semibold [&_img]:block [&_img]:max-w-full [&_img]:max-h-[600px] [&_img]:object-contain [&_img]:rounded-[var(--radius)]"
+          className="min-w-0 m-0 [&_figcaption]:mb-[8px] [&_figcaption]:text-[var(--text-secondary)] [&_figcaption]:text-[11px] [&_figcaption]:font-medium [&_img]:block [&_img]:max-w-full [&_img]:max-h-[600px] [&_img]:object-contain [&_img]:rounded-[var(--radius)]"
         >
           <figcaption>Image result{images.length > 1 ? ` ${i + 1}` : ""}</figcaption>
           <button

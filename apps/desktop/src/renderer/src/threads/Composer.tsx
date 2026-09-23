@@ -1,6 +1,7 @@
-import { chipClasses } from "../ui/styles"
-import { FadeDiv, Pressable } from "../ui/motion"
+import { chipClasses, kbdClasses } from "../ui/styles"
+import { FadeDiv, PopPresence, Pressable, Swap } from "../ui/motion"
 import { useLayoutEffect, useRef, useState } from "react"
+import { Notice } from "../ui/Notice"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { ComposerAttachment } from "@meldshell/contracts/ipc"
 import type {
@@ -17,9 +18,9 @@ import {
   Paperclip,
   RefreshCw,
   ShieldCheck,
-  TriangleAlert,
   X,
   ArrowUp,
+  ListPlus,
   Square,
 } from "lucide-react"
 import { effortLabel, resolveSelection, selectableModels } from "../data/catalog"
@@ -112,7 +113,7 @@ function ComposerAttachments({
       {attachments.map((attachment, index) => (
         <FadeDiv duration={0.2} className={attachmentChipClasses} key={index}>
           <span
-            className="grid w-[48px] h-[48px] flex-[0_0_48px] overflow-hidden rounded-[3px] bg-[var(--surface-active)] place-items-center [&_img]:w-full [&_img]:h-full [&_img]:object-contain"
+            className="grid w-[48px] h-[48px] flex-[0_0_48px] overflow-hidden rounded-[var(--radius-sm)] bg-[var(--surface-active)] place-items-center [&_img]:w-full [&_img]:h-full [&_img]:object-contain"
             aria-hidden="true"
           >
             {attachment.previewUrl || attachment.type === "image" ? (
@@ -530,20 +531,18 @@ export function Composer({
   return (
     <div className="composer-zone [padding:0_clamp(24px,_7vw,_104px)_18px] [&_.notice]:max-w-[860px] [&_.notice]:mr-[auto] [&_.notice]:ml-[auto]">
       {!providerReady && (
-        <FadeDiv
-          duration={0.2}
-          className="notice flex items-start gap-[10px] [padding:10px_12px] mb-[10px] border-[1px] border-[color:var(--line)] border-l-[2px] border-l-[color:var(--text-secondary)] rounded-[var(--radius)] [background:rgba(255,_255,_255,_0.027)] text-[var(--text-secondary)] text-[12px] leading-[1.5] [&_svg]:flex-none [&_svg]:mt-[1px] [&_svg]:text-[var(--text-primary)]"
+        <Notice
+          tone="warning"
           role="status"
+          title="Provider unavailable"
+          message={providerDetail}
+          className="mb-[10px]"
         >
-          <TriangleAlert size={15} strokeWidth={1.75} />
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-[8px]">
-            <span>{providerDetail}</span>
-            <Button size="sm" onClick={onRecheckProvider}>
-              <RefreshCw size={13} strokeWidth={1.75} />
-              Check again
-            </Button>
-          </div>
-        </FadeDiv>
+          <Button size="sm" onClick={onRecheckProvider}>
+            <RefreshCw size={13} strokeWidth={1.75} />
+            Check again
+          </Button>
+        </Notice>
       )}
 
       <div
@@ -640,16 +639,16 @@ export function Composer({
           <div className="flex flex-none items-center gap-[6px] ml-[auto]">
             {!running && queuedCount === 0 && (
               <span
-                className="inline-flex items-center gap-[3px] mr-[5px] text-[var(--text-tertiary)] text-[10px] whitespace-nowrap [&_kbd]:[font:inherit] [@container(max-width:_620px)]:hidden"
+                className="inline-flex items-center gap-[3px] mr-[5px] text-[var(--text-tertiary)] text-[10px] whitespace-nowrap [@container(max-width:_620px)]:hidden"
                 aria-hidden="true"
               >
                 {!enterToSend && (
                   <>
-                    <kbd>Ctrl</kbd>
+                    <kbd className={kbdClasses}>Ctrl</kbd>
                     <span>+</span>
                   </>
                 )}
-                <kbd>Enter</kbd>
+                <kbd className={kbdClasses}>Enter</kbd>
               </span>
             )}
             {queuedCount > 0 && (
@@ -658,7 +657,7 @@ export function Composer({
               </span>
             )}
 
-            {running && (
+            <PopPresence show={running}>
               <IconButton
                 unstyled
                 className="[display:inline-grid] w-[28px] h-[28px] flex-[0_0_28px] border-[1px] border-[color:var(--line)] rounded-[50%] bg-transparent text-[var(--text-secondary)] cursor-default place-items-center [&:hover]:bg-[var(--surface-hover)] [&:hover]:[border-color:var(--line-strong)] [&:hover]:text-[var(--text-primary)]"
@@ -668,14 +667,14 @@ export function Composer({
               >
                 <Square size={11} fill="currentColor" strokeWidth={1.5} />
               </IconButton>
-            )}
+            </PopPresence>
 
             <IconButton
               data-motion="background-color border-color color opacity"
               unstyled
               className={sendButtonClasses}
               disabled={!canSend}
-              aria-label="Send message"
+              aria-label={running ? "Queue message" : "Send message"}
               label={sendTitle({
                 sending,
                 providerReady,
@@ -688,7 +687,13 @@ export function Composer({
               })}
               onClick={() => onSend()}
             >
-              <ArrowUp size={16} strokeWidth={2.25} />
+              <Swap id={running ? "queue" : "send"}>
+                {running ? (
+                  <ListPlus size={15} strokeWidth={2.25} />
+                ) : (
+                  <ArrowUp size={16} strokeWidth={2.25} />
+                )}
+              </Swap>
             </IconButton>
           </div>
         </div>
@@ -699,7 +704,8 @@ export function Composer({
 
 const attachmentChipClasses = [
   "inline-flex flex-[0_0_210px] max-w-[min(240px,_100%)] items-center gap-[8px] p-[6px]",
-  "border-[1px] border-[color:var(--line-subtle)] rounded-[5px] text-[var(--text-secondary)] text-[10.5px]",
+  "border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-[var(--surface-hover)]",
+  "text-[var(--text-secondary)] text-[10.5px]",
   "[&_button]:grid [&_button]:w-[20px] [&_button]:h-[20px] [&_button]:flex-[0_0_20px] [&_button]:p-0",
   "[&_button]:border-0 [&_button]:rounded-[3px] [&_button]:text-inherit [&_button]:bg-transparent",
   "[&_button]:cursor-default [&_button]:place-items-center [&_button:hover]:bg-[var(--surface-active)]",
@@ -709,9 +715,9 @@ const attachmentChipClasses = [
 const composerClasses = [
   "composer [container-type:inline-size] flex w-full max-w-[860px] [margin:0_auto] flex-col",
   "border-[1px] border-[color:var(--line)] rounded-[var(--radius-xl)] bg-[var(--surface-raised)]",
-  "[box-shadow:0_4px_16px_rgba(0,_0,_0,_0.1),_inset_0_1px_0_var(--line-subtle)]",
+  "[box-shadow:var(--shadow-raised),_inset_0_1px_0_var(--edge-highlight)]",
   "[&:focus-within]:[border-color:var(--line-strong)]",
-  "[&:focus-within]:[box-shadow:0_4px_16px_rgba(0,_0,_0,_0.1),_inset_0_1px_0_var(--line-subtle),_0_0_0_2px_var(--surface-active)]",
+  "[&:focus-within]:[box-shadow:var(--shadow-raised),_inset_0_1px_0_var(--edge-highlight),_0_0_0_3px_var(--surface-hover)]",
   "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-raised)]",
   "[@media(prefers-reduced-transparency:_reduce)]:[&:focus-within]:bg-[var(--surface-raised)]",
   "[&_textarea]:min-h-[72px] [&_textarea]:max-h-[210px] [&_textarea]:overflow-y-hidden",

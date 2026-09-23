@@ -1,4 +1,5 @@
-import { ActivitySpinner } from "../ui/motion"
+import { GradientSpinner, useMotionPreference } from "../ui/motion"
+import { motion } from "motion/react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { useRef, useState } from "react"
 import type { Provider, Thread, Workspace } from "@meldshell/contracts"
@@ -23,6 +24,7 @@ import { ProviderIcon } from "../ui/ProviderIcon"
 import { useThreadDraggable } from "../app/thread-drag"
 import type { SplitEdge } from "../app/thread-layout"
 import { Button, DropdownMenu, MenuAction, MenuChoice, MenuRadioGroup } from "../ui/controls"
+import { kbdClasses } from "../ui/styles"
 
 type InboxRow =
   | {
@@ -43,6 +45,8 @@ interface InboxProps {
   readonly workspaceNames: ReadonlyMap<string, string>
   readonly providersByThreadId: ReadonlyMap<string, Provider>
   readonly selectedThreadId: string | null
+  /** Threads that finished out of view and have not been opened since. */
+  readonly unseenThreadIds: ReadonlySet<string>
   readonly onNewThread: () => void
   readonly onAddWorkspace: () => void
   readonly onOpen: (threadId: string) => void
@@ -66,6 +70,7 @@ function InboxThread({
   onPin,
   onSetStatus,
   onDelete,
+  unseen,
 }: Pick<
   InboxProps,
   | "workspaceNames"
@@ -76,7 +81,7 @@ function InboxThread({
   | "onPin"
   | "onSetStatus"
   | "onDelete"
-> & { thread: Thread; workspaceId: string }): React.JSX.Element {
+> & { thread: Thread; workspaceId: string; unseen: boolean }): React.JSX.Element {
   const draggable = useThreadDraggable(thread.id, "inbox")
   return (
     <div
@@ -115,7 +120,7 @@ function InboxThread({
                   aria-label="Running"
                   title="Running"
                 >
-                  <ActivitySpinner />
+                  <GradientSpinner />
                 </span>
               )}
               {thread.activity === "approval" && (
@@ -141,6 +146,9 @@ function InboxThread({
                 >
                   Failed
                 </span>
+              )}
+              {unseen && ["completed", "idle", "interrupted"].includes(thread.activity) && (
+                <UnseenMark />
               )}
               <time dateTime={thread.updatedAt} title={new Date(thread.updatedAt).toLocaleString()}>
                 {formatThreadAge(thread.updatedAt)}
@@ -206,6 +214,22 @@ function InboxThread({
   )
 }
 
+function UnseenMark() {
+  const reduced = useMotionPreference()
+  return (
+    <span className="thread-activity text-[var(--color-info)]">
+      <motion.span
+        aria-hidden="true"
+        className="block w-[6px] h-[6px] rounded-full bg-[var(--color-info)]"
+        initial={reduced ? false : { scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 520, damping: 18 }}
+      />
+      Done
+    </span>
+  )
+}
+
 export function Inbox({
   threads,
   showSettled,
@@ -216,6 +240,7 @@ export function Inbox({
   workspaceNames,
   providersByThreadId,
   selectedThreadId,
+  unseenThreadIds,
   onNewThread,
   onAddWorkspace,
   onOpen,
@@ -320,7 +345,7 @@ export function Inbox({
           >
             <Search size={15} strokeWidth={1.7} aria-hidden="true" />
             <span>Search</span>
-            <kbd>Ctrl K</kbd>
+            <kbd className={kbdClasses}>Ctrl K</kbd>
           </BaseButton>
           <Button
             variant="ghost"
@@ -416,6 +441,7 @@ export function Inbox({
                     workspaceNames={workspaceNames}
                     providersByThreadId={providersByThreadId}
                     selectedThreadId={selectedThreadId}
+                    unseen={unseenThreadIds.has(row.thread.id)}
                     onOpen={onOpen}
                     onOpenBeside={onOpenBeside}
                     onPin={onPin}
@@ -471,7 +497,7 @@ const threadRowClasses = [
   "[&[data-status='settled']_.thread-open]:[padding:0_10px]",
   "[&[data-status='active']:not([data-selected])_.thread-title]:text-[var(--text-secondary)]",
   "[&[data-selected]_.thread-title]:text-[var(--text-primary)]",
-  "[&[data-selected]_.thread-title]:font-medium [&[data-status='active']_.thread-title]:pr-[28px]",
+  "[&[data-status='active']_.thread-title]:pr-[28px]",
   "[&[data-status='settled']_.thread-title]:min-w-0",
   "[&[data-status='settled']_.thread-title]:flex-[1_1_auto]",
   "[&[data-status='settled']_.thread-title]:font-normal [&[data-status='settled']_time]:min-w-[30px]",
@@ -517,11 +543,11 @@ const inboxSearchClasses = [
   "[&_input]:border-0 [&_input]:[outline:0] [&_input]:bg-transparent",
   "[&_input]:text-[var(--text-primary)] [&_input]:text-[12.5px]",
   "[&_input::placeholder]:text-[var(--text-tertiary)] [&_input::-webkit-search-cancel-button]:hidden",
-  "[&_kbd]:[font:10px_var(--font-mono)] [&_kbd]:text-[var(--text-tertiary)] [&_kbd]:shrink-0 w-full",
+  "[&_kbd]:text-[10px] [&_kbd]:shrink-0 w-full",
   "border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-[var(--surface-hover)] [padding:0_10px]",
   "[font:inherit] text-left cursor-pointer text-[var(--text-secondary)] [&_span]:flex-1",
-  "[&_span]:text-[11.5px] [&_span]:whitespace-nowrap [&:hover]:bg-[var(--surface-hover)]",
-  "[&:hover]:text-[var(--text-primary)]",
+  "[&_span]:text-[11.5px] [&_span]:whitespace-nowrap [&:hover]:bg-[var(--surface-active)]",
+  "[&:hover]:[border-color:var(--line-strong)] [&:hover]:text-[var(--text-primary)]",
 ].join(" ")
 
 const workspaceSelectorClasses = [
