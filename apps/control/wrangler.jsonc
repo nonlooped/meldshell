@@ -1,0 +1,44 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Account API and relay. It has no public route: the Pages site forwards /api/* to it through a
+  // service binding, so the site, API, and relay share one origin.
+  "name": "meldshell-control",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "BETTER_AUTH_URL": "https://meldshell.nonlooped.xyz"
+  },
+  // Secrets: BETTER_AUTH_SECRET, and GOOGLE_/DISCORD_CLIENT_ID and _CLIENT_SECRET per provider.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "meldshell",
+      "database_id": "6462fef4-d344-4686-aa2d-0bf453782237",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ACCOUNTS",
+        "class_name": "Account"
+      },
+      {
+        "name": "DEVICES",
+        "class_name": "DeviceRelay"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["Account", "DeviceRelay"]
+    }
+  ]
+}

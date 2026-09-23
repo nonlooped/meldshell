@@ -4,7 +4,8 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import concurrently from "concurrently"
 
-const controlURL = process.env.PUBLIC_CONTROL_URL || "http://localhost:3001"
+// The site dev server proxies the account worker, as Pages does in production.
+const controlURL = "http://localhost:4321"
 // Share the development desktop's data directory so this computer appears as the same device.
 const dataDirectory =
   process.env.MELDSHELL_DATA_DIR ??
@@ -28,11 +29,11 @@ const run = (args) =>
   })
 
 if (process.argv[2] === "--host") {
-  // Linking needs the account service, which starts alongside this process.
+  // Linking needs the site and account worker, which start alongside this process.
   if (!existsSync(join(dataDirectory, "remote-credential.json"))) {
     while (
-      !(await fetch(controlURL).then(
-        () => true,
+      !(await fetch(`${controlURL}/api/remote/v1/config`).then(
+        (response) => response.ok,
         () => false,
       ))
     )
@@ -43,21 +44,13 @@ if (process.argv[2] === "--host") {
 } else {
   console.info("Remote dashboard: http://localhost:4321/dashboard")
   console.info(`Host data: ${dataDirectory}`)
-  console.info("Press Ctrl+C to stop the host, account service, and website.")
+  console.info("Press Ctrl+C to stop the host, account worker, and website.")
 
   const { result } = concurrently(
     [
-      {
-        name: "host",
-        command: "node scripts/dev-host.mjs --host",
-        env: { PUBLIC_CONTROL_URL: controlURL },
-      },
+      { name: "host", command: "node scripts/dev-host.mjs --host" },
       { name: "control", command: "npm run control" },
-      {
-        name: "site",
-        command: "npm run dev --workspace=@meldshell/site -- --port 4321",
-        env: { PUBLIC_CONTROL_URL: controlURL },
-      },
+      { name: "site", command: "npm run dev --workspace=@meldshell/site -- --port 4321" },
     ],
     { killOthersOn: ["success", "failure"], prefixColors: ["yellow", "magenta", "green"] },
   )

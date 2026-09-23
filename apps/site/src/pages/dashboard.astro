@@ -114,7 +114,7 @@ npm run host -- --data-dir /var/lib/meldshell --workspace /srv/project</code></p
     const setup = $("#setup")
     const add = $<HTMLButtonElement>("#add")
     const dialog = $<HTMLDialogElement>("#revoke-dialog")
-    $("#control-url").textContent = import.meta.env.PUBLIC_CONTROL_URL || location.origin
+    $("#control-url").textContent = location.origin
 
     const icon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M2 20h20"/></svg>`
     let devices: Device[] | null = null
@@ -245,7 +245,8 @@ npm run host -- --data-dir /var/lib/meldshell --workspace /srv/project</code></p
       .then(async (session) => {
         $("#who").textContent = session.user.email
         await poll()
-        timer = setInterval(() => { if (!document.hidden) void poll() }, 2_000)
+        // Presence changes are rare; a slow poll keeps the account API within its free request quota.
+        timer = setInterval(() => { if (!document.hidden) void poll() }, 10_000)
       })
       .catch((cause) => {
         $("#loading").hidden = true

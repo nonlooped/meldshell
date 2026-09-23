@@ -5,53 +5,28 @@ import AccountPage from "../components/AccountPage.astro"
 <AccountPage title="Sign in" description="Sign in to reach the computers running MeldShell.">
   <a slot="nav" href="/">Home</a>
 
-  <section id="form-view" class="grid gap-5">
+  <section class="grid gap-5">
     <div>
       <h1 id="title">Sign in to MeldShell</h1>
       <p class="lede" id="lede">Reach your computers and keep your agents moving from any browser.</p>
     </div>
 
-    <div class="tabs" role="tablist" aria-label="Account" id="tabs">
-      <button type="button" role="tab" id="tab-sign-in" aria-selected="true" aria-controls="auth">Sign in</button>
-      <button type="button" role="tab" id="tab-create" aria-selected="false" aria-controls="auth">Create account</button>
-    </div>
-
-    <div id="google-group" class="grid gap-5" hidden>
-      <button type="button" class="btn btn-block" id="google">
+    <div class="grid gap-2" id="providers">
+      <button type="button" class="btn btn-block" data-provider="google" hidden>
         <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>
-        <span id="google-label">Continue with Google</span>
+        <span>Continue with Google</span>
       </button>
-      <div class="divider">or use email</div>
+      <button type="button" class="btn btn-block" data-provider="discord" hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="#5865F2" d="M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.3 18.3 0 0 0-5.487 0a13 13 0 0 0-.617-1.25a.08.08 0 0 0-.079-.037A19.7 19.7 0 0 0 3.677 4.37a.1.1 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.08.08 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.08.08 0 0 0 .084-.028a14 14 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13 13 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10 10 0 0 0 .372-.292a.07.07 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.07.07 0 0 1 .078.01q.181.149.373.292a.077.077 0 0 1-.006.127a12.3 12.3 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.08.08 0 0 0 .084.028a19.8 19.8 0 0 0 6.002-3.03a.08.08 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.06.06 0 0 0-.031-.03M8.02 15.33c-1.182 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418m7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418"/></svg>
+        <span>Continue with Discord</span>
+      </button>
     </div>
 
-    <form id="auth" novalidate>
-      <label class="field" id="name-field" hidden>Name<input name="name" autocomplete="name" maxlength="100" /></label>
-      <label class="field">Email<input name="email" type="email" autocomplete="email" maxlength="320" required /></label>
-      <div class="field" id="password-field">
-        <div class="field-head">
-          <label for="password">Password</label>
-          <button type="button" class="link" id="forgot">Forgot password?</button>
-        </div>
-        <div class="password">
-          <input id="password" name="password" type="password" minlength="1" maxlength="128" autocomplete="current-password" required />
-          <button type="button" id="reveal" aria-controls="password" aria-pressed="false">Show</button>
-        </div>
-        <span class="hint" id="password-hint" hidden>At least 12 characters.</span>
-      </div>
-      <p class="notice" data-tone="error" role="alert" id="error"></p>
-      <p class="notice" role="status" id="status"></p>
-      <button type="submit" class="btn btn-primary btn-block" id="submit">Sign in</button>
-      <button type="button" class="link justify-self-center text-sm" id="back" hidden>Back to sign in</button>
-    </form>
-  </section>
-
-  <section id="sent-view" class="result" hidden>
-    <span class="result-icon" aria-hidden="true">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-    </span>
-    <h1 id="sent-title">Check your email</h1>
-    <p class="lede" id="sent-body"></p>
-    <button type="button" class="btn" id="sent-back">Back to sign in</button>
+    <div class="notice" role="status" id="loading">
+      <span class="spinner" aria-hidden="true"></span><span>Loading sign-in options…</span>
+    </div>
+    <p class="notice" data-tone="error" role="alert" id="error"></p>
+    <p class="muted">New here? Choosing a provider creates your account. Providers that share a verified email sign in to the same account.</p>
   </section>
 
   <p slot="after" class="muted text-center">
@@ -61,169 +36,62 @@ import AccountPage from "../components/AccountPage.astro"
   <script>
     import { accountRequest, currentSession, describe } from "../remote/accounts"
 
-    type Mode = "sign-in" | "create" | "reset"
     const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
-    const form = $<HTMLFormElement>("#auth")
     const error = $("#error")
-    const status = $("#status")
-    const submit = $<HTMLButtonElement>("#submit")
-    const password = $<HTMLInputElement>("#password")
-    const nameInput = form.querySelector<HTMLInputElement>("[name=name]")!
-    let mode: Mode = "sign-in"
-    let google = false
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-provider]")]
 
     const destination = () => {
       const path = sessionStorage.getItem("meldshell:after-sign-in")
       return path?.startsWith("/") && !path.startsWith("//") ? path : "/dashboard"
     }
-    const leave = () => {
-      const path = destination()
-      sessionStorage.removeItem("meldshell:after-sign-in")
-      location.assign(path)
-    }
-    const connecting = destination().startsWith("/device")
-
-    const copy: Record<Mode, { title: string; lede: string; submit: string; busy: string }> = {
-      "sign-in": {
-        title: connecting ? "Sign in to connect your computer" : "Sign in to MeldShell",
-        lede: connecting
-          ? "Use the account you want this computer to belong to. You’ll confirm it on the next page."
-          : "Reach your computers and keep your agents moving from any browser.",
-        submit: "Sign in",
-        busy: "Signing in…",
-      },
-      create: {
-        title: "Create your account",
-        lede: connecting
-          ? "Create an account, then confirm the computer you’re connecting."
-          : "One account links all the computers where you run MeldShell.",
-        submit: "Create account",
-        busy: "Creating account…",
-      },
-      reset: {
-        title: "Reset your password",
-        lede: "Enter your account email and we’ll send you a link to choose a new password.",
-        submit: "Send reset link",
-        busy: "Sending…",
-      },
+    if (destination().startsWith("/device")) {
+      $("#title").textContent = "Sign in to connect your computer"
+      $("#lede").textContent = "Use the account you want this computer to belong to. You’ll confirm it on the next page."
     }
 
-    function setMode(next: Mode) {
-      mode = next
-      const text = copy[mode]
-      $("#title").textContent = text.title
-      $("#lede").textContent = text.lede
-      submit.textContent = text.submit
-      $("#tabs").hidden = mode === "reset"
-      $("#tab-sign-in").setAttribute("aria-selected", String(mode === "sign-in"))
-      $("#tab-create").setAttribute("aria-selected", String(mode === "create"))
-      $("#google-group").hidden = !google || mode === "reset"
-      $("#google-label").textContent = mode === "create" ? "Sign up with Google" : "Continue with Google"
-      $("#name-field").hidden = mode !== "create"
-      nameInput.required = mode === "create"
-      $("#password-field").hidden = mode === "reset"
-      password.required = mode !== "reset"
-      password.minLength = mode === "create" ? 12 : 1
-      password.autocomplete = mode === "create" ? "new-password" : "current-password"
-      $("#password-hint").hidden = mode !== "create"
-      $("#forgot").hidden = mode !== "sign-in"
-      $("#back").hidden = mode !== "reset"
-      error.textContent = ""
-      status.textContent = ""
-    }
-
-    function showSent(title: string, body: string) {
-      $("#form-view").hidden = true
-      $("#sent-view").hidden = false
-      $("#sent-title").textContent = title
-      $("#sent-body").textContent = body
-    }
-
-    async function busy(button: HTMLButtonElement, label: string, run: () => Promise<void>) {
-      error.textContent = ""
-      status.textContent = ""
-      const idle = button.innerHTML
-      document.querySelectorAll<HTMLButtonElement>("#form-view button").forEach((item) => { item.disabled = true })
-      button.setAttribute("aria-busy", "true")
-      if (button === submit) button.textContent = label
-      try {
-        await run()
-      } catch (cause) {
-        error.textContent = describe(cause)
-      } finally {
-        button.removeAttribute("aria-busy")
-        button.innerHTML = idle
-        document.querySelectorAll<HTMLButtonElement>("#form-view button").forEach((item) => { item.disabled = false })
-      }
-    }
+    // Better Auth returns here with an error code when the provider or account linking refuses.
+    const failure = new URL(location.href).searchParams.get("error")
+    if (failure)
+      error.textContent = /not_linked|unable_to_link/i.test(failure)
+        ? "That provider’s email isn’t verified, so it can’t join the account that already uses it. Sign in with the provider you used before."
+        : "Sign-in didn’t finish. Try again."
 
     // Already signed in: continue straight to where the visitor was going.
-    void currentSession().then((session) => { if (session) leave() }).catch(() => undefined)
-    void accountRequest("/api/remote/v1/config")
-      .then((config) => { google = !!config.google; setMode(mode) })
-      .catch((cause) => { error.textContent = describe(cause) })
-
-    $("#tab-sign-in").addEventListener("click", () => setMode("sign-in"))
-    $("#tab-create").addEventListener("click", () => setMode("create"))
-    $("#tabs").addEventListener("keydown", (event) => {
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
-      const next = mode === "sign-in" ? "create" : "sign-in"
-      setMode(next)
-      $(`#tab-${next}`).focus()
-    })
-    $("#forgot").addEventListener("click", () => { setMode("reset"); form.querySelector<HTMLInputElement>("[name=email]")!.focus() })
-    $("#back").addEventListener("click", () => setMode("sign-in"))
-    $("#sent-back").addEventListener("click", () => {
-      $("#sent-view").hidden = true
-      $("#form-view").hidden = false
-      setMode("sign-in")
-    })
-    $("#reveal").addEventListener("click", () => {
-      const shown = password.type === "text"
-      password.type = shown ? "password" : "text"
-      $("#reveal").textContent = shown ? "Show" : "Hide"
-      $("#reveal").setAttribute("aria-pressed", String(!shown))
-    })
-
-    form.addEventListener("submit", (event) => {
-      event.preventDefault()
-      if (!form.reportValidity()) return
-      const fields = new FormData(form)
-      const email = String(fields.get("email")).trim()
-      void busy(submit, copy[mode].busy, async () => {
-        if (mode === "reset") {
-          await accountRequest("/api/auth/request-password-reset", {
-            email,
-            redirectTo: new URL("/reset-password", location.origin).href,
-          })
-          showSent("Check your email", `If ${email} has a MeldShell account, a link to reset your password is on its way.`)
-          return
-        }
-        const data = await accountRequest(mode === "create" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email", {
-          name: String(fields.get("name") ?? "").trim(),
-          email,
-          password: fields.get("password"),
-          callbackURL: new URL(destination(), location.origin).href,
-        })
-        if (mode === "create" && !data.token) {
-          showSent("Verify your email", `We sent a link to ${email}. Open it to finish creating your account — you’ll come right back here.`)
-          return
-        }
-        leave()
-      })
-    })
-
-    $("#google").addEventListener("click", () => {
-      void busy($<HTMLButtonElement>("#google"), "", async () => {
-        const data = await accountRequest("/api/auth/sign-in/social", {
-          provider: "google",
-          callbackURL: new URL(destination(), location.origin).href,
-        })
+    void currentSession()
+      .then((session) => {
+        if (!session) return
+        const path = destination()
         sessionStorage.removeItem("meldshell:after-sign-in")
-        if (data.url) location.assign(data.url)
+        location.assign(path)
       })
-    })
+      .catch(() => undefined)
+    void accountRequest("/api/remote/v1/config")
+      .then((config: { providers: string[] }) => {
+        for (const button of buttons) button.hidden = !config.providers.includes(button.dataset.provider!)
+        if (config.providers.length === 0) error.textContent = "Sign-in isn’t configured on this site yet."
+      })
+      .catch((cause) => { error.textContent = describe(cause) })
+      .finally(() => { $("#loading").hidden = true })
 
-    setMode("sign-in")
+    for (const button of buttons)
+      button.addEventListener("click", () => {
+        error.textContent = ""
+        for (const item of buttons) item.disabled = true
+        button.setAttribute("aria-busy", "true")
+        void accountRequest("/api/auth/sign-in/social", {
+          provider: button.dataset.provider,
+          callbackURL: new URL(destination(), location.origin).href,
+          errorCallbackURL: new URL("/sign-in", location.origin).href,
+        })
+          .then((data: { url?: string }) => {
+            sessionStorage.removeItem("meldshell:after-sign-in")
+            if (data.url) location.assign(data.url)
+          })
+          .catch((cause) => {
+            error.textContent = describe(cause)
+            for (const item of buttons) item.disabled = false
+            button.removeAttribute("aria-busy")
+          })
+      })
   </script>
 </AccountPage>

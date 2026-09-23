@@ -111,6 +111,7 @@ export const requests = {
     "meldshell:open-remote-page",
   ),
   unlinkRemote: request<() => Promise<void>>("meldshell:unlink-remote"),
+  retryRemote: request<() => Promise<void>>("meldshell:retry-remote"),
   getWebPageTitle: request<(url: string) => Promise<string | null>>("meldshell:get-web-page-title"),
   listDirectory: request<(input: WorkspaceFileInput) => Promise<readonly DirectoryEntry[]>>(
     "meldshell:list-directory",

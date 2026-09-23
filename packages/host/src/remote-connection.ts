@@ -2,7 +2,15 @@ import { executeRemoteRpc } from "./remote-rpc"
 import { REMOTE_RPC_METHOD } from "@meldshell/contracts"
 import ReconnectingWebSocket from "partysocket/ws"
 import WS from "ws"
-import { MAX_FRAME_BYTES, MAX_BUFFER_BYTES, type RemoteResult } from "@meldshell/contracts"
+import {
+  HEARTBEAT_INTERVAL_MS,
+  HEARTBEAT_PING,
+  HEARTBEAT_PONG,
+  HEARTBEAT_TIMEOUT_MS,
+  MAX_BUFFER_BYTES,
+  MAX_FRAME_BYTES,
+  type RemoteResult,
+} from "@meldshell/contracts"
 import { readCredential, type DeviceCredential } from "./identity"
 
 /** Serializes a frame; results over the frame limit become an error for the same request. */
@@ -28,21 +36,30 @@ export function connectRelay(
 ) {
   let credential: DeviceCredential | null = null
   let status = "Not linked"
+  /** Browsers connected through the relay; events are only worth sending while one watches. */
+  let watchers = 0
   class HostSocket extends WS {
     constructor(url: string, protocols?: string | string[]) {
       super(url, protocols, {
         headers: { Authorization: `Bearer ${credential?.credential}` },
         maxPayload: MAX_FRAME_BYTES,
       })
-      // The relay pings every 15 seconds; a silent socket is half-open.
-      let timer: ReturnType<typeof setTimeout> | undefined
-      const arm = () => {
-        clearTimeout(timer)
-        timer = setTimeout(() => this.terminate(), 45_000)
+      // The relay answers each ping without waking; a socket that hears nothing is half-open.
+      let silence: ReturnType<typeof setTimeout> | undefined
+      let beat: ReturnType<typeof setInterval> | undefined
+      const heard = () => {
+        clearTimeout(silence)
+        silence = setTimeout(() => this.terminate(), HEARTBEAT_TIMEOUT_MS)
       }
-      this.on("open", arm)
-      this.on("ping", arm)
-      this.on("close", () => clearTimeout(timer))
+      this.on("open", () => {
+        heard()
+        beat = setInterval(() => this.send(HEARTBEAT_PING), HEARTBEAT_INTERVAL_MS)
+      })
+      this.on("message", heard)
+      this.on("close", () => {
+        clearTimeout(silence)
+        clearInterval(beat)
+      })
     }
   }
   const socket = new ReconnectingWebSocket(
@@ -71,15 +88,26 @@ export function connectRelay(
     status = "Online"
   })
   socket.addEventListener("close", (event) => {
+    watchers = 0
     if (event.code === 4003) status = REVOKED
     else if (credential) status = "Offline; reconnecting"
   })
   socket.addEventListener("message", (event) => {
-    let frame: { type?: unknown; clientId?: unknown; command?: { id?: string; method?: string } }
+    if (event.data === HEARTBEAT_PONG) return
+    let frame: {
+      type?: unknown
+      clientId?: unknown
+      count?: unknown
+      command?: { id?: string; method?: string }
+    }
     try {
       frame = JSON.parse(String(event.data))
     } catch {
       frame = {}
+    }
+    if (frame.type === "clients" && typeof frame.count === "number") {
+      watchers = frame.count
+      return
     }
     const { clientId } = frame
     if (frame.type !== "command" || typeof clientId !== "string") return socket.reconnect(1008)
@@ -111,7 +139,10 @@ export function connectRelay(
   return {
     status: () => status,
     sync,
-    publish: send,
+    /** Sends an event to connected browsers; they refetch state when they connect. */
+    publish: (frame: { type: string }) => {
+      if (watchers > 0) send(frame)
+    },
     close: () => socket.close(),
   }
 }

@@ -79,6 +79,8 @@ export async function startHost(
       await unlinkDevice(directory)
       await relay.sync()
     },
+    /** Reconnects now instead of waiting out the relay's backoff. */
+    retry: () => relay.sync(),
   }
 
   let closing: Promise<void> | undefined

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://meldshell.vercel.app/sitemap.xml
+Sitemap: https://meldshell.nonlooped.xyz/sitemap.xml
