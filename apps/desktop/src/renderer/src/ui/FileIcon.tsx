@@ -29,6 +29,23 @@ import settingsIcon from "@iconify-icons/material-icon-theme/settings"
 import nodejsIcon from "@iconify-icons/material-icon-theme/nodejs"
 import vueIcon from "@iconify-icons/material-icon-theme/vue"
 import svelteIcon from "@iconify-icons/material-icon-theme/svelte"
+import tsconfigIcon from "@iconify-icons/material-icon-theme/tsconfig"
+import typescriptDefIcon from "@iconify-icons/material-icon-theme/typescript-def"
+import eslintIcon from "@iconify-icons/material-icon-theme/eslint"
+import lockIcon from "@iconify-icons/material-icon-theme/lock"
+import bunIcon from "@iconify-icons/material-icon-theme/bun"
+import viteIcon from "@iconify-icons/material-icon-theme/vite"
+import tailwindIcon from "@iconify-icons/material-icon-theme/tailwindcss"
+import postcssIcon from "@iconify-icons/material-icon-theme/postcss"
+import prettierIcon from "@iconify-icons/material-icon-theme/prettier"
+import readmeIcon from "@iconify-icons/material-icon-theme/readme"
+import licenseIcon from "@iconify-icons/material-icon-theme/license"
+import biomeIcon from "@iconify-icons/material-icon-theme/biome"
+import npmIcon from "@iconify-icons/material-icon-theme/npm"
+import editorconfigIcon from "@iconify-icons/material-icon-theme/editorconfig"
+import tuneIcon from "@iconify-icons/material-icon-theme/tune"
+import tomlIcon from "@iconify-icons/material-icon-theme/toml"
+import nextIcon from "@iconify-icons/material-icon-theme/next"
 
 const extensions: Readonly<Record<string, IconifyIcon>> = {
   ts: typescriptIcon,
@@ -76,9 +93,12 @@ const extensions: Readonly<Record<string, IconifyIcon>> = {
   tar: zipIcon,
   sql: databaseIcon,
   sqlite: databaseIcon,
-  toml: settingsIcon,
+  toml: tomlIcon,
   ini: settingsIcon,
-  env: settingsIcon,
+  env: tuneIcon,
+  lock: lockIcon,
+  lockb: lockIcon,
+  tsbuildinfo: tsconfigIcon,
   vue: vueIcon,
   svelte: svelteIcon,
 }
@@ -91,7 +111,36 @@ const filenames: Readonly<Record<string, IconifyIcon>> = {
   dockerfile: dockerIcon,
   "docker-compose.yml": dockerIcon,
   "compose.yaml": dockerIcon,
+  "compose.yml": dockerIcon,
+  "docker-compose.yaml": dockerIcon,
+  "bun.lock": bunIcon,
+  "bun.lockb": bunIcon,
+  "bunfig.toml": bunIcon,
+  ".npmrc": npmIcon,
+  ".editorconfig": editorconfigIcon,
+  ".prettierrc": prettierIcon,
+  "biome.json": biomeIcon,
+  "biome.jsonc": biomeIcon,
+  "readme.md": readmeIcon,
+  license: licenseIcon,
+  "license.md": licenseIcon,
+  "license.txt": licenseIcon,
 }
+
+// Tool configuration files share a stem across extensions, such as `vite.config.ts` or `.mjs`.
+const configStems: ReadonlyArray<readonly [string, IconifyIcon]> = [
+  ["tsconfig", tsconfigIcon],
+  ["jsconfig", tsconfigIcon],
+  ["eslint.config.", eslintIcon],
+  [".eslintrc", eslintIcon],
+  ["vite.config.", viteIcon],
+  ["vitest.config.", viteIcon],
+  ["tailwind.config.", tailwindIcon],
+  ["postcss.config.", postcssIcon],
+  ["prettier.config.", prettierIcon],
+  [".prettierrc", prettierIcon],
+  ["next.config.", nextIcon],
+]
 
 export function FileIcon({
   path,
@@ -107,7 +156,10 @@ export function FileIcon({
   const name = path.replaceAll("\\", "/").split("/").pop()?.toLowerCase() ?? ""
   const icon =
     filenames[name] ??
-    (name.startsWith(".env.") ? settingsIcon : extensions[name.split(".").pop() ?? ""]) ??
+    configStems.find(([stem]) => name.startsWith(stem))?.[1] ??
+    (name.startsWith(".env") ? tuneIcon : undefined) ??
+    (name.endsWith(".d.ts") ? typescriptDefIcon : undefined) ??
+    extensions[name.split(".").pop() ?? ""] ??
     documentIcon
   return (
     <Icon
