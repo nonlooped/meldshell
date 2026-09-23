@@ -41,10 +41,9 @@ export function Button({
 }: ButtonProps): React.JSX.Element {
   return (
     <BaseButton
-      data-motion="background-color border-color color opacity"
       render={<Pressable />}
       type={type}
-      className={className === undefined ? buttonClasses : `${buttonClasses} ${className}`}
+      className={`motion-colors ${className === undefined ? buttonClasses : `${buttonClasses} ${className}`}`}
       data-variant={variant}
       data-size={size}
       data-block={block}
@@ -75,17 +74,16 @@ export function IconButton({
       <Tooltip.Trigger
         render={
           <BaseButton
-            data-motion="background-color border-color color opacity"
             render={<Pressable />}
             type={type}
             aria-label={label}
-            className={
+            className={`motion-colors ${
               unstyled
                 ? className
                 : className === undefined
                   ? iconButtonClasses
                   : `${iconButtonClasses} ${className}`
-            }
+            }`}
             {...rest}
           >
             {children}
@@ -153,18 +151,13 @@ export function Switch({
 }: SwitchProps): React.JSX.Element {
   return (
     <BaseSwitch.Root
-      data-motion="background-color border-color"
-      className={switchClasses}
+      className={`motion-colors ${switchClasses}`}
       checked={checked}
       disabled={disabled}
       aria-label={label}
       onCheckedChange={(next) => onCheckedChange(next)}
     >
-      <BaseSwitch.Thumb
-        data-motion="transform background-color"
-        data-motion-duration="0.2"
-        className="switch-thumb block w-[13px] h-[13px] rounded-[50%] bg-[var(--text-secondary)] [transform:translateX(2px)]"
-      />
+      <BaseSwitch.Thumb className="motion-transform motion-duration-200 switch-thumb block w-[13px] h-[13px] rounded-[50%] bg-[var(--text-secondary)] [transform:translateX(2px)]" />
     </BaseSwitch.Root>
   )
 }
@@ -208,12 +201,10 @@ export function TextField({
 }: TextFieldProps): React.JSX.Element {
   const input = (
     <Input
-      data-motion="background-color border-color box-shadow"
-      data-motion-duration="0.2"
       type="text"
       spellCheck={false}
       autoComplete="off"
-      className={className === undefined ? textInputClasses : `${textInputClasses} ${className}`}
+      className={`motion-colors motion-duration-200 ${className === undefined ? textInputClasses : `${textInputClasses} ${className}`}`}
       data-mono={mono}
       onValueChange={onValueChange}
       {...rest}
@@ -259,8 +250,7 @@ export function SelectField<Value extends string>({
       }}
     >
       <Select.Trigger
-        data-motion="background-color border-color color opacity"
-        className={`${className ?? buttonClasses} w-full min-w-0 min-h-[34px] justify-between!`}
+        className={`motion-colors ${className ?? buttonClasses} w-full min-w-0 min-h-[34px] justify-between!`}
         aria-label={label}
       >
         <Select.Value className="overflow-hidden text-ellipsis whitespace-nowrap" />
@@ -280,10 +270,9 @@ export function SelectField<Value extends string>({
             <Select.List>
               {options.map((option) => (
                 <Select.Item
-                  data-motion="background-color border-color color box-shadow"
                   key={option.value}
                   value={option.value}
-                  className="menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)] text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none [&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)] [&[data-disabled]]:text-[var(--text-disabled)]"
+                  className="motion-colors menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)] text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none [&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)] [&[data-disabled]]:text-[var(--text-disabled)]"
                 >
                   <span className="grid w-[14px] flex-[0_0_14px] place-items-center text-[var(--text-primary)]">
                     <Select.ItemIndicator>
@@ -357,8 +346,7 @@ export function MenuAction({
 }: MenuActionProps): React.JSX.Element {
   return (
     <Menu.Item
-      data-motion="background-color border-color color box-shadow"
-      className="menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)] text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none [&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)] [&[data-disabled]]:text-[var(--text-disabled)]"
+      className="motion-colors menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)] text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none [&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)] [&[data-disabled]]:text-[var(--text-disabled)]"
       disabled={disabled}
       onClick={onClick}
     >
@@ -396,12 +384,11 @@ export function MenuChoice({
 }: MenuChoiceProps): React.JSX.Element {
   return (
     <Menu.RadioItem
-      data-motion="background-color border-color color box-shadow"
-      className={
+      className={`motion-colors ${
         className === undefined
           ? "menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)] text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none [&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)] [&[data-disabled]]:text-[var(--text-disabled)]"
           : `menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)] text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none [&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)] [&[data-disabled]]:text-[var(--text-disabled)] ${className}`
-      }
+      }`}
       value={value}
       disabled={disabled}
       closeOnClick
@@ -475,10 +462,9 @@ export function AppDialog({
           <Primitive.Close
             render={
               <BaseButton
-                data-motion="background-color border-color color opacity"
                 render={<Pressable />}
                 type="button"
-                className="absolute top-[14px] right-[12px] grid w-[26px] h-[26px] border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
+                className="motion-colors absolute top-[14px] right-[12px] grid w-[26px] h-[26px] border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
                 aria-label="Close dialog"
               >
                 <X size={15} />

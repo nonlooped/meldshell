@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Check, Copy } from "lucide-react"
+import { Swap } from "../ui/motion"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { IconButton, SelectField } from "../ui/controls"
 import { SourceCode } from "../ui/SourceCode"
@@ -33,7 +34,7 @@ export function ToolOutput({
       <div className={toolOutputHeaderClasses}>
         <span className="tool-output-label mr-[auto] font-medium">{label}</span>
         <SelectField
-          className="tool-output-language [&:focus-visible]:[outline:1px_solid_var(--accent)] [&:focus-visible]:[outline-offset:-2px]"
+          className="tool-output-language [&:focus-visible]:[outline:1px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:-2px]"
           label={`${label} syntax language`}
           value={language}
           onValueChange={setLanguage}
@@ -86,12 +87,14 @@ export function ToolOutput({
             }
           }}
         >
-          {copyState === "copied" ? <Check size={13} /> : <Copy size={13} />}
+          <Swap id={copyState === "copied" ? "copied" : "copy"}>
+            {copyState === "copied" ? <Check size={13} /> : <Copy size={13} />}
+          </Swap>
         </IconButton>
       </div>
       <pre
         className={
-          "[&_>_code]:[font:inherit] [&:focus-visible]:[outline:1px_solid_var(--accent)] [&:focus-visible]:[outline-offset:-2px] max-h-[240px] m-0 p-[12px] overflow-auto text-[var(--text-primary)] [font:12px_/_1.65_var(--font-mono)] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:2] [&[data-expanded]]:max-h-none overflow-y-auto [scrollbar-gutter:stable]"
+          "[&_>_code]:[font:inherit] [&:focus-visible]:[outline:1px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:-2px] max-h-[240px] m-0 p-[12px] overflow-auto text-[var(--text-primary)] [font:12px_/_1.65_var(--font-mono)] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:2] [&[data-expanded]]:max-h-none overflow-y-auto [scrollbar-gutter:stable]"
         }
         data-expanded={expanded || undefined}
         tabIndex={0}
@@ -129,6 +132,6 @@ const toolOutputHeaderClasses = [
   "[&_button]:rounded-[var(--radius-sm)] [&_button]:bg-transparent",
   "[&_button]:text-[var(--text-secondary)] [&_button]:[font:inherit] [&_button]:cursor-pointer",
   "[&_button:hover]:bg-[var(--surface-hover)] [&_button:hover]:text-[var(--text-primary)]",
-  "[&_button:focus-visible]:[outline:1px_solid_var(--accent)]",
+  "[&_button:focus-visible]:[outline:1px_solid_var(--focus-ring)]",
   "[&_button:focus-visible]:[outline-offset:-2px]",
 ].join(" ")

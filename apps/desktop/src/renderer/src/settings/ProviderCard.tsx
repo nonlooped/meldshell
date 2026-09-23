@@ -1,5 +1,5 @@
 import { iconButtonClasses } from "../ui/styles"
-import { Pressable } from "../ui/motion"
+import { CollapsiblePanel, Pressable } from "../ui/motion"
 import { providerStatusQuery, refreshProviderStatus } from "../data/providers"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { modelLabel } from "../data/model-label"
@@ -76,8 +76,7 @@ export function ProviderCard({
             </div>
           </span>
           <ChevronDown
-            data-motion="transform"
-            className="provider-chevron flex-none ml-[2px] text-[var(--text-tertiary)]"
+            className="motion-transform provider-chevron flex-none ml-[2px] text-[var(--text-tertiary)]"
             size={15}
             strokeWidth={1.75}
           />
@@ -92,7 +91,7 @@ export function ProviderCard({
         </label>
       </div>
 
-      <Collapsible.Panel
+      <CollapsiblePanel
         className="border-t-[1px] border-t-[color:var(--line-subtle)] [&[hidden]]:hidden [@container(max-width:_700px)]:pl-[0] [@media(max-width:_880px)]:pl-[0]"
         keepMounted
       >
@@ -172,10 +171,9 @@ export function ProviderCard({
                   align="end"
                   trigger={
                     <BaseButton
-                      data-motion="background-color border-color color opacity"
                       render={<Pressable />}
                       type="button"
-                      className={iconButtonClasses}
+                      className={`motion-colors ${iconButtonClasses}`}
                       aria-label={`Actions for ${modelLabel(model.displayName)}`}
                       title={`Actions for ${modelLabel(model.displayName)}`}
                     >
@@ -209,7 +207,7 @@ export function ProviderCard({
             </Button>
           </div>
         </div>
-      </Collapsible.Panel>
+      </CollapsiblePanel>
     </Collapsible.Root>
   )
 }

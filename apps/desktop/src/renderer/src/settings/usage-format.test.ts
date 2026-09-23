@@ -31,6 +31,7 @@ test("durations truncate to their two largest units", () => {
 
 test("resets within a day count down", () => {
   assert.equal(resetLabel(reset, now), "Resets in 3h")
+  assert.equal(resetLabel((now + 9 * 24 * HOUR + 5 * HOUR) / 1_000, now), "Resets in 9d 5h")
   assert.equal(resetLabel(now / 1_000 - 1, now), "Reset due")
   assert.equal(resetLabel(null, now), "Reset time unknown")
 })

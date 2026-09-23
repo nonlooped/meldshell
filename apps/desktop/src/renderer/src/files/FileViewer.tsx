@@ -280,7 +280,7 @@ const eventMarkdownClasses = [
   "[&_.markdown-table]:max-w-full [&_.markdown-table]:overflow-x-auto [&_.markdown-table]:[margin:1em_0]",
   "[&_.markdown-table]:border-[1px] [&_.markdown-table]:border-[color:var(--line)] [&_.markdown-table]:rounded-[var(--radius)]",
   "[&_.markdown-table]:max-h-[400px] [&_.markdown-table]:overflow-auto [&_.markdown-table]:mt-[0]",
-  "[&_.markdown-table:focus-visible]:[outline:1px_solid_var(--accent)]",
+  "[&_.markdown-table:focus-visible]:[outline:1px_solid_var(--focus-ring)]",
   "[&_.markdown-table:focus-visible]:[outline-offset:2px] [&_table]:w-full",
   "[&_table]:[border-collapse:collapse] [&_table]:[overflow-wrap:normal] [&_th]:min-w-[10rem]",
   "[&_th]:[padding:9px_12px] [&_th]:border-b-[1px] [&_th]:border-b-[color:var(--line)] [&_th]:[vertical-align:top]",

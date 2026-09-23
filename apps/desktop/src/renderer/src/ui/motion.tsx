@@ -1,5 +1,5 @@
-import { installStyleMotion } from "./style-motion"
-import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react"
+import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react"
+import { Collapsible } from "@base-ui-components/react/collapsible"
 import { AnimatePresence, MotionConfig, motion, type HTMLMotionProps } from "motion/react"
 import { LoaderCircle } from "lucide-react"
 
@@ -29,7 +29,6 @@ export function MotionPreferences({
     () => false,
   )
   const reduced = reduceMotion || Boolean(systemReduced)
-  useEffect(() => (reduced ? undefined : installStyleMotion(document.documentElement)), [reduced])
   return (
     <ReducedMotion.Provider value={reduced}>
       <MotionConfig
@@ -167,13 +166,21 @@ export function Shimmer({ children, className = "" }: { children: ReactNode; cla
 }
 
 /** Crossfades keyed content in place, e.g. an icon that changes meaning. */
-export function Swap({ id, children }: { id: string; children: ReactNode }) {
+export function Swap({
+  id,
+  children,
+  className = "grid place-items-center",
+}: {
+  id: string
+  children: ReactNode
+  className?: string
+}) {
   const reduced = useMotionPreference()
   return (
     <AnimatePresence initial={false} mode="popLayout">
       <motion.span
         key={id}
-        className="grid place-items-center"
+        className={className}
         initial={reduced ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: reduced ? 0 : -6, transition: { duration: reduced ? 0 : 0.16 } }}
@@ -185,14 +192,31 @@ export function Swap({ id, children }: { id: string; children: ReactNode }) {
   )
 }
 
+/** Crossfades text that changes, such as a renamed title, while keeping its ellipsis. */
+export function TextSwap({ text }: { text: string }) {
+  return (
+    <Swap id={text} className="block overflow-hidden text-ellipsis whitespace-nowrap">
+      {text}
+    </Swap>
+  )
+}
+
 /** Springs a control in and out as it appears and disappears. */
-export function PopPresence({ show, children }: { show: boolean; children: ReactNode }) {
+export function PopPresence({
+  show,
+  children,
+  className = "inline-flex",
+}: {
+  show: boolean
+  children: ReactNode
+  className?: string
+}) {
   const reduced = useMotionPreference()
   return (
     <AnimatePresence initial={false}>
       {show && (
         <motion.span
-          className="inline-flex"
+          className={className}
           initial={reduced ? false : { opacity: 0, scale: 0.6 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{
@@ -217,4 +241,21 @@ export function FadeDiv({
 }
 export function FadeMain(props: HTMLMotionProps<"main">) {
   return <motion.main {...useEnterMotion()} {...props} />
+}
+
+/**
+ * A Collapsible panel that grows open and folds shut with a CSS transition, which Base UI waits for
+ * before it hides a closing panel; panels that start open do not animate. Layout classes apply to an
+ * inner element, so spacing folds away with the height.
+ */
+export function CollapsiblePanel({
+  className,
+  children,
+  ...props
+}: Omit<Collapsible.Panel.Props, "className"> & { readonly className?: string }) {
+  return (
+    <Collapsible.Panel {...props} className="motion-collapse">
+      <div className={className}>{children}</div>
+    </Collapsible.Panel>
+  )
 }

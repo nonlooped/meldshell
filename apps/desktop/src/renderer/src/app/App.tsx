@@ -182,15 +182,18 @@ function useSidebar(initialWidth: number, initiallyCollapsed = false) {
   }
 }
 
-function SidebarPanel({ defaultSize, ...props }: React.ComponentProps<typeof Panel>) {
+function SidebarPanel({
+  defaultSize,
+  className = "",
+  ...props
+}: React.ComponentProps<typeof Panel>) {
   // Changing defaultSize re-registers the panel and interrupts an active drag.
   // Capture it on mount so returning from Settings still restores the remembered width.
   const [initialSize] = useState(defaultSize)
   return (
     <Panel
-      data-motion="flex-grow"
-      data-motion-duration="0.18"
       {...props}
+      className={`motion-grow motion-duration-180 ${className}`}
       defaultSize={initialSize}
     />
   )
@@ -516,10 +519,7 @@ export function App(): React.JSX.Element {
               </aside>
             </SidebarPanel>
 
-            <Separator
-              data-motion="background-color"
-              className="relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]"
-            />
+            <Separator className="motion-colors relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]" />
 
             <Panel id="thread" minSize={layout.threadMin}>
               <main className="grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]">
@@ -538,10 +538,7 @@ export function App(): React.JSX.Element {
                 </FileOrThread>
               </main>
             </Panel>
-            <Separator
-              data-motion="background-color"
-              className="relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]"
-            />
+            <Separator className="motion-colors relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]" />
             <SidebarPanel
               id="source-control"
               panelRef={sourceControl.panelRef}
@@ -631,9 +628,7 @@ export function App(): React.JSX.Element {
             }}
           >
             <Combobox.Input
-              data-motion="background-color border-color box-shadow"
-              data-motion-duration="0.2"
-              className={textInputClasses}
+              className={`motion-colors motion-duration-200 ${textInputClasses}`}
               autoFocus
               placeholder="Search threads…"
               aria-label="Search threads"
@@ -649,8 +644,7 @@ export function App(): React.JSX.Element {
             >
               {(thread: Thread) => (
                 <Combobox.Item
-                  data-motion="background-color border-color color box-shadow"
-                  className={threadSwitcherItemClasses}
+                  className={`motion-colors ${threadSwitcherItemClasses}`}
                   key={thread.id}
                   value={thread}
                 >
@@ -695,10 +689,9 @@ export function App(): React.JSX.Element {
               align="start"
               trigger={
                 <BaseButton
-                  data-motion="background-color border-color color opacity"
                   render={<Pressable />}
                   type="button"
-                  className={`${buttonClasses} justify-between!`}
+                  className={`motion-colors ${buttonClasses} justify-between!`}
                   data-block="true"
                   aria-label="Workspace"
                 >

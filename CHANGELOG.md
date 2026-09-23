@@ -6,7 +6,15 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
+- A sent prompt flies from the composer into its place in the transcript.
+- A prompt sent while a thread is running drops into the queue button, and the queue count springs in.
+- Collapsible sections grow open and fold shut, and a finished turn folds its working log into its summary.
+- Closing a tab narrows it away; renamed thread titles crossfade in the inbox and tabs.
+- Inbox status badges spring in and out, attachment chips animate out when removed, and copy buttons swap to their confirmation.
+- Jumping to a prompt from the prompt rail briefly rings its message.
+- Subscription usage explains its bars with a legend.
 - A Retry now action reconnects an offline computer to the relay immediately.
+- Left and Right arrow keys page through images in the image viewer.
 
 ### Fixed
 
@@ -14,6 +22,15 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Changed
 
+- Bundle Mona Sans and Monaspace Neon so every platform uses the same interface and code fonts instead of a system fallback.
+- Use a restrained blue accent with a softer focus ring, and one selection style across tabs, the inbox, and the settings navigation.
+- Make New thread the inbox's primary action, show search as a plain button, and style the workspace filter as a select.
+- Narrow the transcript's reading width, group each turn more tightly, lighten inline code, render file references as links, and label work summaries with an icon.
+- Enter sends a message and Shift+Enter adds a line; the send shortcut setting and composer keycaps are removed.
+- Mark each provider's least restricted permission in amber, show reasoning speed only when Fast is on, and remove the composer's toolbar divider.
+- Keep model picker provider headings in view while scrolling.
+- Center settings content, move the way back to the top of settings, and show the relay privacy note as a callout.
+- Show every subscription reset as a countdown, with the exact time on hover.
 - Host the website, account API, and relay together at meldshell.nonlooped.xyz on Cloudflare: the site on Pages, and the account API and relay in a Worker with Durable Objects and D1, instead of Vercel and a self-hosted Node service.
 - Sign in with Google or Discord; accounts that share a verified email are linked. Desktop builds connect to meldshell.nonlooped.xyz by default. Computers linked to the old account service must be linked again.
 - Hosts no longer stream events through the relay while no browser is connected; browsers refetch state when they connect.

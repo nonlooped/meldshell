@@ -25,7 +25,6 @@ export const readAppSettings = Effect.gen(function* () {
   return {
     opacity: Schema.is(AppOpacity)(opacity) ? opacity : undefined,
     titleModelId: rows[0]?.value ?? CURRENT_TITLE_MODEL,
-    sendShortcut: values.get("sendShortcut") === "enter" ? "enter" : "ctrl-enter",
     showSettled: values.get("showSettled") !== "false",
     theme:
       values.get("theme") === "light"
@@ -49,7 +48,6 @@ export const setAppSettings = (input: SetAppSettingsInput) =>
     const sql = yield* SqlClient.SqlClient
     for (const key of [
       "opacity",
-      "sendShortcut",
       "showSettled",
       "theme",
       "transcriptSize",

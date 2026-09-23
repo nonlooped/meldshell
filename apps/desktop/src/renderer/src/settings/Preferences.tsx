@@ -47,7 +47,7 @@ function OpacitySlider({
           <Slider.Indicator className="h-full rounded-[inherit] bg-[var(--accent)]" />
           <Slider.Thumb
             id="app-opacity"
-            className="w-[14px] h-[14px] border-[2px] border-[color:var(--accent)] rounded-[50%] bg-[var(--accent)] [&:has(:focus-visible)]:[outline:2px_solid_var(--accent)] [&:has(:focus-visible)]:[outline-offset:3px]"
+            className="w-[14px] h-[14px] border-[2px] border-[color:var(--accent)] rounded-[50%] bg-[var(--accent)] [&:has(:focus-visible)]:[outline:1.5px_solid_var(--focus-ring)] [&:has(:focus-visible)]:[outline-offset:3px]"
             aria-label="App opacity"
             getAriaValueText={(_formatted, next) => `${next}%`}
           />
@@ -83,23 +83,6 @@ export function Preferences({
     >
       {section === "general" ? (
         <>
-          <SettingRow
-            label="Send messages with"
-            description="Shift+Enter always adds a new line."
-            controlId="send-shortcut"
-          >
-            <SelectField<NonNullable<AppSettings["sendShortcut"]>>
-              id="send-shortcut"
-              label="Send messages with"
-              value={settings.sendShortcut ?? "ctrl-enter"}
-              disabled={pending}
-              options={[
-                { value: "ctrl-enter", label: "Ctrl+Enter" },
-                { value: "enter", label: "Enter" },
-              ]}
-              onValueChange={(sendShortcut) => onChange({ sendShortcut })}
-            />
-          </SettingRow>
           <SettingRow
             label="Show archived threads"
             description="Keep archived threads visible in the inbox. Search always includes them."

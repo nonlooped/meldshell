@@ -4,6 +4,11 @@
 /* Vendor typesetting is kept below application utilities in the cascade. */
 @import "katex/dist/katex.min.css" layer(base);
 @import "react-diff-view/style/index.css" layer(base);
+/* Bundled so every platform renders the same faces instead of a system fallback. */
+@import "@fontsource-variable/mona-sans/wght.css" layer(base);
+@import "@fontsource/monaspace-neon/400.css" layer(base);
+@import "@fontsource/monaspace-neon/500.css" layer(base);
+@import "@fontsource/monaspace-neon/600.css" layer(base);
 @source "../";
 
 /* Activity motion shared by the working indicator and running labels. */
@@ -30,6 +35,51 @@
   }
 }
 
+/* State transitions. Tailwind owns each state; these utilities interpolate between the resolved
+ * values, so hover, focus, Base UI attributes, and theme changes animate alike. `--motion-scale`
+ * is zero while the app or the system reduces motion. */
+@utility motion-colors {
+  transition-property: color, background-color, border-color, opacity, box-shadow;
+  transition-duration: calc(var(--motion-duration, 120ms) * var(--motion-scale, 1));
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@utility motion-transform {
+  transition-property: transform, color, background-color;
+  transition-duration: calc(var(--motion-duration, 120ms) * var(--motion-scale, 1));
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@utility motion-width {
+  transition-property: width, background-color;
+  transition-duration: calc(var(--motion-duration, 120ms) * var(--motion-scale, 1));
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* A resizable panel follows the pointer directly while its separator is dragged. */
+@utility motion-grow {
+  transition-property: flex-grow;
+  transition-duration: calc(var(--motion-duration, 120ms) * var(--motion-scale, 1));
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  *:has(> [data-separator="active"]) > & {
+    transition-duration: 0s;
+  }
+}
+/* A Collapsible panel grows open and folds shut from Base UI's measured height. Base UI releases
+ * the height once the panel settles, so live content keeps growing. */
+@utility motion-collapse {
+  height: var(--collapsible-panel-height);
+  overflow: hidden;
+  transition-property: height, opacity;
+  transition-duration: calc(200ms * var(--motion-scale, 1));
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  &[data-starting-style],
+  &[data-ending-style] {
+    height: 0;
+    opacity: 0;
+  }
+}
+@utility motion-duration-* {
+  --motion-duration: calc(--value(integer) * 1ms);
+}
+
 /* Preflight is omitted to preserve native controls and Markdown document defaults.
  * Shared theme tokens, native document defaults, and platform scrollbars.
  * Component styling lives in Tailwind utilities alongside the markup. */
@@ -53,9 +103,10 @@
     --text-secondary: #adadb2;
     --text-tertiary: #929298;
     --text-disabled: #4a4a4e;
-    --accent: #f5f5f6;
-    --accent-hover: #ffffff;
-    --accent-foreground: #0b0b0c;
+    --accent: #9eabf5;
+    --accent-hover: #b3bdf8;
+    --accent-foreground: #0c0e1c;
+    --focus-ring: rgba(158, 171, 245, 0.72);
     --color-added: #83c994;
     --color-modified: #e5bc75;
     --color-deleted: #ed9393;
@@ -65,9 +116,9 @@
     --spin-middle: #edb185;
     --spin-bottom: #f888a0;
 
-    --font-text: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-    --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
-    --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, monospace;
+    --font-text: "Mona Sans Variable", "Segoe UI Variable Text", system-ui, sans-serif;
+    --font-display: "Mona Sans Variable", "Segoe UI Variable Display", system-ui, sans-serif;
+    --font-mono: "Monaspace Neon", "Cascadia Code", ui-monospace, monospace;
 
     --radius-sm: 5px;
     --radius: 7px;
@@ -122,11 +173,11 @@
     color: inherit;
   }
   ::selection {
-    background: rgba(255, 255, 255, 0.16);
+    background: color-mix(in srgb, var(--accent) 28%, transparent);
   }
   :focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
+    outline: 1.5px solid var(--focus-ring);
+    outline-offset: 2px;
     border-radius: var(--radius-sm);
   }
   :root {
@@ -193,6 +244,7 @@
       --line-strong: rgba(255, 255, 255, 0.52);
       --text-secondary: #cfcfd2;
       --text-tertiary: #a6a6aa;
+      --focus-ring: var(--accent);
     }
   }
   :root[data-theme="light"] {
@@ -212,9 +264,10 @@
     --text-secondary: #53535c;
     --text-tertiary: #6e6e77;
     --text-disabled: #9898a0;
-    --accent: #242428;
-    --accent-hover: #08080a;
+    --accent: #4a5bc4;
+    --accent-hover: #3d4db0;
     --accent-foreground: #ffffff;
+    --focus-ring: rgba(74, 91, 196, 0.65);
     --color-added: #28733e;
     --color-modified: #8c5c13;
     --color-deleted: #b53e46;
@@ -238,6 +291,14 @@
   }
   :root[data-text-size="large"] {
     --transcript-font-size: 16px;
+  }
+  :root[data-reduce-motion="true"] {
+    --motion-scale: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --motion-scale: 0;
+    }
   }
   :root[data-platform="linux"] {
     --scrim: #161617;

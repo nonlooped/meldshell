@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react"
 import { IconButton } from "../ui/controls"
+import { TextSwap, useMotionPreference } from "../ui/motion"
 import { MeldMark } from "../ui/MeldMark"
 import { ProviderIcon } from "../ui/ProviderIcon"
 import { useThreadDraggable } from "./thread-drag"
@@ -44,9 +45,8 @@ function ThreadTabFrame({
   return (
     <div
       ref={draggable.ref}
-      data-motion="background-color border-color color box-shadow"
-      data-motion-enter
-      className={tabClasses}
+      data-tab-frame
+      className={`motion-colors starting:opacity-0 ${tabClasses}`}
       data-dragging={draggable.isDragging ? "" : undefined}
       {...(selected ? { "data-selected": "" } : {})}
       {...(shared ? { "data-shared": "" } : {})}
@@ -74,6 +74,11 @@ export function TitleBar({
 }: TitleBarProps): React.JSX.Element {
   const files = useTabStore((state) => state.files)
   const threadTabs = useTabStore((state) => state.threadTabs)
+  const reduced = useMotionPreference()
+  const closeTab = (button: HTMLElement, tabId: string) => {
+    if (reduced) return onCloseTab(tabId)
+    foldAway(button.closest<HTMLElement>("[data-tab-frame]"), () => onCloseTab(tabId))
+  }
   return (
     <header className="[-webkit-app-region:drag] flex items-center gap-[10px] min-w-0 [padding:0_var(--caption-inset)_0_12px] border-b-[1px] border-b-[color:var(--line-subtle)] select-none">
       <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
@@ -140,8 +145,8 @@ export function TitleBar({
                 >
                   <TabMark layout={tab.layout} provider={provider} />
                 </span>
-                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                  {title}
+                <span className="relative min-w-0 overflow-hidden">
+                  <TextSwap text={title} />
                 </span>
                 {shared && (
                   <span
@@ -153,11 +158,10 @@ export function TitleBar({
                 )}
               </Tabs.Tab>
               <IconButton
-                data-motion="background-color border-color color opacity"
                 unstyled
-                className="tab-close grid w-[18px] h-[18px] flex-[0_0_18px] p-0 border-0 rounded-[4px] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center opacity-[0] [&:focus-visible]:opacity-[1] [&:hover]:bg-[var(--surface-active)] [&:hover]:text-[var(--text-primary)]"
+                className="motion-colors tab-close grid w-[18px] h-[18px] flex-[0_0_18px] p-0 border-0 rounded-[4px] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center opacity-[0] [&:focus-visible]:opacity-[1] [&:hover]:bg-[var(--surface-active)] [&:hover]:text-[var(--text-primary)]"
                 label={`Close ${label}`}
-                onClick={() => onCloseTab(tab.id)}
+                onClick={(event) => closeTab(event.currentTarget, tab.id)}
               >
                 <X size={12} strokeWidth={2} />
               </IconButton>
@@ -166,10 +170,9 @@ export function TitleBar({
         })}
         {files.map((file) => (
           <div
-            data-motion="background-color border-color color box-shadow"
-            data-motion-enter
+            data-tab-frame
             key={file.id}
-            className={tabClasses}
+            className={`motion-colors starting:opacity-0 ${tabClasses}`}
             {...(file.id === selectedTabId ? { "data-selected": "" } : {})}
           >
             <Tabs.Tab
@@ -184,11 +187,10 @@ export function TitleBar({
               </span>
             </Tabs.Tab>
             <IconButton
-              data-motion="background-color border-color color opacity"
               unstyled
-              className="tab-close grid w-[18px] h-[18px] flex-[0_0_18px] p-0 border-0 rounded-[4px] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center opacity-[0] [&:focus-visible]:opacity-[1] [&:hover]:bg-[var(--surface-active)] [&:hover]:text-[var(--text-primary)]"
+              className="motion-colors tab-close grid w-[18px] h-[18px] flex-[0_0_18px] p-0 border-0 rounded-[4px] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center opacity-[0] [&:focus-visible]:opacity-[1] [&:hover]:bg-[var(--surface-active)] [&:hover]:text-[var(--text-primary)]"
               label={`Close ${file.path}`}
-              onClick={() => onCloseTab(file.id)}
+              onClick={(event) => closeTab(event.currentTarget, file.id)}
             >
               <X size={12} />
             </IconButton>
@@ -220,3 +222,27 @@ const tabClasses = [
   "[&[data-selected]_.tab-close]:opacity-[1] [-webkit-app-region:no-drag]",
   "[&_*]:[-webkit-app-region:no-drag]",
 ].join(" ")
+
+const foldEasing = "cubic-bezier(0.4, 0, 0.2, 1)"
+
+/** A closing tab narrows and fades before it leaves, so its neighbours slide over. */
+function foldAway(tab: HTMLElement | null, done: () => void): void {
+  if (tab === null) return done()
+  tab.style.pointerEvents = "none"
+  const animation = tab.animate(
+    [
+      { width: `${tab.offsetWidth}px`, minWidth: "0px", opacity: 1 },
+      {
+        width: "0px",
+        minWidth: "0px",
+        paddingLeft: "0px",
+        paddingRight: "0px",
+        borderWidth: "0px",
+        marginRight: "-2px",
+        opacity: 0,
+      },
+    ],
+    { duration: 160, easing: foldEasing, fill: "forwards" },
+  )
+  animation.onfinish = done
+}

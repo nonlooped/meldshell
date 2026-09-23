@@ -9,7 +9,7 @@ const plural = (count: number, one: string, many: string): string =>
 const readTools = new Set(["Read", "NotebookRead"])
 const searchTools = new Set(["Grep", "Glob", "LS", "WebSearch", "ToolSearch"])
 
-type Work = "thought" | "command" | "edit" | "read" | "search" | "fetch" | "tool" | "plan"
+export type Work = "thought" | "command" | "edit" | "read" | "search" | "fetch" | "tool" | "plan"
 
 const phrases: ReadonlyArray<readonly [Work, (count: number) => string]> = [
   ["thought", (count) => (count === 1 ? "thought" : `thought ${count} times`)],
@@ -46,8 +46,7 @@ function editedPaths(event: CanonicalEvent, item: Record<string, unknown>): stri
   return paths.map((path) => (typeof path === "string" ? path : `item:${event.id}`))
 }
 
-/** Collapsed work line, e.g. "Ran 3 commands · edited 2 files · read 4 files". */
-export function workSummary(events: ReadonlyArray<CanonicalEvent>): string {
+function workCounts(events: ReadonlyArray<CanonicalEvent>): ReadonlyMap<Work, number> {
   const counts = new Map<Work, number>()
   const edited = new Set<string>()
   const add = (work: Work) => counts.set(work, (counts.get(work) ?? 0) + 1)
@@ -64,10 +63,34 @@ export function workSummary(events: ReadonlyArray<CanonicalEvent>): string {
   }
 
   counts.set("edit", edited.size)
+  return counts
+}
+
+/** Collapsed work line, e.g. "Ran 3 commands · edited 2 files · read 4 files". */
+export function workSummary(events: ReadonlyArray<CanonicalEvent>): string {
+  const counts = workCounts(events)
   const segments = phrases.flatMap(([work, phrase]) => {
     const count = counts.get(work) ?? 0
     return count > 0 ? [phrase(count)] : []
   })
   const summary = segments.join(" · ")
   return summary.charAt(0).toUpperCase() + summary.slice(1)
+}
+
+// The most consequential kind of work names the summary's icon.
+const significance: ReadonlyArray<Work> = [
+  "edit",
+  "command",
+  "fetch",
+  "search",
+  "read",
+  "tool",
+  "plan",
+  "thought",
+]
+
+/** The most consequential work in a turn, or null when it did none. */
+export function primaryWork(events: ReadonlyArray<CanonicalEvent>): Work | null {
+  const counts = workCounts(events)
+  return significance.find((work) => (counts.get(work) ?? 0) > 0) ?? null
 }
