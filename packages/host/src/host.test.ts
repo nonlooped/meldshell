@@ -11,6 +11,8 @@ import { IPC } from "@meldshell/contracts"
 import type { HostProcess } from "./platform"
 import { startHost, type Host } from "./host"
 
+const coreProcesses: ReturnType<typeof fork>[] = []
+
 const fakeProviders = (
   entry: string,
   _label: string,
@@ -22,6 +24,7 @@ const fakeProviders = (
       env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe", "ipc"],
     })
+    coreProcesses.push(child)
     return {
       get pid() {
         return child.pid
@@ -98,6 +101,8 @@ test("host state survives restart and remote commands run through the shared API
     assert.equal(transcript.events.filter((event) => event.text === "One submission").length, 1)
 
     await host.close()
+    // Windows cannot delete or reopen the database until the core process that holds it has exited.
+    assert.ok(coreProcesses.every((child) => child.exitCode !== null || child.signalCode !== null))
     host = await startHost(directory, platform)
     const recovered = (await host.call(IPC.getSnapshot, [])) as AppSnapshot
     assert.equal(recovered.threads[0]!.turnCount, 1)

@@ -15,19 +15,29 @@ const makeHostProtocol = RpcClient.Protocol.make((writeResponse) =>
     const runtime = yield* Effect.runtime<never>()
     const runFork = Runtime.runFork(runtime)
     const ready = yield* Deferred.make<void, RpcClientError>()
-    const child = yield* Effect.acquireRelease(
+    const { child } = yield* Effect.acquireRelease(
       Effect.try({
         try: () => {
           const child = platform.fork("core-worker.js", "MeldShell Core", {
             MELDSHELL_DATABASE_PATH: platform.databasePath,
           })
+          const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
           child.stdout?.pipe(process.stdout)
           child.stderr?.pipe(process.stderr)
-          return child
+          return { child, exited }
         },
         catch: (cause) => protocolError("MeldShell core could not start.", cause),
       }),
-      (process) => Effect.sync(() => process.kill()),
+      // Windows keeps the database file locked until the core process is gone, so close waits for
+      // exit. The deadline keeps shutdown bounded if the exit event never arrives.
+      ({ child, exited }) =>
+        Effect.promise(() => {
+          child.kill()
+          return Promise.race([
+            exited,
+            new Promise<void>((resolve) => setTimeout(resolve, 5_000).unref()),
+          ])
+        }),
     )
 
     let didBecomeReady = false
