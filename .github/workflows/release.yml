@@ -1,8 +1,12 @@
-name: Release installers
+name: Release
 
+# A stable vX.Y.Z tag on main (cut with `npm run release`) builds, verifies, and drafts a GitHub
+# Release whose notes are that version's CHANGELOG.md entries. A manual run builds the same
+# installers from any ref as workflow artifacts without releasing.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,43 +15,54 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  npm_config_audit: 'false'
+  npm_config_fund: 'false'
+
 jobs:
-  validate:
+  version:
+    name: Validate version
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Validate stable version tag
+          fetch-depth: 0
+          filter: blob:none
+      - name: Match package versions and tag
+        id: version
+        env:
+          IS_TAG: ${{ github.ref_type == 'tag' }}
         run: |
+          # shellcheck disable=SC2016 # JavaScript template literals, not shell expansions
           node --input-type=module -e '
             import fs from "node:fs";
             const root = JSON.parse(fs.readFileSync("package.json"));
             const desktop = JSON.parse(fs.readFileSync("apps/desktop/package.json"));
-            if (!/^\d+\.\d+\.\d+$/.test(desktop.version) || root.version !== desktop.version || process.env.GITHUB_REF_NAME !== `v${desktop.version}`) {
-              throw new Error("Tag must match the stable version in root and desktop package.json");
+            if (root.version !== desktop.version) throw new Error("Root and desktop package.json versions differ");
+            if (process.env.IS_TAG === "true") {
+              if (!/^\d+\.\d+\.\d+$/.test(desktop.version)) throw new Error(`${desktop.version} is not a stable version`);
+              if (process.env.GITHUB_REF_NAME !== `v${desktop.version}`) throw new Error(`Tag must be v${desktop.version}`);
             }
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${desktop.version}\n`);
           '
-      - name: Install dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Check unused code
-        run: npm run knip
-      - name: Rebuild native test dependency
-        run: npm rebuild better-sqlite3
-      - name: Lint, format, and typecheck
-        run: npm run check:fast
-      - name: Test
-        run: npm test
+      - name: Require tagged commit on main
+        if: github.ref_type == 'tag'
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Require changelog entries
+        if: github.ref_type == 'tag'
+        run: node scripts/release.mjs notes "${{ steps.version.outputs.version }}"
+
+  checks:
+    name: Checks
+    uses: ./.github/workflows/ci.yml
 
   package:
-    needs: validate
+    name: Package (${{ matrix.platform }})
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -57,64 +72,88 @@ jobs:
           - os: ubuntu-24.04
             platform: linux
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # electron-builder downloads Electron itself and rebuilds native modules for its ABI.
+      - run: npm ci --ignore-scripts
+      - name: Cache packaging tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/electron-builder
+          key: electron-builder-${{ runner.os }}-${{ hashFiles('package-lock.json', 'apps/desktop/electron-builder.yml') }}
+          restore-keys: electron-builder-${{ runner.os }}-
       - run: npm run build
       - name: Package without publishing
         working-directory: apps/desktop
         run: npx --no-install electron-builder --${{ matrix.platform }} --x64 --publish never
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: installers-${{ matrix.platform }}
+          name: installers-${{ matrix.platform }}-${{ needs.version.outputs.version }}
           path: |
             release/*.exe
             release/*.AppImage
             release/*.blockmap
             release/latest*.yml
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 7
           compression-level: 0
 
   release:
-    needs: package
+    name: Draft GitHub Release
+    if: github.ref_type == 'tag'
+    needs: [version, checks, package]
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       RELEASE_TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            CHANGELOG.md
+            scripts/release.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: installers-*
           merge-multiple: true
           path: release
-      - name: Assemble draft release
-        shell: bash
+      - name: Verify artifacts
+        working-directory: release
         run: |
-          set -euo pipefail
-          version="${RELEASE_TAG#v}"
-          test -s "release/MeldShell-${version}-setup.exe"
-          test -s "release/MeldShell-${version}-x86_64.AppImage"
-          test -s release/latest.yml
-          test -s release/latest-linux.yml
-          cd release
-          sha256sum *.exe *.AppImage > SHA256SUMS.txt
-          if gh release view "$RELEASE_TAG" --json isDraft > existing.json 2>/dev/null; then
-            test "$(jq -r .isDraft existing.json)" = true || { echo 'Refusing to overwrite a published release'; exit 1; }
+          for file in "MeldShell-$VERSION-setup.exe" "MeldShell-$VERSION-setup.exe.blockmap" \
+            "MeldShell-$VERSION-x86_64.AppImage" latest.yml latest-linux.yml; do
+            test -s "$file" || { echo "::error::Missing $file"; exit 1; }
+          done
+          grep -q "^version: $VERSION$" latest.yml
+          grep -q "^version: $VERSION$" latest-linux.yml
+          sha256sum -- *.exe *.AppImage > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Create or update draft
+        run: |
+          node scripts/release.mjs notes "$VERSION" > "$RUNNER_TEMP/notes.md"
+          if is_draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            test "$is_draft" = true || { echo "::error::Refusing to overwrite published release $RELEASE_TAG"; exit 1; }
+            gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/notes.md"
           else
-            gh release create "$RELEASE_TAG" --verify-tag --draft --title "MeldShell $version" --generate-notes
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "MeldShell $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
           fi
-          gh release upload "$RELEASE_TAG" ./*.exe ./*.AppImage ./*.blockmap ./latest*.yml ./SHA256SUMS.txt --clobber
+          cd release
+          gh release upload "$RELEASE_TAG" ./*.exe ./*.AppImage ./*.blockmap ./latest*.yml SHA256SUMS.txt --clobber
+          echo "Draft release: $(gh release view "$RELEASE_TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"

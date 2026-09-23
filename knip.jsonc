@@ -13,9 +13,51 @@
     "which"
   ],
   "workspaces": {
+    ".": {
+      // The WebSocket bundle test drives the desktop workspace's build tooling.
+      "ignoreDependencies": ["electron-vite", "vite"]
+    },
     "apps/desktop": {
       "entry": ["src/main/index.ts", "src/main/workers/*.ts", "src/**/*.test.mjs"],
-      "project": ["src/**/*.{ts,tsx,mjs,css}"]
+      "project": ["src/**/*.{ts,tsx,mjs,css}"],
+      // Imported through the bundled @meldshell/host package; listing them keeps them external
+      // and packaged. Core and provider-runtime are bundled workspace sources of the host.
+      "ignoreDependencies": [
+        "@effect/experimental",
+        "@effect/platform",
+        "@effect/rpc",
+        "@effect/sql-sqlite-node",
+        "@meldshell/core",
+        "@meldshell/provider-runtime",
+        "ws"
+      ]
+    },
+    "apps/site": {
+      // The remote workspace page bundles the desktop renderer, whose imports resolve against
+      // the site's install on Vercel.
+      "ignoreDependencies": [
+        "@base-ui-components/react",
+        "@dnd-kit/dom",
+        "@dnd-kit/react",
+        "@iconify-icons/material-icon-theme",
+        "@iconify/react",
+        "@meldshell/projection",
+        "@tanstack/react-query",
+        "@tanstack/react-virtual",
+        "effect",
+        "katex",
+        "lucide-react",
+        "mermaid",
+        "react-diff-view",
+        "react-error-boundary",
+        "react-markdown",
+        "react-resizable-panels",
+        "refractor",
+        "rehype-katex",
+        "remark-gfm",
+        "remark-math",
+        "zustand"
+      ]
     },
     "packages/*": {
       "project": ["src/**/*.ts"]

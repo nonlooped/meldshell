@@ -12,9 +12,9 @@ To cut a release from a clean, up-to-date `main`, run `npm run release -- <patch
 
 ## Build and assemble
 
-[Release installers](../.github/workflows/release.yml) runs for a stable `vX.Y.Z` tag matching root and desktop package versions. Its Linux validation job runs unused-code, lint, formatting, type, and test checks. Native Windows and Linux runners build and package NSIS x64 and AppImage x64 artifacts. The final job assembles installers, updater metadata, blockmaps, and SHA256SUMS into one draft GitHub Release.
+[Release](../.github/workflows/release.yml) runs for a stable `vX.Y.Z` tag on `main` that matches the app version and has changelog entries. It runs the full [CI](../.github/workflows/ci.yml) suite while native Windows and Linux runners package NSIS x64 and AppImage x64 artifacts. Once both pass, the final job verifies the installers and updater metadata, then assembles them with blockmaps and SHA256SUMS into one draft GitHub Release whose notes are the version's changelog entries.
 
-A rerun can replace draft assets but refuses to overwrite a published release. Tagging and publishing are external actions; perform them within the authorization for the release task.
+Running the workflow manually from the Actions tab packages installers from any ref as seven-day workflow artifacts without creating a release; use it to test packaging before tagging. A rerun can replace draft assets but refuses to overwrite a published release. Tagging and publishing are external actions; perform them within the authorization for the release task.
 
 For a local candidate:
 
@@ -26,7 +26,7 @@ For a local candidate:
 
 Keep each installer/AppImage with the `latest.yml` or `latest-linux.yml` produced by the same build. Publish both platforms together after review. Installed applications cannot use draft assets; public downloads and updates need a publicly accessible destination. Never embed a GitHub access token in the app.
 
-Configuration lives in [electron-builder.yml](../apps/desktop/electron-builder.yml). Routine [CI](../.github/workflows/ci.yml) and tagged release validation have different scopes; inspect their definitions when changing automation.
+Configuration lives in [electron-builder.yml](../apps/desktop/electron-builder.yml). Pull requests and `main` pushes run [CI](../.github/workflows/ci.yml): static checks, Linux build and tests, and Windows tests. It skips documentation-only changes.
 
 ## Manual candidate matrix
 

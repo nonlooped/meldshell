@@ -9,7 +9,6 @@ const RemoteCommand = Schema.Struct({
   method: Schema.String.pipe(Schema.maxLength(80)),
   args: Schema.Array(Schema.Unknown).pipe(Schema.maxItems(2)),
 })
-export type RemoteCommand = typeof RemoteCommand.Type
 export type RemoteResult = {
   type: "result"
   id: string
