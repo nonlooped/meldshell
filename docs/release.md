@@ -17,13 +17,15 @@ MeldShell has one app version, kept in the root and desktop `package.json` files
 
 Every user-visible change adds an entry under `## [Unreleased]` in [CHANGELOG.md](../CHANGELOG.md), using the Keep a Changelog groups `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Write each entry for users, not in terms of the implementation. Internal refactors, tests, CI, and documentation need no entry.
 
+Before 1.0.0, `0.x.0` tags publish as normal GitHub Releases and `0.x.y` tags with `y > 0` publish as prereleases. Prereleases are not the latest stable download or update.
+
 To cut a release from a clean, up-to-date `main`, run `npm run release -- <patch|minor|major|X.Y.Z>`. The script moves the Unreleased entries under the new version and date, bumps every version field, commits `chore(release): vX.Y.Z`, and creates an annotated tag. Push both with `git push --atomic origin main vX.Y.Z`. A [test](../tests/changelog.test.ts) keeps the version fields and changelog consistent.
 
 ## Build and assemble
 
-[Release](../.github/workflows/release.yml) runs for a stable `vX.Y.Z` tag on `main` that matches the app version and has changelog entries. It runs the full [CI](../.github/workflows/ci.yml) suite while native Windows and Linux runners package NSIS x64 and AppImage x64 artifacts. Once both pass, the final job verifies the installers and updater metadata, then assembles them with blockmaps and SHA256SUMS into one draft GitHub Release whose notes are the version's changelog entries.
+[Release](../.github/workflows/release.yml) runs for a stable `vX.Y.Z` tag on `main` that matches the app version and has changelog entries. It runs the full [CI](../.github/workflows/ci.yml) suite while native Windows and Linux runners package NSIS x64 and AppImage x64 artifacts. Once both pass, the final job verifies the installers and updater metadata, stages them with blockmaps and SHA256SUMS in a draft, then publishes the release with the version's changelog entries and the classification above. A failed upload leaves the draft unpublished.
 
-Running the workflow manually from the Actions tab packages installers from any ref as seven-day workflow artifacts without creating a release; use it to test packaging before tagging. A rerun can replace draft assets but refuses to overwrite a published release. Tagging and publishing are external actions; perform them within the authorization for the release task.
+Running the workflow manually from the Actions tab packages installers from any ref as seven-day workflow artifacts without creating a release; use it to test packaging and applicable manual flows before tagging. A rerun can replace draft assets but refuses to overwrite a published release. Tagging starts automatic publication after the checks pass; perform it within the authorization for the release task.
 
 For a local candidate:
 
@@ -31,9 +33,9 @@ For a local candidate:
 2. Install with `npm ci`. Run `npm run check` and `npm test` for candidate validation.
 3. Run `npm run package:win` on Windows or `npm run package:linux` on Linux.
 4. Inspect the repository-root `release` output. Confirm SQLite loads outside ASAR and no Claude Code native executable is packaged.
-5. Record hashes and complete the applicable manual matrix against those exact artifacts.
+5. Record hashes and complete the applicable manual matrix against those exact artifacts before tagging. Results from a pretag build apply only to that build; record any checks on the published installers separately.
 
-Keep each installer/AppImage with the `latest.yml` or `latest-linux.yml` produced by the same build. Publish both platforms together after review. Installed applications cannot use draft assets; public downloads and updates need a publicly accessible destination. Never embed a GitHub access token in the app.
+Keep each installer/AppImage with the `latest.yml` or `latest-linux.yml` produced by the same build. The workflow publishes both platforms together after automated verification. Installed applications cannot use draft assets; public downloads and updates need a publicly accessible destination. Never embed a GitHub access token in the app.
 
 Configuration lives in [electron-builder.yml](../apps/desktop/electron-builder.yml). Pull requests and `main` pushes run [CI](../.github/workflows/ci.yml): static checks, Linux build and tests, and Windows tests. It skips documentation-only changes.
 
