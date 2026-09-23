@@ -13,10 +13,6 @@
     "which"
   ],
   "workspaces": {
-    ".": {
-      // The WebSocket bundle test drives the desktop workspace's build tooling.
-      "ignoreDependencies": ["electron-vite", "vite"]
-    },
     "apps/desktop": {
       "entry": ["src/main/index.ts", "src/main/workers/*.ts", "src/**/*.test.mjs"],
       "project": ["src/**/*.{ts,tsx,mjs,css}"],
@@ -34,9 +30,10 @@
     },
     "apps/site": {
       // The remote workspace page bundles the desktop renderer, whose imports resolve against
-      // the site's install on Vercel.
+      // the site's install on Vercel. Its tsconfig extends the Electron toolkit preset.
       "ignoreDependencies": [
         "@base-ui-components/react",
+        "@electron-toolkit/tsconfig",
         "@dnd-kit/dom",
         "@dnd-kit/react",
         "@iconify-icons/material-icon-theme",
@@ -44,7 +41,6 @@
         "@meldshell/projection",
         "@tanstack/react-query",
         "@tanstack/react-virtual",
-        "effect",
         "katex",
         "lucide-react",
         "mermaid",
