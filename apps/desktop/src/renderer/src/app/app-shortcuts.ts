@@ -2,9 +2,8 @@ interface ShortcutActions {
   settingsOpen: boolean
   closeSettings: () => void
   requestNewThread: () => void
-  setSearchOpen: (open: boolean) => void
-  setSwitcherQuery: (query: string) => void
-  setSwitcherOpen: (open: boolean) => void
+  openThreadPalette: () => void
+  openFilePalette: () => void
   openSettings: () => void
   selectedThreadId: string | null
   closeThread: (id: string) => void
@@ -18,9 +17,8 @@ export function handleAppShortcut(
     settingsOpen,
     closeSettings,
     requestNewThread,
-    setSearchOpen,
-    setSwitcherQuery,
-    setSwitcherOpen,
+    openThreadPalette,
+    openFilePalette,
     openSettings,
     selectedThreadId,
     closeThread,
@@ -52,12 +50,11 @@ export function handleAppShortcut(
       break
     case "k":
       event.preventDefault()
-      setSearchOpen(true)
+      openThreadPalette()
       break
     case "p":
       event.preventDefault()
-      setSwitcherQuery("")
-      setSwitcherOpen(true)
+      openFilePalette()
       break
     case ",":
       event.preventDefault()

@@ -1,4 +1,4 @@
-import { centeredStateClasses, threadContentClasses, textInputClasses } from "../ui/styles"
+import { centeredStateClasses, threadContentClasses } from "../ui/styles"
 import { FadeDiv, MotionPreferences } from "../ui/motion"
 import { useAppData } from "../data/queries"
 import {
@@ -9,7 +9,6 @@ import {
 } from "../data/mutations"
 import { useAppAppearance } from "./appearance"
 import { Tabs } from "@base-ui-components/react/tabs"
-import { Combobox } from "@base-ui-components/react/combobox"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
@@ -17,7 +16,8 @@ import { workspaceScope } from "../data/workspace-scope"
 import { Plus, Settings } from "lucide-react"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import { InteractionDialog } from "../threads/InteractionDialog"
-import { SearchDialog } from "../threads/SearchDialog"
+import { FilePalette } from "./FilePalette"
+import { ThreadPalette } from "./ThreadPalette"
 import { Inbox } from "../threads/Inbox"
 import { FilesSidebar } from "../files/FilesSidebar"
 import { DiffViewer } from "../files/DiffViewer"
@@ -277,6 +277,7 @@ export function App(): React.JSX.Element {
   const openThreadIds = useTabStore((state) => state.openThreadIds)
   const selectedThreadId = useTabStore((state) => state.selectedThreadId)
   const openThread = useTabStore((state) => state.openThread)
+  const openFile = useTabStore((state) => state.openFile)
   const closeThread = useTabStore((state) => state.closeTab)
   const openBeside = useTabStore((state) => state.openBeside)
   const { selectedFile, selectedTabId } = useSelectedTab()
@@ -289,12 +290,11 @@ export function App(): React.JSX.Element {
   const closeSettings = useViewStore((state) => state.closeSettings)
 
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
+  const [threadPaletteOpen, setThreadPaletteOpen] = useState(false)
   const [searchTarget, setSearchTarget] = useState<TranscriptSearchResult | null>(null)
   const [searchThreads, setSearchThreads] = useState<ReadonlyArray<Thread>>([])
   const [deleteTarget, setDeleteTarget] = useState<Thread | null>(null)
-  const [switcherOpen, setSwitcherOpen] = useState(false)
-  const [switcherQuery, setSwitcherQuery] = useState("")
+  const [filePaletteOpen, setFilePaletteOpen] = useState(false)
   const remotePhone = useRemotePhone()
   const inbox = useSidebar(304, remotePhone)
   // Source control opens on request: the thread pane owns the window until the operator asks.
@@ -402,9 +402,8 @@ export function App(): React.JSX.Element {
         settingsOpen,
         closeSettings,
         requestNewThread,
-        setSearchOpen,
-        setSwitcherQuery,
-        setSwitcherOpen,
+        openThreadPalette: () => setThreadPaletteOpen(true),
+        openFilePalette: () => setFilePaletteOpen(true),
         openSettings,
         selectedThreadId: selectedTabId,
         closeThread,
@@ -540,7 +539,7 @@ export function App(): React.JSX.Element {
               >
                 <Inbox
                   showSettled={snapshot.settings.showSettled ?? true}
-                  onSearch={() => setSearchOpen(true)}
+                  onSearch={() => setThreadPaletteOpen(true)}
                   onManageWorkspaces={() => setWorkspacesOpen(true)}
                   onPin={(thread) => pinMutation.mutate(thread)}
                   threads={inboxThreads}
@@ -661,83 +660,35 @@ export function App(): React.JSX.Element {
             />
           </div>
         </AppDialog>
-        {searchOpen && (
-          <SearchDialog
-            workspaces={snapshot.workspaces}
-            onClose={() => setSearchOpen(false)}
-            onOpen={(result) => {
-              setSearchThreads((threads) => [
-                ...threads.filter((thread) => thread.id !== result.thread.id),
-                result.thread,
-              ])
-              setSearchTarget(result)
-              closeSettings()
-              openThread(result.thread.id)
-              setSearchOpen(false)
-            }}
-          />
-        )}
-
-        <AppDialog
-          open={switcherOpen}
-          onOpenChange={setSwitcherOpen}
-          title="Open thread"
-          actions={<Button onClick={() => setSwitcherOpen(false)}>Cancel</Button>}
-        >
-          <Combobox.Root<Thread>
-            inline
-            defaultOpen
-            autoHighlight
-            items={allThreads}
-            limit={50}
-            filter={(thread, query) =>
-              thread.title.toLowerCase().includes(query.trim().toLowerCase())
-            }
-            inputValue={switcherQuery}
-            onInputValueChange={setSwitcherQuery}
-            itemToStringLabel={(thread) => thread.title}
-            onValueChange={(thread) => {
-              if (thread === null) return
-              closeSettings()
-              openThread(thread.id)
-              setSwitcherOpen(false)
-            }}
-          >
-            <Combobox.Input
-              className={`motion-colors motion-duration-200 ${textInputClasses}`}
-              autoFocus
-              placeholder="Search threads…"
-              aria-label="Search threads"
-            />
-            <Combobox.Empty className="m-0 [padding:18px_8px] text-[var(--text-secondary)] text-[12.5px] leading-[1.5]">
-              {switcherQuery.trim() === ""
-                ? "No threads yet. Create one with Ctrl+N."
-                : "No matching threads. Try a different search."}
-            </Combobox.Empty>
-            <Combobox.List
-              className="flex max-h-[320px] flex-col gap-[2px] overflow-auto [padding:10px_12px_0] [&_small]:text-[var(--text-tertiary)] [&_small]:text-[10.5px]"
-              aria-label="Matching threads"
-            >
-              {(thread: Thread) => (
-                <Combobox.Item
-                  className={`motion-colors ${threadSwitcherItemClasses}`}
-                  key={thread.id}
-                  value={thread}
-                >
-                  <span className="flex min-w-0 flex-col gap-[3px] [overflow-wrap:anywhere]">
-                    <span>{thread.title}</span>
-                    <small>{workspaceById.get(thread.workspaceId)?.name}</small>
-                  </span>
-                  {thread.id === selectedThreadId && (
-                    <span className="flex-none text-[var(--text-secondary)] text-[10.5px]">
-                      Current
-                    </span>
-                  )}
-                </Combobox.Item>
-              )}
-            </Combobox.List>
-          </Combobox.Root>
-        </AppDialog>
+        <ThreadPalette
+          open={threadPaletteOpen}
+          onOpenChange={setThreadPaletteOpen}
+          threads={allThreads}
+          workspaces={snapshot.workspaces}
+          onOpenThread={(threadId) => {
+            closeSettings()
+            openThread(threadId)
+          }}
+          onOpenMatch={(result) => {
+            setSearchThreads((threads) => [
+              ...threads.filter((thread) => thread.id !== result.thread.id),
+              result.thread,
+            ])
+            setSearchTarget(result)
+            closeSettings()
+            openThread(result.thread.id)
+          }}
+        />
+        <FilePalette
+          open={filePaletteOpen}
+          onOpenChange={setFilePaletteOpen}
+          workspaces={snapshot.workspaces}
+          activeScope={activeScope}
+          onOpenFile={(scope, path) => {
+            closeSettings()
+            openFile(scope, path)
+          }}
+        />
 
         {selectedApproval !== null && (
           <InteractionDialog
@@ -780,11 +731,3 @@ export function App(): React.JSX.Element {
     </MotionPreferences>
   )
 }
-
-const threadSwitcherItemClasses = [
-  "flex items-center justify-between gap-[16px] [padding:9px_8px] border-0 rounded-[4px]",
-  "text-[var(--text-primary)] bg-transparent cursor-default text-[12.5px] leading-[1.45] text-left",
-  "[&:hover]:bg-[var(--surface-hover)] [&:focus-visible]:bg-[var(--surface-hover)]",
-  "[&[aria-selected='true']]:bg-[var(--surface-selected)]",
-  "[&[data-highlighted]]:[outline:1px_solid_currentColor] [&[data-highlighted]]:[outline-offset:-1px]",
-].join(" ")
