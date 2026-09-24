@@ -5,12 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ErrorBoundary } from "react-error-boundary"
 import { LucideProvider } from "lucide-react"
 import { App } from "./app/App"
+import { installDesktopBehavior } from "./app/desktop-behavior"
 import { ThreadDragProvider } from "./app/thread-drag"
 import { MeldMark } from "./ui/MeldMark"
 import { Button } from "./ui/controls"
 import "./app/styles.css"
 
 document.documentElement.dataset.platform = window.meldshell.platform
+installDesktopBehavior()
 
 const queryClient = new QueryClient({
   defaultOptions: {

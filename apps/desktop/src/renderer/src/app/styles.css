@@ -158,6 +158,11 @@
   svg {
     user-select: none;
   }
+  /* Links and images do not drag out as browser URLs. */
+  a,
+  img {
+    -webkit-user-drag: none;
+  }
   html,
   body,
   #root {

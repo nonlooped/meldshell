@@ -26,6 +26,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Adding a model or editing an identifier warns when the provider already has a model with that identifier instead of silently ignoring it, and built-in identifiers can no longer be changed.
 - With Cursor, `/` lists Cursor's commands and `$` lists its skills, including built-in skills. Before, skills also showed up under `/` as commands.
 - With Codex, `/` says that Codex has no slash commands and points to `$` for skills instead of showing "No matching commands".
+- MeldShell no longer responds to browser shortcuts. Ctrl+W closes only a thread tab and never the app, Ctrl+R no longer reloads the interface, Ctrl+= and Ctrl+- no longer zoom the page, Ctrl+Shift+I no longer opens developer tools, F11 no longer enters full screen, and Alt no longer reveals a hidden menu bar.
+- Files dropped onto the window are refused instead of showing a copy cursor, and links and images no longer drag out as web addresses.
 
 ## [0.6.0] - 2026-09-24
 

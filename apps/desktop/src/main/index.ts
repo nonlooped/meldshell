@@ -1,4 +1,4 @@
-import { electronApp, is, optimizer } from "@electron-toolkit/utils"
+import { electronApp, is } from "@electron-toolkit/utils"
 import { app, BrowserWindow, type Event } from "electron"
 import contextMenu from "electron-context-menu"
 import { Effect } from "effect"
@@ -12,7 +12,7 @@ import {
   installingUpdate,
   markQuitting,
 } from "./runtime/shutdown"
-import { createWindow, getMainWindow } from "./window"
+import { createWindow, getMainWindow, installApplicationMenu } from "./window"
 import { registerIpc } from "./ipc"
 import { updateService } from "./updater"
 
@@ -38,25 +38,20 @@ const appListeners = Effect.acquireRelease(
       if (mainWindow?.isMinimized()) mainWindow.restore()
       mainWindow?.focus()
     }
-    const onBrowserWindowCreated = (_event: Event, window: BrowserWindow): void => {
-      optimizer.watchWindowShortcuts(window)
-    }
     const onActivate = (): void => {
       if (BrowserWindow.getAllWindows().length === 0) openWindow()
     }
     const onWindowAllClosed = (): void => app.quit()
 
     app.on("second-instance", onSecondInstance)
-    app.on("browser-window-created", onBrowserWindowCreated)
     app.on("activate", onActivate)
     app.on("window-all-closed", onWindowAllClosed)
 
-    return { onSecondInstance, onBrowserWindowCreated, onActivate, onWindowAllClosed }
+    return { onSecondInstance, onActivate, onWindowAllClosed }
   }),
   (listeners) =>
     Effect.sync(() => {
       app.off("second-instance", listeners.onSecondInstance)
-      app.off("browser-window-created", listeners.onBrowserWindowCreated)
       app.off("activate", listeners.onActivate)
       app.off("window-all-closed", listeners.onWindowAllClosed)
     }),
@@ -107,6 +102,7 @@ const desktopProgram = Effect.scoped(
       electronApp.setAppUserModelId("com.meldshell.desktop")
       // Register handlers before loading the renderer. Their runtime calls wait for core safely.
       registerIpc()
+      installApplicationMenu()
       openWindow()
       updateService.start()
     })
