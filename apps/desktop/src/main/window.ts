@@ -2,7 +2,7 @@ import { join } from "node:path"
 import { logStartupTiming } from "./runtime/startup-timing"
 import type { AppSnapshot } from "@meldshell/contracts"
 import { is } from "@electron-toolkit/utils"
-import { BrowserWindow, nativeTheme, shell, type Event } from "electron"
+import { app, BrowserWindow, nativeTheme, shell, type Event } from "electron"
 
 let mainWindow: BrowserWindow | null = null
 
@@ -21,6 +21,7 @@ export const applyAppearance = (snapshot: AppSnapshot): void => {
 
 export const createWindow = (onClose: (event: Event) => void): void => {
   const window = new BrowserWindow({
+    icon: join(app.getAppPath(), "resources/icon.png"),
     width: 1440,
     height: 920,
     minWidth: 960,

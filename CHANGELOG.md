@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+
+- Show the MeldShell mark instead of the default artwork on the app icon and Windows setup and uninstall screens.
+
 ## [0.4.0] - 2026-09-23
 
 ### Added
