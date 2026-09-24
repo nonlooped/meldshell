@@ -300,6 +300,7 @@ const threadTileClasses = [
   "[&:has(>_.thread-tile-header)_.transcript-loading]:px-[clamp(16px,_7cqi,_104px)]",
   "[&:has(>_.thread-tile-header)_.transcript-origin]:px-[clamp(16px,_7cqi,_104px)]",
   "[&:has(>_.thread-tile-header)_.composer-zone]:px-[clamp(16px,_7cqi,_104px)]",
+  "[&:has(>_.thread-tile-header)_.thread-branch-toggle]:px-[clamp(16px,_7cqi,_104px)]",
 ].join(" ")
 
 const dropPreviewPaneClasses = [

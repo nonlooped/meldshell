@@ -9,7 +9,7 @@ export const centeredStateClasses = [
 ].join(" ")
 
 export const threadContentClasses = [
-  "[&:has(>_.transcript-origin)]:grid-rows-[auto_auto]",
+  "[&:has(>_.transcript-origin)]:grid-rows-[auto_auto_auto]",
   "[&:has(>_.transcript-origin)]:[align-content:safe_center] [&:has(>_.transcript-origin)]:py-[24px]",
   "[&:has(>_.transcript-origin)]:overflow-y-auto [&:has(>_.transcript-origin)_.composer-zone]:pb-[0]",
   "[&:has(>_.transcript-origin)_.composer]:max-w-[680px]",
