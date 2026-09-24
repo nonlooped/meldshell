@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Tabs } from "@base-ui-components/react/tabs"
 import type {
   AppSnapshot,
+  Provider,
   ProviderModel,
   SetAppSettingsInput,
   UpsertModelInput,
@@ -47,7 +48,7 @@ interface SettingsViewProps {
   ) => void
   readonly onUpsertModel: (input: UpsertModelInput) => void
   readonly onDeleteModel: (modelId: string) => void
-  readonly onResetCatalog: () => void
+  readonly onResetCatalog: (providerId: string) => void
   readonly onChangeAppSettings: (input: SetAppSettingsInput) => void
 }
 
@@ -84,7 +85,7 @@ const SECTIONS: ReadonlyArray<{
     label: "Providers",
     icon: <Boxes size={16} strokeWidth={1.75} />,
     title: "Providers",
-    caption: "Rename providers and curate the model catalog offered to every thread.",
+    caption: "Check each connection and choose which models appear in the composer.",
   },
   {
     id: "usage",
@@ -134,7 +135,7 @@ export function SettingsView({
     readonly model: ProviderModel | null
   } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ProviderModel | null>(null)
-  const [resetOpen, setResetOpen] = useState(false)
+  const [resetTarget, setResetTarget] = useState<Provider | null>(null)
 
   const active = SECTIONS.find((entry) => entry.id === section) ?? SECTIONS[0]
   const usageProviders = snapshot.providers.filter(hasSubscriptionUsage)
@@ -227,7 +228,7 @@ export function SettingsView({
                     onEditModel={(model) => setModelDialog({ providerId: provider.id, model })}
                     onDeleteModel={setDeleteTarget}
                     onAddModel={() => setModelDialog({ providerId: provider.id, model: null })}
-                    onResetCatalog={() => setResetOpen(true)}
+                    onResetCatalog={() => setResetTarget(provider)}
                   />
                 ))
               ))}
@@ -305,6 +306,7 @@ export function SettingsView({
           key={`${modelDialog.providerId}:${modelDialog.model?.id ?? "new"}`}
           providerId={modelDialog.providerId}
           model={modelDialog.model}
+          siblings={modelsForProvider(snapshot, modelDialog.providerId)}
           onClose={() => setModelDialog(null)}
           onSubmit={onUpsertModel}
         />
@@ -334,24 +336,25 @@ export function SettingsView({
       >
         <p>
           “{deleteTarget?.displayName}” will no longer be offered in the composer. Threads already
-          pointing at it fall back to the first enabled model. Built-in models can be restored
-          later.
+          using it switch to another available model. You can add it again later.
         </p>
       </AppDialog>
 
       <AppDialog
         alert
-        open={resetOpen}
-        onOpenChange={setResetOpen}
-        title="Restore the built-in models?"
+        open={resetTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setResetTarget(null)
+        }}
+        title={`Restore the built-in ${resetTarget?.displayName ?? ""} models?`}
         actions={
           <>
-            <Button onClick={() => setResetOpen(false)}>Cancel</Button>
+            <Button onClick={() => setResetTarget(null)}>Cancel</Button>
             <Button
               variant="primary"
               onClick={() => {
-                onResetCatalog()
-                setResetOpen(false)
+                if (resetTarget !== null) onResetCatalog(resetTarget.id)
+                setResetTarget(null)
               }}
             >
               Restore models
@@ -360,8 +363,8 @@ export function SettingsView({
         }
       >
         <p>
-          Built-in models are re-added with their original names and reasoning options. Models you
-          added yourself are kept, and any edits to built-in entries are discarded.
+          Built-in models get their original names, reasoning options, and visibility back. Models
+          you added yourself are kept. Other providers are not affected.
         </p>
       </AppDialog>
     </Tabs.Root>

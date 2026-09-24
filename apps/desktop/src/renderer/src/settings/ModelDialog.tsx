@@ -11,23 +11,40 @@ interface ModelDialogProps {
   readonly providerId: string
   /** `null` opens the dialog in create mode. */
   readonly model: ProviderModel | null
+  /** The provider's other models, which a new or renamed identifier must not collide with. */
+  readonly siblings: ReadonlyArray<ProviderModel>
   readonly onClose: () => void
   readonly onSubmit: (input: UpsertModelInput) => void
 }
+
+/** New models start from the provider default's efforts, which match its other models best. */
+const defaultEfforts = (siblings: ReadonlyArray<ProviderModel>): ReadonlyArray<ReasoningEffort> =>
+  (siblings.find((sibling) => sibling.isDefault) ?? siblings[0])?.reasoningEfforts ?? [
+    "low",
+    "medium",
+    "high",
+  ]
 
 /** The caller mounts a fresh form for each model. */
 export function ModelDialog({
   providerId,
   model,
+  siblings,
   onClose,
   onSubmit,
 }: ModelDialogProps): React.JSX.Element {
   const [slug, setSlug] = useState(model?.slug ?? "")
   const [displayName, setDisplayName] = useState(model?.displayName ?? "")
   const [efforts, setEfforts] = useState<ReadonlyArray<ReasoningEffort>>(
-    model?.reasoningEfforts ?? ["low", "medium", "high"],
+    model?.reasoningEfforts ?? defaultEfforts(siblings),
   )
   const [supportsFast, setSupportsFast] = useState(model?.supportsFast ?? false)
+  const trimmedSlug = slug.trim()
+  const duplicate = siblings.some(
+    (sibling) => sibling.id !== model?.id && sibling.slug === trimmedSlug,
+  )
+  // Discovery matches built-in models by identifier, so renaming one would orphan it.
+  const slugLocked = model?.builtIn === true
 
   const submit = (): void => {
     onSubmit({
@@ -51,7 +68,7 @@ export function ModelDialog({
       actions={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" disabled={slug.trim() === ""} onClick={submit}>
+          <Button variant="primary" disabled={trimmedSlug === "" || duplicate} onClick={submit}>
             {model === null ? "Add model" : "Save changes"}
           </Button>
         </>
@@ -68,8 +85,20 @@ export function ModelDialog({
           mono
           value={slug}
           placeholder="gpt-5.1-codex"
+          readOnly={slugLocked}
+          aria-invalid={duplicate}
           onValueChange={setSlug}
         />
+        {(duplicate || slugLocked) && (
+          <p
+            className="[margin:6px_0_14px] text-[11.5px] leading-[1.5]"
+            style={{ color: duplicate ? "var(--color-deleted)" : "var(--text-tertiary)" }}
+          >
+            {duplicate
+              ? "This provider already has a model with this identifier."
+              : "Built-in identifiers come from the provider and can't be changed."}
+          </p>
+        )}
         <TextField
           label="Display name"
           value={displayName}
