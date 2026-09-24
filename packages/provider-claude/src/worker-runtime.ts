@@ -2,6 +2,7 @@ import { workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
 import {
   query,
   type Options,
+  type PermissionMode,
   type PermissionResult,
   type PermissionUpdate,
   type Query,
@@ -47,6 +48,13 @@ const toolQuestions = (toolName: string, toolInput: Record<string, unknown>) => 
       }))
     : []
 }
+const approvalMethod = (toolName: string, asksQuestions: boolean): string => {
+  if (toolName === "ExitPlanMode") return "claude/exit_plan_mode"
+  if (asksQuestions) return "item/tool/requestUserInput"
+  if (toolName === "Bash") return "item/commandExecution/requestApproval"
+  if (["Edit", "Write", "NotebookEdit"].includes(toolName)) return "item/fileChange/requestApproval"
+  return "item/permissions/requestApproval"
+}
 const resultError = (message: Extract<SDKMessage, { type: "result" }>): string | undefined => {
   return message.subtype === "success"
     ? message.is_error
@@ -78,6 +86,8 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
       input: Record<string, unknown>
       suggestions: PermissionUpdate[]
       questions: Array<{ id: string; question: string }>
+      /** Set for a plan review: the mode Claude works in once the plan is approved. */
+      planApproved?: { mode: PermissionMode; emit: (method: string, params: unknown) => void }
     }
   >()
   const publish = (value: unknown): void => port.postMessage(value)
@@ -296,18 +306,15 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
 
       return false
     }
+    // Approving a plan returns Claude to the permissions the thread chose, as Claude Code does.
+    const workingMode = claudeOptions({ ...dispatch, mode: "default" }).permissionMode ?? "default"
     const canUseTool: NonNullable<Options["canUseTool"]> = async (toolName, toolInput, context) => {
       if (interrupted() || context.signal.aborted)
         return { behavior: "deny", message: "Turn interrupted.", interrupt: true }
       const requestId = `claude:${randomUUID()}`
       const questions = toolQuestions(toolName, toolInput)
-      const method = questions.length
-        ? "item/tool/requestUserInput"
-        : toolName === "Bash"
-          ? "item/commandExecution/requestApproval"
-          : ["Edit", "Write", "NotebookEdit"].includes(toolName)
-            ? "item/fileChange/requestApproval"
-            : "item/permissions/requestApproval"
+      const plan = toolName === "ExitPlanMode"
+      const method = approvalMethod(toolName, questions.length > 0)
       return new Promise<PermissionResult>((resolve) => {
         const abort = (): void => {
           emit("serverRequest/resolved", { requestId })
@@ -324,6 +331,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
           input: toolInput,
           suggestions: context.suggestions ?? [],
           questions,
+          ...(plan ? { planApproved: { mode: workingMode, emit } } : {}),
         })
         context.signal.addEventListener("abort", abort, { once: true })
         controller.signal.addEventListener("abort", abort, { once: true })
@@ -335,6 +343,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
             command: toolInput.command,
             permissions: { tool: toolName, input: toolInput },
             questions,
+            ...(plan ? { plan: typeof toolInput.plan === "string" ? toolInput.plan : "" } : {}),
             toolName,
             input: toolInput,
           },
@@ -555,14 +564,23 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
             : {}),
         },
         // Session approval must never write user or project settings.
-        ...(message.decision === "acceptForSession"
+        ...(approval.planApproved
           ? {
-              updatedPermissions: approval.suggestions.map((suggestion) => ({
-                ...suggestion,
-                destination: "session" as const,
-              })),
+              updatedPermissions: [
+                { type: "setMode", mode: approval.planApproved.mode, destination: "session" },
+              ],
             }
-          : {}),
+          : message.decision === "acceptForSession"
+            ? {
+                updatedPermissions: approval.suggestions.map((suggestion) => ({
+                  ...suggestion,
+                  destination: "session" as const,
+                })),
+              }
+            : {}),
+      })
+      approval.planApproved?.emit("claude/permission_mode", {
+        permissionMode: approval.planApproved.mode,
       })
     } else
       approval.resolve({

@@ -24,7 +24,13 @@ import {
   buildTitleRequest,
 } from "./titles"
 import { getSnapshot } from "./snapshots"
-import { eventKind, eventText, approvalCopy } from "@meldshell/projection"
+import {
+  CLAUDE_EXIT_PLAN_MODE,
+  CLAUDE_PERMISSION_MODE,
+  eventKind,
+  eventText,
+  approvalCopy,
+} from "@meldshell/projection"
 
 interface DispatchRow {
   readonly workspace_path: string
@@ -296,6 +302,8 @@ export const recordRuntimeEvent = (input: RuntimeEventInput) =>
 
     yield* updateThreadName(input)
 
+    yield* updateClaudeMode(input)
+
     yield* updateCursorMode(input)
 
     yield* persistApproval(input)
@@ -425,6 +433,17 @@ const updateThreadName = (input: RuntimeEventInput) =>
     }
   })
 
+/** An approved plan takes Claude out of plan mode, so the thread's next turn starts working. */
+const updateClaudeMode = (input: RuntimeEventInput) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    if (input.method !== CLAUDE_PERMISSION_MODE) return
+    const mode = (input.params as { permissionMode?: unknown }).permissionMode
+    if (typeof mode === "string" && mode !== "plan")
+      yield* sql`UPDATE thread_settings SET mode = 'default'
+        WHERE thread_id = ${input.threadId} AND provider_id IN (SELECT id FROM providers WHERE harness = 'claude-code')`
+  })
+
 const updateCursorMode = (input: RuntimeEventInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
@@ -466,6 +485,7 @@ const persistApproval = (input: RuntimeEventInput) =>
         "cursor/acp/session/request_permission",
         "cursor/ask_question",
         "cursor/create_plan",
+        CLAUDE_EXIT_PLAN_MODE,
       ].includes(input.method)
     ) {
       const copy = approvalCopy(input.method, input.params)

@@ -7,6 +7,7 @@ import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { ComposerAttachment } from "@meldshell/contracts/ipc"
 import type {
   AppSnapshot,
+  CollaborationMode,
   ReasoningEffort,
   SandboxMode,
   SetThreadSettingsInput,
@@ -17,6 +18,9 @@ import {
   Eye,
   ImageIcon,
   FolderPen,
+  Hammer,
+  ListChecks,
+  MessageCircleQuestion,
   Paperclip,
   RefreshCw,
   ShieldAlert,
@@ -321,6 +325,24 @@ function ReasoningSettings({
 
 type ModelSelection = NonNullable<ReturnType<typeof resolveSelection>>
 
+const MODES: Readonly<Record<CollaborationMode, { label: string; icon: typeof Hammer }>> = {
+  default: { label: "Agent", icon: Hammer },
+  plan: { label: "Plan", icon: ListChecks },
+  ask: { label: "Ask", icon: MessageCircleQuestion },
+}
+
+/** The modes each harness offers natively. Codex takes no collaboration mode from MeldShell. */
+const harnessModes = (harness: string): readonly CollaborationMode[] => {
+  switch (harness) {
+    case "claude-code":
+      return ["default", "plan"]
+    case "cursor":
+      return ["default", "plan", "ask"]
+    default:
+      return []
+  }
+}
+
 function ComposerSettings({
   snapshot,
   threadId,
@@ -414,6 +436,7 @@ function ComposerSettings({
       : options.find((option) => option.sandbox === selection.sandbox)!
   // Every harness lists its least guarded permission last; it stays visibly distinct when chosen.
   const riskiest = options[options.length - 1]!
+  const modes = harnessModes(selection.provider.harness)
   const visible = selectableModels(snapshot).filter((model) => !model.hidden)
   return (
     <>
@@ -439,12 +462,17 @@ function ComposerSettings({
             data-risky={selected.id === riskiest.id}
             aria-label={
               toolPermissions
-                ? `Change ${isClaude ? "Claude" : "Cursor"} permissions`
+                ? `Change ${isClaude ? "Claude" : "Cursor"} mode and permissions`
                 : "Change sandbox access"
             }
           >
             <SandboxIcon mode={selection.sandbox} />
             <span className="overflow-hidden text-ellipsis">{selected.label}</span>
+            {selection.mode !== "default" && modes.includes(selection.mode) && (
+              <span className="flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[10.5px] leading-[1.3]">
+                {MODES[selection.mode].label}
+              </span>
+            )}
             <ChevronDown
               size={13}
               strokeWidth={1.75}
@@ -453,6 +481,31 @@ function ComposerSettings({
           </BaseButton>
         }
       >
+        {modes.length > 0 && (
+          <>
+            <MenuRadioGroup
+              value={selection.mode}
+              onValueChange={(value) =>
+                onChangeSettings({ threadId, mode: String(value) as CollaborationMode })
+              }
+            >
+              <MenuGroup label="Mode">
+                {modes.map((mode) => {
+                  const { label, icon: ModeIcon } = MODES[mode]
+                  return (
+                    <MenuChoice key={mode} value={mode}>
+                      {label}
+                      <span className="grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] place-items-center text-[var(--text-secondary)]">
+                        <ModeIcon size={14} strokeWidth={1.7} />
+                      </span>
+                    </MenuChoice>
+                  )
+                })}
+              </MenuGroup>
+            </MenuRadioGroup>
+            <MenuSeparator />
+          </>
+        )}
         <MenuRadioGroup
           value={selected.id}
           onValueChange={(value) => {
@@ -461,9 +514,7 @@ function ComposerSettings({
               onChangeSettings({
                 threadId,
                 sandbox: option.sandbox,
-                ...(toolPermissions
-                  ? { approvalPolicy: option.approvalPolicy, mode: "default" }
-                  : {}),
+                ...(toolPermissions ? { approvalPolicy: option.approvalPolicy } : {}),
               })
           }}
         >

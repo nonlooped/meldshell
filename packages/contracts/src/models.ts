@@ -134,8 +134,9 @@ export const ApprovalRequest = Schema.Union(
   }),
   Schema.Struct({
     ...InteractionFields,
-    kind: Schema.Literal("cursor-plan"),
-    method: Schema.Literal("cursor/create_plan"),
+    kind: Schema.Literal("plan"),
+    /** Cursor's plan tool, or Claude Code's ExitPlanMode tool, asking to leave plan mode. */
+    method: Schema.Literal("cursor/create_plan", "claude/exit_plan_mode"),
     plan: Schema.String,
     params: Schema.Unknown,
   }),
