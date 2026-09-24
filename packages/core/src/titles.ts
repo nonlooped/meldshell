@@ -83,7 +83,7 @@ export const buildTitleRequest = (threadId: string, text: string) =>
       readonly workspace_path: string
       readonly model_id: string | null
     }>`
-      SELECT w.path AS workspace_path, s.model_id
+      SELECT COALESCE(t.worktree_path, w.path) AS workspace_path, s.model_id
       FROM threads t
       JOIN workspaces w ON w.id = t.workspace_id
       JOIN thread_settings s ON s.thread_id = t.id

@@ -6,7 +6,13 @@ import { AnimatePresence, motion } from "motion/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import type { Workspace } from "@meldshell/contracts"
-import type { GitChange, GitSnapshot, GitDiffSide, GitFileAction } from "@meldshell/contracts/ipc"
+import type {
+  GitChange,
+  GitSnapshot,
+  GitDiffSide,
+  GitFileAction,
+  WorkspaceScope,
+} from "@meldshell/contracts/ipc"
 import {
   ChevronDown,
   ChevronRight,
@@ -24,6 +30,7 @@ import { useTabStore } from "../app/tab-store"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { type GraphRow, layoutGraph } from "./git-graph"
 import { relativeAge } from "../ui/relative-age"
+import { scopeKey } from "../data/workspace-scope"
 const graphColors = [
   "var(--color-info)",
   "var(--color-added)",
@@ -87,7 +94,7 @@ function statusLabel(change: GitChange): string {
 }
 
 function FileRow({
-  workspaceId,
+  scope,
   change,
   side,
   busy,
@@ -96,14 +103,15 @@ function FileRow({
   side: GitDiffSide
   busy: boolean
   onAction: (path: string, action: GitFileAction) => void
-  workspaceId: string
+  scope: WorkspaceScope
   change: GitChange
 }): React.JSX.Element {
   const openDiff = useTabStore((state) => state.openDiff)
   const slash = change.path.lastIndexOf("/")
   const rowRef = useRef<HTMLDivElement>(null)
   const reduced = useMotionPreference()
-  const flightKey = (to: GitDiffSide) => `git:${workspaceId}:${to}:${change.path}`
+  const flightKey = (to: GitDiffSide) =>
+    `git:${scope.workspaceId}:${scope.threadId ?? ""}:${to}:${change.path}`
   // A file staged or unstaged here flies into its row in the other list.
   // biome-ignore lint/correctness/useExhaustiveDependencies: Only a newly mounted row can be a landing.
   useLayoutEffect(() => {
@@ -124,7 +132,7 @@ function FileRow({
       >
         <button
           type="button"
-          onClick={() => openDiff(workspaceId, change.path, side)}
+          onClick={() => openDiff(scope, change.path, side)}
           className={
             "git-file flex items-center gap-[7px] w-full h-[28px] border-0 [padding:0_14px] bg-transparent text-left cursor-pointer [&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)]"
           }
@@ -174,9 +182,11 @@ function FileRow({
 
 export function GitSidebar({
   workspace,
+  scope,
   threadId,
 }: {
   workspace?: Workspace
+  scope?: WorkspaceScope
   threadId?: string
 }): React.JSX.Element {
   const [limit, setLimit] = useState(100)
@@ -189,7 +199,7 @@ export function GitSidebar({
   }
   const action = useMutation({
     mutationFn: (input: { path: string; action: GitFileAction }) =>
-      window.meldshell.gitFileAction({ workspaceId: workspace!.id, ...input }),
+      window.meldshell.gitFileAction({ ...scope!, ...input }),
     onSettled: refresh,
   })
   const [commitBusy, setCommitBusy] = useState(false)
@@ -198,9 +208,9 @@ export function GitSidebar({
   const changesPanelRef = usePanelRef()
   const graphPanelRef = usePanelRef()
   const query = useQuery({
-    queryKey: ["git", workspace?.id, limit],
-    queryFn: () => window.meldshell.getGitSnapshot({ workspaceId: workspace!.id, limit }),
-    enabled: Boolean(workspace),
+    queryKey: ["git", ...(scope ? scopeKey(scope) : []), limit],
+    queryFn: () => window.meldshell.getGitSnapshot({ ...scope!, limit }),
+    enabled: Boolean(workspace && scope),
     refetchInterval: 5000,
     retry: false,
   })
@@ -209,7 +219,7 @@ export function GitSidebar({
       className="h-full min-w-0 flex flex-col overflow-hidden text-[var(--text-secondary)] text-[12px]"
       aria-label="Source control"
     >
-      {!workspace ? (
+      {!workspace || !scope ? (
         <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
           Select a thread to view its workspace changes and history.
         </p>
@@ -236,7 +246,7 @@ export function GitSidebar({
         <>
           <CommitSection
             threadId={threadId}
-            workspaceId={workspace.id}
+            scope={scope}
             data={query.data}
             busy={action.isPending}
             onBusy={setCommitBusy}
@@ -270,7 +280,7 @@ export function GitSidebar({
                 }}
                 busy={action.isPending || commitBusy}
                 onAction={(path, operation) => action.mutate({ path, action: operation })}
-                workspaceId={workspace.id}
+                scope={scope}
                 changes={query.data.changes}
                 refreshing={query.isFetching}
                 onRefresh={() => void query.refetch()}
@@ -297,7 +307,7 @@ export function GitSidebar({
                   if (open) graphPanelRef.current?.expand()
                   else graphPanelRef.current?.collapse()
                 }}
-                workspaceId={workspace.id}
+                scope={scope}
                 data={query.data}
                 limit={limit}
                 setLimit={setLimit}
@@ -312,14 +322,14 @@ export function GitSidebar({
 
 function CommitSection({
   threadId,
-  workspaceId,
+  scope,
   data,
   busy,
   onBusy,
   onRefresh,
 }: {
   threadId?: string
-  workspaceId: string
+  scope: WorkspaceScope
   data: GitSnapshot
   busy: boolean
   onBusy: (busy: boolean) => void
@@ -334,21 +344,22 @@ function CommitSection({
       onBusy(true)
       setNotice("")
       if (operation === "generate") {
+        // The thread picks the model; a worktree scope has already named that same thread.
         const generated = await window.meldshell.generateCommitMessage({
-          workspaceId,
-          threadId,
+          workspaceId: scope.workspaceId,
+          threadId: scope.threadId ?? threadId,
         })
         setMessage(generated.replace(/\s*\r?\n\s*/g, " ").trim())
         return
       }
       if (operation !== "push") {
-        await window.meldshell.gitCommit({ workspaceId, message })
+        await window.meldshell.gitCommit({ ...scope, message })
         setMessage("")
         setNotice("Committed staged changes.")
       }
       if (operation === "push" || operation === "commit-push") {
         try {
-          await window.meldshell.gitPush(workspaceId)
+          await window.meldshell.gitPush(scope)
         } catch (error) {
           throw new Error(
             `${operation === "commit-push" ? "Commit succeeded, but push failed. " : ""}${String(error)}`,
@@ -469,7 +480,7 @@ function ChangesSection({
   changes,
   busy,
   onAction,
-  workspaceId,
+  scope,
   refreshing,
   onRefresh,
 }: {
@@ -478,7 +489,7 @@ function ChangesSection({
   changes: readonly GitChange[]
   busy: boolean
   onAction: (path: string, action: GitFileAction) => void
-  workspaceId: string
+  scope: WorkspaceScope
   refreshing: boolean
   onRefresh: () => void
 }): React.JSX.Element {
@@ -534,7 +545,7 @@ function ChangesSection({
                   {files.map((change) => (
                     <FileRow
                       key={change.path}
-                      workspaceId={workspaceId}
+                      scope={scope}
                       change={change}
                       side={side}
                       busy={busy}
@@ -554,14 +565,14 @@ function ChangesSection({
 function GraphSection({
   open,
   onOpenChange,
-  workspaceId,
+  scope,
   data,
   limit,
   setLimit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  workspaceId: string
+  scope: WorkspaceScope
   data: GitSnapshot
   limit: number
   setLimit: (limit: number) => void
@@ -598,12 +609,7 @@ function GraphSection({
         )}
         <ol className="[list-style:none] p-0 m-0">
           {rows.map((row) => (
-            <CommitRow
-              key={row.commit.hash}
-              workspaceId={workspaceId}
-              row={row}
-              graphWidth={graphWidth}
-            />
+            <CommitRow key={row.commit.hash} scope={scope} row={row} graphWidth={graphWidth} />
           ))}
         </ol>
         {data.hasMore &&
@@ -626,16 +632,10 @@ function GraphSection({
   )
 }
 
-function CommitDiff({
-  workspaceId,
-  hash,
-}: {
-  workspaceId: string
-  hash: string
-}): React.JSX.Element {
+function CommitDiff({ scope, hash }: { scope: WorkspaceScope; hash: string }): React.JSX.Element {
   const query = useQuery({
-    queryKey: ["git-commit-diff", workspaceId, hash],
-    queryFn: () => window.meldshell.getGitCommitDiff({ workspaceId, hash }),
+    queryKey: ["git-commit-diff", ...scopeKey(scope), hash],
+    queryFn: () => window.meldshell.getGitCommitDiff({ ...scope, hash }),
     staleTime: Infinity,
     retry: false,
   })
@@ -664,11 +664,11 @@ function CommitDiff({
 }
 
 function CommitRow({
-  workspaceId,
+  scope,
   row,
   graphWidth,
 }: {
-  workspaceId: string
+  scope: WorkspaceScope
   row: GraphRow
   graphWidth: number
 }): React.JSX.Element {
@@ -743,7 +743,7 @@ function CommitRow({
               </>
             )}
           </p>
-          <CommitDiff workspaceId={workspaceId} hash={commit.hash} />
+          <CommitDiff scope={scope} hash={commit.hash} />
         </div>
       </CollapsiblePanel>
     </Collapsible.Root>

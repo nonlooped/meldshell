@@ -3,6 +3,7 @@ import { FadeDiv } from "../ui/motion"
 import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import { useThreadActions } from "../data/mutations"
 import { useSelectedProvider } from "../data/providers"
+import { workspaceScope } from "../data/workspace-scope"
 import { emptyDraft, useThreadDrafts } from "../app/thread-drafts"
 import { ErrorToast } from "../ui/Notice"
 import { Composer } from "./Composer"
@@ -68,6 +69,8 @@ export function ThreadView({
           threadId={thread.id}
           running={thread.activity === "running"}
           workspace={snapshot.workspaces.find((workspace) => workspace.id === thread.workspaceId)}
+          scope={workspaceScope(thread)}
+          branch={thread.worktree?.branch}
           targetTurnId={
             searchTarget?.thread.id === thread.id
               ? (searchTarget.turnId ?? `event:${searchTarget.eventId}`)

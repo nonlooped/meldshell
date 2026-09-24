@@ -26,8 +26,15 @@ import type {
 
 export type ComposerAttachment = InputAttachment & { readonly previewUrl?: string }
 
-export interface WorkspaceFileInput {
+/**
+ * The folder a file or Git request reads. A thread with its own worktree names itself so the host
+ * resolves that checkout; every other request reads the workspace folder.
+ */
+export interface WorkspaceScope {
   readonly workspaceId: string
+  readonly threadId?: string | undefined
+}
+export interface WorkspaceFileInput extends WorkspaceScope {
   readonly path: string
 }
 export interface DirectoryEntry {
@@ -86,6 +93,15 @@ export interface AppUpdateStatus {
   readonly message: string | null
 }
 
+export interface WorktreeStatus {
+  readonly branch: string
+  readonly baseBranch: string | null
+  /** Uncommitted entries in the worktree, including untracked files. */
+  readonly changes: number
+  /** Commits on the thread branch that its base branch does not have; null without a base. */
+  readonly unmerged: number | null
+}
+
 export type GitFileAction = "stage" | "unstage" | "restore"
 export type GitDiffSide = "staged" | "unstaged"
 
@@ -125,42 +141,42 @@ export const requests = {
   searchWorkspacePaths: request<
     (input: {
       workspaceId: string
+      threadId?: string
       query: string
       limit?: number
     }) => Promise<readonly WorkspacePathMatch[]>
   >("meldshell:search-workspace-paths"),
   listComposerCommands: request<
-    (input: { workspaceId: string; harness: string }) => Promise<readonly ComposerCommand[]>
+    (input: WorkspaceScope & { harness: string }) => Promise<readonly ComposerCommand[]>
   >("meldshell:list-composer-commands"),
   readWorkspaceFile: request<(input: WorkspaceFileInput) => Promise<FilePreview>>(
     "meldshell:read-workspace-file",
   ),
   gitFileAction: request<
-    (input: { workspaceId: string; path: string; action: GitFileAction }) => Promise<void>
+    (input: WorkspaceScope & { path: string; action: GitFileAction }) => Promise<void>
   >("meldshell:git-file-action"),
   gitCommit:
-    request<(input: { workspaceId: string; message: string }) => Promise<void>>(
-      "meldshell:git-commit",
-    ),
-  gitPush: request<(workspaceId: string) => Promise<void>>("meldshell:git-push"),
+    request<(input: WorkspaceScope & { message: string }) => Promise<void>>("meldshell:git-commit"),
+  gitPush: request<(input: WorkspaceScope) => Promise<void>>("meldshell:git-push"),
   generateCommitMessage: request<
     (input: { workspaceId: string; threadId?: string }) => Promise<string>
   >("meldshell:generate-commit-message"),
-  getGitCommitDiff: request<(input: { workspaceId: string; hash: string }) => Promise<string>>(
+  getGitCommitDiff: request<(input: WorkspaceScope & { hash: string }) => Promise<string>>(
     "meldshell:get-git-commit-diff",
   ),
-  getGitSnapshot: request<(input: { workspaceId: string; limit: number }) => Promise<GitSnapshot>>(
+  getGitSnapshot: request<(input: WorkspaceScope & { limit: number }) => Promise<GitSnapshot>>(
     "meldshell:get-git-snapshot",
   ),
   getGitDiff:
     request<
-      (input: {
-        workspaceId: string
-        path: string
-        side?: GitDiffSide
-        /** Includes every unchanged line so a viewer can fold and expand context itself. */
-        context?: "full"
-      }) => Promise<string>
+      (
+        input: WorkspaceScope & {
+          path: string
+          side?: GitDiffSide
+          /** Includes every unchanged line so a viewer can fold and expand context itself. */
+          context?: "full"
+        },
+      ) => Promise<string>
     >("meldshell:get-git-diff"),
   renameWorkspace: request<(input: { workspaceId: string; name: string }) => Promise<AppSnapshot>>(
     "meldshell:rename-workspace",
@@ -168,6 +184,13 @@ export const requests = {
   removeWorkspace: request<(workspaceId: string) => Promise<AppSnapshot>>(
     "meldshell:remove-workspace",
   ),
+  getWorktreeStatus: request<(threadId: string) => Promise<WorktreeStatus>>(
+    "meldshell:get-worktree-status",
+  ),
+  mergeWorktree: request<(threadId: string) => Promise<void>>("meldshell:merge-worktree"),
+  removeWorktree: request<
+    (input: { threadId: string; deleteBranch: boolean }) => Promise<AppSnapshot>
+  >("meldshell:remove-worktree"),
   setThreadPinned: request<(input: { threadId: string; pinned: boolean }) => Promise<AppSnapshot>>(
     "meldshell:set-thread-pinned",
   ),

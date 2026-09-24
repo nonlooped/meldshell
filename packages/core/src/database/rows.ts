@@ -11,6 +11,7 @@ import {
   type SandboxMode,
   type Thread,
   type ThreadSettings,
+  type ThreadWorktree,
   type Workspace,
 } from "@meldshell/contracts"
 
@@ -33,6 +34,10 @@ export interface ThreadRow {
   readonly activity: Thread["activity"]
   readonly queued_count: number
   readonly turn_count: number
+  readonly worktree_path: string | null
+  readonly worktree_branch: string | null
+  readonly worktree_base: string | null
+  readonly worktree_state: NonNullable<Thread["worktree"]>["state"] | null
 }
 
 export interface EventRow {
@@ -102,18 +107,37 @@ export const fromWorkspaceRow = (row: WorkspaceRow): Workspace => ({
   lastOpenedAt: row.last_opened_at,
 })
 
-export const fromThreadRow = (row: ThreadRow): Thread => ({
-  id: row.id,
-  workspaceId: row.workspace_id,
-  title: row.title,
-  status: row.status,
-  pinned: row.pinned === 1,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-  activity: row.activity,
-  queuedCount: Number(row.queued_count),
-  turnCount: Number(row.turn_count),
-})
+export const fromThreadRow = (row: ThreadRow): Thread => {
+  const worktree = fromWorktreeColumns(row)
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    title: row.title,
+    status: row.status,
+    pinned: row.pinned === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    activity: row.activity,
+    queuedCount: Number(row.queued_count),
+    turnCount: Number(row.turn_count),
+    ...(worktree === null ? {} : { worktree }),
+  }
+}
+
+type WorktreeColumns = Pick<
+  ThreadRow,
+  "worktree_path" | "worktree_branch" | "worktree_base" | "worktree_state"
+>
+
+export const fromWorktreeColumns = (row: WorktreeColumns): ThreadWorktree | null =>
+  row.worktree_path === null
+    ? null
+    : {
+        path: row.worktree_path,
+        branch: row.worktree_branch ?? "",
+        baseBranch: row.worktree_base,
+        state: row.worktree_state ?? "ready",
+      }
 
 export const parseProviderData = (value: string): unknown => {
   try {

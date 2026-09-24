@@ -49,7 +49,7 @@ const createDispatch = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<DispatchRow>`
-      SELECT w.path AS workspace_path, p.key AS provider_key, p.harness,
+      SELECT COALESCE(t.worktree_path, w.path) AS workspace_path, p.key AS provider_key, p.harness,
              m.slug AS model_slug, m.metadata AS model_metadata,
              m.supports_fast AS model_supports_fast, s.reasoning_effort, s.speed,
              s.mode, s.sandbox, s.approval_policy,
@@ -148,6 +148,19 @@ const queueInput = (
     } satisfies SubmitTurnResult
   })
 
+/** A thread with its own worktree never falls back to the workspace folder. */
+const requireWorktree = (state: string | null) =>
+  state === null || state === "ready"
+    ? Effect.void
+    : Effect.fail(
+        new CoreProtocolError({
+          message:
+            state === "removed"
+              ? "This thread's worktree was removed. Start a new thread to keep working."
+              : "This thread's worktree folder is missing. Restore it or remove the worktree.",
+        }),
+      )
+
 export const submitTurn = (input: SubmitTurnInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
@@ -165,9 +178,13 @@ export const submitTurn = (input: SubmitTurnInput) =>
       )
     }
 
-    const threads = yield* sql<{ readonly title_locked: number }>`
-      SELECT title_locked FROM threads WHERE id = ${input.threadId}
+    const threads = yield* sql<{
+      readonly title_locked: number
+      readonly worktree_state: string | null
+    }>`
+      SELECT title_locked, worktree_state FROM threads WHERE id = ${input.threadId}
     `
+    yield* requireWorktree(threads[0]?.worktree_state ?? null)
     const unnamed = threads[0]?.title_locked === 0 && text !== ""
     if (unnamed) {
       const derivedTitle = derivedThreadTitle(text)

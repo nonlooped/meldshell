@@ -2,6 +2,7 @@ import { Effect, Stream, Fiber } from "effect"
 import { CoreClient } from "./core-client"
 import { HostEvents, eventFrames } from "./events"
 import { createHostApi } from "./api"
+import { reconcileWorktrees } from "./thread-worktrees"
 import { createHostRuntime, stopHost } from "./runtime"
 import type { HostPlatform } from "./platform"
 import { connectRelay } from "./remote-connection"
@@ -24,6 +25,18 @@ export async function startHost(
     throw cause
   }
   const api = createHostApi(runtime)
+  runtime.runFork(
+    reconcileWorktrees.pipe(
+      Effect.flatMap((changed) =>
+        changed
+          ? Effect.flatMap(HostEvents, (events) =>
+              events.publish({ _tag: "RuntimeChanged", threadId: "" }),
+            )
+          : Effect.void,
+      ),
+      Effect.catchAll(Effect.logError),
+    ),
+  )
   const relay = connectRelay(directory, api.execute)
   // Batch bursts such as streamed deltas into one change per thread every 32 ms.
   const eventFiber = runtime.runFork(

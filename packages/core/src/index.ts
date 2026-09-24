@@ -10,6 +10,9 @@ export {
   setThreadStatus,
   deleteThread,
   setProviderSession,
+  getThreadLocation,
+  listWorktreeThreads,
+  setWorktreeState,
 } from "./threads"
 export { refreshTranscriptSearch, searchTranscripts } from "./search"
 export {

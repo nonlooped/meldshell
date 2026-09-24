@@ -2,7 +2,9 @@ import { Schema } from "effect"
 import { Rpc, RpcGroup } from "@effect/rpc"
 import {
   AppSnapshot,
-  CreateThreadInput,
+  RecordThreadInput,
+  ThreadLocation,
+  ThreadWorktree,
   SetThreadTitleInput,
   SetThreadStatusInput,
   UpdateProviderInput,
@@ -43,7 +45,21 @@ export class CoreRpcs extends RpcGroup.make(
   }),
   Rpc.make("GetSnapshot", { success: AppSnapshot, error: CoreError }),
   snapshotRpc("AddWorkspace", Schema.Struct({ path: Schema.String })),
-  snapshotRpc("CreateThread", CreateThreadInput),
+  snapshotRpc("CreateThread", RecordThreadInput),
+  Rpc.make("GetThreadLocation", {
+    payload: Schema.Struct({ threadId: Schema.String }),
+    success: ThreadLocation,
+    error: CoreError,
+  }),
+  Rpc.make("ListWorktreeThreads", {
+    payload: Schema.Struct({ workspaceId: Schema.optional(Schema.String) }),
+    success: Schema.Array(ThreadLocation),
+    error: CoreError,
+  }),
+  snapshotRpc(
+    "SetWorktreeState",
+    Schema.Struct({ threadId: Schema.String, state: ThreadWorktree.fields.state }),
+  ),
   snapshotRpc("SetThreadStatus", SetThreadStatusInput),
   snapshotRpc("SetThreadTitle", SetThreadTitleInput),
   snapshotRpc("DeleteThread", Schema.Struct({ threadId: Schema.String })),
