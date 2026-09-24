@@ -5,7 +5,7 @@ import { RequestError, type RequestPermissionResponse } from "@agentclientprotoc
 import { type TitleRequest, type TurnDispatch, type CursorStatus } from "@meldshell/contracts"
 import { effortOption, modelSelection, parameterizedModels } from "./model-config"
 import { readCursorUsage } from "./usage"
-import { discoverCursorSkills } from "./skills"
+import { cursorCommands, discoverCursorSkills } from "./skills"
 import {
   CursorClient,
   discoverCursor,
@@ -565,26 +565,19 @@ export const runCursorWorker = (
         })
       const skills = await discoverCursorSkills(workspacePath)
       if (stopping) return
-      publish({
-        type: "commands-result",
-        requestId,
-        commands: [
-          ...(current.availableCommands ?? []).flatMap((command) => {
-            const name = text(command.name)
-            if (!name) return []
-            const hint = text(record(command.input).hint)
-            return [
-              {
-                kind: "command",
-                name,
-                description: text(command.description),
-                ...(hint ? { argumentHint: hint } : {}),
-              },
-            ]
-          }),
-          ...skills,
-        ],
+      const advertised = (current.availableCommands ?? []).flatMap((command) => {
+        const name = text(command.name)
+        if (!name) return []
+        const argumentHint = text(record(command.input).hint)
+        return [
+          {
+            name,
+            description: text(command.description),
+            ...(argumentHint ? { argumentHint } : {}),
+          },
+        ]
       })
+      publish({ type: "commands-result", requestId, commands: cursorCommands(advertised, skills) })
     } catch (cause) {
       if (!stopping) publish({ type: "commands-result", requestId, error: errorText(cause) })
     } finally {
