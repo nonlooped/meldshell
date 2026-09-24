@@ -66,6 +66,9 @@ const automaticPermission = (
   return kind === "reject_once" ? { decision: "cancel" } : null
 }
 
+/** Cursor names MeldShell's default mode `agent`; plan and ask share their names. */
+const cursorMode = (mode: TurnDispatch["mode"]): string => (mode === "default" ? "agent" : mode)
+
 export const runCursorWorker = (
   port: WorkerPort,
   dependencies: {
@@ -441,7 +444,7 @@ export const runCursorWorker = (
       await configureModel(
         session,
         dispatch.model,
-        "agent",
+        cursorMode(dispatch.mode),
         dispatch.reasoningEffort,
         dispatch.speed,
       )

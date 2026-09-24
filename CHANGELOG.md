@@ -8,6 +8,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Settings › About has a **Nightly builds** switch. Nightly builds are published every hour when MeldShell has changed, ahead of the daily stable release; they are less tested. With the switch on, MeldShell updates to each new nightly. Turning it off returns to the latest stable release on the next check, even though it is older than the nightly in use. An installed nightly build follows nightlies until the switch is turned off.
 
+### Fixed
+
+- Cursor threads now run in the mode the thread is set to. Before, every Cursor turn ran in Agent mode.
+
 ### Changed
 
 - Stable releases are published automatically once a day when there are new changes, and each one is a new minor version.
