@@ -736,3 +736,58 @@ export const TranscriptSearchPage = Schema.Struct({
 })
 
 export type TranscriptSearchPage = typeof TranscriptSearchPage.Type
+
+/** An ISO 8601 timestamp. */
+const Instant = Schema.String.pipe(
+  Schema.filter((value) => Number.isFinite(Date.parse(value)) || "Expected an ISO timestamp"),
+)
+
+/** A local time of day, `HH:MM` on a 24-hour clock. */
+const TimeOfDay = Schema.String.pipe(Schema.pattern(/^([01]\d|2[0-3]):[0-5]\d$/))
+
+/**
+ * When a scheduled prompt runs: once at a moment, every so many minutes, or daily at a local time
+ * on the chosen weekdays (0 is Sunday; none chosen means every day).
+ */
+export const ScheduleCadence = Schema.Union(
+  Schema.Struct({ kind: Schema.Literal("once"), at: Instant }),
+  Schema.Struct({
+    kind: Schema.Literal("interval"),
+    minutes: Schema.Number.pipe(Schema.int(), Schema.between(5, 7 * 24 * 60)),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("daily"),
+    time: TimeOfDay,
+    weekdays: Schema.Array(Schema.Number.pipe(Schema.int(), Schema.between(0, 6))),
+  }),
+)
+
+export type ScheduleCadence = typeof ScheduleCadence.Type
+
+/** A prompt the host sends to a thread on a schedule, as if typed into its composer. */
+export const ScheduledPrompt = Schema.Struct({
+  id: Schema.String,
+  threadId: Schema.String,
+  prompt: Schema.String,
+  cadence: ScheduleCadence,
+  enabled: Schema.Boolean,
+  /** Null once a one-time prompt has run, or while the schedule is paused. */
+  nextRunAt: Schema.NullOr(Schema.String),
+  lastRunAt: Schema.NullOr(Schema.String),
+  /** Why the last run could not send its prompt. */
+  lastError: Schema.NullOr(Schema.String),
+  createdAt: Schema.String,
+})
+
+export type ScheduledPrompt = typeof ScheduledPrompt.Type
+
+export const SaveScheduleInput = Schema.Struct({
+  /** Omitted to create a schedule. */
+  id: Schema.optional(Schema.String),
+  threadId: Schema.String,
+  prompt: Schema.String.pipe(Schema.maxLength(20_000)),
+  cadence: ScheduleCadence,
+  enabled: Schema.Boolean,
+})
+
+export type SaveScheduleInput = typeof SaveScheduleInput.Type

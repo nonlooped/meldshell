@@ -9,6 +9,7 @@ import type { HostPlatform } from "./platform"
 import { connectRelay } from "./remote-connection"
 import { beginLink, readCredential, unlinkDevice } from "./identity"
 import { readWorkspaceScripts, scriptEnvironment } from "./workspace-scripts"
+import { scheduleLoop } from "./scheduler"
 
 /** Runs the host in this process: core writer, provider workers, and the relay connection. */
 export async function startHost(
@@ -39,6 +40,7 @@ export async function startHost(
       Effect.catchAll(Effect.logError),
     ),
   )
+  const schedulerFiber = runtime.runFork(scheduleLoop)
   const relay = connectRelay(directory, api.execute)
   // Batch bursts such as streamed deltas into one change per thread every 32 ms.
   const eventFiber = runtime.runFork(
@@ -102,6 +104,7 @@ export async function startHost(
   const close = () =>
     (closing ??= (async () => {
       relay.close()
+      await Effect.runPromise(Fiber.interrupt(schedulerFiber))
       await Effect.runPromise(Fiber.interrupt(eventFiber))
       try {
         await runtime.runPromise(stopHost)

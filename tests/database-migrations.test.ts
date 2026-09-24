@@ -40,7 +40,7 @@ test("Effect migrations initialize once and convert legacy history after a disk 
   )
   assert.deepEqual(
     versions.map((row) => row.migration_id),
-    [2, 3, 4, 5, 6, 7, 8, 9],
+    [2, 3, 4, 5, 6, 7, 8, 9, 10],
   )
 })
 

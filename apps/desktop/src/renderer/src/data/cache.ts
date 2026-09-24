@@ -5,6 +5,7 @@ export const queryKeys = {
   snapshot: ["snapshot"] as const,
   threads: ["threads"] as const,
   search: ["transcript-search"] as const,
+  schedules: ["schedules"] as const,
   transcript: (threadId: string) => ["transcript", threadId] as const,
   providerStatus: (harness: string) =>
     [
@@ -34,6 +35,8 @@ export function invalidateThread(
   if (snapshotChanged) {
     void client.invalidateQueries({ queryKey: queryKeys.snapshot })
     void client.invalidateQueries({ queryKey: queryKeys.threads })
+    // Scheduled runs and edits from other clients arrive as host-wide changes.
+    void client.invalidateQueries({ queryKey: queryKeys.schedules })
   }
   void client.invalidateQueries({ queryKey: queryKeys.transcript(threadId) })
 }

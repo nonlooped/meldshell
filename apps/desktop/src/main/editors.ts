@@ -45,7 +45,7 @@ const locate = async (editor: EditorCommand): Promise<string | null> => {
   return null
 }
 
-export async function listEditors(): Promise<ExternalEditor[]> {
+async function listEditors(): Promise<ExternalEditor[]> {
   const found = await Promise.all(
     EDITORS.map(async (editor) => ((await locate(editor)) === null ? [] : [editor])),
   )
@@ -76,7 +76,7 @@ const launch = (file: string, folder: string): Promise<void> =>
     })
   })
 
-export async function openInEditor(scope: WorkspaceScope, editorId: string): Promise<void> {
+async function openInEditor(scope: WorkspaceScope, editorId: string): Promise<void> {
   const host = await desktopHost.start()
   const folder = await host.scopePath(scope)
   if (

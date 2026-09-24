@@ -12,6 +12,7 @@ import type {
   SetThreadSettingsInput,
 } from "@meldshell/contracts"
 import {
+  AlarmClock,
   ChevronDown,
   Eye,
   ImageIcon,
@@ -61,6 +62,10 @@ interface ComposerProps {
   readonly attachments: ReadonlyArray<ComposerAttachment>
   readonly onAddAttachments: (attachments: ReadonlyArray<ComposerAttachment>) => void
   readonly onRemoveAttachment: (index: number) => void
+  /** Opens the schedule dialog for the draft. */
+  readonly onSchedule: () => void
+  /** Shown above the message box, such as the thread's scheduled prompts. */
+  readonly accessory?: React.ReactNode
 }
 
 const SPEED_LABEL = { standard: "Standard", fast: "Fast" } as const
@@ -517,6 +522,8 @@ export function Composer({
   attachments,
   onAddAttachments,
   onRemoveAttachment,
+  onSchedule,
+  accessory,
 }: ComposerProps): React.JSX.Element {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sendButtonRef = useRef<HTMLSpanElement>(null)
@@ -606,6 +613,7 @@ export function Composer({
         </Notice>
       )}
 
+      {accessory}
       <div className={`motion-colors motion-duration-200 ${composerClasses}`}>
         {completion.menu}
         <ComposerAttachments attachments={attachments} onRemoveAttachment={onRemoveAttachment} />
@@ -694,6 +702,15 @@ export function Composer({
             onClick={() => void addAttachments(() => window.meldshell.selectAttachments())}
           >
             <Paperclip size={13} strokeWidth={1.75} />
+          </IconButton>
+          <IconButton
+            unstyled
+            className={`motion-colors ${chipClasses}`}
+            label="Schedule this prompt"
+            disabled={sending}
+            onClick={onSchedule}
+          >
+            <AlarmClock size={13} strokeWidth={1.75} />
           </IconButton>
           <ComposerSettings
             snapshot={snapshot}

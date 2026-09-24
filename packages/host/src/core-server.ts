@@ -49,6 +49,11 @@ import {
   syncProviderCatalog,
   updateProvider,
   upsertModel,
+  listSchedules,
+  saveSchedule,
+  deleteSchedule,
+  claimDueSchedules,
+  recordScheduleRun,
 } from "@meldshell/core"
 import { Cause, Effect, Layer, Mailbox, ManagedRuntime, Option, Runtime, Schedule } from "effect"
 
@@ -152,6 +157,11 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
     FinishShutdown: () => exposeCoreError(finishShutdown),
     BeginShutdown: () => exposeCoreError(beginShutdown),
     GetActiveTurnCount: () => exposeCoreRead(getActiveTurnCount),
+    ListSchedules: ({ threadId }) => exposeCoreRead(listSchedules(threadId)),
+    SaveSchedule: (input) => exposeCoreError(saveSchedule(input)),
+    DeleteSchedule: ({ scheduleId }) => exposeCoreError(deleteSchedule(scheduleId)),
+    ClaimDueSchedules: ({ now }) => exposeCoreError(claimDueSchedules(new Date(now))),
+    RecordScheduleRun: (input) => exposeCoreError(recordScheduleRun(input.scheduleId, input.error)),
   })
 
   const makeElectronProtocol = RpcServer.Protocol.make((writeRequest) =>

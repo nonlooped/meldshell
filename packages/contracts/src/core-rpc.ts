@@ -27,6 +27,8 @@ import {
   SetThreadPinnedInput,
   SearchTranscriptsInput,
   TranscriptSearchPage,
+  SaveScheduleInput,
+  ScheduledPrompt,
 } from "./models"
 import { CoreError } from "./errors"
 
@@ -142,4 +144,30 @@ export class CoreRpcs extends RpcGroup.make(
     error: CoreError,
   }),
   Rpc.make("GetActiveTurnCount", { success: Schema.Number, error: CoreError }),
+  Rpc.make("ListSchedules", {
+    payload: Schema.Struct({ threadId: Schema.optional(Schema.String) }),
+    success: Schema.Array(ScheduledPrompt),
+    error: CoreError,
+  }),
+  Rpc.make("SaveSchedule", {
+    payload: SaveScheduleInput,
+    success: ScheduledPrompt,
+    error: CoreError,
+  }),
+  Rpc.make("DeleteSchedule", {
+    payload: Schema.Struct({ scheduleId: Schema.String }),
+    success: Schema.Void,
+    error: CoreError,
+  }),
+  /** Hands out the schedules due now and moves each on to its next run. */
+  Rpc.make("ClaimDueSchedules", {
+    payload: Schema.Struct({ now: Schema.String }),
+    success: Schema.Array(ScheduledPrompt),
+    error: CoreError,
+  }),
+  Rpc.make("RecordScheduleRun", {
+    payload: Schema.Struct({ scheduleId: Schema.String, error: Schema.NullOr(Schema.String) }),
+    success: Schema.Void,
+    error: CoreError,
+  }),
 ) {}

@@ -283,6 +283,24 @@ export const runMigrations = Effect.gen(function* () {
       apply: sql`ALTER TABLE threads ADD COLUMN worktree_setup TEXT
         CHECK (worktree_setup IN ('running', 'succeeded', 'failed', 'interrupted'))`,
     },
+    {
+      version: 10,
+      apply: Effect.gen(function* () {
+        yield* sql`CREATE TABLE scheduled_prompts (
+          id TEXT PRIMARY KEY,
+          thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+          prompt TEXT NOT NULL,
+          cadence TEXT NOT NULL,
+          enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+          next_run_at TEXT,
+          last_run_at TEXT,
+          last_error TEXT,
+          created_at TEXT NOT NULL
+        )`
+        yield* sql`CREATE INDEX scheduled_prompts_due_idx ON scheduled_prompts(enabled, next_run_at)`
+        yield* sql`CREATE INDEX scheduled_prompts_thread_idx ON scheduled_prompts(thread_id)`
+      }),
+    },
   ]
   const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table'`
   const has = (name: string) => tables.some((table) => table.name === name)
