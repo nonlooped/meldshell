@@ -123,6 +123,17 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.resetProviderCatalog]: coreCall(Schema.String, false, (core, providerId) =>
     core.ResetProviderCatalog({ providerId }),
   ),
+  [C.IPC.listSchedules]: coreCall(
+    Schema.Struct({ threadId: Schema.optional(Schema.String) }),
+    true,
+    (core, input) => core.ListSchedules(input),
+  ),
+  [C.IPC.saveSchedule]: coreCall(C.SaveScheduleInput, false, (core, input) =>
+    core.SaveSchedule(input),
+  ),
+  [C.IPC.deleteSchedule]: coreCall(Schema.String, false, (core, scheduleId) =>
+    core.DeleteSchedule({ scheduleId }),
+  ),
   [C.IPC.submitTurn]: operation(C.SubmitTurnInput, false, submitTurn),
   [C.IPC.interruptTurn]: operation(Schema.String, false, interruptTurn),
   [C.IPC.resolveApproval]: operation(C.ResolveApprovalInput, false, resolveApproval),

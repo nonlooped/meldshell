@@ -9,7 +9,7 @@ import { threadPort } from "@meldshell/host/workspace-scripts"
  */
 
 /** Keeps preview cookies and storage apart from the app's own session. */
-export const PREVIEW_PARTITION = "persist:meldshell-preview"
+const PREVIEW_PARTITION = "persist:meldshell-preview"
 
 const webAddress = (url: unknown): url is string =>
   typeof url === "string" && /^https?:\/\//i.test(url)

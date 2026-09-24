@@ -10,6 +10,9 @@ import { Composer } from "./Composer"
 import { skillAttachments } from "./composer-completion"
 import { Transcript } from "./Transcript"
 import { ThreadBranchToggle, ThreadOrigin } from "./ThreadOrigin"
+import { useState } from "react"
+import { ScheduleDialog } from "../schedules/ScheduleDialog"
+import { ThreadSchedules } from "../schedules/ThreadSchedules"
 
 export function ThreadView({
   snapshot,
@@ -21,6 +24,7 @@ export function ThreadView({
   searchTarget: TranscriptSearchResult | null
 }) {
   const draft = useThreadDrafts((state) => state.drafts[thread.id] ?? emptyDraft)
+  const [scheduling, setScheduling] = useState(false)
   const update = useThreadDrafts((state) => state.update)
   const { isClaude, isCursor, providerStatus, providerReady } = useSelectedProvider(
     snapshot,
@@ -110,9 +114,21 @@ export function ThreadView({
           onSend={() => void send()}
           onInterrupt={() => interruptMutation.mutate(thread.id)}
           interrupting={interruptMutation.isPending}
+          onSchedule={() => setScheduling(true)}
+          accessory={<ThreadSchedules threadId={thread.id} />}
         />
         {thread.turnCount === 0 && <ThreadBranchToggle thread={thread} />}
       </FadeDiv>
+      {scheduling && (
+        <ScheduleDialog
+          threadId={thread.id}
+          schedule={null}
+          prompt={draft.text}
+          onClose={() => setScheduling(false)}
+          // The scheduled text leaves the composer; attachments stay for a message sent now.
+          onSaved={() => update(thread.id, { text: "", tokens: [] })}
+        />
+      )}
       {error && (
         <ErrorToast
           message={error}

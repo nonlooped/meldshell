@@ -12,6 +12,7 @@ import type {
 import {
   Settings,
   Palette,
+  AlarmClock,
   ArrowLeft,
   Boxes,
   Gauge,
@@ -36,6 +37,7 @@ import {
 import { UpdateSettings } from "./UpdateSettings"
 
 import { KeyboardSettings } from "./KeyboardSettings"
+import { ScheduleSettings } from "./ScheduleSettings"
 import { Preferences } from "./Preferences"
 
 interface SettingsViewProps {
@@ -101,6 +103,13 @@ const SECTIONS: ReadonlyArray<{
     icon: <MessagesSquare size={16} strokeWidth={1.75} />,
     title: "Threads",
     caption: "Control how MeldShell names new conversations.",
+  },
+  {
+    id: "schedules",
+    label: "Scheduled prompts",
+    icon: <AlarmClock size={16} strokeWidth={1.75} />,
+    title: "Scheduled prompts",
+    caption: "Prompts MeldShell sends to threads on a schedule while it runs.",
   },
   {
     id: "keyboard",
@@ -209,6 +218,7 @@ export function SettingsView({
               />
             )}
             {section === "account" && <RemoteAccess />}
+            {section === "schedules" && <ScheduleSettings snapshot={snapshot} />}
             {section === "keyboard" && (
               <KeyboardSettings pending={settingsPending} onChange={onChangeAppSettings} />
             )}

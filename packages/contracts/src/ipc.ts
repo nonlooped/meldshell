@@ -22,6 +22,8 @@ import type {
   ThreadPage,
   ThreadPageQuery,
   ComposerCommand,
+  SaveScheduleInput,
+  ScheduledPrompt,
 } from "./models"
 
 export type ComposerAttachment = InputAttachment & { readonly previewUrl?: string }
@@ -327,6 +329,13 @@ export const requests = {
     "meldshell:select-attachments",
   ),
   listThreads: request<(input: ThreadPageQuery) => Promise<ThreadPage>>("meldshell:list-threads"),
+  /** Every scheduled prompt, or one thread's, soonest first. */
+  listSchedules: request<(input: { threadId?: string }) => Promise<readonly ScheduledPrompt[]>>(
+    "meldshell:list-schedules",
+  ),
+  saveSchedule:
+    request<(input: SaveScheduleInput) => Promise<ScheduledPrompt>>("meldshell:save-schedule"),
+  deleteSchedule: request<(scheduleId: string) => Promise<void>>("meldshell:delete-schedule"),
 }
 
 export type InvokeApi = {
