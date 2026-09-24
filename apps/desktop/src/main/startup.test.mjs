@@ -47,7 +47,10 @@ test("opens the window with IPC registered while runtime initialization is pendi
     "./runtime/services": { runtime },
     "./runtime/startup-timing": { logStartupTiming: (name) => calls.push(name) },
     "./runtime/shutdown": {},
-    "./window": { createWindow: () => calls.push("window") },
+    "./window": {
+      createWindow: () => calls.push("window"),
+      installApplicationMenu: () => undefined,
+    },
     "./ipc": { registerIpc: () => calls.push("ipc") },
     "./updater": { updateService: { start: () => calls.push("updater") } },
   }
