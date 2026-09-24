@@ -117,6 +117,7 @@ function usePhonePanels(
   phone: boolean,
   inbox: ReturnType<typeof usePanelRef>,
   files: ReturnType<typeof usePanelRef>,
+  animate: (change: () => void) => void,
 ) {
   useEffect(
     () =>
@@ -126,17 +127,43 @@ function usePhonePanels(
           (state.selectedThreadTabId !== previous.selectedThreadTabId ||
             state.selectedFileId !== previous.selectedFileId)
         ) {
-          inbox.current?.collapse()
-          files.current?.collapse()
+          animate(() => {
+            inbox.current?.collapse()
+            files.current?.collapse()
+          })
         }
       }),
-    [phone, inbox, files],
+    [phone, inbox, files, animate],
   )
 }
 
-function toggleSidebar(phone: boolean, other: ReturnType<typeof usePanelRef>, toggle: () => void) {
-  if (phone) other.current?.collapse()
-  toggle()
+/** Sidebar toggles animate the group's layout; drags and window resizes still apply instantly. */
+function usePanelMotion() {
+  const groupRef = useRef<HTMLDivElement>(null)
+  const settleTimer = useRef<number | undefined>(undefined)
+  const animate = useCallback((change: () => void) => {
+    const group = groupRef.current
+    if (group) {
+      group.dataset.panelMotion = ""
+      window.clearTimeout(settleTimer.current)
+      // Outlasts the transition, which is skipped entirely when motion is reduced.
+      settleTimer.current = window.setTimeout(() => delete group.dataset.panelMotion, 400)
+    }
+    change()
+  }, [])
+  return { groupRef, animate }
+}
+
+function toggleSidebar(
+  phone: boolean,
+  other: ReturnType<typeof usePanelRef>,
+  toggle: () => void,
+  animate: (change: () => void) => void,
+) {
+  animate(() => {
+    if (phone) other.current?.collapse()
+    toggle()
+  })
 }
 
 function remoteLayout(phone: boolean, inboxWidth: number, filesWidth: number) {
@@ -182,21 +209,13 @@ function useSidebar(initialWidth: number, initiallyCollapsed = false) {
   }
 }
 
-function SidebarPanel({
-  defaultSize,
-  className = "",
-  ...props
-}: React.ComponentProps<typeof Panel>) {
+function SidebarPanel({ defaultSize, ...props }: React.ComponentProps<typeof Panel>) {
   // Changing defaultSize re-registers the panel and interrupts an active drag.
   // Capture it on mount so returning from Settings still restores the remembered width.
   const [initialSize] = useState(defaultSize)
-  return (
-    <Panel
-      {...props}
-      className={`motion-grow motion-duration-180 ${className}`}
-      defaultSize={initialSize}
-    />
-  )
+  // The library's inline `overflow: auto` outranks classes; content keeps its width while the panel
+  // animates, so clip it instead of letting a scrollbar appear.
+  return <Panel {...props} defaultSize={initialSize} style={{ overflow: "hidden" }} />
 }
 
 function tabWorkspaceId(file: FileTab | undefined, thread: Thread | null) {
@@ -254,7 +273,8 @@ export function App(): React.JSX.Element {
   const inbox = useSidebar(304, remotePhone)
   // Source control opens on request: the thread pane owns the window until the operator asks.
   const sourceControl = useSidebar(300, true)
-  usePhonePanels(remotePhone, inbox.panelRef, sourceControl.panelRef)
+  const panelMotion = usePanelMotion()
+  usePhonePanels(remotePhone, inbox.panelRef, sourceControl.panelRef, panelMotion.animate)
   const layout = remoteLayout(remotePhone, inbox.width, sourceControl.width)
 
   const { snapshotQuery, threadPagesQuery, snapshot } = useAppData()
@@ -431,9 +451,11 @@ export function App(): React.JSX.Element {
           sidebarsVisible={!settingsOpen}
           inboxCollapsed={inbox.collapsed}
           sourceControlCollapsed={sourceControl.collapsed}
-          onToggleInbox={() => toggleSidebar(remotePhone, sourceControl.panelRef, inbox.toggle)}
+          onToggleInbox={() =>
+            toggleSidebar(remotePhone, sourceControl.panelRef, inbox.toggle, panelMotion.animate)
+          }
           onToggleSourceControl={() =>
-            toggleSidebar(remotePhone, inbox.panelRef, sourceControl.toggle)
+            toggleSidebar(remotePhone, inbox.panelRef, sourceControl.toggle, panelMotion.animate)
           }
         />
 
@@ -452,13 +474,16 @@ export function App(): React.JSX.Element {
             onChangeAppSettings={(input) => appSettingsMutation.mutate(input)}
           />
         ) : (
-          <Group className="min-h-0" orientation={layout.orientation}>
+          <Group
+            elementRef={panelMotion.groupRef}
+            className="motion-panels motion-duration-220 min-h-0"
+            orientation={layout.orientation}
+          >
             <SidebarPanel
               id="inbox"
               panelRef={inbox.panelRef}
               elementRef={inbox.elementRef}
               onTransitionEnd={inbox.onTransitionEnd}
-              className="overflow-hidden"
               collapsible
               collapsedSize={0}
               defaultSize={inbox.defaultSize}
@@ -468,7 +493,7 @@ export function App(): React.JSX.Element {
               onResize={inbox.onResize}
             >
               <aside
-                className="grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto] [padding:10px_8px_8px]"
+                className={`motion-colors motion-duration-220 grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto] [padding:10px_8px_8px] ${inbox.collapsed ? "opacity-0" : ""}`}
                 inert={inbox.collapsed}
                 style={{ width: layout.inboxWidth }}
               >
@@ -544,7 +569,6 @@ export function App(): React.JSX.Element {
               panelRef={sourceControl.panelRef}
               elementRef={sourceControl.elementRef}
               onTransitionEnd={sourceControl.onTransitionEnd}
-              className="overflow-hidden"
               collapsible
               collapsedSize={0}
               inert={sourceControl.collapsed}
@@ -554,7 +578,10 @@ export function App(): React.JSX.Element {
               groupResizeBehavior="preserve-pixel-size"
               onResize={sourceControl.onResize}
             >
-              <div className="h-full" style={{ width: layout.filesWidth }}>
+              <div
+                className={`motion-colors motion-duration-220 h-full ${sourceControl.collapsed ? "opacity-0" : ""}`}
+                style={{ width: layout.filesWidth }}
+              >
                 <FilesSidebar
                   threadId={selectedThread?.id}
                   key={activeWorkspaceId}
