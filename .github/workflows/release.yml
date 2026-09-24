@@ -2,8 +2,10 @@ name: Release
 
 # A stable vX.Y.Z tag on main (cut with `npm run release`) builds, verifies, and publishes a GitHub
 # Release whose notes are that version's CHANGELOG.md entries. Before 1.0, minor versions are
-# normal releases and nonzero patch versions are prereleases. A manual run builds the same
-# installers from any ref as workflow artifacts without releasing.
+# normal releases and nonzero patch versions are prereleases. If checks or packaging fail, the
+# notes are still published without installers and never become the latest release, which the
+# updater follows; a successful rerun adds the installers. A manual run builds the same installers
+# from any ref as workflow artifacts without releasing.
 on:
   push:
     tags: ['v*']
@@ -113,7 +115,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    if: github.ref_type == 'tag'
+    if: always() && github.ref_type == 'tag' && needs.version.result == 'success'
     needs: [version, checks, package]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -125,6 +127,8 @@ jobs:
       RELEASE_TAG: ${{ github.ref_name }}
       VERSION: ${{ needs.version.outputs.version }}
       PRERELEASE: ${{ needs.version.outputs.prerelease }}
+      BUILD_PASSED: ${{ needs.checks.result == 'success' && needs.package.result == 'success' }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -134,11 +138,13 @@ jobs:
             scripts/release.mjs
           sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: env.BUILD_PASSED == 'true'
         with:
           pattern: installers-*
           merge-multiple: true
           path: release
       - name: Verify artifacts
+        if: env.BUILD_PASSED == 'true'
         working-directory: release
         run: |
           for file in "MeldShell-$VERSION-setup.exe" "MeldShell-$VERSION-setup.exe.blockmap" \
@@ -152,17 +158,28 @@ jobs:
       - name: Stage, upload, and publish release
         run: |
           node scripts/release.mjs notes "$VERSION" > "$RUNNER_TEMP/notes.md"
-          if is_draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null); then
-            test "$is_draft" = true || { echo "::error::Refusing to overwrite published release $RELEASE_TAG"; exit 1; }
+          if [ "$BUILD_PASSED" != true ]; then
+            printf '\n> [!WARNING]\n> This version has no installers because its [release build](%s) failed.\n' "$RUN_URL" >> "$RUNNER_TEMP/notes.md"
+          fi
+          # A published release may be edited only while it is notes-only from an earlier failed build.
+          if existing=$(gh release view "$RELEASE_TAG" --json isDraft,assets --jq '"\(.isDraft) \(.assets | length)"' 2>/dev/null); then
+            case "$existing" in
+              "true "* | "false 0") ;;
+              *) echo "::error::Refusing to overwrite published release $RELEASE_TAG"; exit 1 ;;
+            esac
             gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/notes.md"
           else
             gh release create "$RELEASE_TAG" --verify-tag --draft --title "MeldShell $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
           fi
-          cd release
-          gh release upload "$RELEASE_TAG" ./*.exe ./*.AppImage ./*.blockmap ./latest*.yml SHA256SUMS.txt --clobber
+          if [ "$BUILD_PASSED" != true ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease="$PRERELEASE" --latest=false
+            echo "Published notes without installers: $(gh release view "$RELEASE_TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          (cd release && gh release upload "$RELEASE_TAG" ./*.exe ./*.AppImage ./*.blockmap ./latest*.yml SHA256SUMS.txt --clobber)
           if [ "$PRERELEASE" = true ]; then
-            gh release edit "$RELEASE_TAG" --draft=false --prerelease
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
           else
-            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
           fi
           echo "Published release: $(gh release view "$RELEASE_TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"

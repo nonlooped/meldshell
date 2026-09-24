@@ -36,7 +36,9 @@ To cut a release from a clean, up-to-date `main`, run `npm run release -- <patch
 
 [Release](../.github/workflows/release.yml) runs for a stable `vX.Y.Z` tag on `main` that matches the app version and has changelog entries. It runs the full [CI](../.github/workflows/ci.yml) suite while native Windows and Linux runners package NSIS x64 and AppImage x64 artifacts. Once both pass, the final job verifies the installers and updater metadata, stages them with blockmaps and SHA256SUMS in a draft, then publishes the release with the version's changelog entries and the classification above. A failed upload leaves the draft unpublished.
 
-Running the workflow manually from the Actions tab packages installers from any ref as seven-day workflow artifacts without creating a release; use it to test packaging and applicable manual flows before tagging. A rerun can replace draft assets but refuses to overwrite a published release. Tagging starts automatic publication after the checks pass; perform it within the authorization for the release task.
+If the checks or packaging fail, the final job still publishes the version's changelog entries as a release without installers, with a warning linking to the failed run. It is never marked latest, so the updater, which follows the latest release, stays on the previous installers. A rerun that succeeds adds the installers to that release and publishes it normally. A fix that needs a new commit needs a new version; the notes-only release stays for the failed one.
+
+Running the workflow manually from the Actions tab packages installers from any ref as seven-day workflow artifacts without creating a release; use it to test packaging and applicable manual flows before tagging. A rerun can replace draft assets but refuses to overwrite a published release that has installers. Tagging starts automatic publication after the checks pass; perform it within the authorization for the release task.
 
 For a local candidate:
 
