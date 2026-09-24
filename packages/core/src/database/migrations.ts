@@ -278,6 +278,11 @@ export const runMigrations = Effect.gen(function* () {
           CHECK (worktree_state IN ('ready', 'missing', 'removed'))`
       }),
     },
+    {
+      version: 9,
+      apply: sql`ALTER TABLE threads ADD COLUMN worktree_setup TEXT
+        CHECK (worktree_setup IN ('running', 'succeeded', 'failed', 'interrupted'))`,
+    },
   ]
   const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table'`
   const has = (name: string) => tables.some((table) => table.name === name)

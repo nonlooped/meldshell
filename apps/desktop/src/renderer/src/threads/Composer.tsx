@@ -184,6 +184,7 @@ function sendTitle({
   loadingAttachments,
   hasContent,
   running,
+  settingUp,
 }: {
   sending: boolean
   providerReady: boolean
@@ -192,8 +193,10 @@ function sendTitle({
   loadingAttachments: boolean
   hasContent: boolean
   running: boolean
+  settingUp: boolean
 }): string {
   if (sending) return "Sending message…"
+  if (settingUp) return "Waiting for the setup script to finish"
   if (!providerReady) return `${providerName} is unavailable`
   if (!hasSelection) return "Enable a model in Settings"
   if (loadingAttachments) return "Adding attachments…"
@@ -536,7 +539,9 @@ export function Composer({
     onDraftChange,
     onTokensChange,
   })
+  const settingUp = thread?.worktree?.setup === "running"
   const canSend =
+    !settingUp &&
     providerReady &&
     selection !== null &&
     (draft.trim().length > 0 || attachments.length > 0) &&
@@ -733,6 +738,7 @@ export function Composer({
                   loadingAttachments,
                   hasContent: draft.trim().length > 0 || attachments.length > 0,
                   running,
+                  settingUp,
                 })}
                 onClick={send}
               >

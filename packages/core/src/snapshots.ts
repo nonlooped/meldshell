@@ -33,7 +33,7 @@ export const getSnapshot = Effect.gen(function* () {
         LIMIT 250
       )
       SELECT t.id, t.workspace_id, t.title, t.status, t.pinned, t.created_at, t.updated_at,
-        t.worktree_path, t.worktree_branch, t.worktree_base, t.worktree_state,
+        t.worktree_path, t.worktree_branch, t.worktree_base, t.worktree_state, t.worktree_setup,
         ${sql.unsafe(threadActivitySql)} AS activity,
         (SELECT COUNT(*) FROM queued_inputs q WHERE q.thread_id = t.id) AS queued_count,
         (SELECT COUNT(*) FROM turns r WHERE r.thread_id = t.id) AS turn_count
@@ -96,7 +96,7 @@ export const listThreads = (input: { readonly cursor?: string; readonly limit?: 
       LIMIT ${limit + 1}
       )
       SELECT t.id, t.workspace_id, t.title, t.status, t.pinned, t.created_at, t.updated_at,
-        t.worktree_path, t.worktree_branch, t.worktree_base, t.worktree_state,
+        t.worktree_path, t.worktree_branch, t.worktree_base, t.worktree_state, t.worktree_setup,
         ${sql.unsafe(threadActivitySql)} AS activity,
         (SELECT COUNT(*) FROM queued_inputs q WHERE q.thread_id = t.id) AS queued_count,
         (SELECT COUNT(*) FROM turns r WHERE r.thread_id = t.id) AS turn_count

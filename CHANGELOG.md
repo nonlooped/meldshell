@@ -4,6 +4,13 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- A workspace can define setup and run scripts in a `meldshell.json` file at the root of its repository: `{ "scripts": { "setup": "npm install", "run": "npm run dev" } }`. `run` can also name several commands to choose from, such as `{ "app": "npm run dev", "docs": "npm run docs" }`. MeldShell reads the file from the workspace folder, so it can be committed or kept untracked. Scripts run through `/bin/sh`, or `cmd.exe` on Windows.
+- The setup script runs in every new thread worktree as soon as the worktree is created, to install dependencies or copy ignored files such as `.env` that a fresh checkout lacks. The thread's start screen and branch bar show that setup is running, stopped, or failed, with its output and actions to stop it or run it again. Messages can be sent once it ends. If MeldShell quits during setup, the thread shows setup as stopped.
+- The **Run** button in the title bar starts the run script in the thread's terminal, in its worktree when it has one. With several named run scripts, it opens a menu to choose one, and each starts in its own terminal. Running a script again shows its terminal instead of starting a second copy. The remote web client has no Run button because it has no terminals.
+- Scripts and thread terminals receive `MELDSHELL_ROOT_PATH` (the workspace's main checkout), `MELDSHELL_WORKSPACE_PATH` (the folder the thread works in), `MELDSHELL_THREAD_ID`, `MELDSHELL_BRANCH` in a worktree, and `MELDSHELL_PORT`, the first of ten ports assigned to the thread. The port stays the same across restarts and rarely matches another thread's.
+
 ## [0.8.0] - 2026-09-24
 
 ### Fixed

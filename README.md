@@ -10,6 +10,7 @@ Each MeldShell thread keeps a separate native session for each harness. Switchin
 - Streaming conversations, tool details, approvals, questions, attachments, and queued follow-ups.
 - SQLite history, durable queues, worker recovery, and native session resume.
 - Workspace files, file previews, diffs, Git staging, commits, push, and history.
+- Per-thread Git worktrees, with setup and run scripts from `meldshell.json`, and per-thread terminals.
 - Provider catalogs, account usage where available, and appearance preferences.
 - Remote browser access to a linked desktop or headless host.
 

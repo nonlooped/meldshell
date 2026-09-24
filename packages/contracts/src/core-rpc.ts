@@ -5,6 +5,7 @@ import {
   RecordThreadInput,
   ThreadLocation,
   ThreadWorktree,
+  WorktreeSetup,
   SetThreadTitleInput,
   SetThreadStatusInput,
   UpdateProviderInput,
@@ -61,12 +62,19 @@ export class CoreRpcs extends RpcGroup.make(
     Schema.Struct({
       threadId: Schema.String,
       workspaceId: Schema.String,
-      worktree: Schema.NullOr(ThreadWorktree.pipe(Schema.omit("state"))),
+      worktree: Schema.NullOr(ThreadWorktree.pipe(Schema.omit("state", "setup"))),
     }),
   ),
   snapshotRpc(
     "SetWorktreeState",
     Schema.Struct({ threadId: Schema.String, state: ThreadWorktree.fields.state }),
+  ),
+  snapshotRpc(
+    "SetWorktreeSetup",
+    Schema.Struct({
+      threadId: Schema.String,
+      setup: Schema.NullOr(WorktreeSetup),
+    }),
   ),
   snapshotRpc("SetThreadStatus", SetThreadStatusInput),
   snapshotRpc("SetThreadTitle", SetThreadTitleInput),

@@ -8,6 +8,7 @@ import { replaceSnapshot } from "../data/cache"
 import { DropdownMenu, MenuChoice, MenuRadioGroup } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
 import { ErrorToast } from "../ui/Notice"
+import { WorktreeSetupNote } from "../files/WorktreeSetup"
 
 type DraftLocation = { workspaceId?: string; isolated?: boolean }
 
@@ -148,8 +149,10 @@ export function ThreadBranchToggle({ thread }: { thread: Thread }): React.JSX.El
             Own branch
           </Toggle>
         </ToggleGroup>
-        {note !== undefined && (
+        {note !== undefined ? (
           <span className="min-w-0 text-[var(--text-tertiary)] text-[12px]">{note}</span>
+        ) : (
+          <WorktreeSetupNote thread={thread} className="text-[12px]" />
         )}
       </div>
       {mutation.isError && (

@@ -148,18 +148,28 @@ const queueInput = (
     } satisfies SubmitTurnResult
   })
 
-/** A thread with its own worktree never falls back to the workspace folder. */
-const requireWorktree = (state: string | null) =>
-  state === null || state === "ready"
-    ? Effect.void
-    : Effect.fail(
-        new CoreProtocolError({
-          message:
-            state === "removed"
-              ? "This thread's worktree was removed. Start a new thread to keep working."
-              : "This thread's worktree folder is missing. Restore it or remove the worktree.",
-        }),
-      )
+/**
+ * A thread with its own worktree never falls back to the workspace folder, and does not start work
+ * while its setup script is still preparing that folder.
+ */
+const requireWorktree = (state: string | null, setup: string | null) => {
+  if (state !== null && state !== "ready")
+    return Effect.fail(
+      new CoreProtocolError({
+        message:
+          state === "removed"
+            ? "This thread's worktree was removed. Start a new thread to keep working."
+            : "This thread's worktree folder is missing. Restore it or remove the worktree.",
+      }),
+    )
+  if (setup === "running")
+    return Effect.fail(
+      new CoreProtocolError({
+        message: "This thread's setup script is still running. Send again when it finishes.",
+      }),
+    )
+  return Effect.void
+}
 
 export const submitTurn = (input: SubmitTurnInput) =>
   Effect.gen(function* () {
@@ -181,10 +191,11 @@ export const submitTurn = (input: SubmitTurnInput) =>
     const threads = yield* sql<{
       readonly title_locked: number
       readonly worktree_state: string | null
+      readonly worktree_setup: string | null
     }>`
-      SELECT title_locked, worktree_state FROM threads WHERE id = ${input.threadId}
+      SELECT title_locked, worktree_state, worktree_setup FROM threads WHERE id = ${input.threadId}
     `
-    yield* requireWorktree(threads[0]?.worktree_state ?? null)
+    yield* requireWorktree(threads[0]?.worktree_state ?? null, threads[0]?.worktree_setup ?? null)
     const unnamed = threads[0]?.title_locked === 0 && text !== ""
     if (unnamed) {
       const derivedTitle = derivedThreadTitle(text)

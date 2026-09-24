@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path"
 import { Effect } from "effect"
-import type { CreateThreadInput, ThreadLocation } from "@meldshell/contracts"
+import type { AppSnapshot, CreateThreadInput, ThreadLocation } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { CoreClient } from "./core-client"
 import { HostPlatform } from "./platform"
@@ -12,6 +12,13 @@ import {
   worktreePresent,
   worktreeStatus,
 } from "./worktrees"
+import {
+  beginWorktreeSetup,
+  readSetupLog,
+  readWorkspaceScripts,
+  setupRunning,
+  stopWorktreeSetup,
+} from "./workspace-scripts"
 
 const attempt = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({
@@ -60,9 +67,9 @@ export const scopePath = (scope: WorkspaceScope) =>
  * Creates a worktree and hands it to `record`. If the core refuses the record, the worktree and its
  * branch are removed again so no orphaned checkout is left behind.
  */
-const withNewWorktree = <A, E>(
+const withNewWorktree = <A, E, R>(
   workspacePath: string,
-  record: (worktree: Awaited<ReturnType<typeof createWorktree>>) => Effect.Effect<A, E>,
+  record: (worktree: Awaited<ReturnType<typeof createWorktree>>) => Effect.Effect<A, E, R>,
 ) =>
   Effect.gen(function* () {
     const platform = yield* HostPlatform
@@ -78,6 +85,25 @@ const withNewWorktree = <A, E>(
     )
   })
 
+/** Starts the setup script in a thread's new worktree and returns the snapshot that shows it. */
+const setUpWorktree = (threadId: string) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const location = yield* core.GetThreadLocation({ threadId })
+    yield* beginWorktreeSetup(location).pipe(Effect.catchAll(Effect.logError))
+    return yield* core.GetSnapshot()
+  })
+
+/** The thread is already recorded, so a setup problem must not undo the worktree it owns. */
+const setUpCreatedWorktree = (snapshot: AppSnapshot, worktreePath: string) => {
+  const thread = snapshot.threads.find((entry) => entry.worktree?.path === worktreePath)
+  return thread === undefined
+    ? Effect.succeed(snapshot)
+    : setUpWorktree(thread.id).pipe(
+        Effect.catchAll((cause) => Effect.as(Effect.logError(cause), snapshot)),
+      )
+}
+
 export const createThread = (input: CreateThreadInput) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
@@ -88,7 +114,9 @@ export const createThread = (input: CreateThreadInput) =>
     if (input.isolated !== true) return yield* core.CreateThread(record)
     const workspacePath = yield* scopePath({ workspaceId: input.workspaceId })
     return yield* withNewWorktree(workspacePath, (worktree) =>
-      core.CreateThread({ ...record, worktree }),
+      core
+        .CreateThread({ ...record, worktree })
+        .pipe(Effect.flatMap((snapshot) => setUpCreatedWorktree(snapshot, worktree.path))),
     )
   })
 
@@ -113,6 +141,7 @@ export const setDraftLocation = (input: {
       return yield* Effect.fail(
         new Error("This thread's worktree has uncommitted changes, so it stays where it is."),
       )
+    yield* stopWorktreeSetup(input.threadId)
     const workspacePath = yield* scopePath({ workspaceId })
     const record = { threadId: input.threadId, workspaceId }
     const snapshot = isolated
@@ -124,7 +153,7 @@ export const setDraftLocation = (input: {
       yield* attempt(() =>
         removeWorktree(location.workspacePath, current, { force: false, deleteBranch: true }),
       ).pipe(Effect.catchAll(Effect.logError))
-    return snapshot
+    return isolated ? yield* setUpWorktree(input.threadId) : snapshot
   })
 
 /** Deleting a thread removes its checkout but keeps the branch, so committed work survives. */
@@ -138,6 +167,7 @@ export const deleteThread = (threadId: string) =>
           "This thread's worktree has uncommitted changes. Commit them or remove the worktree first.",
         ),
       )
+    yield* stopWorktreeSetup(threadId)
     const snapshot = yield* core.DeleteThread({ threadId })
     const worktree = location.worktree
     if (worktree !== null && worktree.state !== "removed")
@@ -158,6 +188,7 @@ export const removeWorkspace = (workspaceId: string) =>
             `A thread's worktree has uncommitted changes (${location.worktree?.branch}). Commit them or remove that worktree first.`,
           ),
         )
+    for (const location of threads) yield* stopWorktreeSetup(location.threadId)
     const snapshot = yield* core.RemoveWorkspace({ workspaceId })
     for (const location of threads)
       yield* attempt(() =>
@@ -198,6 +229,7 @@ export const removeThreadWorktree = (input: {
       return yield* Effect.fail(
         new Error("Stop this thread and clear its queue before removing its worktree."),
       )
+    yield* stopWorktreeSetup(input.threadId)
     yield* attempt(() =>
       removeWorktree(location.workspacePath, worktree, {
         force: true,
@@ -207,9 +239,42 @@ export const removeThreadWorktree = (input: {
     return yield* core.SetWorktreeState({ threadId: input.threadId, state: "removed" })
   })
 
+export const getWorktreeSetupLog = (threadId: string) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const worktree = yield* readyWorktree(yield* core.GetThreadLocation({ threadId }))
+    return yield* attempt(() => readSetupLog(worktree.path))
+  })
+
+export const rerunWorktreeSetup = (threadId: string) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const location = yield* core.GetThreadLocation({ threadId })
+    yield* readyWorktree(location)
+    if (location.busy)
+      return yield* Effect.fail(
+        new Error("Stop this thread and clear its queue before running setup again."),
+      )
+    const scripts = yield* attempt(() => readWorkspaceScripts(location.workspacePath))
+    if (scripts.setup === null)
+      return yield* Effect.fail(
+        new Error("This workspace has no setup script. Add scripts.setup to meldshell.json."),
+      )
+    yield* beginWorktreeSetup(location)
+    return yield* core.GetSnapshot()
+  })
+
+export const stopThreadWorktreeSetup = (threadId: string) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    yield* stopWorktreeSetup(threadId)
+    return yield* core.GetSnapshot()
+  })
+
 /**
  * Marks worktrees whose folders disappeared while MeldShell was closed, and restores ones that came
- * back, so a thread never starts a turn in a folder that is not there. Returns whether any changed.
+ * back, so a thread never starts a turn in a folder that is not there. A setup script that was
+ * running when MeldShell quit is marked interrupted. Returns whether any thread changed.
  */
 export const reconcileWorktrees = Effect.gen(function* () {
   const core = yield* CoreClient
@@ -217,10 +282,15 @@ export const reconcileWorktrees = Effect.gen(function* () {
   const changed = yield* Effect.forEach(threads, (location) =>
     Effect.gen(function* () {
       const worktree = location.worktree!
+      let changed = false
+      if (worktree.setup === "running" && !setupRunning(location.threadId)) {
+        yield* core.SetWorktreeSetup({ threadId: location.threadId, setup: "interrupted" })
+        changed = true
+      }
       const state = (yield* Effect.promise(() => worktreePresent(worktree.path)))
         ? "ready"
         : "missing"
-      if (state === worktree.state) return false
+      if (state === worktree.state) return changed
       yield* core.SetWorktreeState({ threadId: location.threadId, state })
       return true
     }),

@@ -50,6 +50,9 @@ CLAUDE.local.md
 # Local artifacts
 /artifacts/
 
+# App data for development copies started by the meldshell.json run script
+.dev-data/
+
 # Local editor settings and scratch files
 .vscode/
 .idea/

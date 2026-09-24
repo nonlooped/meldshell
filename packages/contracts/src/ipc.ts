@@ -102,6 +102,25 @@ export interface WorktreeStatus {
   readonly unmerged: number | null
 }
 
+export interface RunScript {
+  readonly name: string
+  readonly command: string
+}
+
+/** The scripts in a workspace's `meldshell.json`. */
+export interface WorkspaceScripts {
+  /** Null when the workspace has no setup script. */
+  readonly setup: string | null
+  /** In the file's order; a lone `run` command is named `run`. */
+  readonly run: readonly RunScript[]
+}
+
+export interface WorktreeSetupLog {
+  readonly text: string
+  /** Only the end of a long log is returned. */
+  readonly truncated: boolean
+}
+
 export interface TerminalOpenInput {
   /** Chosen by the renderer so output that arrives before `open` resolves still finds its view. */
   readonly id: string
@@ -109,11 +128,15 @@ export interface TerminalOpenInput {
   readonly threadId: string
   readonly cols: number
   readonly rows: number
+  /** Starts the workspace run script with this name in the new shell. */
+  readonly run?: string
 }
 
 export interface TerminalSession {
   readonly cwd: string
   readonly shell: string
+  /** The run script the shell was started with. */
+  readonly run?: RunScript
 }
 
 /** Shells run on the workstation only; a remote client leaves `MeldShellApi.terminal` undefined. */
@@ -216,6 +239,19 @@ export const requests = {
     (input: { threadId: string; workspaceId?: string; isolated?: boolean }) => Promise<AppSnapshot>
   >("meldshell:set-draft-location"),
   mergeWorktree: request<(threadId: string) => Promise<void>>("meldshell:merge-worktree"),
+  getWorkspaceScripts: request<(input: WorkspaceScope) => Promise<WorkspaceScripts>>(
+    "meldshell:get-workspace-scripts",
+  ),
+  getWorktreeSetupLog: request<(threadId: string) => Promise<WorktreeSetupLog>>(
+    "meldshell:get-worktree-setup-log",
+  ),
+  /** Runs the setup script again in a thread's worktree, replacing its previous log. */
+  rerunWorktreeSetup: request<(threadId: string) => Promise<AppSnapshot>>(
+    "meldshell:rerun-worktree-setup",
+  ),
+  stopWorktreeSetup: request<(threadId: string) => Promise<AppSnapshot>>(
+    "meldshell:stop-worktree-setup",
+  ),
   removeWorktree: request<
     (input: { threadId: string; deleteBranch: boolean }) => Promise<AppSnapshot>
   >("meldshell:remove-worktree"),
