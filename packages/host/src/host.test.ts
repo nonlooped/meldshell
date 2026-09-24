@@ -149,6 +149,23 @@ test("isolated threads work in their own worktree until merged or removed", {
     assert.match(worktree.branch, /^meldshell\/[0-9a-f]{8}$/)
     assert.ok((await stat(join(worktree.path, "a.txt"))).isFile())
 
+    // A draft thread can move onto its own branch and back until it sends its first message.
+    const drafted = (await host.call(IPC.createThread, [
+      { workspaceId, title: "Draft" },
+    ])) as AppSnapshot
+    const draftId = drafted.threads.find((entry) => entry.title === "Draft")!.id
+    const isolated = (await host.call(IPC.setThreadIsolated, [
+      { threadId: draftId, isolated: true },
+    ])) as AppSnapshot
+    const draftWorktree = isolated.threads.find((entry) => entry.id === draftId)!.worktree!
+    assert.equal(draftWorktree.state, "ready")
+    const shared = (await host.call(IPC.setThreadIsolated, [
+      { threadId: draftId, isolated: false },
+    ])) as AppSnapshot
+    assert.equal(shared.threads.find((entry) => entry.id === draftId)!.worktree, undefined)
+    await assert.rejects(stat(draftWorktree.path))
+    assert.equal(run(repository, "branch", "--list", draftWorktree.branch), "")
+
     // Turns and Git requests for the thread use its worktree rather than the workspace folder.
     const provider = created.providers.find((entry) => entry.harness === "codex")!
     const catalog = (await host.call(IPC.upsertModel, [
@@ -161,6 +178,10 @@ test("isolated threads work in their own worktree until merged or removed", {
       { threadId: thread.id, text: "Work here" },
     ])) as SubmitTurnResult
     assert.equal(submitted.dispatch?.workspacePath, worktree.path)
+    await assert.rejects(
+      host.call(IPC.setThreadIsolated, [{ threadId: thread.id, isolated: false }]),
+      /before its first message/,
+    )
     const git = (await host.call(IPC.getGitSnapshot, [
       { workspaceId, threadId: thread.id, limit: 10 },
     ])) as GitSnapshot

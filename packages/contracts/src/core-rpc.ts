@@ -57,6 +57,13 @@ export class CoreRpcs extends RpcGroup.make(
     error: CoreError,
   }),
   snapshotRpc(
+    "SetDraftWorktree",
+    Schema.Struct({
+      threadId: Schema.String,
+      worktree: Schema.NullOr(ThreadWorktree.pipe(Schema.omit("state"))),
+    }),
+  ),
+  snapshotRpc(
     "SetWorktreeState",
     Schema.Struct({ threadId: Schema.String, state: ThreadWorktree.fields.state }),
   ),
