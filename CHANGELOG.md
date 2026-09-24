@@ -4,6 +4,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-24
+
 ### Fixed
 
 - 0.7.0 was never published because its release checks failed. This release delivers every change listed under 0.7.0 below.
@@ -144,7 +146,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/nonlooped/meldshell/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nonlooped/meldshell/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nonlooped/meldshell/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/nonlooped/meldshell/compare/v0.4.0...v0.5.0
