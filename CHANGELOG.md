@@ -4,6 +4,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-24
+
 ### Added
 
 - A new thread can work on its own branch: choose **Own branch** below an empty thread's composer before the first message. MeldShell creates a Git worktree for it from the workspace's current commit, so threads running at the same time never edit the same files. Every harness in that thread, the Files and Changes sidebars, file links, and `@` completions use the thread's worktree.
@@ -138,7 +140,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/nonlooped/meldshell/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nonlooped/meldshell/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/nonlooped/meldshell/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/nonlooped/meldshell/compare/v0.3.0...v0.4.0
