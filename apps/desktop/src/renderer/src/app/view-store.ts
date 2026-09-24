@@ -7,6 +7,7 @@ export type SettingsSection =
   | "providers"
   | "usage"
   | "threads"
+  | "keyboard"
   | "about"
 
 interface ViewStore {

@@ -14,6 +14,7 @@ import { AppDialog, Button, DropdownMenu, IconButton, MenuAction } from "../ui/c
 import { ThreadView } from "../threads/ThreadView"
 import { TerminalPanel } from "../terminals/TerminalPanel"
 import { terminalApi, useTerminalStore } from "../terminals/terminal-store"
+import { useKeybindings } from "./keybindings"
 import { useTabStore } from "./tab-store"
 import {
   movePane,
@@ -58,6 +59,7 @@ function SplitPicker({
   onClose: () => void
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
+  const newThreadChord = useKeybindings((state) => state.bindings.newThread)
   const candidates = threads.filter(
     (candidate) =>
       candidate.id !== thread.id &&
@@ -93,7 +95,14 @@ function SplitPicker({
             {candidate.title}
           </Button>
         ))}
-        {candidates.length === 0 && <p>No matching threads. Create another thread with Ctrl+N.</p>}
+        {candidates.length === 0 && (
+          <p>
+            No matching threads.{" "}
+            {newThreadChord === ""
+              ? "Create another thread from the inbox."
+              : `Create another thread with ${newThreadChord}.`}
+          </p>
+        )}
       </div>
     </AppDialog>
   )

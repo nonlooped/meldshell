@@ -5,11 +5,20 @@ import {
   CURRENT_TITLE_MODEL,
   AppOpacity,
 } from "@meldshell/contracts"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 
 import { getSnapshot } from "./snapshots"
 
 const TITLE_MODEL_SETTING = "title_model_id"
+const KEYBINDINGS_SETTING = "keybindings"
+
+const Keybindings = Schema.parseJson(Schema.Record({ key: Schema.String, value: Schema.String }))
+
+/** A stored value that no longer decodes falls back to the default shortcuts. */
+const readKeybindings = (value: string | undefined) =>
+  value === undefined
+    ? undefined
+    : Schema.decodeUnknownOption(Keybindings)(value).pipe(Option.getOrUndefined)
 
 export const readAppSettings = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -41,6 +50,7 @@ export const readAppSettings = Effect.gen(function* () {
     reduceMotion: values.get("reduceMotion") === "true",
     sounds: values.get("sounds") !== "false",
     editor: values.get("editor"),
+    keybindings: readKeybindings(values.get(KEYBINDINGS_SETTING)),
   } satisfies AppSettings
 })
 
@@ -60,6 +70,11 @@ export const setAppSettings = (input: SetAppSettingsInput) =>
         yield* sql`INSERT INTO settings (key, value) VALUES (${key}, ${String(input[key])})
           ON CONFLICT(key) DO UPDATE SET value = excluded.value`
       }
+    }
+    if (input.keybindings !== undefined) {
+      const value = JSON.stringify(input.keybindings)
+      yield* sql`INSERT INTO settings (key, value) VALUES (${KEYBINDINGS_SETTING}, ${value})
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`
     }
     const titleModelId = input.titleModelId?.trim()
     if (titleModelId !== undefined && titleModelId !== "") {

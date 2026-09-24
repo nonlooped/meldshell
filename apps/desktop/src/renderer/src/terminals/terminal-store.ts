@@ -17,6 +17,7 @@ import {
   terminalTheme,
   watchAppearance,
 } from "./terminal-theme"
+import { actionForEvent, useKeybindings } from "../app/keybindings"
 
 /*
  * Thread terminals outlive their views. The store keeps each thread's pane tree; the xterm
@@ -285,7 +286,8 @@ function listen(): void {
 
 /** Keys the app keeps while a shell has focus, and the terminal's clipboard keys. */
 function handleKey(event: KeyboardEvent, term: Terminal): boolean {
-  if (event.ctrlKey && (event.key === "Tab" || event.code === "Backquote")) return false
+  const action = actionForEvent(event, useKeybindings.getState().bindings)
+  if (action === "nextTab" || action === "previousTab" || action === "toggleTerminal") return false
   const key = event.key.toLowerCase()
   const windows = window.meldshell.platform === "win32"
   const copy =

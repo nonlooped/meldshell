@@ -318,6 +318,8 @@ export const AppSettings = Schema.Struct({
   sounds: Schema.optional(Schema.Boolean),
   /** The external editor that opens a thread's folder; an `ExternalEditor` id. */
   editor: Schema.optional(Schema.String),
+  /** Shortcut chords that differ from the defaults, by action; an empty chord removes one. */
+  keybindings: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
 
   /** A `ProviderModel` id, or `CURRENT_TITLE_MODEL`. */
   titleModelId: Schema.String,
@@ -525,6 +527,13 @@ export const SetAppSettingsInput = Schema.Struct({
   reduceMotion: Schema.optional(Schema.Boolean),
   sounds: Schema.optional(Schema.Boolean),
   editor: Schema.optional(Schema.String.pipe(Schema.maxLength(64))),
+  /** Replaces every stored override. */
+  keybindings: Schema.optional(
+    Schema.Record({
+      key: Schema.String.pipe(Schema.maxLength(64)),
+      value: Schema.String.pipe(Schema.maxLength(64)),
+    }),
+  ),
 
   titleModelId: Schema.optional(Schema.String),
 })

@@ -16,6 +16,7 @@ import {
   Boxes,
   Gauge,
   Info,
+  Keyboard,
   MessagesSquare,
   Monitor,
 } from "lucide-react"
@@ -24,7 +25,6 @@ import { modelsForProvider } from "../data/catalog"
 import { useViewStore, type SettingsSection } from "../app/view-store"
 import { AppDialog, Button, IconButton } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
-import { kbdClasses } from "../ui/styles"
 import { ModelDialog } from "./ModelDialog"
 import { ProviderCard } from "./ProviderCard"
 import { ThreadTitleCard } from "./ThreadTitleCard"
@@ -35,6 +35,7 @@ import {
 } from "./SubscriptionUsage"
 import { UpdateSettings } from "./UpdateSettings"
 
+import { KeyboardSettings } from "./KeyboardSettings"
 import { Preferences } from "./Preferences"
 
 interface SettingsViewProps {
@@ -102,11 +103,18 @@ const SECTIONS: ReadonlyArray<{
     caption: "Control how MeldShell names new conversations.",
   },
   {
+    id: "keyboard",
+    label: "Keyboard shortcuts",
+    icon: <Keyboard size={16} strokeWidth={1.75} />,
+    title: "Keyboard shortcuts",
+    caption: "Change the keys that run MeldShell's commands.",
+  },
+  {
     id: "about",
     label: "About",
     icon: <Info size={16} strokeWidth={1.75} />,
     title: "About MeldShell",
-    caption: "Version, application information, and keyboard shortcuts.",
+    caption: "Version and application information.",
   },
 ]
 
@@ -201,6 +209,9 @@ export function SettingsView({
               />
             )}
             {section === "account" && <RemoteAccess />}
+            {section === "keyboard" && (
+              <KeyboardSettings pending={settingsPending} onChange={onChangeAppSettings} />
+            )}
             {section === "usage" && <SubscriptionUsage providers={usageProviders} />}
             {section === "threads" && (
               <ThreadTitleCard
@@ -276,25 +287,6 @@ export function SettingsView({
                   </div>
                 </div>
                 <UpdateSettings />
-                <div className="mt-[32px] max-w-[380px] [&_h3]:text-[12px] [&_h3]:font-medium [&_h3]:text-[var(--text-secondary)] [&_p]:flex [&_p]:items-center [&_p]:justify-between [&_p]:m-0 [&_p]:[padding:8px_0] [&_p+p]:border-t-[1px] [&_p+p]:border-t-[color:var(--line-subtle)] [&_p]:text-[12px] [&_kbd]:text-[10.5px]">
-                  <h3>Keyboard shortcuts</h3>
-                  <p>
-                    <span>Go to thread or message</span>
-                    <kbd className={kbdClasses}>Ctrl+K</kbd>
-                  </p>
-                  <p>
-                    <span>Go to file</span>
-                    <kbd className={kbdClasses}>Ctrl+P</kbd>
-                  </p>
-                  <p>
-                    <span>New thread</span>
-                    <kbd className={kbdClasses}>Ctrl+N</kbd>
-                  </p>
-                  <p>
-                    <span>Settings</span>
-                    <kbd className={kbdClasses}>Ctrl+,</kbd>
-                  </p>
-                </div>
               </section>
             )}
           </FadeDiv>
