@@ -53,13 +53,14 @@
   transition-duration: calc(var(--motion-duration, 120ms) * var(--motion-scale, 1));
   transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-/* A resizable panel follows the pointer directly while its separator is dragged. */
-@utility motion-grow {
-  transition-property: flex-grow;
-  transition-duration: calc(var(--motion-duration, 120ms) * var(--motion-scale, 1));
-  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
-  *:has(> [data-separator="active"]) > & {
-    transition-duration: 0s;
+/* Resizable panels follow drags and window resizes directly. While a sidebar is shown or hidden,
+ * the group sets `data-panel-motion` and every panel glides to the new layout together.
+ * react-resizable-panels sizes the outer `[data-panel]` element, not the one given `className`. */
+@utility motion-panels {
+  &[data-panel-motion] > [data-panel] {
+    transition-property: flex-grow;
+    transition-duration: calc(var(--motion-duration, 120ms) * var(--motion-scale, 1));
+    transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
   }
 }
 /* A Collapsible panel grows open and folds shut from Base UI's measured height. Base UI releases

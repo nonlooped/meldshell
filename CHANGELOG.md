@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Changed
+
+- The inbox and source control sidebars slide open and closed when toggled instead of snapping.
+
 ## [0.6.0] - 2026-09-24
 
 ### Changed
