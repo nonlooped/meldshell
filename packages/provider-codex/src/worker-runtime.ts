@@ -1,5 +1,5 @@
 import { workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
-import { type TitleRequest, type TurnDispatch } from "@meldshell/contracts"
+import { type ComposerCommand, type TitleRequest, type TurnDispatch } from "@meldshell/contracts"
 import {
   CodexAppServer,
   listCodexModels,
@@ -12,6 +12,37 @@ import {
   type AppServerCallbacks,
 } from "./index"
 import { Effect } from "effect"
+
+const text = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim() !== "" ? value : undefined
+
+/** Codex has no slash-command API; its enabled skills are sent as skill inputs. */
+const codexSkillCommands = (response: unknown): ComposerCommand[] => {
+  const data = (response as { data?: unknown } | null)?.data
+  if (!Array.isArray(data)) return []
+  const commands = new Map<string, ComposerCommand>()
+  for (const entry of data) {
+    const skills = (entry as { skills?: unknown } | null)?.skills
+    if (!Array.isArray(skills)) continue
+    for (const skill of skills as Array<Record<string, unknown>>) {
+      const name = text(skill.name)
+      const path = text(skill.path)
+      if (!name || !path || skill.enabled === false || commands.has(name)) continue
+      const presentation = (skill.interface ?? {}) as Record<string, unknown>
+      commands.set(name, {
+        kind: "skill",
+        name,
+        description:
+          text(presentation.shortDescription) ??
+          text(skill.shortDescription) ??
+          text(skill.description) ??
+          "",
+        path,
+      })
+    }
+  }
+  return [...commands.values()]
+}
 
 type CodexConnection = Pick<
   CodexAppServer,
@@ -650,6 +681,26 @@ export const runCodexWorker = (
           .finally(() => usageRequests.delete(input.requestId))
         break
       }
+      case "list-commands":
+        void serverForRequest()
+          .then((server) =>
+            server.request("skills/list", { cwds: [input.workspacePath] }, { timeoutMs: 15_000 }),
+          )
+          .then(
+            (response) =>
+              publish({
+                type: "commands-result",
+                requestId: input.requestId,
+                commands: codexSkillCommands(response),
+              }),
+            (cause: unknown) =>
+              publish({
+                type: "commands-result",
+                requestId: input.requestId,
+                error: cause instanceof Error ? cause.message : String(cause),
+              }),
+          )
+        break
       case "start-turn":
         void startTurn(input.dispatch)
         break

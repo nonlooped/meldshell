@@ -1,14 +1,23 @@
 import type { ComposerAttachment } from "@meldshell/contracts/ipc"
 import { create } from "zustand"
+import type { ComposerToken } from "../threads/composer-completion"
 
 interface ThreadDraft {
   readonly text: string
   readonly attachments: ReadonlyArray<ComposerAttachment>
+  /** Accepted completions that the composer shows as pills. */
+  readonly tokens: ReadonlyArray<ComposerToken>
   readonly sending: boolean
   readonly error: string | null
 }
 
-export const emptyDraft: ThreadDraft = { text: "", attachments: [], sending: false, error: null }
+export const emptyDraft: ThreadDraft = {
+  text: "",
+  attachments: [],
+  tokens: [],
+  sending: false,
+  error: null,
+}
 
 export const useThreadDrafts = create<{
   drafts: Readonly<Record<string, ThreadDraft>>
@@ -32,6 +41,7 @@ export const useThreadDrafts = create<{
             ...current,
             sending: false,
             text: current.text === sent.text ? "" : current.text,
+            tokens: current.text === sent.text ? [] : current.tokens,
             attachments: current.attachments.filter(
               (attachment) => !sent.attachments.includes(attachment),
             ),

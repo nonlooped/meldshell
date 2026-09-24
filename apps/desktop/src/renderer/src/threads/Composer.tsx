@@ -27,6 +27,8 @@ import {
 import { effortLabel, resolveSelection, selectableModels } from "../data/catalog"
 import { FileIcon } from "../ui/FileIcon"
 import { ModelPicker } from "./ModelPicker"
+import { useComposerCompletion } from "./ComposerCompletion"
+import type { ComposerToken } from "./composer-completion"
 import { dropText, launchFromText } from "../ui/flight"
 import {
   Button,
@@ -43,6 +45,8 @@ interface ComposerProps {
   readonly threadId: string
   readonly draft: string
   readonly onDraftChange: (draft: string) => void
+  readonly tokens: ReadonlyArray<ComposerToken>
+  readonly onTokensChange: (tokens: ReadonlyArray<ComposerToken>) => void
   readonly providerReady: boolean
   readonly providerDetail: string
   readonly onRecheckProvider: () => void
@@ -494,6 +498,8 @@ export function Composer({
   threadId,
   draft,
   onDraftChange,
+  tokens,
+  onTokensChange,
   providerReady,
   providerDetail,
   onRecheckProvider,
@@ -519,6 +525,15 @@ export function Composer({
   const attachmentReadsPending = useRef(0)
   const selection = resolveSelection(snapshot, threadId)
   const providerName = harnessName(selection?.provider.harness)
+  const completion = useComposerCompletion({
+    draft,
+    tokens,
+    workspaceId: snapshot.threads.find((thread) => thread.id === threadId)?.workspaceId,
+    harness: selection?.provider.harness,
+    textareaRef,
+    onDraftChange,
+    onTokensChange,
+  })
   const canSend =
     providerReady &&
     selection !== null &&
@@ -585,6 +600,7 @@ export function Composer({
       )}
 
       <div className={`motion-colors motion-duration-200 ${composerClasses}`}>
+        {completion.menu}
         <ComposerAttachments attachments={attachments} onRemoveAttachment={onRemoveAttachment} />
         {loadingAttachments && (
           <div className="text-[var(--text-tertiary)] text-[11px] p-[8px]" role="status">
@@ -596,59 +612,71 @@ export function Composer({
             {attachmentError}
           </div>
         )}
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          rows={2}
-          placeholder={`Ask ${providerName} to work in this workspace…`}
-          aria-label={`Message ${providerName}`}
-          aria-keyshortcuts="Enter"
-          onChange={(event) => onDraftChange(event.target.value)}
-          onPaste={(event) => {
-            const images = Array.from(event.clipboardData.files).filter((file) =>
-              file.type.startsWith("image/"),
-            )
-            if (images.length === 0) return
-            event.preventDefault()
-            void addAttachments(() =>
-              Promise.all(
-                images.map(
-                  (file) =>
-                    new Promise<ComposerAttachment>((resolve, reject) => {
-                      const reader = new FileReader()
-                      reader.onload = () => {
-                        if (typeof reader.result !== "string") {
-                          reject(new Error("Could not read image"))
-                          return
-                        }
-                        resolve({
-                          type: "image",
-                          value: reader.result,
-                          name: file.name || "Pasted image",
-                        })
-                      }
-                      reader.onerror = () => reject(reader.error)
-                      reader.onabort = () => reject(new Error("Image read cancelled"))
-                      reader.readAsDataURL(file)
-                    }),
-                ),
-              ),
-            )
-          }}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.nativeEvent.isComposing &&
-              !event.shiftKey &&
-              !event.altKey &&
-              canSend &&
-              attachmentReadsPending.current === 0
-            ) {
+        <div className="relative grid">
+          {completion.highlight}
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            rows={2}
+            placeholder={`Ask ${providerName} to work in this workspace…`}
+            aria-label={`Message ${providerName}`}
+            aria-keyshortcuts="Enter"
+            {...completion.inputProps}
+            onChange={(event) => {
+              onDraftChange(event.target.value)
+              completion.syncCaret(event)
+            }}
+            onPaste={(event) => {
+              const images = Array.from(event.clipboardData.files).filter((file) =>
+                file.type.startsWith("image/"),
+              )
+              if (images.length === 0) return
               event.preventDefault()
-              send()
-            }
-          }}
-        />
+              void addAttachments(() =>
+                Promise.all(
+                  images.map(
+                    (file) =>
+                      new Promise<ComposerAttachment>((resolve, reject) => {
+                        const reader = new FileReader()
+                        reader.onload = () => {
+                          if (typeof reader.result !== "string") {
+                            reject(new Error("Could not read image"))
+                            return
+                          }
+                          resolve({
+                            type: "image",
+                            value: reader.result,
+                            name: file.name || "Pasted image",
+                          })
+                        }
+                        reader.onerror = () => reject(reader.error)
+                        reader.onabort = () => reject(new Error("Image read cancelled"))
+                        reader.readAsDataURL(file)
+                      }),
+                  ),
+                ),
+              )
+            }}
+            onKeyDown={(event) => {
+              if (completion.handleKeyDown(event)) {
+                event.preventDefault()
+                event.stopPropagation()
+                return
+              }
+              if (
+                event.key === "Enter" &&
+                !event.nativeEvent.isComposing &&
+                !event.shiftKey &&
+                !event.altKey &&
+                canSend &&
+                attachmentReadsPending.current === 0
+              ) {
+                event.preventDefault()
+                send()
+              }
+            }}
+          />
+        </div>
 
         <div className="flex items-center flex-wrap gap-[6px] [padding:2px_8px_8px] [@container(max-width:_620px)]:gap-[4px] [@container(max-width:_620px)]:[&_.chip]:px-[6px]">
           <IconButton
@@ -733,7 +761,7 @@ const attachmentChipClasses = [
 ].join(" ")
 
 const composerClasses = [
-  "composer [container-type:inline-size] flex w-full max-w-[860px] [margin:0_auto] flex-col",
+  "composer relative [container-type:inline-size] flex w-full max-w-[860px] [margin:0_auto] flex-col",
   "border-[1px] border-[color:var(--line)] rounded-[var(--radius-xl)] bg-[var(--surface-raised)]",
   "[box-shadow:var(--shadow-raised),_inset_0_1px_0_var(--edge-highlight)]",
   "[&:focus-within]:[border-color:var(--line-strong)]",
@@ -742,7 +770,11 @@ const composerClasses = [
   "[@media(prefers-reduced-transparency:_reduce)]:[&:focus-within]:bg-[var(--surface-raised)]",
   "[&_textarea]:min-h-[72px] [&_textarea]:max-h-[210px] [&_textarea]:overflow-y-hidden",
   "[&_textarea]:[padding:15px_16px_10px] [&_textarea]:border-0 [&_textarea]:bg-transparent",
-  "[&_textarea]:text-[var(--text-primary)] [&_textarea]:text-[14px] [&_textarea]:leading-[1.55]",
+  "[&_textarea]:text-[14px] [&_textarea]:leading-[1.55] [&_textarea]:[scrollbar-gutter:stable]",
+  // The highlight layer draws the text, so the textarea only shows its caret and selection.
+  "[&_textarea]:text-transparent [&_textarea]:[caret-color:var(--text-primary)]",
+  "[&_.composer-highlight]:[padding:15px_16px_10px] [&_.composer-highlight]:text-[14px]",
+  "[&_.composer-highlight]:leading-[1.55] [&_.composer-highlight]:[scrollbar-gutter:stable]",
   "[&_textarea]:outline-none [&_textarea]:resize-none",
   "[&_textarea::placeholder]:text-[var(--text-tertiary)]",
 ].join(" ")

@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- The composer autocompletes workspace files and folders after `@`, the selected harness's skills after `$`, and its commands after a leading `/`. Accepted suggestions become pills in the message and are deleted as a unit.
+
 ### Fixed
 
 - Show the MeldShell mark instead of the default artwork on the app icon and Windows setup and uninstall screens.

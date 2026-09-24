@@ -490,6 +490,18 @@ export const InputAttachment = Schema.Struct({
 
 export type InputAttachment = typeof InputAttachment.Type
 
+/** A harness slash command or skill that the composer can offer while typing. */
+export const ComposerCommand = Schema.Struct({
+  kind: Schema.Literal("command", "skill"),
+  name: Schema.String,
+  description: Schema.String,
+  argumentHint: Schema.optional(Schema.String),
+  /** Present when the harness takes the skill as an attachment instead of `/name` text. */
+  path: Schema.optional(Schema.String),
+})
+
+export type ComposerCommand = typeof ComposerCommand.Type
+
 export const SubmitTurnInput = Schema.Struct({
   threadId: Schema.String,
   text: Schema.String,
