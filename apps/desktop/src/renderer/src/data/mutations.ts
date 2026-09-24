@@ -130,7 +130,9 @@ export function useCatalogActions() {
     window.meldshell.upsertModel(input),
   )
   const deleteModelMutation = useSnapshotMutation((id: string) => window.meldshell.deleteModel(id))
-  const resetCatalogMutation = useSnapshotMutation(() => window.meldshell.resetProviderCatalog())
+  const resetCatalogMutation = useSnapshotMutation((providerId: string) =>
+    window.meldshell.resetProviderCatalog(providerId),
+  )
   return { updateProviderMutation, upsertModelMutation, deleteModelMutation, resetCatalogMutation }
 }
 

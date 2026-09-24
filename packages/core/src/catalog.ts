@@ -281,17 +281,19 @@ export const syncProviderCatalog = (input: SyncProviderCatalogInput) =>
     return yield* getSnapshot
   })
 
-export const resetProviderCatalog = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  const rows = yield* sql<ProviderModelRow>`
+/** Restores one provider's built-in models to their discovered names, options, and visibility. */
+export const resetProviderCatalog = (providerId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows = yield* sql<ProviderModelRow>`
     SELECT id, provider_id, slug, display_name, reasoning_efforts, metadata,
            supports_fast, enabled, hidden, sort_order, built_in
-    FROM provider_models WHERE built_in = 1
+    FROM provider_models WHERE built_in = 1 AND provider_id = ${providerId}
   `
-  for (const row of rows) {
-    const metadata = modelMetadata(row)
-    const efforts = Array.isArray(metadata.reasoningEfforts) ? metadata.reasoningEfforts : []
-    yield* sql`
+    for (const row of rows) {
+      const metadata = modelMetadata(row)
+      const efforts = Array.isArray(metadata.reasoningEfforts) ? metadata.reasoningEfforts : []
+      yield* sql`
       UPDATE provider_models
       SET display_name = ${metadata.displayName ?? row.slug},
           reasoning_efforts = ${JSON.stringify(efforts)},
@@ -300,9 +302,9 @@ export const resetProviderCatalog = Effect.gen(function* () {
           enabled = 1, hidden = ${metadata.hidden === true ? 1 : 0}
       WHERE id = ${row.id}
     `
-  }
-  return yield* getSnapshot
-})
+    }
+    return yield* getSnapshot
+  }).pipe(transaction)
 
 export const setThreadSettings = (input: SetThreadSettingsInput) =>
   Effect.gen(function* () {
