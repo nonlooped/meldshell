@@ -2,15 +2,14 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreBinaries": ["install-electron"],
   "includeEntryExports": true,
-  // The compiler loads its plugin by name. SQLite, semver and which stay direct desktop
-  // dependencies because bundled workers leave them external for Electron packaging. The site
+  // The compiler loads its plugin by name. SQLite and semver stay direct desktop dependencies
+  // because bundled workers leave them external for Electron packaging. The site
   // pins cookie so Astro's prerender entry resolves its own major instead of the hoisted one.
   "ignoreDependencies": [
     "babel-plugin-react-compiler",
     "better-sqlite3",
     "cookie",
-    "semver",
-    "which"
+    "semver"
   ],
   "workspaces": {
     "apps/desktop": {
@@ -48,6 +47,10 @@
         "@meldshell/projection",
         "@tanstack/react-query",
         "@tanstack/react-virtual",
+        "@xterm/addon-fit",
+        "@xterm/addon-unicode11",
+        "@xterm/addon-web-links",
+        "@xterm/xterm",
         "katex",
         "lucide-react",
         "mermaid",

@@ -9,6 +9,7 @@ interface ShortcutActions {
   selectedThreadId: string | null
   closeThread: (id: string) => void
   cycleTabs: (direction: 1 | -1) => void
+  toggleTerminal: () => void
 }
 
 export function handleAppShortcut(
@@ -24,6 +25,7 @@ export function handleAppShortcut(
     selectedThreadId,
     closeThread,
     cycleTabs,
+    toggleTerminal,
   }: ShortcutActions,
 ): void {
   if (
@@ -37,6 +39,12 @@ export function handleAppShortcut(
     return
   }
   if (!event.ctrlKey) return
+  // By position, so layouts that put another character on that key still reach the terminal.
+  if (event.code === "Backquote") {
+    event.preventDefault()
+    toggleTerminal()
+    return
+  }
   switch (event.key.toLowerCase()) {
     case "n":
       event.preventDefault()

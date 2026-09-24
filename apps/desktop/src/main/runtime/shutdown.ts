@@ -2,6 +2,7 @@ import { app, dialog } from "electron"
 import { Effect } from "effect"
 import { desktopHost } from "./services"
 import { getMainWindow } from "../window"
+import { closeTerminals } from "../terminals"
 
 let closePromptOpen = false
 export let quitting = false
@@ -10,7 +11,9 @@ export const markQuitting = (): void => {
   quitting = true
 }
 
-export const stopProviders = Effect.promise(() => desktopHost.stop())
+export const stopProviders = Effect.sync(closeTerminals).pipe(
+  Effect.andThen(Effect.promise(() => desktopHost.stop())),
+)
 
 export const prepareToClose = Effect.gen(function* () {
   if (closePromptOpen) return false

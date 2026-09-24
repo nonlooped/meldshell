@@ -49,6 +49,25 @@ const api: MeldShellApi = {
     ipcRenderer.on(IPC.updateStatusChanged, handleStatus)
     return () => ipcRenderer.removeListener(IPC.updateStatusChanged, handleStatus)
   },
+  terminal: {
+    open: (input) => ipcRenderer.invoke(IPC.terminalOpen, input),
+    // Keystrokes and resizes need no reply, so they skip invoke's round trip.
+    write: (id, data) => ipcRenderer.send(IPC.terminalWrite, id, data),
+    resize: (id, cols, rows) => ipcRenderer.send(IPC.terminalResize, id, cols, rows),
+    close: (id) => ipcRenderer.send(IPC.terminalClose, id),
+    onData: (listener) => {
+      const handleData = (_event: Electron.IpcRendererEvent, id: string, data: string): void =>
+        listener(id, data)
+      ipcRenderer.on(IPC.terminalData, handleData)
+      return () => ipcRenderer.removeListener(IPC.terminalData, handleData)
+    },
+    onExit: (listener) => {
+      const handleExit = (_event: Electron.IpcRendererEvent, id: string, code: number): void =>
+        listener(id, code)
+      ipcRenderer.on(IPC.terminalExit, handleExit)
+      return () => ipcRenderer.removeListener(IPC.terminalExit, handleExit)
+    },
+  },
 }
 
 contextBridge.exposeInMainWorld("meldshell", api)

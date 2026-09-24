@@ -95,3 +95,12 @@ export const kbdClasses = [
   "bg-[var(--surface-hover)] text-[var(--text-tertiary)] [font-family:var(--font-mono)]",
   "text-[0.95em] leading-none whitespace-nowrap",
 ].join(" ")
+
+/** A hairline between resizable panes, with a wider invisible grip. */
+export const paneSeparatorClasses = [
+  "relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute",
+  "[&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)]",
+  "[&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]",
+  "[&[aria-orientation='horizontal']]:w-auto [&[aria-orientation='horizontal']]:h-[1px]",
+  "[&[aria-orientation='horizontal']::after]:[inset:-3px_0]",
+].join(" ")

@@ -102,6 +102,30 @@ export interface WorktreeStatus {
   readonly unmerged: number | null
 }
 
+export interface TerminalOpenInput {
+  /** Chosen by the renderer so output that arrives before `open` resolves still finds its view. */
+  readonly id: string
+  readonly workspaceId: string
+  readonly threadId: string
+  readonly cols: number
+  readonly rows: number
+}
+
+export interface TerminalSession {
+  readonly cwd: string
+  readonly shell: string
+}
+
+/** Shells run on the workstation only; a remote client leaves `MeldShellApi.terminal` undefined. */
+interface TerminalApi {
+  readonly open: (input: TerminalOpenInput) => Promise<TerminalSession>
+  readonly write: (id: string, data: string) => void
+  readonly resize: (id: string, cols: number, rows: number) => void
+  readonly close: (id: string) => void
+  readonly onData: (listener: (id: string, data: string) => void) => () => void
+  readonly onExit: (listener: (id: string, exitCode: number) => void) => () => void
+}
+
 export type GitFileAction = "stage" | "unstage" | "restore"
 export type GitDiffSide = "staged" | "unstaged"
 
@@ -265,6 +289,12 @@ export const IPC = {
   runtimeChanged: "meldshell:runtime-changed",
   attentionRequested: "meldshell:attention-requested",
   updateStatusChanged: "meldshell:update-status-changed",
+  terminalOpen: "meldshell:terminal-open",
+  terminalWrite: "meldshell:terminal-write",
+  terminalResize: "meldshell:terminal-resize",
+  terminalClose: "meldshell:terminal-close",
+  terminalData: "meldshell:terminal-data",
+  terminalExit: "meldshell:terminal-exit",
 } as const
 
 export type MeldShellApi = InvokeApi & {
@@ -276,6 +306,7 @@ export type MeldShellApi = InvokeApi & {
   ) => () => void
   readonly onOpenAttention: (listener: (threadId: string) => void) => () => void
   readonly onUpdateStatus: (listener: (status: AppUpdateStatus) => void) => () => void
+  readonly terminal?: TerminalApi
 }
 
 /** Only registered methods cross the preload boundary; callers cannot choose arbitrary channels. */

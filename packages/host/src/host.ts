@@ -2,7 +2,8 @@ import { Effect, Stream, Fiber } from "effect"
 import { CoreClient } from "./core-client"
 import { HostEvents, eventFrames } from "./events"
 import { createHostApi } from "./api"
-import { reconcileWorktrees } from "./thread-worktrees"
+import type { WorkspaceScope } from "@meldshell/contracts/ipc"
+import { reconcileWorktrees, scopePath } from "./thread-worktrees"
 import { createHostRuntime, stopHost } from "./runtime"
 import type { HostPlatform } from "./platform"
 import { connectRelay } from "./remote-connection"
@@ -122,6 +123,8 @@ export async function startHost(
       return snapshot
     },
     activeTurns: () => core((client) => client.GetActiveTurnCount()),
+    /** The folder a thread works in: its worktree when it has one, otherwise its workspace. */
+    scopePath: (scope: WorkspaceScope) => runtime.runPromise(scopePath(scope)),
     remote,
     close,
   }
