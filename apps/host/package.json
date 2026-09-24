@@ -12,6 +12,6 @@
     "@meldshell/provider-codex": "*",
     "@meldshell/provider-claude": "*",
     "@meldshell/provider-cursor": "*",
-    "tsx": "4.23.13"
+    "tsx": "4.23.15"
   }
 }
