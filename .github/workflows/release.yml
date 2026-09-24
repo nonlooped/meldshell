@@ -1,73 +1,100 @@
 name: Release
+run-name: Release (${{ inputs.channel || (github.event.schedule == '17 0 * * *' && 'stable' || 'nightly') }})
 
-# A stable vX.Y.Z tag on main (cut with `npm run release`) builds, verifies, and publishes a GitHub
-# Release whose notes are that version's CHANGELOG.md entries. Before 1.0, minor versions are
-# normal releases and nonzero patch versions are prereleases. If checks or packaging fail, the
-# notes are still published without installers and never become the latest release, which the
-# updater follows; a successful rerun adds the installers. A manual run builds the same installers
-# from any ref as workflow artifacts without releasing.
+# Releases are cut on a schedule from main, never by hand. Daily, a stable release publishes the
+# CHANGELOG.md Unreleased entries as the next minor version when there are any. Hourly, a nightly
+# prerelease publishes main when app files changed since the last release. Either one is cut only
+# after the full CI suite and packaging pass on that commit, and a commit whose release failed is
+# not retried by the schedule; a new commit or a manual run retries. A manual run can also release
+# now, or build installers from any ref as workflow artifacts without releasing.
 on:
-  push:
-    tags: ['v*']
+  schedule:
+    - cron: '17 0 * * *' # stable
+    - cron: '47 * * * *' # nightly
   workflow_dispatch:
+    inputs:
+      channel:
+        description: Release to cut
+        type: choice
+        options: [nightly, stable, build-only]
+        default: build-only
 
 permissions:
   contents: read
 
+# Releases run one at a time so a nightly never tags beside a stable cut in progress.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 env:
+  CHANNEL: ${{ inputs.channel || (github.event.schedule == '17 0 * * *' && 'stable' || 'nightly') }}
   npm_config_audit: 'false'
   npm_config_fund: 'false'
 
 jobs:
-  version:
-    name: Validate version
+  plan:
+    name: Plan
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      prerelease: ${{ steps.version.outputs.prerelease }}
+      build: ${{ steps.plan.outputs.build }}
+      publish: ${{ steps.plan.outputs.release }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      previous: ${{ steps.plan.outputs.previous }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
           filter: blob:none
-      - name: Match package versions and tag
-        id: version
+      - name: Decide
+        id: plan
         env:
-          IS_TAG: ${{ github.ref_type == 'tag' }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_TITLE: Release (${{ env.CHANNEL }})
         run: |
-          # shellcheck disable=SC2016 # JavaScript template literals, not shell expansions
-          node --input-type=module -e '
-            import fs from "node:fs";
-            const root = JSON.parse(fs.readFileSync("package.json"));
-            const desktop = JSON.parse(fs.readFileSync("apps/desktop/package.json"));
-            if (root.version !== desktop.version) throw new Error("Root and desktop package.json versions differ");
-            if (process.env.IS_TAG === "true") {
-              if (!/^\d+\.\d+\.\d+$/.test(desktop.version)) throw new Error(`${desktop.version} is not a stable version`);
-              if (process.env.GITHUB_REF_NAME !== `v${desktop.version}`) throw new Error(`Tag must be v${desktop.version}`);
-            }
-            const [major, , patch] = desktop.version.split(".").map(Number);
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${desktop.version}\nprerelease=${major === 0 && patch > 0}\n`);
-          '
-      - name: Require tagged commit on main
-        if: github.ref_type == 'tag'
-        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
-      - name: Require changelog entries
-        if: github.ref_type == 'tag'
-        run: node scripts/release.mjs notes "${{ steps.version.outputs.version }}"
+          if [ "$CHANNEL" = build-only ]; then
+            version=$(node -p 'require("./package.json").version')
+            printf 'build=true\nrelease=false\nversion=%s\n' "$version" >> "$GITHUB_OUTPUT"
+            echo "Building $version installers without releasing" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::Releases are cut only from main"
+            exit 1
+          fi
+          node scripts/release.mjs plan "$CHANNEL" > "$RUNNER_TEMP/plan"
+          cat "$RUNNER_TEMP/plan"
+          release=$(sed -n 's/^release=//p' "$RUNNER_TEMP/plan")
+          reason=$(sed -n 's/^reason=//p' "$RUNNER_TEMP/plan")
+          if [ "$release" = true ] && [ "$GITHUB_EVENT_NAME" = schedule ]; then
+            failed=$(gh run list --workflow release.yml --commit "$GITHUB_SHA" --status failure \
+              --json displayTitle --jq "map(select(.displayTitle == \"$RUN_TITLE\")) | length")
+            if [ "$failed" != 0 ]; then
+              release=false
+              reason="a $CHANNEL release of $GITHUB_SHA already failed; waiting for a new commit"
+            fi
+          fi
+          grep -Ev '^(release|reason)=' "$RUNNER_TEMP/plan" >> "$GITHUB_OUTPUT"
+          printf 'release=%s\nbuild=%s\n' "$release" "$release" >> "$GITHUB_OUTPUT"
+          echo "${CHANNEL^}: $reason" >> "$GITHUB_STEP_SUMMARY"
 
   checks:
     name: Checks
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     uses: ./.github/workflows/ci.yml
 
   package:
     name: Package (${{ matrix.platform }})
-    needs: version
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -81,6 +108,7 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+      VERSION: ${{ needs.plan.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,6 +119,10 @@ jobs:
           cache: npm
       # electron-builder downloads Electron itself and rebuilds native modules for its ABI.
       - run: npm ci --ignore-scripts
+      - name: Set the release version
+        if: needs.plan.outputs.publish == 'true'
+        shell: bash
+        run: node scripts/release.mjs set-version "$VERSION"
       - name: Cache packaging tools
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -103,7 +135,7 @@ jobs:
         run: npx --no-install electron-builder --${{ matrix.platform }} --x64 --publish never
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: installers-${{ matrix.platform }}-${{ needs.version.outputs.version }}
+          name: installers-${{ matrix.platform }}-${{ env.VERSION }}
           path: |
             release/*.exe
             release/*.AppImage
@@ -115,8 +147,8 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    if: always() && github.ref_type == 'tag' && needs.version.result == 'success'
-    needs: [version, checks, package]
+    needs: [plan, checks, package]
+    if: needs.plan.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -124,27 +156,21 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: ${{ github.ref_name }}
-      VERSION: ${{ needs.version.outputs.version }}
-      PRERELEASE: ${{ needs.version.outputs.prerelease }}
-      BUILD_PASSED: ${{ needs.checks.result == 'success' && needs.package.result == 'success' }}
-      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      PREVIOUS: ${{ needs.plan.outputs.previous }}
+      PRERELEASE: ${{ needs.plan.outputs.prerelease }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: false
-          sparse-checkout: |
-            CHANGELOG.md
-            scripts/release.mjs
-          sparse-checkout-cone-mode: false
+          fetch-depth: 0
+          filter: blob:none
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        if: env.BUILD_PASSED == 'true'
         with:
           pattern: installers-*
           merge-multiple: true
           path: release
       - name: Verify artifacts
-        if: env.BUILD_PASSED == 'true'
         working-directory: release
         run: |
           for file in "MeldShell-$VERSION-setup.exe" "MeldShell-$VERSION-setup.exe.blockmap" \
@@ -153,33 +179,48 @@ jobs:
           done
           grep -q "^version: $VERSION$" latest.yml
           grep -q "^version: $VERSION$" latest-linux.yml
+          # The updater reads a prerelease's own channel file before falling back to latest.
+          if [ "$PRERELEASE" = true ]; then
+            cp latest.yml nightly.yml
+            cp latest-linux.yml nightly-linux.yml
+          fi
           sha256sum -- *.exe *.AppImage > SHA256SUMS.txt
           cat SHA256SUMS.txt
+      - name: Tag
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # A rerun after a failed upload reuses the tag it already pushed.
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            git fetch --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
+          elif [ "$PRERELEASE" = true ]; then
+            git tag --annotate "$TAG" --message "MeldShell $VERSION"
+            git push origin "refs/tags/$TAG"
+          else
+            node scripts/release.mjs cut "$VERSION"
+            # Fails without releasing if main moved since the checked commit; the next day retries.
+            git push --atomic origin HEAD:refs/heads/main "refs/tags/$TAG"
+          fi
       - name: Stage, upload, and publish release
         run: |
-          node scripts/release.mjs notes "$VERSION" > "$RUNNER_TEMP/notes.md"
-          if [ "$BUILD_PASSED" != true ]; then
-            printf '\n> [!WARNING]\n> This version has no installers because its [release build](%s) failed.\n' "$RUN_URL" >> "$RUNNER_TEMP/notes.md"
-          fi
-          # A published release may be edited only while it is notes-only from an earlier failed build.
-          if existing=$(gh release view "$RELEASE_TAG" --json isDraft,assets --jq '"\(.isDraft) \(.assets | length)"' 2>/dev/null); then
-            case "$existing" in
-              "true "* | "false 0") ;;
-              *) echo "::error::Refusing to overwrite published release $RELEASE_TAG"; exit 1 ;;
-            esac
-            gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/notes.md"
-          else
-            gh release create "$RELEASE_TAG" --verify-tag --draft --title "MeldShell $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
-          fi
-          if [ "$BUILD_PASSED" != true ]; then
-            gh release edit "$RELEASE_TAG" --draft=false --prerelease="$PRERELEASE" --latest=false
-            echo "Published notes without installers: $(gh release view "$RELEASE_TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          (cd release && gh release upload "$RELEASE_TAG" ./*.exe ./*.AppImage ./*.blockmap ./latest*.yml SHA256SUMS.txt --clobber)
           if [ "$PRERELEASE" = true ]; then
-            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+            node scripts/release.mjs nightly-notes "$PREVIOUS" "$TAG" > "$RUNNER_TEMP/notes.md"
+            title="MeldShell $VERSION (nightly)"
           else
-            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
+            node scripts/release.mjs notes "$VERSION" "$TAG" > "$RUNNER_TEMP/notes.md"
+            title="MeldShell $VERSION"
           fi
-          echo "Published release: $(gh release view "$RELEASE_TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
+          # A rerun may replace assets only on a release that is still a draft.
+          if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$draft" != true ]; then echo "::error::$TAG is already published"; exit 1; fi
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            gh release create "$TAG" --verify-tag --draft --title "$title" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+          (cd release && gh release upload "$TAG" ./*.exe ./*.AppImage ./*.blockmap ./*.yml SHA256SUMS.txt --clobber)
+          if [ "$PRERELEASE" = true ]; then
+            gh release edit "$TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$TAG" --draft=false --prerelease=false --latest
+          fi
+          echo "Published release: $(gh release view "$TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"

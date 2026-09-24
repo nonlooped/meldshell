@@ -87,9 +87,13 @@ type AppUpdateState =
   | "up-to-date"
   | "error"
 
+/** Nightly builds are hourly prereleases; stable builds are the daily releases. */
+export type UpdateChannel = "stable" | "nightly"
+
 export interface AppUpdateStatus {
   readonly state: AppUpdateState
   readonly currentVersion: string
+  readonly channel: UpdateChannel
   readonly availableVersion: string | null
   readonly progressPercent: number | null
   readonly message: string | null
@@ -316,6 +320,9 @@ export const requests = {
   getUpdateStatus: request<() => Promise<AppUpdateStatus>>("meldshell:get-update-status"),
   checkForUpdates: request<() => Promise<AppUpdateStatus>>("meldshell:check-for-updates"),
   installUpdate: request<() => Promise<boolean>>("meldshell:install-update"),
+  setUpdateChannel: request<(channel: UpdateChannel) => Promise<AppUpdateStatus>>(
+    "meldshell:set-update-channel",
+  ),
   getTranscript: request<(input: TranscriptQuery) => Promise<TranscriptPage>>(
     "meldshell:get-transcript",
   ),

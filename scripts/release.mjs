@@ -1,6 +1,9 @@
-// Cuts a MeldShell release: `npm run release -- <patch|minor|major|X.Y.Z>` moves the changelog's
-// Unreleased entries under the new version, bumps the app version, commits, and tags.
-// `node scripts/release.mjs notes X.Y.Z` prints that version's changelog entries.
+// Release tooling for the scheduled Release workflow; nobody cuts releases by hand.
+// `plan <stable|nightly>` decides whether HEAD should be released and prints key=value outputs.
+// `set-version X` writes a version into every version field without committing.
+// `cut X` moves the changelog's Unreleased entries under X, bumps the version, commits, and tags.
+// `notes X [ref]` prints X's changelog entries; `nightly-notes <previous-tag> <ref>` summarizes a
+// nightly build.
 import { execFileSync } from "node:child_process"
 import { readFileSync, writeFileSync } from "node:fs"
 import { pathToFileURL } from "node:url"
@@ -9,22 +12,24 @@ const REPOSITORY = "https://github.com/nonlooped/meldshell"
 // The app version lives in the root and desktop manifests; other workspaces are unversioned.
 const VERSIONED_WORKSPACES = ["", "apps/desktop"]
 const STABLE = /^(\d+)\.(\d+)\.(\d+)$/
+const VERSION = /^\d+\.\d+\.\d+(-nightly\.\d+)?$/
+// Changes to these paths alone do not warrant a nightly build.
+const NON_APP_PATH = /^(docs\/|\.github\/)|\.md$/
 
-export function nextVersion(current, bump) {
+/** Every stable release is the next minor version. */
+export function nextVersion(current) {
   const parts = STABLE.exec(current)?.slice(1).map(Number)
   if (!parts) throw new Error(`Current version ${current} is not a stable X.Y.Z version`)
-  const [major, minor, patch] = parts
-  if (bump === "major") return `${major + 1}.0.0`
-  if (bump === "minor") return `${major}.${minor + 1}.0`
-  if (bump === "patch") return `${major}.${minor}.${patch + 1}`
-  const target = STABLE.exec(bump ?? "")
-    ?.slice(1)
-    .map(Number)
-  if (!target) throw new Error("Pass patch, minor, major, or an X.Y.Z version")
-  const order = target[0] - major || target[1] - minor || target[2] - patch
-  if (order <= 0) throw new Error(`${bump} must be greater than the current ${current}`)
-  return bump
+  return `${parts[0]}.${parts[1] + 1}.0`
 }
+
+/** A nightly precedes the stable release it leads up to, and later nightlies sort higher. */
+export function nightlyVersion(current, date) {
+  const stamp = date.toISOString().slice(0, 16).replace(/\D/g, "")
+  return `${nextVersion(current)}-nightly.${stamp}`
+}
+
+export const isAppChange = (path) => !NON_APP_PATH.test(path)
 
 /** Splits the changelog into its preamble, `## ` sections, and trailing link definitions. */
 function parseChangelog(changelog) {
@@ -35,6 +40,16 @@ function parseChangelog(changelog) {
 
 function sectionBody(section) {
   return section.slice(section.indexOf("\n") + 1).trim()
+}
+
+/** The Unreleased entries, or an empty string when there are none to release. */
+export function unreleasedEntries(changelog) {
+  const [unreleased] = parseChangelog(changelog).sections
+  if (!unreleased?.startsWith("## [Unreleased]")) {
+    throw new Error("CHANGELOG.md must start its sections with ## [Unreleased]")
+  }
+  const entries = sectionBody(unreleased)
+  return /^- /m.test(entries) ? entries : ""
 }
 
 export function releaseNotes(changelog, version) {
@@ -49,12 +64,8 @@ export function releaseNotes(changelog, version) {
 /** `previousTag` links the new version to a comparison; untagged history gets a release link. */
 export function cutChangelog(changelog, version, date, previousTag = null) {
   const { preamble, sections, links } = parseChangelog(changelog)
-  const [unreleased, ...released] = sections
-  if (!unreleased?.startsWith("## [Unreleased]")) {
-    throw new Error("CHANGELOG.md must start its sections with ## [Unreleased]")
-  }
-  const entries = sectionBody(unreleased)
-  if (!/^- /m.test(entries)) throw new Error("CHANGELOG.md has no Unreleased entries to release")
+  const entries = unreleasedEntries(changelog)
+  if (!entries) throw new Error("CHANGELOG.md has no Unreleased entries to release")
   const versionLink = previousTag
     ? `${REPOSITORY}/compare/${previousTag}...v${version}`
     : `${REPOSITORY}/releases/tag/v${version}`
@@ -68,7 +79,7 @@ export function cutChangelog(changelog, version, date, previousTag = null) {
     "",
     entries,
     "",
-    ...released.map((section) => `${section.trimEnd()}\n`),
+    ...sections.slice(1).map((section) => `${section.trimEnd()}\n`),
     `[Unreleased]: ${REPOSITORY}/compare/v${version}...HEAD`,
     `[${version}]: ${versionLink}`,
     ...otherLinks,
@@ -76,95 +87,123 @@ export function cutChangelog(changelog, version, date, previousTag = null) {
   ].join("\n")
 }
 
+export function nightlyNotes({ entries, commits, previousTag, tag }) {
+  const lines = []
+  if (entries) lines.push("Changes since the last stable release:", "", entries, "")
+  lines.push(`Commits since ${previousTag}:`, "", commits.trim() || "- None", "")
+  lines.push(`Full comparison: ${REPOSITORY}/compare/${previousTag}...${tag}`, "")
+  return lines.join("\n")
+}
+
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"))
 const writeJson = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`)
 const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trim()
+const manifestPath = (workspace) => (workspace ? `${workspace}/package.json` : "package.json")
 
-function release(bump, options) {
-  const unknown = options.find((option) => !["--dry-run", "--push"].includes(option))
-  if (unknown) throw new Error(`Unknown option: ${unknown}`)
-  const dryRun = options.includes("--dry-run")
-  const push = options.includes("--push")
-  if (git("status", "--porcelain")) throw new Error("Commit or stash local changes first")
-  if (git("branch", "--show-current") !== "main") throw new Error("Release from main")
+/** The nearest release tag behind HEAD, stable or nightly. */
+function previousTag() {
+  try {
+    return git("describe", "--tags", "--abbrev=0", "--match", "v[0-9]*")
+  } catch {
+    return null
+  }
+}
 
+function plan(channel, now = new Date()) {
   const current = readJson("package.json").version
-  const version = nextVersion(current, bump)
-  if (git("tag", "--list", `v${version}`)) throw new Error(`Tag v${version} already exists`)
-  const date = new Date().toISOString().slice(0, 10)
-  const previousTag = git("tag", "--list", `v${current}`) || null
-  const changelog = cutChangelog(readFileSync("CHANGELOG.md", "utf8"), version, date, previousTag)
+  const previous = previousTag()
+  let version
+  let reason
+  if (channel === "stable") {
+    version = nextVersion(current)
+    if (!unreleasedEntries(readFileSync("CHANGELOG.md", "utf8"))) reason = "no Unreleased entries"
+  } else if (channel === "nightly") {
+    version = nightlyVersion(current, now)
+    const changed = previous
+      ? git("diff", "--name-only", previous, "HEAD").split("\n").filter(Boolean)
+      : ["(no earlier release)"]
+    if (!changed.some(isAppChange)) reason = `no app changes since ${previous}`
+  } else throw new Error("Plan stable or nightly")
+  if (!reason && git("tag", "--list", `v${version}`)) reason = `v${version} already exists`
+  return {
+    release: !reason,
+    reason: reason ?? `release ${version}`,
+    version,
+    tag: `v${version}`,
+    previous: previous ?? "",
+    prerelease: channel === "nightly",
+  }
+}
 
+function setVersion(version) {
+  if (!VERSION.test(version ?? "")) throw new Error(`${version} is not a release version`)
+  const current = readJson("package.json").version
   const lock = readJson("package-lock.json")
   const manifests = VERSIONED_WORKSPACES.map((workspace) => {
-    const path = workspace ? `${workspace}/package.json` : "package.json"
-    const manifest = readJson(path)
+    const manifest = readJson(manifestPath(workspace))
     if (manifest.version !== current || lock.packages[workspace]?.version !== current) {
-      throw new Error(`Version mismatch in ${path} or package-lock.json`)
+      throw new Error(`Version mismatch in ${manifestPath(workspace)} or package-lock.json`)
     }
-    return { path, manifest }
+    return manifest
   })
   if (lock.version !== current) throw new Error("Version mismatch in package-lock.json")
-
-  const classification =
-    version.startsWith("0.") && !version.endsWith(".0")
-      ? "prerelease (excluded from stable downloads and updates)"
-      : "normal release"
-  console.log(`${current} → ${version}: ${classification}\n\n${releaseNotes(changelog, version)}`)
-  const pushCommand = `git push --atomic origin main v${version}`
-  if (dryRun) {
-    console.log(`Preview only; no files, commits, tags, or remote refs changed.\n${pushCommand}`)
-    return
-  }
-  if (push) {
-    git("fetch", "--no-tags", "origin", "refs/heads/main")
-    if (git("rev-parse", "HEAD") !== git("rev-parse", "FETCH_HEAD")) {
-      throw new Error(
-        "Publish requires main to match origin/main. Push or integrate local commits first.",
-      )
-    }
-    if (git("ls-remote", "--tags", "origin", `refs/tags/v${version}`)) {
-      throw new Error(`Remote tag v${version} already exists`)
-    }
-  }
-
-  writeFileSync("CHANGELOG.md", changelog)
-  for (const { path, manifest } of manifests) writeJson(path, { ...manifest, version })
-  for (const workspace of VERSIONED_WORKSPACES) {
+  VERSIONED_WORKSPACES.forEach((workspace, index) => {
+    writeJson(manifestPath(workspace), { ...manifests[index], version })
     lock.packages[workspace].version = version
-  }
+  })
   lock.version = version
   writeJson("package-lock.json", lock)
+}
 
-  git("add", "CHANGELOG.md", "package.json", "apps/desktop/package.json", "package-lock.json")
+function cut(version) {
+  if (git("status", "--porcelain")) throw new Error("Commit or stash local changes first")
+  const current = readJson("package.json").version
+  if (version !== nextVersion(current)) throw new Error(`Expected ${nextVersion(current)}`)
+  if (git("tag", "--list", `v${version}`)) throw new Error(`Tag v${version} already exists`)
+  const date = new Date().toISOString().slice(0, 10)
+  const previous = git("tag", "--list", `v${current}`) || null
+  const changelog = cutChangelog(readFileSync("CHANGELOG.md", "utf8"), version, date, previous)
+  setVersion(version)
+  writeFileSync("CHANGELOG.md", changelog)
+  git("add", "CHANGELOG.md", "package-lock.json", ...VERSIONED_WORKSPACES.map(manifestPath))
   git("commit", "--quiet", "--message", `chore(release): v${version}`)
   git("tag", "--annotate", `v${version}`, "--message", `MeldShell ${version}`)
-  console.log(`Tagged v${version}. Publish with: ${pushCommand}`)
-  if (push) {
-    try {
-      git("push", "--atomic", "origin", "main", `v${version}`)
-    } catch {
-      throw new Error(
-        `Push failed; the release commit and tag are kept locally. Retry: ${pushCommand}`,
-      )
-    }
-    console.log(
-      `Pushed v${version}. Follow build and publication: ${REPOSITORY}/actions/workflows/release.yml`,
-    )
+  console.log(`Tagged v${version}`)
+}
+
+const changelogAt = (ref) =>
+  ref ? git("show", `${ref}:CHANGELOG.md`) : readFileSync("CHANGELOG.md", "utf8")
+
+function run(command, args) {
+  if (command === "plan") {
+    const result = plan(args[0])
+    return Object.entries(result)
+      .map(([key, value]) => `${key}=${value}\n`)
+      .join("")
   }
+  if (command === "set-version") return setVersion(args[0])
+  if (command === "cut") return cut(args[0])
+  if (command === "notes") return releaseNotes(changelogAt(args[1]), args[0])
+  if (command === "nightly-notes") {
+    const [previous, ref] = args
+    if (!previous || !ref) throw new Error("Pass the previous tag and the nightly ref")
+    return nightlyNotes({
+      entries: unreleasedEntries(changelogAt(ref)),
+      commits: git("log", "--no-merges", "--format=- %s (%h)", `${previous}..${ref}`),
+      previousTag: previous,
+      tag: ref,
+    })
+  }
+  throw new Error(
+    "Usage: node scripts/release.mjs plan <stable|nightly> | set-version X | cut X | notes X [ref] | nightly-notes <previous-tag> <ref>",
+  )
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try {
-    const [command, ...options] = process.argv.slice(2)
-    const [argument] = options
-    if (command === "notes")
-      process.stdout.write(releaseNotes(readFileSync("CHANGELOG.md", "utf8"), argument))
-    else if (command === "--help") {
-      console.log(
-        "Usage: npm run release -- <patch|minor|major|X.Y.Z> [--dry-run] [--push]\n       npm run release -- notes X.Y.Z\n--push cuts and pushes the release, triggering automatic publication.\n--dry-run previews locally without changes or network access; remote readiness is checked on --push.",
-      )
-    } else release(command, options)
+    const [command, ...args] = process.argv.slice(2)
+    const output = run(command, args)
+    if (typeof output === "string") process.stdout.write(output)
   } catch (error) {
     console.error(error instanceof Error ? error.message : error)
     process.exit(1)

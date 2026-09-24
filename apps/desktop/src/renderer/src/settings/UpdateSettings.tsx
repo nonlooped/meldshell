@@ -1,6 +1,6 @@
 import type { AppUpdateStatus } from "@meldshell/contracts"
 import { useEffect, useState } from "react"
-import { Button } from "../ui/controls"
+import { Button, Switch } from "../ui/controls"
 
 const buttonLabel = (status: AppUpdateStatus | null): string => {
   if (status === null) return "Loading..."
@@ -55,33 +55,65 @@ export function UpdateSettings(): React.JSX.Element {
     }
   }
 
+  const setNightly = async (nightly: boolean): Promise<void> => {
+    setActionError(null)
+    try {
+      setStatus(await window.meldshell.setUpdateChannel(nightly ? "nightly" : "stable"))
+    } catch (cause) {
+      setActionError(
+        cause instanceof Error ? cause.message : "Could not change the update channel.",
+      )
+    }
+  }
+
   return (
-    <div className="mt-[22px] flex items-start justify-between gap-[32px]">
-      <div className="min-w-0">
-        <h3 className="m-0 text-[13px] font-medium text-[var(--text-primary)]">Updates</h3>
-        <p
-          className="[margin:5px_0_0] text-[12px] text-[var(--text-tertiary)]"
-          role={status?.state === "error" || actionError !== null ? "alert" : "status"}
+    <>
+      <div className="mt-[22px] flex items-start justify-between gap-[32px]">
+        <div className="min-w-0">
+          <h3 className="m-0 text-[13px] font-medium text-[var(--text-primary)]">Updates</h3>
+          <p
+            className="[margin:5px_0_0] text-[12px] text-[var(--text-tertiary)]"
+            role={status?.state === "error" || actionError !== null ? "alert" : "status"}
+          >
+            {actionError ?? status?.message ?? "MeldShell checks GitHub Releases automatically."}
+          </p>
+          {status?.state === "downloading" && status.progressPercent !== null && (
+            <progress
+              className="mt-[10px] block h-[4px] w-[240px] max-w-full accent-[var(--accent)]"
+              value={status.progressPercent}
+              max={100}
+              aria-label="Update download progress"
+            />
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant={status?.state === "ready" ? "primary" : "default"}
+          disabled={busy || unavailable}
+          onClick={() => void runAction()}
         >
-          {actionError ?? status?.message ?? "MeldShell checks GitHub Releases automatically."}
-        </p>
-        {status?.state === "downloading" && status.progressPercent !== null && (
-          <progress
-            className="mt-[10px] block h-[4px] w-[240px] max-w-full accent-[var(--accent)]"
-            value={status.progressPercent}
-            max={100}
-            aria-label="Update download progress"
-          />
-        )}
+          {buttonLabel(status)}
+        </Button>
       </div>
-      <Button
-        size="sm"
-        variant={status?.state === "ready" ? "primary" : "default"}
-        disabled={busy || unavailable}
-        onClick={() => void runAction()}
-      >
-        {buttonLabel(status)}
-      </Button>
-    </div>
+      {status !== null && !unavailable && (
+        <div className="mt-[18px] flex items-start justify-between gap-[32px]">
+          <div className="min-w-0">
+            <h3 className="m-0 text-[13px] font-medium text-[var(--text-primary)]">
+              Nightly builds
+            </h3>
+            <p className="[margin:5px_0_0] text-[12px] text-[var(--text-tertiary)]">
+              Get an early build of new changes every hour. Nightlies are less tested than the daily
+              stable releases. Turning this off returns to the latest stable release.
+            </p>
+          </div>
+          <Switch
+            label="Nightly builds"
+            checked={status.channel === "nightly"}
+            disabled={busy}
+            onCheckedChange={(nightly) => void setNightly(nightly)}
+          />
+        </div>
+      )}
+    </>
   )
 }

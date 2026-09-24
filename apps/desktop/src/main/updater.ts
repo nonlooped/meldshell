@@ -1,4 +1,6 @@
-import type { AppUpdateStatus } from "@meldshell/contracts"
+import { readFileSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import type { AppUpdateStatus, UpdateChannel } from "@meldshell/contracts"
 import { app } from "electron"
 import electronUpdater, {
   type AppUpdater,
@@ -17,6 +19,7 @@ export class UpdateService {
   readonly #updater: AppUpdater
   readonly #enabled: boolean
   readonly #currentVersion: string
+  #channel: UpdateChannel
   readonly #listeners = new Set<StatusListener>()
   #interval: NodeJS.Timeout | null = null
   #status: AppUpdateStatus
@@ -27,15 +30,19 @@ export class UpdateService {
       readonly packaged: boolean
       readonly platform: NodeJS.Platform
       readonly version: string
+      readonly channel?: UpdateChannel
     },
   ) {
     this.#updater = updater
     this.#currentVersion = options.version
+    // A nightly install follows nightlies until told otherwise.
+    this.#channel = options.channel ?? (options.version.includes("-") ? "nightly" : "stable")
     const supported = options.platform === "win32" || options.platform === "linux"
     this.#enabled = options.packaged && supported
     this.#status = {
       state: this.#enabled ? "idle" : "unavailable",
       currentVersion: this.#currentVersion,
+      channel: this.#channel,
       availableVersion: null,
       progressPercent: null,
       message: options.packaged
@@ -48,7 +55,7 @@ export class UpdateService {
     if (!this.#enabled) return
     updater.autoDownload = true
     updater.autoInstallOnAppQuit = true
-    updater.allowPrerelease = false
+    this.#applyChannel()
     updater.on("checking-for-update", () => this.#setStatus("checking"))
     updater.on("update-available", (info: UpdateInfo) =>
       this.#setStatus("downloading", {
@@ -118,18 +125,51 @@ export class UpdateService {
     return this.#status
   }
 
+  /** Switches release channels and checks the new channel right away. */
+  async setChannel(channel: UpdateChannel): Promise<AppUpdateStatus> {
+    this.#channel = channel
+    this.#status = { ...this.#status, channel }
+    if (!this.#enabled) return this.#status
+    this.#applyChannel()
+    return this.check()
+  }
+
   install(): boolean {
     if (!this.#enabled || this.#status.state !== "ready") return false
     this.#updater.quitAndInstall(false, true)
     return true
   }
 
+  #applyChannel(): void {
+    // Nightlies are GitHub prereleases. Leaving the nightly channel installs the latest stable
+    // release even though it is older than the running nightly.
+    this.#updater.allowPrerelease = this.#channel === "nightly"
+    this.#updater.allowDowngrade = this.#channel === "stable" && this.#currentVersion.includes("-")
+  }
+
   #setStatus(
     state: AppUpdateStatus["state"],
     patch: Partial<Omit<AppUpdateStatus, "state" | "currentVersion">> = {},
   ): void {
-    this.#status = { ...this.#status, ...patch, state, currentVersion: this.#currentVersion }
+    this.#status = {
+      ...this.#status,
+      ...patch,
+      state,
+      currentVersion: this.#currentVersion,
+      channel: this.#channel,
+    }
     for (const listener of this.#listeners) listener(this.#status)
+  }
+}
+
+const channelFile = join(app.getPath("userData"), "update-channel.json")
+
+const readChannel = (): UpdateChannel | undefined => {
+  try {
+    const { channel } = JSON.parse(readFileSync(channelFile, "utf8"))
+    return channel === "stable" || channel === "nightly" ? channel : undefined
+  } catch {
+    return undefined
   }
 }
 
@@ -137,7 +177,13 @@ export const updateService = new UpdateService(autoUpdater, {
   packaged: app.isPackaged,
   platform: process.platform,
   version: app.getVersion(),
+  channel: readChannel(),
 })
+
+export const setUpdateChannel = (channel: UpdateChannel): Promise<AppUpdateStatus> => {
+  writeFileSync(channelFile, `${JSON.stringify({ channel })}\n`)
+  return updateService.setChannel(channel)
+}
 
 updateService.subscribe((status) => {
   const window = getMainWindow()

@@ -36,6 +36,6 @@ Regenerate changed Codex app-server schemas with the supported CLI and commit th
 
 ## Versions and changelog
 
-Add an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) with every user-visible change. Releases are cut with `npm run release`; see [versioning](docs/release.md#versioning).
+Add an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) with every user-visible change. Releases are cut automatically: a daily stable release publishes the Unreleased entries, and hourly nightlies publish new commits. See [the release guide](docs/release.md).
 
 For installer work, use the [release checklist](docs/release.md).

@@ -119,12 +119,14 @@ export function remoteApi(
     getUpdateStatus: async () => ({
       state: "unavailable",
       currentVersion: "",
+      channel: "stable",
       availableVersion: null,
       progressPercent: null,
       message: "Updates are managed on the host.",
     }),
     checkForUpdates: unsupported,
     installUpdate: unsupported,
+    setUpdateChannel: unsupported,
     closeApp: async () => {
       location.assign("/dashboard")
       return true
