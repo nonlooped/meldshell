@@ -15,7 +15,7 @@ User instructions take precedence over skills. Keep skills within the requested 
 - [Renderer styles](apps/desktop/src/renderer/src/app/styles.css): desktop UI changes. Renderer tokens and shared components own exact values.
 - [Markdown renderer](apps/desktop/src/renderer/src/ui/Markdown.tsx): Markdown, file references, diagrams, math, or rich output.
 - [Contributing](CONTRIBUTING.md): setup, check selection, or schema regeneration.
-- [Release](docs/release.md): versioning, changelog entries, installer preparation, and candidate certification.
+- [Release](docs/release.md): scheduled stable and nightly releases, versioning, changelog entries, installer preparation, and candidate certification.
 - [Site deployment configuration](apps/site/wrangler.jsonc) and [account worker configuration](apps/control/wrangler.jsonc): Cloudflare Pages, Worker, D1, and relay setup.
 - [Remote contracts](packages/contracts/src/remote.ts) and [account worker](apps/control/src/index.ts): accounts, relay, device linking, and headless hosts.
 
@@ -33,7 +33,7 @@ Report what changed, what was checked, and any remaining failure or verification
 
 ## Changelog
 
-A user-visible change adds an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) in the same change. Do not edit released sections or version fields by hand; `npm run release` does that.
+A user-visible change adds an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) in the same change. Do not edit released sections or version fields by hand; the scheduled [Release](.github/workflows/release.yml) workflow does that.
 
 ## Dependency documentation
 

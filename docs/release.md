@@ -2,43 +2,43 @@
 
 Use this checklist for an installer candidate. Routine edits follow [AGENTS.md](../AGENTS.md#verification). A recorded result applies only to its exact artifact.
 
-## Usual release path
+## Automatic releases
 
-1. Commit the intended changes and Unreleased entries, and push `main`.
-2. If account API or relay behavior changed, complete the [remote service cutover](#remote-service-cutover).
-3. Optionally preview with `npm run release -- minor --dry-run` (use `patch` for fixes or an explicit version).
-4. Run `npm run release -- minor --push`. This cuts the release and pushes the commit and tag together. The printed Actions link shows builds and publication; agent monitoring follows the [repository verification policy](../AGENTS.md#verification).
+Nobody cuts releases by hand. The [Release](../.github/workflows/release.yml) workflow runs on a schedule from `main`:
 
-The preview prints the release notes and whether the version reaches stable downloads. It changes nothing and does not check the remote. Publishing requires a clean `main` matching freshly fetched `origin/main`, consistent version fields, Unreleased entries, and an unused version tag. If pushing fails after the cut, the script retains the local commit/tag and prints the exact push command to retry; do not bump again.
+- **Stable**, daily at 00:17 UTC: if [CHANGELOG.md](../CHANGELOG.md) has `## [Unreleased]` entries, it releases them as the next minor version (`0.9.0` → `0.10.0`). It moves the entries under the new version and date, bumps every version field, pushes `chore(release): vX.Y.0` to `main` with an annotated tag, and publishes the GitHub Release as the latest release. Days without Unreleased entries release nothing.
+- **Nightly**, hourly at minute 47: if files outside `docs/`, `.github/`, and Markdown changed since the nearest release tag, stable or nightly, it publishes a prerelease `vX.Y.0-nightly.YYYYMMDDHHMM` of the upcoming minor version. The version is set only in the build; nothing is committed, and the tag points at the `main` commit. Its notes list the Unreleased entries and the commits since the previous release. Nightlies are never marked latest and are kept.
 
-The tag workflow owns full automated validation and packaging. Routine releases do not need duplicate local builds or suites before tagging. Use the candidate path below when installer or runtime changes need manual evidence. Keep the manual matrix as the coverage reference and record skipped cases; a routine release does not imply that every manual case was certified.
+Each release runs the full [CI](../.github/workflows/ci.yml) suite and packages both platforms from the same commit. It is tagged and published only if everything passes, so a failure leaves no tag, commit, or release. The schedule does not retry a commit whose release failed. A new commit on `main`, a rerun, or a manual run with the same channel does.
+
+The stable job pushes its release commit only as a fast-forward of the commit it tested. If `main` moved during the run, the push fails, nothing is published, and the next day's run releases the newer commit. A rerun after a failed upload reuses the tag it already pushed and refuses to change a published release.
+
+To release now, run the workflow from the Actions tab with `stable` or `nightly`. `build-only` packages installers from any ref as seven-day workflow artifacts without releasing. GitHub disables scheduled workflows in a public repository after 60 days without repository activity; re-enable Release from the Actions tab if that happens.
+
+If account API or relay behavior changed, complete the [remote service cutover](#remote-service-cutover) before the next scheduled stable release. Routine releases do not need local builds or suites. Use the candidate path below when installer or runtime changes need manual evidence. Keep the manual matrix as the coverage reference and record skipped cases; a routine release does not imply that every manual case was certified.
 
 ## Remote service cutover
 
-When a release changes the account API or relay, put the compatible site and account worker in production before tagging a desktop build that points to them. The Worker configuration is [apps/control/wrangler.jsonc](../apps/control/wrangler.jsonc), and the Pages configuration is [apps/site/wrangler.jsonc](../apps/site/wrangler.jsonc).
+When a release changes the account API or relay, put the compatible site and account worker in production before the scheduled release of a desktop build that points to them. The Worker configuration is [apps/control/wrangler.jsonc](../apps/control/wrangler.jsonc), and the Pages configuration is [apps/site/wrangler.jsonc](../apps/site/wrangler.jsonc).
 
 1. Confirm the D1 database ID and configure the Worker secrets: `BETTER_AUTH_SECRET` (at least 32 characters), plus both client ID and secret for at least one of Google or Discord. Register `https://meldshell.nonlooped.xyz/api/auth/callback/google` and `https://meldshell.nonlooped.xyz/api/auth/callback/discord` with the respective providers you enable.
 2. Apply D1 migrations and deploy the account Worker with `npm run deploy --workspace=@meldshell/control`. This command changes the production database; review its pending migrations first.
 3. Build the site with `npm run build --workspace=@meldshell/site`, then deploy `apps/site/dist` to the `meldshell` Pages project. Its `/api/*` Function needs the `CONTROL` service binding to `meldshell-control`.
-4. Route `meldshell.nonlooped.xyz` to Pages. Confirm `/api/remote/v1/config` returns the enabled providers, and complete a real sign-in and device link before tagging. A successful static home page alone does not verify the account API.
+4. Route `meldshell.nonlooped.xyz` to Pages. Confirm `/api/remote/v1/config` returns the enabled providers, and complete a real sign-in and device link before that release. A successful static home page alone does not verify the account API.
 
 ## Versioning
 
-MeldShell has one app version, kept in the root and desktop `package.json` files and the lockfile. Tags are `vX.Y.Z` and follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0.0, a minor bump marks new features or incompatible changes to stored data, settings, or remote protocols, and a patch bump marks fixes only. 1.0.0 marks the first public release.
+MeldShell has one app version, kept in the root and desktop `package.json` files and the lockfile. Tags are `vX.Y.Z` for stable releases and `vX.Y.Z-nightly.YYYYMMDDHHMM` for nightlies, following [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every stable release bumps the minor version; a nightly precedes the stable release it leads up to. A major version, such as 1.0.0 for the first public release, needs a change to [scripts/release.mjs](../scripts/release.mjs).
 
-Every user-visible change adds an entry under `## [Unreleased]` in [CHANGELOG.md](../CHANGELOG.md), using the Keep a Changelog groups `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Write each entry for users, not in terms of the implementation. Internal refactors, tests, CI, and documentation need no entry.
+Every user-visible change adds an entry under `## [Unreleased]` in [CHANGELOG.md](../CHANGELOG.md), using the Keep a Changelog groups `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Write each entry for users, not in terms of the implementation. Internal refactors, tests, CI, and documentation need no entry. A change without an entry still reaches nightlies but does not start a stable release. A [test](../tests/changelog.test.ts) keeps the version fields and changelog consistent.
 
-Before 1.0.0, `0.x.0` tags publish as normal GitHub Releases and `0.x.y` tags with `y > 0` publish as prereleases. Prereleases are not the latest stable download or update.
+## Updates
 
-To cut a release from a clean, up-to-date `main`, run `npm run release -- <patch|minor|major|X.Y.Z>`. The script moves the Unreleased entries under the new version and date, bumps every version field, commits `chore(release): vX.Y.Z`, and creates an annotated tag. Add `--push` to also publish the commit and tag, or push both later with `git push --atomic origin main vX.Y.Z`. A [test](../tests/changelog.test.ts) keeps the version fields and changelog consistent.
+Installed builds check GitHub Releases every four hours. Stable installs follow the latest stable release. Settings › About › **Nightly builds** switches to the nightly channel, which follows GitHub prereleases. A nightly install follows nightlies by default. Turning the switch off installs the latest stable release even though it is older. The choice is stored in `update-channel.json` in the app's user data folder.
 
 ## Build and assemble
 
-[Release](../.github/workflows/release.yml) runs for a stable `vX.Y.Z` tag on `main` that matches the app version and has changelog entries. It runs the full [CI](../.github/workflows/ci.yml) suite while native Windows and Linux runners package NSIS x64 and AppImage x64 artifacts. Once both pass, the final job verifies the installers and updater metadata, stages them with blockmaps and SHA256SUMS in a draft, then publishes the release with the version's changelog entries and the classification above. A failed upload leaves the draft unpublished.
-
-If the checks or packaging fail, the final job still publishes the version's changelog entries as a release without installers, with a warning linking to the failed run. It is never marked latest, so the updater, which follows the latest release, stays on the previous installers. A rerun that succeeds adds the installers to that release and publishes it normally. A fix that needs a new commit needs a new version; the notes-only release stays for the failed one.
-
-Running the workflow manually from the Actions tab packages installers from any ref as seven-day workflow artifacts without creating a release; use it to test packaging and applicable manual flows before tagging. A rerun can replace draft assets but refuses to overwrite a published release that has installers. Tagging starts automatic publication after the checks pass; perform it within the authorization for the release task.
+Native Windows and Linux runners package NSIS x64 and AppImage x64 artifacts while CI runs. The publish job verifies the installers and updater metadata, then stages them with blockmaps and SHA256SUMS in a draft before publishing it. Nightlies also carry `nightly.yml` and `nightly-linux.yml`, copies of the `latest` metadata that the updater reads for a prerelease. A failed upload leaves the draft unpublished.
 
 For a local candidate:
 
@@ -46,9 +46,9 @@ For a local candidate:
 2. Install with `npm ci`. For full local candidate validation, run `npm run knip`, `npm run check:fast`, and `npm test` once. The packaging command in the next step includes the desktop build. When using workflow artifacts, use the workflow's automated verdict instead of repeating these checks locally.
 3. Run `npm run package:win` on Windows or `npm run package:linux` on Linux.
 4. Inspect the repository-root `release` output. Confirm SQLite loads outside ASAR and no Claude Code native executable is packaged.
-5. Record hashes and complete the applicable manual matrix against those exact artifacts before tagging. Results from a pretag build apply only to that build; record any checks on the published installers separately.
+5. Record hashes and complete the applicable manual matrix against those exact artifacts. Results from a local or `build-only` build apply only to that build; record any checks on the published installers separately.
 
-Keep each installer/AppImage with the `latest.yml` or `latest-linux.yml` produced by the same build. The workflow publishes both platforms together after automated verification. Installed applications cannot use draft assets; public downloads and updates need a publicly accessible destination. Never embed a GitHub access token in the app.
+Keep each installer/AppImage with the `latest.yml` or `latest-linux.yml` produced by the same build. Installed applications cannot use draft assets; public downloads and updates need a publicly accessible destination. Never embed a GitHub access token in the app.
 
 Configuration lives in [electron-builder.yml](../apps/desktop/electron-builder.yml). Pull requests and `main` pushes run [CI](../.github/workflows/ci.yml): static checks, Linux build and tests, and Windows tests. It skips documentation-only changes.
 

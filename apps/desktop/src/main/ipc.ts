@@ -7,7 +7,7 @@ import { hostOperations } from "@meldshell/host/api"
 import { desktopHost } from "./runtime/services"
 import { confirmAndClose, markInstallingUpdate, prepareToClose } from "./runtime/shutdown"
 import { getMainWindow, applyAppearance } from "./window"
-import { updateService } from "./updater"
+import { setUpdateChannel, updateService } from "./updater"
 import { getWebPageTitle } from "./web-page-title"
 import { registerTerminalIpc } from "./terminals"
 import { registerEditorIpc } from "./editors"
@@ -99,6 +99,10 @@ export const registerIpc = (): void => {
   ipcMain.handle(IPC.closeApp, () => Effect.runPromise(confirmAndClose))
   ipcMain.handle(IPC.getUpdateStatus, () => updateService.status)
   ipcMain.handle(IPC.checkForUpdates, () => updateService.check())
+  ipcMain.handle(IPC.setUpdateChannel, (_event, channel: unknown) => {
+    if (channel !== "stable" && channel !== "nightly") throw new Error("Unknown update channel")
+    return setUpdateChannel(channel)
+  })
   ipcMain.handle(IPC.installUpdate, async () => {
     if (updateService.status.state !== "ready") return false
     if (!(await Effect.runPromise(prepareToClose))) return false

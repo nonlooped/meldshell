@@ -7,12 +7,9 @@ import test from "node:test"
 import { fileURLToPath } from "node:url"
 
 const script = fileURLToPath(new URL("../scripts/release.mjs", import.meta.url))
-function fixture(t) {
-  const root = mkdtempSync(join(tmpdir(), "meldshell-release-"))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const cwd = join(root, "work")
-  const remote = join(root, "remote.git")
-  mkdirSync(cwd)
+function fixture(t, entries = "- A fix.\n\n") {
+  const cwd = mkdtempSync(join(tmpdir(), "meldshell-release-"))
+  t.after(() => rmSync(cwd, { recursive: true, force: true }))
   const git = (...args) =>
     execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
   git("init", "--initial-branch=main")
@@ -20,7 +17,7 @@ function fixture(t) {
   git("config", "user.email", "release@example.test")
   git("config", "commit.gpgsign", "false")
   git("config", "tag.gpgsign", "false")
-  git("config", "core.hooksPath", join(root, "no-hooks"))
+  git("config", "core.hooksPath", join(cwd, ".git", "no-hooks"))
   mkdirSync(join(cwd, "apps/desktop"), { recursive: true })
   for (const path of ["package.json", "apps/desktop/package.json"]) {
     writeFileSync(join(cwd, path), JSON.stringify({ version: "0.1.0" }))
@@ -34,76 +31,84 @@ function fixture(t) {
   )
   writeFileSync(
     join(cwd, "CHANGELOG.md"),
-    "# Changelog\n\n## [Unreleased]\n\n- A fix.\n\n[Unreleased]: https://example.test\n",
+    `# Changelog\n\n## [Unreleased]\n\n${entries}[Unreleased]: https://example.test\n`,
   )
   git("add", ".")
   git("commit", "-m", "Initial")
-  git("init", "--bare", remote)
-  git("remote", "add", "origin", remote)
-  git("push", "origin", "main")
+  git("tag", "v0.1.0")
   const run = (...args) => spawnSync(process.execPath, [script, ...args], { cwd, encoding: "utf8" })
-  return { cwd, remote, git, run }
+  const plan = (channel) => {
+    const result = run("plan", channel)
+    assert.equal(result.status, 0, result.stderr)
+    return Object.fromEntries(
+      result.stdout
+        .trim()
+        .split("\n")
+        .map((line) => line.split(/=(.*)/)),
+    )
+  }
+  const commit = (path, message) => {
+    writeFileSync(join(cwd, path), message)
+    git("add", path)
+    git("commit", "-m", message)
+  }
+  return { cwd, git, run, plan, commit }
 }
 
-test("preview is read-only and reports the release channel", (t) => {
-  const { git, run } = fixture(t)
-  const before = git("rev-parse", "HEAD")
-  const result = run("patch", "--dry-run", "--push")
-  assert.equal(result.status, 0, result.stderr)
-  assert.match(result.stdout, /prerelease/)
-  assert.equal(git("rev-parse", "HEAD"), before)
-  assert.equal(git("status", "--porcelain"), "")
-  assert.equal(git("tag", "--list"), "")
-  assert.equal(git("ls-remote", "--tags", "origin"), "")
+test("a stable release is planned only when the changelog has Unreleased entries", (t) => {
+  const withEntries = fixture(t).plan("stable")
+  assert.equal(withEntries.release, "true")
+  assert.equal(withEntries.version, "0.2.0")
+  assert.equal(withEntries.tag, "v0.2.0")
+  assert.equal(withEntries.prerelease, "false")
+  const without = fixture(t, "").plan("stable")
+  assert.equal(without.release, "false")
+  assert.match(without.reason, /no Unreleased entries/)
 })
 
-test("push cuts consistent manifests, notes, and an annotated remote tag", (t) => {
+test("a nightly is planned only when app files changed since the last release", (t) => {
+  const { plan, commit } = fixture(t)
+  assert.equal(plan("nightly").release, "false")
+  commit("README.md", "docs: explain")
+  assert.equal(plan("nightly").release, "false")
+  commit("main.ts", "feat: work")
+  const nightly = plan("nightly")
+  assert.equal(nightly.release, "true")
+  assert.match(nightly.version, /^0\.2\.0-nightly\.\d{12}$/)
+  assert.equal(nightly.previous, "v0.1.0")
+  assert.equal(nightly.prerelease, "true")
+})
+
+test("set-version writes every version field without committing", (t) => {
   const { cwd, git, run } = fixture(t)
-  const result = run("minor", "--push")
+  const result = run("set-version", "0.2.0-nightly.202609250507")
   assert.equal(result.status, 0, result.stderr)
-  assert.match(result.stdout, /normal release/)
+  for (const path of ["package.json", "apps/desktop/package.json", "package-lock.json"]) {
+    assert.equal(JSON.parse(readFileSync(join(cwd, path))).version, "0.2.0-nightly.202609250507")
+  }
+  assert.equal(git("log", "--oneline").split("\n").length, 1)
+  assert.match(run("set-version", "0.2").stderr, /not a release version/)
+})
+
+test("cut commits consistent manifests and notes under an annotated tag", (t) => {
+  const { cwd, git, run } = fixture(t)
+  const result = run("cut", "0.2.0")
+  assert.equal(result.status, 0, result.stderr)
   assert.equal(git("status", "--porcelain"), "")
   assert.equal(git("cat-file", "-t", "v0.2.0"), "tag")
-  assert.equal(
-    git("ls-remote", "origin", "refs/heads/main").split(/\s/)[0],
-    git("rev-parse", "HEAD"),
-  )
-  assert.match(git("ls-remote", "--tags", "origin"), /refs\/tags\/v0.2.0/)
+  assert.equal(git("log", "-1", "--format=%s"), "chore(release): v0.2.0")
   for (const path of ["package.json", "apps/desktop/package.json", "package-lock.json"]) {
     assert.equal(JSON.parse(readFileSync(join(cwd, path))).version, "0.2.0")
   }
-  assert.equal(run("notes", "0.2.0").stdout, "- A fix.\n")
+  assert.equal(run("notes", "0.2.0", "v0.2.0").stdout, "- A fix.\n")
+  assert.equal(run("plan", "stable").stdout.match(/^release=(.*)$/m)[1], "false")
 })
 
-test("invalid options and unpublished main commits fail before mutation", (t) => {
+test("cut refuses anything but the next minor version", (t) => {
   const { git, run } = fixture(t)
-  assert.match(run("patch", "--psuh").stderr, /Unknown option/)
-  git("commit", "--allow-empty", "-m", "Unpublished")
-  const before = git("rev-parse", "HEAD")
-  assert.match(run("patch", "--push").stderr, /match origin\/main/)
-  assert.equal(git("rev-parse", "HEAD"), before)
+  assert.match(run("cut", "0.1.1").stderr, /Expected 0\.2\.0/)
+  assert.equal(git("tag", "--list"), "v0.1.0")
   assert.equal(git("status", "--porcelain"), "")
-  assert.equal(git("tag", "--list"), "")
-})
-
-test("rejected push preserves the local release and gives a retry command", (t) => {
-  const { remote, git, run } = fixture(t)
-  writeFileSync(join(remote, "hooks/pre-receive"), "#!/bin/sh\nexit 1\n", { mode: 0o755 })
-  const remoteBefore = git("ls-remote", "origin", "refs/heads/main")
-  const result = run("patch", "--push")
-  assert.equal(result.status, 1)
-  assert.match(result.stderr, /Retry: git push --atomic origin main v0.1.1/)
-  assert.equal(git("cat-file", "-t", "v0.1.1"), "tag")
-  assert.equal(git("ls-remote", "origin", "refs/heads/main"), remoteBefore)
-})
-
-test("local-only release remains available without a remote", (t) => {
-  const { git, run } = fixture(t)
-  git("remote", "remove", "origin")
-  const result = run("patch")
-  assert.equal(result.status, 0, result.stderr)
-  assert.equal(git("cat-file", "-t", "v0.1.1"), "tag")
-  assert.match(result.stdout, /Publish with: git push --atomic origin main v0.1.1/)
 })
 
 test("manifest mismatch fails without partially cutting the changelog", (t) => {
@@ -112,19 +117,17 @@ test("manifest mismatch fails without partially cutting the changelog", (t) => {
   git("add", ".")
   git("commit", "-m", "Mismatched version")
   const before = git("rev-parse", "HEAD")
-  assert.match(run("patch").stderr, /Version mismatch/)
+  assert.match(run("cut", "0.2.0").stderr, /Version mismatch/)
   assert.equal(git("rev-parse", "HEAD"), before)
   assert.equal(git("status", "--porcelain"), "")
 })
 
-test("existing remote release tags are rejected before cutting", (t) => {
-  const { git, run } = fixture(t)
-  git("tag", "v0.1.1")
-  git("push", "origin", "v0.1.1")
-  git("tag", "--delete", "v0.1.1")
-  const before = git("rev-parse", "HEAD")
-  assert.match(run("patch", "--push").stderr, /Remote tag v0.1.1 already exists/)
-  assert.equal(git("rev-parse", "HEAD"), before)
-  assert.equal(git("status", "--porcelain"), "")
-  assert.equal(git("tag", "--list"), "")
+test("nightly notes summarize commits since the previous release", (t) => {
+  const { git, run, commit } = fixture(t)
+  commit("main.ts", "feat: work")
+  git("tag", "v0.2.0-nightly.202609250507")
+  const result = run("nightly-notes", "v0.1.0", "v0.2.0-nightly.202609250507")
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /Changes since the last stable release:\n\n- A fix\./)
+  assert.match(result.stdout, /Commits since v0\.1\.0:\n\n- feat: work \([0-9a-f]+\)/)
 })
