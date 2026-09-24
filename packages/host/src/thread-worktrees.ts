@@ -93,32 +93,37 @@ export const createThread = (input: CreateThreadInput) =>
   })
 
 /**
- * Moves a thread that has not started onto its own branch, or back to the workspace folder. Going
- * back deletes the unused branch; uncommitted files in the worktree block it.
+ * Moves a thread that has not started to another workspace, onto its own branch, or both. A replaced
+ * worktree and its unused branch are deleted; uncommitted files in that worktree block the move.
  */
-export const setThreadIsolated = (input: {
+export const setDraftLocation = (input: {
   readonly threadId: string
-  readonly isolated: boolean
+  readonly workspaceId?: string | undefined
+  readonly isolated?: boolean | undefined
 }) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
     const location = yield* core.GetThreadLocation({ threadId: input.threadId })
     const current = location.worktree?.state === "removed" ? null : location.worktree
-    if (input.isolated) {
-      if (current !== null) return yield* core.GetSnapshot()
-      return yield* withNewWorktree(location.workspacePath, (worktree) =>
-        core.SetDraftWorktree({ threadId: input.threadId, worktree }),
-      )
-    }
-    if (current === null) return yield* core.GetSnapshot()
+    const workspaceId = input.workspaceId ?? location.workspaceId
+    const isolated = input.isolated ?? current !== null
+    if (workspaceId === location.workspaceId && isolated === (current !== null))
+      return yield* core.GetSnapshot()
     if (yield* hasUncommittedWork(location))
       return yield* Effect.fail(
-        new Error("This thread's worktree has uncommitted changes, so it was kept."),
+        new Error("This thread's worktree has uncommitted changes, so it stays where it is."),
       )
-    const snapshot = yield* core.SetDraftWorktree({ threadId: input.threadId, worktree: null })
-    yield* attempt(() =>
-      removeWorktree(location.workspacePath, current, { force: false, deleteBranch: true }),
-    ).pipe(Effect.catchAll(Effect.logError))
+    const workspacePath = yield* scopePath({ workspaceId })
+    const record = { threadId: input.threadId, workspaceId }
+    const snapshot = isolated
+      ? yield* withNewWorktree(workspacePath, (worktree) =>
+          core.SetDraftLocation({ ...record, worktree }),
+        )
+      : yield* core.SetDraftLocation({ ...record, worktree: null })
+    if (current !== null)
+      yield* attempt(() =>
+        removeWorktree(location.workspacePath, current, { force: false, deleteBranch: true }),
+      ).pipe(Effect.catchAll(Effect.logError))
     return snapshot
   })
 

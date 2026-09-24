@@ -13,7 +13,7 @@ export {
   getThreadLocation,
   listWorktreeThreads,
   setWorktreeState,
-  setDraftWorktree,
+  setDraftLocation,
 } from "./threads"
 export { refreshTranscriptSearch, searchTranscripts } from "./search"
 export {

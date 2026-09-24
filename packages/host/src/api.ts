@@ -26,7 +26,7 @@ import {
   removeThreadWorktree,
   removeWorkspace,
   scopePath,
-  setThreadIsolated,
+  setDraftLocation,
 } from "./thread-worktrees"
 
 type Operation = {
@@ -72,10 +72,14 @@ export const hostOperations: Record<string, Operation> = {
   ),
   [C.IPC.removeWorkspace]: operation(Schema.String, false, removeWorkspace),
   [C.IPC.getWorktreeStatus]: operation(Schema.String, true, getWorktreeStatus),
-  [C.IPC.setThreadIsolated]: operation(
-    Schema.Struct({ threadId: Schema.String, isolated: Schema.Boolean }),
+  [C.IPC.setDraftLocation]: operation(
+    Schema.Struct({
+      threadId: Schema.String,
+      workspaceId: Schema.optional(Schema.String),
+      isolated: Schema.optional(Schema.Boolean),
+    }),
     false,
-    setThreadIsolated,
+    setDraftLocation,
   ),
   [C.IPC.mergeWorktree]: operation(Schema.String, false, mergeThreadWorktree),
   [C.IPC.removeWorktree]: operation(
