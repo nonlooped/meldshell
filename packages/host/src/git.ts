@@ -11,7 +11,7 @@ import type {
 
 const MAX_BYTES = 2 * 1024 * 1024
 
-async function git(cwd: string, args: string[], timeout = 15_000): Promise<string> {
+export async function git(cwd: string, args: string[], timeout = 15_000): Promise<string> {
   const directory = await stat(cwd).catch(() => null)
   if (!directory?.isDirectory()) throw new Error(`Git working directory is unavailable: ${cwd}`)
   return new Promise((resolve, reject) => {
@@ -71,7 +71,7 @@ async function repository(
   return { root, head, branch }
 }
 
-const statusAt = async (root: string): Promise<GitChange[]> =>
+export const statusAt = async (root: string): Promise<GitChange[]> =>
   parseStatus(await git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]))
 
 export async function getGitSnapshot(workspacePath: string, limit: number): Promise<GitSnapshot> {
@@ -199,7 +199,7 @@ export async function getGitCommitDiff(workspacePath: string, hash: string): Pro
 
 // Serialize writes across workspaces that resolve to the same repository.
 const writes = new Map<string, Promise<void>>()
-async function writeRepository(
+export async function writeRepository(
   workspacePath: string,
   operation: (root: string) => Promise<void>,
 ): Promise<void> {
@@ -268,7 +268,30 @@ export async function gitCommit(workspacePath: string, message: string): Promise
 
 export async function gitPush(workspacePath: string): Promise<void> {
   await writeRepository(workspacePath, async (root) => {
-    await git(root, ["push"], 120_000)
+    const upstream = await git(root, ["rev-parse", "--abbrev-ref", "@{upstream}"]).then(
+      () => true,
+      () => false,
+    )
+    if (upstream) {
+      await git(root, ["push"], 120_000)
+      return
+    }
+    // A new branch, such as a thread's worktree branch, publishes to the only or `origin` remote.
+    const branch = await git(root, ["symbolic-ref", "--short", "HEAD"]).then(
+      (value) => value.trim(),
+      () => {
+        throw new Error("Check out a branch before pushing.")
+      },
+    )
+    const remotes = (await git(root, ["remote"])).split("\n").filter(Boolean)
+    const remote = remotes.includes("origin") ? "origin" : remotes.length === 1 ? remotes[0] : null
+    if (remote === null || remote === undefined)
+      throw new Error(
+        remotes.length === 0
+          ? "This repository has no remote to push to."
+          : `Set an upstream for ${branch} before pushing; there are several remotes.`,
+      )
+    await git(root, ["push", "--set-upstream", remote, branch], 120_000)
   })
 }
 

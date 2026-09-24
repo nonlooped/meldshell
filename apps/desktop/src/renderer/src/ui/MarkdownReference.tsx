@@ -3,8 +3,9 @@ import type { Element } from "hast"
 import { useQuery } from "@tanstack/react-query"
 import { ContentTooltip } from "./controls"
 import { BookOpen, Globe } from "lucide-react"
-import type { Workspace } from "@meldshell/contracts"
+import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { useTabStore } from "../app/tab-store"
+import { scopeKey } from "../data/workspace-scope"
 import { FileIcon } from "./FileIcon"
 import { SourceCode } from "./SourceCode"
 import {
@@ -16,7 +17,8 @@ import {
 } from "./markdown-model"
 import { MarkdownSearch } from "./MarkdownBlocks"
 
-export const MarkdownWorkspace = createContext<Workspace | undefined>(undefined)
+/** The folder that file references in rendered Markdown resolve against. */
+export const MarkdownWorkspace = createContext<WorkspaceScope | undefined>(undefined)
 export const MarkdownSources = createContext<ReadonlyMap<string, string>>(new Map())
 
 function SearchText({ text }: { text: string }) {
@@ -38,14 +40,14 @@ function SearchText({ text }: { text: string }) {
 
 function ReferenceExcerpt({
   reference,
-  workspaceId,
+  scope,
 }: {
   reference: FileReference
-  workspaceId: string
+  scope: WorkspaceScope
 }) {
   const query = useQuery({
-    queryKey: ["workspace-file", workspaceId, reference.path],
-    queryFn: () => window.meldshell.readWorkspaceFile({ workspaceId, path: reference.path }),
+    queryKey: ["workspace-file", ...scopeKey(scope), reference.path],
+    queryFn: () => window.meldshell.readWorkspaceFile({ ...scope, path: reference.path }),
     staleTime: 30_000,
     retry: false,
   })
@@ -71,7 +73,7 @@ function ReferenceExcerpt({
 }
 
 export function ReferenceChip({ reference, label }: { reference: FileReference; label?: string }) {
-  const workspace = useContext(MarkdownWorkspace)
+  const scope = useContext(MarkdownWorkspace)
   const openFile = useTabStore((state) => state.openFile)
   const [open, setOpen] = useState(false)
   const name = reference.path.split("/").at(-1) ?? reference.path
@@ -92,7 +94,7 @@ export function ReferenceChip({ reference, label }: { reference: FileReference; 
       )}
     </>
   )
-  if (!workspace)
+  if (!scope)
     return (
       <span className={referenceChipClasses} title={title}>
         {content}
@@ -108,14 +110,14 @@ export function ReferenceChip({ reference, label }: { reference: FileReference; 
           type="button"
           className={referenceChipClasses}
           aria-label={`Open ${title}`}
-          onClick={() => openFile(workspace.id, reference.path, reference.line, reference.endLine)}
+          onClick={() => openFile(scope, reference.path, reference.line, reference.endLine)}
         >
           {content}
         </button>
       }
     >
       <span>{title}</span>
-      {open && <ReferenceExcerpt reference={reference} workspaceId={workspace.id} />}
+      {open && <ReferenceExcerpt reference={reference} scope={scope} />}
     </ContentTooltip>
   )
 }

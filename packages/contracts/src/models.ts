@@ -12,6 +12,18 @@ export type Workspace = typeof Workspace.Type
 
 const ThreadStatus = Schema.Literal("active", "settled")
 
+/** A thread's own branch and checkout, created from the workspace so parallel threads cannot collide. */
+export const ThreadWorktree = Schema.Struct({
+  path: Schema.String,
+  branch: Schema.String,
+  /** The branch the workspace had checked out when the thread began, or null when it was detached. */
+  baseBranch: Schema.NullOr(Schema.String),
+  /** `missing` means the folder disappeared outside MeldShell; `removed` means MeldShell removed it. */
+  state: Schema.Literal("ready", "missing", "removed"),
+})
+
+export type ThreadWorktree = typeof ThreadWorktree.Type
+
 export const Thread = Schema.Struct({
   id: Schema.String,
   workspaceId: Schema.String,
@@ -31,6 +43,7 @@ export const Thread = Schema.Struct({
   ),
   queuedCount: Schema.Number,
   turnCount: Schema.Number,
+  worktree: Schema.optional(ThreadWorktree),
 })
 
 export type Thread = typeof Thread.Type
@@ -406,9 +419,32 @@ export type CodexUsage = typeof CodexUsage.Type
 export const CreateThreadInput = Schema.Struct({
   workspaceId: Schema.String,
   title: Schema.optional(Schema.String),
+  /** Gives the thread its own branch and worktree instead of the workspace checkout. */
+  isolated: Schema.optional(Schema.Boolean),
 })
 
 export type CreateThreadInput = typeof CreateThreadInput.Type
+
+/** The core's record of a new thread. Only the host chooses worktree paths, after creating them. */
+export const RecordThreadInput = Schema.Struct({
+  workspaceId: Schema.String,
+  title: Schema.optional(Schema.String),
+  worktree: Schema.optional(ThreadWorktree.pipe(Schema.omit("state"))),
+})
+
+export type RecordThreadInput = typeof RecordThreadInput.Type
+
+/** Where a thread's files live, for host operations that need the folder rather than the row. */
+export const ThreadLocation = Schema.Struct({
+  threadId: Schema.String,
+  workspaceId: Schema.String,
+  workspacePath: Schema.String,
+  worktree: Schema.NullOr(ThreadWorktree),
+  /** A turn is running or input is queued, so the folder must stay where it is. */
+  busy: Schema.Boolean,
+})
+
+export type ThreadLocation = typeof ThreadLocation.Type
 
 export const SetThreadTitleInput = Schema.Struct({
   threadId: Schema.String,

@@ -16,10 +16,11 @@ export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide })
   // The whole file comes back so unchanged runs can be expanded in place. Git is polled, so the
   // view follows edits without a manual refresh.
   const query = useQuery({
-    queryKey: ["git-diff", file.workspaceId, file.path, side, "full"],
+    queryKey: ["git-diff", file.workspaceId, file.threadId ?? null, file.path, side, "full"],
     queryFn: () =>
       window.meldshell.getGitDiff({
         workspaceId: file.workspaceId,
+        threadId: file.threadId,
         path: file.path,
         side,
         context: "full",

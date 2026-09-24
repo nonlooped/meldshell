@@ -15,6 +15,7 @@ import { Toggle } from "@base-ui-components/react/toggle"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Button, IconButton } from "../ui/controls"
 import type { CanonicalEvent, Workspace } from "@meldshell/contracts"
+import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { TurnChanges } from "./TurnChanges"
 import { ToolOutput } from "./ToolOutput"
@@ -535,12 +536,18 @@ export function Transcript({
   threadId,
   targetTurnId,
   workspace,
+  scope,
+  branch,
   running = false,
 }: {
   readonly running?: boolean
   readonly targetTurnId?: string
   readonly threadId: string
   readonly workspace?: Workspace
+  /** Where file references resolve; a worktree thread reads its own checkout. */
+  readonly scope?: WorkspaceScope
+  /** The thread's own branch when it works in a worktree. */
+  readonly branch?: string
 }): React.JSX.Element {
   "use no memo"
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -619,6 +626,12 @@ export function Transcript({
             >
               <span>Workspace</span>
               <strong>{workspace.name}</strong>
+              {branch !== undefined && (
+                <>
+                  <span>Branch</span>
+                  <strong>{branch}</strong>
+                </>
+              )}
             </p>
           )}
         </FadeDiv>
@@ -626,7 +639,7 @@ export function Transcript({
     )
 
   return (
-    <MarkdownWorkspace value={workspace}>
+    <MarkdownWorkspace value={scope}>
       <div className="@container relative grid min-h-0 min-w-0 grid-rows-[minmax(0,_1fr)]">
         {query.isError && (
           <Button variant="ghost" size="sm" onClick={() => void query.refetch()}>

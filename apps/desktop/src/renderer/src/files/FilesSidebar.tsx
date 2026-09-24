@@ -4,10 +4,12 @@ import { Collapsible } from "@base-ui-components/react/collapsible"
 import { CollapsiblePanel } from "../ui/motion"
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import type { Workspace } from "@meldshell/contracts"
-import type { DirectoryEntry } from "@meldshell/contracts/ipc"
+import type { Thread, Workspace } from "@meldshell/contracts"
+import type { DirectoryEntry, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
 import { GitSidebar } from "./GitSidebar"
+import { WorktreeBar } from "./WorktreeBar"
+import { scopeKey } from "../data/workspace-scope"
 import { FileIcon } from "../ui/FileIcon"
 import { Button, IconButton } from "../ui/controls"
 import { useTabStore } from "../app/tab-store"
@@ -97,11 +99,11 @@ function moveInTree(event: React.KeyboardEvent<HTMLElement>) {
 
 function FileRow({
   entry,
-  workspaceId,
+  scope,
   depth,
 }: {
   entry: DirectoryEntry
-  workspaceId: string
+  scope: WorkspaceScope
   depth: number
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -118,7 +120,7 @@ function FileRow({
       }
       style={{ paddingLeft: 10 + depth * 14, ...indentGuides(depth) }}
       title={`${entry.path}${entry.status ? ` (${kind})` : ""}`}
-      onClick={entry.directory ? undefined : () => openFile(workspaceId, entry.path)}
+      onClick={entry.directory ? undefined : () => openFile(scope, entry.path)}
     >
       {entry.directory ? (
         expanded ? (
@@ -157,7 +159,7 @@ function FileRow({
       <Collapsible.Trigger render={row} />
       <CollapsiblePanel>
         <Directory
-          workspaceId={workspaceId}
+          scope={scope}
           path={entry.path}
           depth={depth + 1}
           inheritedStatus={entry.status}
@@ -168,20 +170,20 @@ function FileRow({
 }
 
 function Directory({
-  workspaceId,
+  scope,
   path,
   depth = 0,
   inheritedStatus = "",
 }: {
-  workspaceId: string
+  scope: WorkspaceScope
   path: string
   depth?: number
   inheritedStatus?: string
 }) {
   const [limit, setLimit] = useState(300)
   const query = useQuery({
-    queryKey: ["workspace-directory", workspaceId, path],
-    queryFn: () => window.meldshell.listDirectory({ workspaceId, path }),
+    queryKey: ["workspace-directory", ...scopeKey(scope), path],
+    queryFn: () => window.meldshell.listDirectory({ ...scope, path }),
     staleTime: 5000,
     retry: false,
   })
@@ -220,7 +222,7 @@ function Directory({
             ...entry,
             status: entry.status || (["!!", "??"].includes(inheritedStatus) ? inheritedStatus : ""),
           }}
-          workspaceId={workspaceId}
+          scope={scope}
           depth={depth}
         />
       ))}
@@ -245,14 +247,21 @@ function Directory({
 
 export function FilesSidebar({
   workspace,
+  scope,
+  worktreeThread,
   threadId,
 }: {
   workspace?: Workspace
+  /** The folder shown: a worktree thread's checkout or the workspace itself. */
+  scope?: WorkspaceScope
+  /** The thread that owns `scope` when it is a worktree. */
+  worktreeThread?: Thread
   threadId?: string
 }) {
   const client = useQueryClient()
   return (
     <Tabs.Root defaultValue="files" className="flex flex-col h-full min-h-0 overflow-hidden">
+      {worktreeThread !== undefined && <WorktreeBar thread={worktreeThread} />}
       <Tabs.List className={panelTabsClasses} aria-label="Workspace sidebar">
         <Tabs.Tab value="files">Files</Tabs.Tab>
         <Tabs.Tab value="changes">Changes</Tabs.Tab>
@@ -261,7 +270,7 @@ export function FilesSidebar({
         <div className="flex items-center shrink-0 pr-[6px] [&_.git-section-heading]:flex-1 [&_.git-section-heading]:min-w-0">
           <span
             className="flex-1 [padding:8px_12px] overflow-hidden text-ellipsis whitespace-nowrap"
-            title={workspace?.path}
+            title={worktreeThread?.worktree?.path ?? workspace?.path}
           >
             {workspace?.name ?? "Files"}
           </span>
@@ -276,8 +285,8 @@ export function FilesSidebar({
           </IconButton>
         </div>
         <div className="overflow-y-auto [scrollbar-gutter:stable] overflow-auto flex-1">
-          {workspace ? (
-            <Directory key={workspace.id} workspaceId={workspace.id} path="" />
+          {workspace && scope ? (
+            <Directory key={workspace.id} scope={scope} path="" />
           ) : (
             <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
               Choose a thread to browse its workspace.
@@ -286,7 +295,7 @@ export function FilesSidebar({
         </div>
       </Tabs.Panel>
       <Tabs.Panel value="changes" className="flex flex-col h-full min-h-0 overflow-hidden">
-        <GitSidebar workspace={workspace} threadId={threadId} />
+        <GitSidebar workspace={workspace} scope={scope} threadId={threadId} />
       </Tabs.Panel>
     </Tabs.Root>
   )

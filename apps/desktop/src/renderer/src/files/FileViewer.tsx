@@ -28,10 +28,14 @@ function PreviewImage({ file, src, alt }: { file: FileTab; src?: string; alt?: s
   const path = localPath(file, src ?? "")
 
   const query = useQuery({
-    queryKey: ["workspace-file", file.workspaceId, path],
+    queryKey: ["workspace-file", file.workspaceId, file.threadId ?? null, path],
 
     queryFn: () =>
-      window.meldshell.readWorkspaceFile({ workspaceId: file.workspaceId, path: path! }),
+      window.meldshell.readWorkspaceFile({
+        workspaceId: file.workspaceId,
+        threadId: file.threadId,
+        path: path!,
+      }),
 
     enabled: path !== null,
 
@@ -70,7 +74,7 @@ async function htmlPreview(file: FileTab, content: string): Promise<string> {
 
         const asset = await window.meldshell
 
-          .readWorkspaceFile({ workspaceId: file.workspaceId, path })
+          .readWorkspaceFile({ workspaceId: file.workspaceId, threadId: file.threadId, path })
 
           .catch(() => null)
 
@@ -101,7 +105,7 @@ async function htmlPreview(file: FileTab, content: string): Promise<string> {
 
 function HtmlPreview({ file, content }: { file: FileTab; content: string }) {
   const query = useQuery({
-    queryKey: ["html-preview", file.workspaceId, file.path, content],
+    queryKey: ["html-preview", file.workspaceId, file.threadId ?? null, file.path, content],
 
     queryFn: () => htmlPreview(file, content),
 
@@ -133,7 +137,7 @@ export function FileViewer({ file }: { file: FileTab }) {
   const openFile = useTabStore((state) => state.openFile)
 
   const query = useQuery({
-    queryKey: ["workspace-file", file.workspaceId, file.path],
+    queryKey: ["workspace-file", file.workspaceId, file.threadId ?? null, file.path],
 
     queryFn: () => window.meldshell.readWorkspaceFile(file),
 
@@ -162,7 +166,7 @@ export function FileViewer({ file }: { file: FileTab }) {
           {file.line ? ` · L${file.line}` : ""}
         </span>
         {file.line && (
-          <Button size="sm" onClick={() => openFile(file.workspaceId, file.path)}>
+          <Button size="sm" onClick={() => openFile(file, file.path)}>
             Clear line reference
           </Button>
         )}
@@ -238,7 +242,7 @@ export function FileViewer({ file }: { file: FileTab }) {
                     if (path !== null) {
                       event.preventDefault()
 
-                      openFile(file.workspaceId, path)
+                      openFile(file, path)
                     }
                   }}
                 >

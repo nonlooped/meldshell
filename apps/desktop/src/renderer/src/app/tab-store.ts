@@ -1,4 +1,4 @@
-import type { GitDiffSide } from "@meldshell/contracts/ipc"
+import type { GitDiffSide, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { create } from "zustand"
 import {
   movePane,
@@ -12,9 +12,8 @@ import {
   type ThreadLayout,
 } from "./thread-layout"
 
-export interface FileTab {
+export interface FileTab extends WorkspaceScope {
   readonly id: string
-  readonly workspaceId: string
   readonly path: string
   readonly diffSide?: GitDiffSide
   readonly line?: number
@@ -38,8 +37,8 @@ interface TabStore {
 
   readonly files: readonly FileTab[]
   readonly selectedFileId: string | null
-  readonly openFile: (workspaceId: string, path: string, line?: number, endLine?: number) => void
-  readonly openDiff: (workspaceId: string, path: string, side: GitDiffSide) => void
+  readonly openFile: (scope: WorkspaceScope, path: string, line?: number, endLine?: number) => void
+  readonly openDiff: (scope: WorkspaceScope, path: string, side: GitDiffSide) => void
   readonly selectTab: (id: string) => void
   readonly closeTab: (id: string) => void
 
@@ -132,25 +131,25 @@ export const useTabStore = create<TabStore>((set, get) => ({
     }),
   files: [],
   selectedFileId: null,
-  openFile: (workspaceId, path, line, endLine) =>
+  openFile: ({ workspaceId, threadId }, path, line, endLine) =>
     set((state) => {
       const normalized = path.replaceAll("\\", "/")
-      const id = `file:${JSON.stringify([workspaceId, normalized])}`
+      const id = `file:${JSON.stringify([workspaceId, threadId ?? null, normalized])}`
       return {
         files: state.files.some((file) => file.id === id)
           ? state.files.map((file) => (file.id === id ? { ...file, line, endLine } : file))
-          : [...state.files, { id, workspaceId, path: normalized, line, endLine }],
+          : [...state.files, { id, workspaceId, threadId, path: normalized, line, endLine }],
         selectedFileId: id,
       }
     }),
-  openDiff: (workspaceId, path, diffSide) =>
+  openDiff: ({ workspaceId, threadId }, path, diffSide) =>
     set((state) => {
       const normalized = path.replaceAll("\\", "/")
-      const id = `diff:${JSON.stringify([workspaceId, normalized, diffSide])}`
+      const id = `diff:${JSON.stringify([workspaceId, threadId ?? null, normalized, diffSide])}`
       return {
         files: state.files.some((file) => file.id === id)
           ? state.files
-          : [...state.files, { id, workspaceId, path: normalized, diffSide }],
+          : [...state.files, { id, workspaceId, threadId, path: normalized, diffSide }],
         selectedFileId: id,
       }
     }),

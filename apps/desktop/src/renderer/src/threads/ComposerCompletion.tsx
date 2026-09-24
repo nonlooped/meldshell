@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "motion/react"
 import { Folder, Sparkles, SquareSlash } from "lucide-react"
 import type { ComposerCommand } from "@meldshell/contracts"
-import type { WorkspacePathMatch } from "@meldshell/contracts/ipc"
+import type { WorkspacePathMatch, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { FileIcon } from "../ui/FileIcon"
 import { useMotionPreference } from "../ui/motion"
 import {
@@ -82,7 +82,7 @@ function completionToken(item: CompletionItem): { token: ComposerToken; closes: 
 interface CompletionOptions {
   readonly draft: string
   readonly tokens: readonly ComposerToken[]
-  readonly workspaceId: string | undefined
+  readonly scope: WorkspaceScope | undefined
   readonly harness: string | undefined
   readonly textareaRef: React.RefObject<HTMLTextAreaElement | null>
   readonly onDraftChange: (draft: string) => void
@@ -96,7 +96,7 @@ interface CompletionOptions {
 export function useComposerCompletion({
   draft,
   tokens,
-  workspaceId,
+  scope,
   harness,
   textareaRef,
   onDraftChange,
@@ -120,24 +120,23 @@ export function useComposerCompletion({
   const trigger = found !== null && found.start !== dismissed && !settled ? found : null
 
   const paths = useQuery({
-    queryKey: ["workspace-paths", workspaceId, trigger?.query],
+    queryKey: ["workspace-paths", scope?.workspaceId, scope?.threadId ?? null, trigger?.query],
     queryFn: () =>
       window.meldshell.searchWorkspacePaths({
-        workspaceId: workspaceId!,
+        ...scope!,
         query: trigger!.query,
         limit: 50,
       }),
-    enabled: trigger?.kind === "path" && workspaceId !== undefined,
+    enabled: trigger?.kind === "path" && scope !== undefined,
     placeholderData: keepPreviousData,
     staleTime: 5_000,
   })
   const commands = useQuery({
-    queryKey: ["composer-commands", workspaceId, harness],
-    queryFn: () =>
-      window.meldshell.listComposerCommands({ workspaceId: workspaceId!, harness: harness! }),
+    queryKey: ["composer-commands", scope?.workspaceId, scope?.threadId ?? null, harness],
+    queryFn: () => window.meldshell.listComposerCommands({ ...scope!, harness: harness! }),
     enabled:
       (trigger?.kind === "command" || trigger?.kind === "skill") &&
-      workspaceId !== undefined &&
+      scope !== undefined &&
       harness !== undefined,
     staleTime: 5 * 60_000,
     retry: false,

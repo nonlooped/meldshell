@@ -268,6 +268,16 @@ export const runMigrations = Effect.gen(function* () {
       }),
     },
     { version: 7, apply: repairWorkspacePaths },
+    {
+      version: 8,
+      apply: Effect.gen(function* () {
+        yield* sql`ALTER TABLE threads ADD COLUMN worktree_path TEXT`
+        yield* sql`ALTER TABLE threads ADD COLUMN worktree_branch TEXT`
+        yield* sql`ALTER TABLE threads ADD COLUMN worktree_base TEXT`
+        yield* sql`ALTER TABLE threads ADD COLUMN worktree_state TEXT
+          CHECK (worktree_state IN ('ready', 'missing', 'removed'))`
+      }),
+    },
   ]
   const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table'`
   const has = (name: string) => tables.some((table) => table.name === name)

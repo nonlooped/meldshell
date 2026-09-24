@@ -72,7 +72,7 @@ export function useThreadActions(
     window.meldshell.setThreadPinned({ threadId: thread.id, pinned: !thread.pinned }),
   )
   const createThreadMutation = useSnapshotMutation(
-    (workspaceId: string) => window.meldshell.createThread({ workspaceId }),
+    (input: Input<"createThread">) => window.meldshell.createThread(input),
     (next) => {
       const existing = new Set([
         ...snapshot.threadSettings.map((settings) => settings.threadId),

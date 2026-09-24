@@ -10,6 +10,7 @@ import {
   Columns2,
   Folder,
   FolderPlus,
+  GitBranch,
   CircleAlert,
   MoreHorizontal,
   Rows2,
@@ -107,6 +108,16 @@ function InboxThread({
             </span>
             <span className={threadContextClasses}>
               <ProviderIcon provider={providersByThreadId.get(thread.id)} size={13} />
+              {thread.worktree !== undefined && (
+                <span
+                  className="inline-flex shrink-0"
+                  role="img"
+                  aria-label={`Own branch ${thread.worktree.branch}`}
+                  title={`Works on its own branch: ${thread.worktree.branch}`}
+                >
+                  <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
+                </span>
+              )}
               {workspaceId === "all" && (
                 <span className="thread-workspace">
                   {workspaceNames.get(thread.workspaceId) ?? "Unknown workspace"}

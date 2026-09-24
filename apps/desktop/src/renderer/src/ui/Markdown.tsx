@@ -23,13 +23,12 @@ import {
 
 function MarkdownImage({ src, alt, node }: { src?: string; alt?: string; node?: Element }) {
   const [failed, setFailed] = useState<string>()
-  const workspace = useContext(MarkdownWorkspace)
+  const scope = useContext(MarkdownWorkspace)
   const reference = fileReference(src ?? "")
   const query = useQuery({
-    queryKey: ["workspace-file", workspace?.id, reference?.path],
-    queryFn: () =>
-      window.meldshell.readWorkspaceFile({ workspaceId: workspace!.id, path: reference!.path }),
-    enabled: !!workspace && !!reference,
+    queryKey: ["workspace-file", scope?.workspaceId, scope?.threadId ?? null, reference?.path],
+    queryFn: () => window.meldshell.readWorkspaceFile({ ...scope!, path: reference!.path }),
+    enabled: !!scope && !!reference,
     retry: false,
     staleTime: 30_000,
   })

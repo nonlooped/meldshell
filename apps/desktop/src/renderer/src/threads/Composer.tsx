@@ -25,6 +25,7 @@ import {
   Square,
 } from "lucide-react"
 import { effortLabel, resolveSelection, selectableModels } from "../data/catalog"
+import { workspaceScope } from "../data/workspace-scope"
 import { FileIcon } from "../ui/FileIcon"
 import { ModelPicker } from "./ModelPicker"
 import { useComposerCompletion } from "./ComposerCompletion"
@@ -525,10 +526,11 @@ export function Composer({
   const attachmentReadsPending = useRef(0)
   const selection = resolveSelection(snapshot, threadId)
   const providerName = harnessName(selection?.provider.harness)
+  const thread = snapshot.threads.find((candidate) => candidate.id === threadId)
   const completion = useComposerCompletion({
     draft,
     tokens,
-    workspaceId: snapshot.threads.find((thread) => thread.id === threadId)?.workspaceId,
+    scope: thread === undefined ? undefined : workspaceScope(thread),
     harness: selection?.provider.harness,
     textareaRef,
     onDraftChange,

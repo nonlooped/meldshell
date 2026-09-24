@@ -4,8 +4,16 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- A new thread can work on its own branch. MeldShell creates a Git worktree for it from the workspace's current commit, so threads running at the same time never edit the same files. Every harness in that thread, the Files and Changes sidebars, file links, and `@` completions use the thread's worktree.
+- Threads on their own branch show a branch mark in the inbox and a branch bar in the source control sidebar, with actions to merge the branch into the branch it started from or remove the worktree. A merge that conflicts is undone instead of leaving the workspace half-merged.
+- A worktree folder deleted outside MeldShell is marked missing at startup, and its thread will not start turns until the folder is back when MeldShell next starts, or the worktree is removed.
+
 ### Changed
 
+- Push publishes a branch with no upstream to `origin`, or to the only remote, and sets it as the upstream.
+- Deleting a thread that has its own worktree removes the worktree folder but keeps its branch, and is refused while the worktree has uncommitted changes. Removing a workspace does the same for all of its threads' worktrees.
 - Settings › Providers shows each provider's connection status and version without expanding it, and opens providers that need attention. Connection problems say what to do next.
 - Each model has one Shown, Hidden, or Off choice instead of separate Hidden and Enabled switches, and the model list shows identifiers, compact reasoning ranges, and Default, Custom, and Fast labels. Long lists can be filtered.
 - Only custom models can be removed; built-in models are turned off instead, because the provider adds them back.

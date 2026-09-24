@@ -17,7 +17,9 @@ import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Tabs } from "@base-ui-components/react/tabs"
 import { Combobox } from "@base-ui-components/react/combobox"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Thread, TranscriptSearchResult } from "@meldshell/contracts"
+import type { Thread, TranscriptSearchResult, Workspace } from "@meldshell/contracts"
+import type { WorkspaceScope } from "@meldshell/contracts/ipc"
+import { workspaceScope } from "../data/workspace-scope"
 import { ChevronDown, Plus, Settings } from "lucide-react"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import { InteractionDialog } from "../threads/InteractionDialog"
@@ -30,7 +32,14 @@ import { MeldMark } from "../ui/MeldMark"
 import { WorkspaceManager } from "../workspaces/WorkspaceManager"
 import { TitleBar } from "./TitleBar"
 import { AppScale } from "./AppScale"
-import { AppDialog, Button, DropdownMenu, MenuChoice, MenuRadioGroup } from "../ui/controls"
+import {
+  AppDialog,
+  Button,
+  Checkbox,
+  DropdownMenu,
+  MenuChoice,
+  MenuRadioGroup,
+} from "../ui/controls"
 import { ErrorToast } from "../ui/Notice"
 import { handleAppShortcut } from "./app-shortcuts"
 import { useTabStore, type FileTab } from "./tab-store"
@@ -218,8 +227,9 @@ function SidebarPanel({ defaultSize, ...props }: React.ComponentProps<typeof Pan
   return <Panel {...props} defaultSize={initialSize} style={{ overflow: "hidden" }} />
 }
 
-function tabWorkspaceId(file: FileTab | undefined, thread: Thread | null) {
-  return file?.workspaceId ?? thread?.workspaceId ?? ""
+function tabScope(file: FileTab | undefined, thread: Thread | null): WorkspaceScope | undefined {
+  if (file) return { workspaceId: file.workspaceId, threadId: file.threadId }
+  return thread === null ? undefined : workspaceScope(thread)
 }
 
 function FileOrThread({ file, children }: { file?: FileTab; children: React.ReactNode }) {
@@ -243,6 +253,112 @@ function useSelectedTab() {
     selectedFile: files.find((file) => file.id === selectedFileId),
     selectedTabId: selectedFileId ?? selectedThreadTabId,
   }
+}
+
+function NewThreadDialog({
+  open,
+  onOpenChange,
+  workspaces,
+  workspaceId,
+  onWorkspaceChange,
+  mutation,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  workspaces: readonly Workspace[]
+  workspaceId: string
+  onWorkspaceChange: (workspaceId: string) => void
+  mutation: ReturnType<typeof useThreadActions>["createThreadMutation"]
+}): React.JSX.Element {
+  const [isolated, setIsolated] = useState(false)
+  const workspace = workspaces.find((entry) => entry.id === workspaceId)
+  return (
+    <AppDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) mutation.reset()
+        onOpenChange(next)
+      }}
+      title="New thread"
+      actions={
+        <>
+          <Button onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            variant="primary"
+            disabled={workspaceId === "" || mutation.isPending}
+            onClick={() => mutation.mutate({ workspaceId, isolated })}
+          >
+            {mutation.isPending && isolated ? "Creating worktree…" : "Create thread"}
+          </Button>
+        </>
+      }
+    >
+      <p>Choose the workspace folder this conversation belongs to.</p>
+      <div className="[padding:14px_20px_0] mt-[0]">
+        <span className="block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium">
+          Workspace
+        </span>
+        <DropdownMenu
+          align="start"
+          trigger={
+            <BaseButton
+              render={<Pressable />}
+              type="button"
+              className={`motion-colors ${buttonClasses} justify-between!`}
+              data-block="true"
+              aria-label="Workspace"
+            >
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                {workspace?.name ?? "Select a workspace"}
+              </span>
+              <ChevronDown
+                size={14}
+                strokeWidth={2}
+                className="flex-none text-[var(--text-tertiary)]"
+              />
+            </BaseButton>
+          }
+        >
+          <MenuRadioGroup
+            value={workspaceId}
+            onValueChange={(value) => onWorkspaceChange(String(value))}
+          >
+            {workspaces.map((entry) => (
+              <MenuChoice
+                key={entry.id}
+                value={entry.id}
+                className="h-auto [padding:7px_9px] items-start"
+              >
+                <span className="flex min-w-0 flex-1 flex-col gap-[1px]">
+                  <span className="model-item-name text-inherit text-[12.5px]">{entry.name}</span>
+                  <span className="text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10px]">
+                    {entry.path}
+                  </span>
+                </span>
+              </MenuChoice>
+            ))}
+          </MenuRadioGroup>
+        </DropdownMenu>
+      </div>
+      <label className="flex items-start gap-[8px] [padding:16px_20px_0] text-[12.5px] leading-[1.5]">
+        <span className="flex pt-[2px]">
+          <Checkbox checked={isolated} onCheckedChange={setIsolated} />
+        </span>
+        <span>
+          Work on its own branch
+          <span className="block text-[var(--text-secondary)] text-[11.5px]">
+            Creates a Git worktree from the workspace's current commit, so threads running at the
+            same time never edit the same files.
+          </span>
+        </span>
+      </label>
+      {mutation.isError && (
+        <p role="alert" className="text-[var(--color-deleted)]!">
+          {mutation.error.message}
+        </p>
+      )}
+    </AppDialog>
+  )
 }
 
 export function App(): React.JSX.Element {
@@ -422,7 +538,12 @@ export function App(): React.JSX.Element {
     useWatchedThreadIds(),
     snapshot.settings.sounds ?? true,
   )
-  const activeWorkspaceId = tabWorkspaceId(selectedFile, selectedThread)
+  const activeScope = tabScope(selectedFile, selectedThread)
+  const activeWorkspaceId = activeScope?.workspaceId ?? ""
+  const worktreeThread =
+    activeScope?.threadId === undefined
+      ? undefined
+      : allThreads.find((thread) => thread.id === activeScope.threadId)
   const openThreads = openThreadIds.flatMap((id) => {
     const thread = allThreads.find((candidate) => candidate.id === id)
     return thread === undefined ? [] : [thread]
@@ -584,8 +705,10 @@ export function App(): React.JSX.Element {
               >
                 <FilesSidebar
                   threadId={selectedThread?.id}
-                  key={activeWorkspaceId}
+                  key={`${activeWorkspaceId}:${activeScope?.threadId ?? ""}`}
                   workspace={workspaceById.get(activeWorkspaceId)}
+                  scope={activeScope}
+                  worktreeThread={worktreeThread}
                 />
               </div>
             </SidebarPanel>
@@ -690,73 +813,14 @@ export function App(): React.JSX.Element {
           </Combobox.Root>
         </AppDialog>
 
-        <AppDialog
+        <NewThreadDialog
           open={newThreadOpen}
           onOpenChange={setNewThreadOpen}
-          title="New thread"
-          actions={
-            <>
-              <Button onClick={() => setNewThreadOpen(false)}>Cancel</Button>
-              <Button
-                variant="primary"
-                disabled={newThreadWorkspaceId === "" || createThreadMutation.isPending}
-                onClick={() => createThreadMutation.mutate(newThreadWorkspaceId)}
-              >
-                Create thread
-              </Button>
-            </>
-          }
-        >
-          <p>Choose the workspace folder this conversation belongs to.</p>
-          <div className="[padding:14px_20px_0] mt-[0]">
-            <span className="block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium">
-              Workspace
-            </span>
-            <DropdownMenu
-              align="start"
-              trigger={
-                <BaseButton
-                  render={<Pressable />}
-                  type="button"
-                  className={`motion-colors ${buttonClasses} justify-between!`}
-                  data-block="true"
-                  aria-label="Workspace"
-                >
-                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                    {workspaceById.get(newThreadWorkspaceId)?.name ?? "Select a workspace"}
-                  </span>
-                  <ChevronDown
-                    size={14}
-                    strokeWidth={2}
-                    className="flex-none text-[var(--text-tertiary)]"
-                  />
-                </BaseButton>
-              }
-            >
-              <MenuRadioGroup
-                value={newThreadWorkspaceId}
-                onValueChange={(value) => setNewThreadWorkspaceId(String(value))}
-              >
-                {snapshot.workspaces.map((workspace) => (
-                  <MenuChoice
-                    key={workspace.id}
-                    value={workspace.id}
-                    className="h-auto [padding:7px_9px] items-start"
-                  >
-                    <span className="flex min-w-0 flex-1 flex-col gap-[1px]">
-                      <span className="model-item-name text-inherit text-[12.5px]">
-                        {workspace.name}
-                      </span>
-                      <span className="text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10px]">
-                        {workspace.path}
-                      </span>
-                    </span>
-                  </MenuChoice>
-                ))}
-              </MenuRadioGroup>
-            </DropdownMenu>
-          </div>
-        </AppDialog>
+          workspaces={snapshot.workspaces}
+          workspaceId={newThreadWorkspaceId}
+          onWorkspaceChange={setNewThreadWorkspaceId}
+          mutation={createThreadMutation}
+        />
 
         {selectedApproval !== null && (
           <InteractionDialog
@@ -793,6 +857,12 @@ export function App(): React.JSX.Element {
           <p>
             “{deleteTarget?.title}” and its complete history will be removed. This cannot be undone.
           </p>
+          {deleteTarget?.worktree !== undefined && deleteTarget.worktree.state !== "removed" && (
+            <p>
+              Its worktree folder is removed too. The branch{" "}
+              <code>{deleteTarget.worktree.branch}</code> and its commits are kept.
+            </p>
+          )}
         </AppDialog>
       </Tabs.Root>
     </MotionPreferences>

@@ -16,11 +16,17 @@ export const createHostRuntime = (platform: typeof HostPlatform.Service) =>
   ManagedRuntime.make(
     Layer.mergeAll(codexProviderLive(), claudeProviderLive(), cursorProviderLive()).pipe(
       Layer.provideMerge(Layer.merge(CoreClient.Default, HostEvents.Default)),
-      Layer.provide(Layer.succeed(HostPlatform, platform)),
+      Layer.provideMerge(Layer.succeed(HostPlatform, platform)),
     ),
   )
 export type HostRuntime = ReturnType<typeof createHostRuntime>
-export type HostServices = CoreClient | HostEvents | CodexProvider | ClaudeProvider | CursorProvider
+export type HostServices =
+  | CoreClient
+  | HostEvents
+  | HostPlatform
+  | CodexProvider
+  | ClaudeProvider
+  | CursorProvider
 export const stopHost = Effect.gen(function* () {
   const core = yield* CoreClient
   const turns = yield* core

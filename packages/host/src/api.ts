@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect"
 import * as C from "@meldshell/contracts"
+import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
 import { submitTurn, interruptTurn, resolveApproval } from "./operations"
@@ -17,6 +18,15 @@ import {
 import { listDirectory, readWorkspaceFile } from "./workspace-files"
 import { searchWorkspacePaths } from "./workspace-search"
 import { requestGeneratedText } from "./generated-text"
+import {
+  createThread,
+  deleteThread,
+  getWorktreeStatus,
+  mergeThreadWorktree,
+  removeThreadWorktree,
+  removeWorkspace,
+  scopePath,
+} from "./thread-worktrees"
 
 type Operation = {
   read: boolean
@@ -36,18 +46,15 @@ const coreCall = <A, I>(
   read: boolean,
   run: (core: typeof CoreClient.Service, input: A) => Effect.Effect<unknown, unknown>,
 ) => operation(schema, read, (input) => Effect.flatMap(CoreClient, (core) => run(core, input)))
-const fileInput = Schema.Struct({ workspaceId: Schema.String, path: Schema.String })
-const withWorkspace = <A>(workspaceId: string, run: (path: string) => Promise<A>) =>
-  Effect.gen(function* () {
-    const core = yield* CoreClient
-    const snapshot = yield* core.GetSnapshot()
-    const workspace = snapshot.workspaces.find((entry) => entry.id === workspaceId)
-    if (!workspace) return yield* Effect.fail(new Error("Workspace not found."))
-    return yield* Effect.tryPromise({
-      try: () => run(workspace.path),
+const scopeFields = { workspaceId: Schema.String, threadId: Schema.optional(Schema.String) }
+const fileInput = Schema.Struct({ ...scopeFields, path: Schema.String })
+const withWorkspace = <A>(scope: WorkspaceScope, run: (path: string) => Promise<A>) =>
+  Effect.flatMap(scopePath(scope), (path) =>
+    Effect.tryPromise({
+      try: () => run(path),
       catch: (cause) => new Error(String(cause)),
-    })
-  })
+    }),
+  )
 
 export const hostOperations: Record<string, Operation> = {
   [C.IPC.getSnapshot]: coreCall(noInput, true, (core) => core.GetSnapshot()),
@@ -58,14 +65,17 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.searchTranscripts]: coreCall(C.SearchTranscriptsInput, true, (core, input) =>
     core.SearchTranscripts(input),
   ),
-  [C.IPC.createThread]: coreCall(C.CreateThreadInput, false, (core, input) =>
-    core.CreateThread(input),
-  ),
+  [C.IPC.createThread]: operation(C.CreateThreadInput, false, createThread),
   [C.IPC.renameWorkspace]: coreCall(C.RenameWorkspaceInput, false, (core, input) =>
     core.RenameWorkspace(input),
   ),
-  [C.IPC.removeWorkspace]: coreCall(Schema.String, false, (core, id) =>
-    core.RemoveWorkspace({ workspaceId: id }),
+  [C.IPC.removeWorkspace]: operation(Schema.String, false, removeWorkspace),
+  [C.IPC.getWorktreeStatus]: operation(Schema.String, true, getWorktreeStatus),
+  [C.IPC.mergeWorktree]: operation(Schema.String, false, mergeThreadWorktree),
+  [C.IPC.removeWorktree]: operation(
+    Schema.Struct({ threadId: Schema.String, deleteBranch: Schema.Boolean }),
+    false,
+    removeThreadWorktree,
   ),
   [C.IPC.setThreadPinned]: coreCall(C.SetThreadPinnedInput, false, (core, input) =>
     core.SetThreadPinned(input),
@@ -73,9 +83,7 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.setThreadStatus]: coreCall(C.SetThreadStatusInput, false, (core, input) =>
     core.SetThreadStatus(input),
   ),
-  [C.IPC.deleteThread]: coreCall(Schema.String, false, (core, threadId) =>
-    core.DeleteThread({ threadId }),
-  ),
+  [C.IPC.deleteThread]: operation(Schema.String, false, deleteThread),
   [C.IPC.updateProvider]: coreCall(C.UpdateProviderInput, false, (core, input) =>
     core.UpdateProvider(input),
   ),
@@ -98,86 +106,77 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.interruptTurn]: operation(Schema.String, false, interruptTurn),
   [C.IPC.resolveApproval]: operation(C.ResolveApprovalInput, false, resolveApproval),
   [C.IPC.listDirectory]: operation(fileInput, true, (input) =>
-    withWorkspace(input.workspaceId, (path) => listDirectory(path, input.path)),
+    withWorkspace(input, (path) => listDirectory(path, input.path)),
   ),
   [C.IPC.searchWorkspacePaths]: operation(
     Schema.Struct({
-      workspaceId: Schema.String,
+      ...scopeFields,
       query: Schema.String.pipe(Schema.maxLength(1024)),
       limit: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.between(1, 200))),
     }),
     true,
-    (input) =>
-      withWorkspace(input.workspaceId, (path) =>
-        searchWorkspacePaths(path, input.query, input.limit),
-      ),
+    (input) => withWorkspace(input, (path) => searchWorkspacePaths(path, input.query, input.limit)),
   ),
   [C.IPC.listComposerCommands]: operation(
     Schema.Struct({
-      workspaceId: Schema.String,
+      ...scopeFields,
       harness: Schema.Literal("codex", "claude-code", "cursor"),
     }),
     true,
     (input) =>
       Effect.gen(function* () {
-        const core = yield* CoreClient
-        const snapshot = yield* core.GetSnapshot()
-        const workspace = snapshot.workspaces.find((entry) => entry.id === input.workspaceId)
-        if (!workspace) return yield* Effect.fail(new Error("Workspace not found."))
+        const path = yield* scopePath(input)
         const service = yield* providerFor(input.harness)
-        return yield* service.commands(workspace.path)
+        return yield* service.commands(path)
       }),
   ),
   [C.IPC.readWorkspaceFile]: operation(fileInput, true, (input) =>
-    withWorkspace(input.workspaceId, (path) => readWorkspaceFile(path, input.path)),
+    withWorkspace(input, (path) => readWorkspaceFile(path, input.path)),
   ),
   [C.IPC.getGitSnapshot]: operation(
     Schema.Struct({
-      workspaceId: Schema.String,
+      ...scopeFields,
       limit: Schema.Number.pipe(Schema.int(), Schema.between(1, 2000)),
     }),
     true,
-    (input) => withWorkspace(input.workspaceId, (path) => getGitSnapshot(path, input.limit)),
+    (input) => withWorkspace(input, (path) => getGitSnapshot(path, input.limit)),
   ),
   [C.IPC.getGitDiff]: operation(
     Schema.Struct({
-      workspaceId: Schema.String,
+      ...scopeFields,
       path: Schema.String,
       side: Schema.optional(Schema.Literal("staged", "unstaged")),
       context: Schema.optional(Schema.Literal("full")),
     }),
     true,
     (input) =>
-      withWorkspace(input.workspaceId, (path) =>
-        getGitDiff(path, input.path, input.side, input.context),
-      ),
+      withWorkspace(input, (path) => getGitDiff(path, input.path, input.side, input.context)),
   ),
   [C.IPC.getGitCommitDiff]: operation(
-    Schema.Struct({ workspaceId: Schema.String, hash: Schema.String }),
+    Schema.Struct({ ...scopeFields, hash: Schema.String }),
     true,
-    (input) => withWorkspace(input.workspaceId, (path) => getGitCommitDiff(path, input.hash)),
+    (input) => withWorkspace(input, (path) => getGitCommitDiff(path, input.hash)),
   ),
   [C.IPC.gitFileAction]: operation(
     Schema.Struct({
-      workspaceId: Schema.String,
+      ...scopeFields,
       path: Schema.String,
       action: Schema.Literal("stage", "unstage", "restore"),
     }),
     false,
-    (input) =>
-      withWorkspace(input.workspaceId, (path) => gitFileAction(path, input.path, input.action)),
+    (input) => withWorkspace(input, (path) => gitFileAction(path, input.path, input.action)),
   ),
   [C.IPC.gitCommit]: operation(
-    Schema.Struct({ workspaceId: Schema.String, message: Schema.String }),
+    Schema.Struct({ ...scopeFields, message: Schema.String }),
     false,
-    (input) => withWorkspace(input.workspaceId, (path) => gitCommit(path, input.message)),
+    (input) => withWorkspace(input, (path) => gitCommit(path, input.message)),
   ),
-  [C.IPC.gitPush]: operation(Schema.String, false, (workspaceId) =>
-    withWorkspace(workspaceId, gitPush),
+  [C.IPC.gitPush]: operation(Schema.Struct(scopeFields), false, (input) =>
+    withWorkspace(input, gitPush),
   ),
 }
 hostOperations[C.IPC.generateCommitMessage] = operation(
-  Schema.Struct({ workspaceId: Schema.String, threadId: Schema.optional(Schema.String) }),
+  Schema.Struct(scopeFields),
   false,
   (input) =>
     Effect.gen(function* () {
@@ -204,8 +203,8 @@ hostOperations[C.IPC.generateCommitMessage] = operation(
         return yield* Effect.fail(
           new Error("Choose an available Title model or a model for this thread."),
         )
-      const prompt = yield* withWorkspace(input.workspaceId, commitMessagePrompt)
-      const workspace = snapshot.workspaces.find((entry) => entry.id === input.workspaceId)!
+      const workspacePath = yield* scopePath(input)
+      const prompt = yield* withWorkspace(input, commitMessagePrompt)
       const service = yield* providerFor(provider.harness)
       return yield* Effect.tryPromise({
         try: () =>
@@ -215,7 +214,7 @@ hostOperations[C.IPC.generateCommitMessage] = operation(
                 type: "generate-title",
                 request: {
                   threadId,
-                  workspacePath: workspace.path,
+                  workspacePath,
                   model: model.slug,
                   harness: provider.harness as "codex" | "claude-code" | "cursor",
                   reasoningEffort: model.defaultReasoningEffort,
