@@ -7,6 +7,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 ### Added
 
 - Settings › About has a **Nightly builds** switch. Nightly builds are published every hour when MeldShell has changed, ahead of the daily stable release; they are less tested. With the switch on, MeldShell updates to each new nightly. Turning it off returns to the latest stable release on the next check, even though it is older than the nightly in use. An installed nightly build follows nightlies until the switch is turned off.
+- In Claude Code and Cursor threads, the composer's permissions menu also chooses a mode. **Agent** makes changes, **Plan** has the agent plan before it changes files, and Cursor also offers **Ask**, which answers without changing files. The menu's button shows Plan or Ask while one is chosen. Codex threads have no modes because Codex does not take a mode from MeldShell. When Claude finishes a plan, it opens for review like Cursor's plans do: **Approve plan** lets Claude start working with the thread's tool permissions and returns the thread to Agent mode, and **Keep planning** keeps it in Plan mode.
 
 ### Fixed
 

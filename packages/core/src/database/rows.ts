@@ -186,9 +186,10 @@ export const fromApprovalRow = (row: ApprovalRow): ApprovalRequest => {
         >["options"],
       }
     case "cursor/create_plan":
+    case "claude/exit_plan_mode":
       return {
         ...fields,
-        kind: "cursor-plan",
+        kind: "plan",
         method: row.method,
         params,
         plan: String(params.plan ?? ""),

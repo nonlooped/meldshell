@@ -35,7 +35,15 @@ export const claudeOptions = (dispatch: TurnDispatch): Options => {
     allowDangerouslySkipPermissions: bypass,
     ...(readOnly
       ? {
-          tools: ["Read", "Glob", "Grep", "WebSearch", "WebFetch"],
+          // Plan mode still needs its exit tool so the plan can reach the user for review.
+          tools: [
+            "Read",
+            "Glob",
+            "Grep",
+            "WebSearch",
+            "WebFetch",
+            ...(dispatch.mode === "plan" ? ["ExitPlanMode"] : []),
+          ],
           allowedTools: ["Read", "Glob", "Grep", "WebSearch", "WebFetch"],
           disallowedTools: [
             "Bash",

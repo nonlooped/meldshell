@@ -1,8 +1,15 @@
 import type { CanonicalEventKind } from "@meldshell/contracts"
 import { cursorEventKind, cursorEventText } from "./cursor"
 
+/** Claude Code asks to leave plan mode with the plan it wrote; approving it starts the work. */
+export const CLAUDE_EXIT_PLAN_MODE = "claude/exit_plan_mode"
+/** Claude Code left plan mode, so the thread's next turn should not start in it again. */
+export const CLAUDE_PERMISSION_MODE = "claude/permission_mode"
+
 export const eventKind = (method: string, params: unknown): CanonicalEventKind => {
   if (method.startsWith("cursor/")) return cursorEventKind(method, params)
+  if (method === CLAUDE_EXIT_PLAN_MODE) return "approval"
+  if (method === CLAUDE_PERMISSION_MODE) return "status"
   return nativeEventKind(method, params)
 }
 
@@ -54,6 +61,7 @@ export const eventText = (method: string, params: unknown): string | null => {
   if (method.startsWith("cursor/")) return cursorEventText(method, params)
   if (typeof params !== "object" || params === null) return null
   const record = params as Record<string, unknown>
+  if (method === CLAUDE_EXIT_PLAN_MODE) return stringValue(record.plan)
   const delta = stringValue(record.delta)
   if (delta !== null) return delta
   if (method === "turn/plan/updated")
@@ -86,6 +94,11 @@ export const approvalCopy = (
   if (method.startsWith("cursor/")) {
     return cursorApprovalCopy(method, record)
   }
+  if (method === CLAUDE_EXIT_PLAN_MODE)
+    return {
+      title: "Approve Claude's plan?",
+      detail: "Claude Code is ready to leave plan mode and start working.",
+    }
   const provider = typeof record.toolName === "string" ? "Claude Code" : "Codex"
   const command = Array.isArray(record.command)
     ? record.command.map(String).join(" ")

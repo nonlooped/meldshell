@@ -97,6 +97,11 @@ function QuestionInput({
   )
 }
 
+const declineLabel = (request: ApprovalRequest): string => {
+  if (request.kind === "user-input") return "Skip"
+  return request.kind === "plan" ? "Keep planning" : "Decline"
+}
+
 export function InteractionDialog({
   request,
   pending,
@@ -156,9 +161,9 @@ export function InteractionDialog({
           ) : (
             <>
               <Button disabled={pending} onClick={() => resolve("decline")}>
-                {userInput ? "Skip" : "Decline"}
+                {declineLabel(request)}
               </Button>
-              {!userInput && request.kind !== "cursor-plan" && (
+              {!userInput && request.kind !== "plan" && (
                 <Button disabled={pending} onClick={() => resolve("acceptForSession")}>
                   {request.approvalScope === "turn"
                     ? "Allow for this turn"
@@ -172,7 +177,7 @@ export function InteractionDialog({
               >
                 {userInput
                   ? "Submit answers"
-                  : request.kind === "cursor-plan"
+                  : request.kind === "plan"
                     ? "Approve plan"
                     : "Allow once"}
               </Button>
@@ -184,7 +189,7 @@ export function InteractionDialog({
       <p className="max-h-[220px] overflow-auto [padding:9px_10px] [margin:12px_20px_0] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.198)] text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[11.5px] leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere]">
         {request.detail}
       </p>
-      {request.kind === "cursor-plan" && <Markdown className="cursor-plan" text={request.plan} />}
+      {request.kind === "plan" && <Markdown className="plan-review" text={request.plan} />}
       {request.kind === "cursor-permission" && (
         <pre className="max-h-[220px] overflow-auto [padding:9px_10px] [margin:12px_20px_0] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.198)] text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[11.5px] leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere]">
           {JSON.stringify((request.params as { toolCall?: unknown }).toolCall, null, 2)}

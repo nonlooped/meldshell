@@ -555,7 +555,7 @@ const dialogClasses = [
   "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)] text-[var(--text-primary)]",
   "outline-none [transform:translate(-50%,_-50%)] [&_>_p]:m-0 [&_>_p]:[padding:8px_20px_0]",
   "[&_>_p]:text-[var(--text-secondary)] [&_>_p]:text-[12.5px] [&_>_p]:leading-[1.6]",
-  "[&_.cursor-plan]:[margin:0_20px_20px] [&_.cursor-plan]:max-h-[50vh] [&_.cursor-plan]:overflow-auto",
+  "[&_.plan-review]:[margin:0_20px_20px] [&_.plan-review]:max-h-[50vh] [&_.plan-review]:overflow-auto",
   "[&_>_.text-input]:w-[calc(100%_-_40px)] [&_>_.text-input]:[margin:12px_20px_0]",
   "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
   "[&:has(.workspace-manager)]:w-[640px] [&:has(.setup-log)]:w-[680px] [&_>_.field]:[margin:18px_20px_0]",
