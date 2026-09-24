@@ -44,3 +44,30 @@ export async function discoverCursorSkills(workspacePath: string): Promise<Compo
   }
   return [...skills.values()]
 }
+
+/** Cursor labels skills in its command list, as in `Create Cursor rules. (builtin skill)`. */
+const SKILL_LABEL = /\s*\((?:[\w-]+ )?skill\)$/i
+
+/**
+ * Cursor advertises skills among its commands, so its labels decide which entries are skills.
+ * Skills found on disk supply their SKILL.md path, and fill in when Cursor advertises nothing.
+ */
+export function cursorCommands(
+  advertised: ReadonlyArray<{ name: string; description: string; argumentHint?: string }>,
+  discovered: readonly ComposerCommand[],
+): ComposerCommand[] {
+  const paths = new Map(discovered.map((skill) => [skill.name, skill.path]))
+  const commands = advertised.map(({ name, description, argumentHint }): ComposerCommand => {
+    if (!SKILL_LABEL.test(description))
+      return { kind: "command", name, description, ...(argumentHint ? { argumentHint } : {}) }
+    const path = paths.get(name)
+    return {
+      kind: "skill",
+      name,
+      description: description.replace(SKILL_LABEL, ""),
+      ...(path ? { path } : {}),
+    }
+  })
+  const advertisedNames = new Set(advertised.map((command) => command.name))
+  return [...commands, ...discovered.filter((skill) => !advertisedNames.has(skill.name))]
+}

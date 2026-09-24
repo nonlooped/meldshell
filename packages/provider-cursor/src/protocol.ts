@@ -1,7 +1,7 @@
 import type { ProviderModelCatalogEntry, TurnDispatch } from "@meldshell/contracts"
 import type { ContentBlock, RequestPermissionResponse } from "@agentclientprotocol/sdk"
 import { readFile } from "node:fs/promises"
-import { extname } from "node:path"
+import { extname, isAbsolute } from "node:path"
 import { record, records, text, type RecordValue } from "./client"
 
 export const cursorModels = (session: RecordValue, image: boolean): ProviderModelCatalogEntry[] => {
@@ -29,6 +29,12 @@ export const cursorModels = (session: RecordValue, image: boolean): ProviderMode
     }))
 }
 
+const referenceText = ({ type, value }: TurnDispatch["attachments"][number]): string => {
+  if (type === "mention") return `Referenced file: ${value}`
+  // Skills Cursor advertises without a SKILL.md on disk arrive by name.
+  return isAbsolute(value) ? `Read and follow this skill: ${value}` : `Use the ${value} skill.`
+}
+
 export const cursorPrompt = async (
   dispatch: TurnDispatch,
   images: boolean,
@@ -38,7 +44,7 @@ export const cursorPrompt = async (
     if (attachment.type === "mention" || attachment.type === "skill") {
       prompt.push({
         type: "text",
-        text: `${attachment.type === "skill" ? "Read and follow this skill" : "Referenced file"}: ${attachment.value}`,
+        text: referenceText(attachment),
       })
       continue
     }
