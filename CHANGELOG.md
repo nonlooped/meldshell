@@ -4,6 +4,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-24
+
 ### Added
 
 - A workspace can define setup and run scripts in a `meldshell.json` file at the root of its repository: `{ "scripts": { "setup": "npm install", "run": "npm run dev" } }`. `run` can also name several commands to choose from, such as `{ "app": "npm run dev", "docs": "npm run docs" }`. MeldShell reads the file from the workspace folder, so it can be committed or kept untracked. Scripts run through `/bin/sh`, or `cmd.exe` on Windows.
@@ -166,7 +168,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/nonlooped/meldshell/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/nonlooped/meldshell/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nonlooped/meldshell/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nonlooped/meldshell/compare/v0.5.0...v0.6.0
