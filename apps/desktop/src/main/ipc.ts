@@ -11,6 +11,7 @@ import { updateService } from "./updater"
 import { getWebPageTitle } from "./web-page-title"
 import { registerTerminalIpc } from "./terminals"
 import { registerEditorIpc } from "./editors"
+import { registerPreviewIpc } from "./preview"
 
 // The site serves the account API; development uses the site dev server, which proxies it.
 const controlURL =
@@ -119,4 +120,5 @@ export const registerIpc = (): void => {
   ipcMain.handle(IPC.retryRemote, async () => (await remote()).retry())
   registerTerminalIpc()
   registerEditorIpc()
+  registerPreviewIpc()
 }

@@ -86,7 +86,7 @@ export async function readWorkspaceScripts(workspacePath: string): Promise<Works
  * The first of ten ports for a thread's servers. It is derived from the thread, so it stays the same
  * across restarts and is unlikely, though not certain, to match another thread's.
  */
-const threadPort = (threadId: string): number =>
+export const threadPort = (threadId: string): number =>
   20_000 + (createHash("sha256").update(threadId).digest().readUInt32BE(0) % 4_000) * 10
 
 /** Variables every workspace script and thread terminal receives. */

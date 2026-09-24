@@ -375,3 +375,14 @@
     box-shadow: none;
   }
 }
+
+/*
+ * Thread previews: a page keeps every pointer event it receives, so while a separator or a thread
+ * is dragged across it the page stands aside and the drag continues.
+ */
+@layer components {
+  body:has([data-separator="active"]) .preview-webview,
+  body:has([data-dragging]) .preview-webview {
+    pointer-events: none;
+  }
+}

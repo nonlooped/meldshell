@@ -52,6 +52,8 @@ const api: MeldShellApi = {
   desktop: {
     listEditors: () => ipcRenderer.invoke(IPC.listEditors),
     openInEditor: (input) => ipcRenderer.invoke(IPC.openInEditor, input),
+    threadPort: (threadId) => ipcRenderer.invoke(IPC.threadPort, threadId),
+    openExternal: (url) => ipcRenderer.invoke(IPC.openExternal, url),
   },
   terminal: {
     open: (input) => ipcRenderer.invoke(IPC.terminalOpen, input),

@@ -8,13 +8,15 @@ import { Pressable, FadeDiv } from "../ui/motion"
 import { useState } from "react"
 import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import { Group, Panel, Separator } from "react-resizable-panels"
-import { Columns2, Maximize2, MoreHorizontal, Rows2, SquareTerminal, X } from "lucide-react"
+import { Columns2, Globe, Maximize2, MoreHorizontal, Rows2, SquareTerminal, X } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { AppDialog, Button, DropdownMenu, IconButton, MenuAction } from "../ui/controls"
 import { ThreadView } from "../threads/ThreadView"
 import { TerminalPanel } from "../terminals/TerminalPanel"
 import { terminalApi, useTerminalStore } from "../terminals/terminal-store"
 import { useKeybindings } from "./keybindings"
+import { PreviewPanel } from "../preview/PreviewPanel"
+import { previewSupported, usePreviewStore } from "../preview/preview-store"
 import { useTabStore } from "./tab-store"
 import {
   movePane,
@@ -120,6 +122,7 @@ function ThreadTileHeader({
   const [picker, setPicker] = useState<SplitEdge | null>(null)
   const draggable = useThreadDraggable(thread.id, "pane")
   const terminalShown = useTerminalStore((state) => state.threads[thread.id]?.open === true)
+  const previewShown = usePreviewStore((state) => state.threads[thread.id]?.open === true)
   return (
     <div className="thread-tile-header flex min-w-0 items-center gap-[2px] [padding:3px_6px] border-b-[1px] border-b-[color:var(--line-subtle)] text-[var(--text-tertiary)]">
       <BaseButton
@@ -160,6 +163,14 @@ function ThreadTileHeader({
         >
           Show only this thread
         </MenuAction>
+        {previewSupported && (
+          <MenuAction
+            icon={<Globe size={13} />}
+            onClick={() => usePreviewStore.getState().toggle(thread.id)}
+          >
+            {previewShown ? "Hide preview" : "Show preview"}
+          </MenuAction>
+        )}
         {terminalApi !== undefined && (
           <MenuAction
             icon={<SquareTerminal size={13} />}
@@ -215,7 +226,7 @@ function ThreadTile({
 }
 
 /** The conversation, with the thread's terminal panel below it while that panel is shown. */
-function ThreadBody({
+function ConversationAndTerminal({
   snapshot,
   thread,
   searchTarget,
@@ -244,6 +255,41 @@ function ThreadBody({
           />
           <Panel id={terminalPanelId} defaultSize={`${terminals.size}%`} minSize="96px">
             <TerminalPanel thread={thread} terminals={terminals} />
+          </Panel>
+        </>
+      )}
+    </Group>
+  )
+}
+
+/** The conversation and terminal, with the thread's browser preview beside them while it is shown. */
+function ThreadBody(
+  props: Omit<WorkbenchProps, "threads"> & { thread: Thread },
+): React.JSX.Element {
+  const { thread } = props
+  const preview = usePreviewStore((state) => state.threads[thread.id])
+  const previewPanelId = `preview:${thread.id}`
+  return (
+    <Group
+      className="w-full h-full min-w-0 min-h-0"
+      orientation="horizontal"
+      onLayoutChanged={(layout, meta) => {
+        const size = layout[previewPanelId]
+        if (meta.isUserInteraction && size !== undefined)
+          usePreviewStore.getState().resize(thread.id, size)
+      }}
+    >
+      <Panel id={`work:${thread.id}`} minSize="280px">
+        <ConversationAndTerminal {...props} />
+      </Panel>
+      {preview?.open && (
+        <>
+          <Separator
+            className={`motion-colors ${paneSeparatorClasses}`}
+            aria-label="Resize preview"
+          />
+          <Panel id={previewPanelId} defaultSize={`${preview.size}%`} minSize="240px">
+            <PreviewPanel thread={thread} preview={preview} />
           </Panel>
         </>
       )}

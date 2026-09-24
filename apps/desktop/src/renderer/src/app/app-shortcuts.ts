@@ -13,6 +13,7 @@ interface ShortcutActions {
   toggleInbox: () => void
   toggleSourceControl: () => void
   toggleTerminal: () => void
+  togglePreview: () => void
   openInEditor: () => void
 }
 
@@ -48,6 +49,7 @@ export function handleAppShortcut(
     toggleInbox: actions.toggleInbox,
     toggleSourceControl: actions.toggleSourceControl,
     toggleTerminal: actions.toggleTerminal,
+    togglePreview: actions.togglePreview,
     openInEditor: actions.openInEditor,
   }
   run[action]()

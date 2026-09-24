@@ -2,6 +2,7 @@ import { join } from "node:path"
 import { logStartupTiming } from "./runtime/startup-timing"
 import type { AppSnapshot } from "@meldshell/contracts"
 import { is } from "@electron-toolkit/utils"
+import { guardPreviews } from "./preview"
 import { app, BrowserWindow, Menu, nativeTheme, shell, type Event } from "electron"
 
 let mainWindow: BrowserWindow | null = null
@@ -68,11 +69,14 @@ export const createWindow = (onClose: (event: Event) => void): void => {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // The thread preview shows pages in `<webview>`; `guardPreviews` locks each guest down.
+      webviewTag: true,
     },
   })
 
   mainWindow = window
   if (is.dev) watchDevelopmentShortcuts(window)
+  guardPreviews(window)
   window.on("close", onClose)
   window.once("ready-to-show", () => {
     logStartupTiming("ready-to-show")
