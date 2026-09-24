@@ -4,6 +4,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-24
+
 ### Added
 
 - The composer autocompletes workspace files and folders after `@`, the selected harness's skills after `$`, and its commands after a leading `/`. Accepted suggestions become pills in the message and are deleted as a unit.
@@ -98,7 +100,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/nonlooped/meldshell/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/nonlooped/meldshell/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/nonlooped/meldshell/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/nonlooped/meldshell/releases/tag/v0.2.0
