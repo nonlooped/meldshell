@@ -33,7 +33,7 @@
     "effect": "3.22.1",
     "katex": "0.18.7",
     "lucide-react": "1.40.0",
-    "mermaid": "11.17.2",
+    "mermaid": "12.0.0",
     "motion": "13.4.0",
     "partysocket": "^1.3.0",
     "react": "19.2.8",
