@@ -6,7 +6,14 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Changed
 
+- Settings › Providers shows each provider's connection status and version without expanding it, and opens providers that need attention. Connection problems say what to do next.
+- Each model has one Shown, Hidden, or Off choice instead of separate Hidden and Enabled switches, and the model list shows identifiers, compact reasoning ranges, and Default, Custom, and Fast labels. Long lists can be filtered.
+- Only custom models can be removed; built-in models are turned off instead, because the provider adds them back.
 - The inbox and source control sidebars slide open and closed when toggled instead of snapping.
+
+### Fixed
+
+- Adding a model or editing an identifier warns when the provider already has a model with that identifier instead of silently ignoring it, and built-in identifiers can no longer be changed.
 
 ## [0.6.0] - 2026-09-24
 
