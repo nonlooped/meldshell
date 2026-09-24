@@ -119,7 +119,7 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
     UpdateProvider: (input) => exposeCoreError(updateProvider(input)),
     UpsertModel: (input) => exposeCoreError(upsertModel(input)),
     DeleteModel: ({ modelId }) => exposeCoreError(deleteModel(modelId)),
-    ResetProviderCatalog: () => exposeCoreError(resetProviderCatalog),
+    ResetProviderCatalog: ({ providerId }) => exposeCoreError(resetProviderCatalog(providerId)),
     SyncProviderCatalog: (input) => exposeCoreError(syncProviderCatalog(input)),
     SetThreadSettings: (input) => exposeCoreError(setThreadSettings(input)),
     SetAppSettings: (input) => exposeCoreError(setAppSettings(input)),

@@ -187,7 +187,9 @@ export const requests = {
   ),
   upsertModel: request<(input: UpsertModelInput) => Promise<AppSnapshot>>("meldshell:upsert-model"),
   deleteModel: request<(modelId: string) => Promise<AppSnapshot>>("meldshell:delete-model"),
-  resetProviderCatalog: request<() => Promise<AppSnapshot>>("meldshell:reset-provider-catalog"),
+  resetProviderCatalog: request<(providerId: string) => Promise<AppSnapshot>>(
+    "meldshell:reset-provider-catalog",
+  ),
   setThreadSettings: request<(input: SetThreadSettingsInput) => Promise<AppSnapshot>>(
     "meldshell:set-thread-settings",
   ),

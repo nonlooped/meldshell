@@ -50,7 +50,7 @@ export class CoreRpcs extends RpcGroup.make(
   snapshotRpc("UpdateProvider", UpdateProviderInput),
   snapshotRpc("UpsertModel", UpsertModelInput),
   snapshotRpc("DeleteModel", Schema.Struct({ modelId: Schema.String })),
-  Rpc.make("ResetProviderCatalog", { success: AppSnapshot, error: CoreError }),
+  snapshotRpc("ResetProviderCatalog", Schema.Struct({ providerId: Schema.String })),
   snapshotRpc("SyncProviderCatalog", SyncProviderCatalogInput),
   snapshotRpc("SetThreadSettings", SetThreadSettingsInput),
   snapshotRpc("SetAppSettings", SetAppSettingsInput),

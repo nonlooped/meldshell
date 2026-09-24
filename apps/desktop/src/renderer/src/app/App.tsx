@@ -470,7 +470,7 @@ export function App(): React.JSX.Element {
             }
             onUpsertModel={(input) => upsertModelMutation.mutate(input)}
             onDeleteModel={(modelId) => deleteModelMutation.mutate(modelId)}
-            onResetCatalog={() => resetCatalogMutation.mutate()}
+            onResetCatalog={(providerId) => resetCatalogMutation.mutate(providerId)}
             onChangeAppSettings={(input) => appSettingsMutation.mutate(input)}
           />
         ) : (
