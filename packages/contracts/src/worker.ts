@@ -21,6 +21,11 @@ export const WorkerCommand = Schema.Union(
   Schema.Struct({ type: Schema.Literal("shutdown") }),
   Schema.Struct({ type: Schema.Literal("get-usage"), requestId: Schema.String }),
   Schema.Struct({ type: Schema.Literal("cancel-usage"), requestId: Schema.String }),
+  Schema.Struct({
+    type: Schema.Literal("list-commands"),
+    requestId: Schema.String,
+    workspacePath: Schema.String,
+  }),
 )
 export type WorkerCommand = typeof WorkerCommand.Type
 export type ProviderWorkerInput = WorkerCommand | "probe-now"

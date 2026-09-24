@@ -6,6 +6,7 @@ import { useSelectedProvider } from "../data/providers"
 import { emptyDraft, useThreadDrafts } from "../app/thread-drafts"
 import { ErrorToast } from "../ui/Notice"
 import { Composer } from "./Composer"
+import { skillAttachments } from "./composer-completion"
 import { Transcript } from "./Transcript"
 
 export function ThreadView({
@@ -45,7 +46,10 @@ export function ThreadView({
       await submitTurnMutation.mutateAsync({
         threadId: thread.id,
         text: sent.text,
-        attachments: sent.attachments.map(({ type, value, name }) => ({ type, value, name })),
+        attachments: [
+          ...sent.attachments.map(({ type, value, name }) => ({ type, value, name })),
+          ...skillAttachments(sent.text, sent.tokens),
+        ],
       })
       useThreadDrafts.getState().finish(thread.id, sent)
     } catch (error) {
@@ -75,6 +79,8 @@ export function ThreadView({
           threadId={thread.id}
           draft={draft.text}
           onDraftChange={(text) => update(thread.id, { text })}
+          tokens={draft.tokens}
+          onTokensChange={(tokens) => update(thread.id, { tokens })}
           providerReady={providerReady}
           providerDetail={providerStatus.detail}
           onRecheckProvider={() =>

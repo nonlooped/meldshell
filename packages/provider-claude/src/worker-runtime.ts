@@ -463,6 +463,53 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
     }
   }
 
+  const listCommands = async (requestId: string, workspacePath: string): Promise<void> => {
+    const controller = new AbortController()
+    controllers.add(controller)
+    const timeout = setTimeout(() => controller.abort(), 20_000)
+    let session: Query | undefined
+    try {
+      session = query({
+        prompt: idleInput(controller.signal),
+        options: {
+          ...spawnOptions(),
+          cwd: workspacePath,
+          abortController: controller,
+          // Project and local settings contribute the workspace's own commands and skills.
+          settingSources: ["user", "project", "local"],
+          tools: [],
+          permissionMode: "dontAsk",
+          persistSession: false,
+        },
+      })
+      queries.add(session)
+      const [commands, skills] = await Promise.all([
+        session.supportedCommands(),
+        session.reloadSkills().then(
+          (response) => new Set(response.skills.map((skill) => skill.name)),
+          () => new Set<string>(),
+        ),
+      ])
+      publish({
+        type: "commands-result",
+        requestId,
+        commands: commands.map((command) => ({
+          kind: skills.has(command.name) ? "skill" : "command",
+          name: command.name,
+          description: command.description,
+          ...(command.argumentHint ? { argumentHint: command.argumentHint } : {}),
+        })),
+      })
+    } catch (cause) {
+      publish({ type: "commands-result", requestId, error: errorText(cause) })
+    } finally {
+      clearTimeout(timeout)
+      controller.abort()
+      closeQuery(session)
+      controllers.delete(controller)
+    }
+  }
+
   const shutdown = async (): Promise<void> => {
     if (stopping) return
     stopping = true
@@ -546,6 +593,9 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
           break
         case "cancel-usage":
           usageRequests.get(message.requestId)?.abort()
+          break
+        case "list-commands":
+          void listCommands(message.requestId, message.workspacePath)
           break
         case "start-turn":
           startTurn(message.dispatch)

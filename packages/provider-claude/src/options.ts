@@ -1,7 +1,7 @@
 import type { Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk"
 import type { TurnDispatch } from "@meldshell/contracts"
 import { readFile } from "node:fs/promises"
-import { extname } from "node:path"
+import { extname, isAbsolute } from "node:path"
 
 /** Claude permission modes are tool policies. They do not provide Codex's OS sandbox. */
 export const claudeOptions = (dispatch: TurnDispatch): Options => {
@@ -67,15 +67,18 @@ const localImage = async (value: string): Promise<string> => {
   if (bytes.length > 20 * 1024 * 1024) throw new Error("The attached image exceeds 20 MB.")
   return `data:${media};base64,${bytes.toString("base64")}`
 }
+const referenceText = ({ type, value }: TurnDispatch["attachments"][number]): string => {
+  if (type === "mention") return `Referenced file: ${value}`
+  // Skills chosen by `$name` come from Claude Code's own list, which carries names, not paths.
+  return isAbsolute(value) ? `Read and follow this skill: ${value}` : `Use the ${value} skill.`
+}
+
 export const claudePrompt = async (dispatch: TurnDispatch): Promise<SDKUserMessage> => {
   const content: Exclude<SDKUserMessage["message"]["content"], string> = []
   if (dispatch.text) content.push({ type: "text", text: dispatch.text })
   for (const attachment of dispatch.attachments) {
     if (attachment.type === "mention" || attachment.type === "skill") {
-      content.push({
-        type: "text",
-        text: `${attachment.type === "skill" ? "Read and follow this skill" : "Referenced file"}: ${attachment.value}`,
-      })
+      content.push({ type: "text", text: referenceText(attachment) })
       continue
     }
     let value = attachment.value

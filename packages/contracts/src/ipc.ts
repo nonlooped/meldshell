@@ -21,6 +21,7 @@ import type {
   InputAttachment,
   ThreadPage,
   ThreadPageQuery,
+  ComposerCommand,
 } from "./models"
 
 export type ComposerAttachment = InputAttachment & { readonly previewUrl?: string }
@@ -34,6 +35,11 @@ export interface DirectoryEntry {
   readonly path: string
   readonly directory: boolean
   readonly status: string
+}
+export interface WorkspacePathMatch {
+  /** Workspace-relative, `/`-separated; directories end with `/`. */
+  readonly path: string
+  readonly directory: boolean
 }
 export interface FilePreview {
   readonly kind: "text" | "markdown" | "html" | "image" | "unsupported"
@@ -116,6 +122,16 @@ export const requests = {
   listDirectory: request<(input: WorkspaceFileInput) => Promise<readonly DirectoryEntry[]>>(
     "meldshell:list-directory",
   ),
+  searchWorkspacePaths: request<
+    (input: {
+      workspaceId: string
+      query: string
+      limit?: number
+    }) => Promise<readonly WorkspacePathMatch[]>
+  >("meldshell:search-workspace-paths"),
+  listComposerCommands: request<
+    (input: { workspaceId: string; harness: string }) => Promise<readonly ComposerCommand[]>
+  >("meldshell:list-composer-commands"),
   readWorkspaceFile: request<(input: WorkspaceFileInput) => Promise<FilePreview>>(
     "meldshell:read-workspace-file",
   ),

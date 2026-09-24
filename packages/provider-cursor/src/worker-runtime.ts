@@ -5,6 +5,7 @@ import { RequestError, type RequestPermissionResponse } from "@agentclientprotoc
 import { type TitleRequest, type TurnDispatch, type CursorStatus } from "@meldshell/contracts"
 import { effortOption, modelSelection, parameterizedModels } from "./model-config"
 import { readCursorUsage } from "./usage"
+import { discoverCursorSkills } from "./skills"
 import {
   CursorClient,
   discoverCursor,
@@ -36,6 +37,8 @@ interface Session {
   replaying: boolean
   interactive: boolean
   permissions?: Pick<TurnDispatch, "sandbox" | "approvalPolicy">
+  availableCommands?: readonly RecordValue[]
+  onCommands?: () => void
 }
 interface RunningTurn {
   dispatch: TurnDispatch
@@ -189,6 +192,14 @@ export const runCursorWorker = (
       sessionUpdate: ({ sessionId, update }) => {
         if (sessionId === session.sessionId && update.sessionUpdate === "config_option_update")
           session.configuration = { ...session.configuration, configOptions: update.configOptions }
+        // Each client owns one session, and the list can arrive before session/new returns its ID.
+        if (
+          (!session.sessionId || sessionId === session.sessionId) &&
+          update.sessionUpdate === "available_commands_update"
+        ) {
+          session.availableCommands = records(update.availableCommands)
+          session.onCommands?.()
+        }
       },
       requestPermission: ({ params, signal }) =>
         onRequest(
@@ -538,6 +549,48 @@ export const runCursorWorker = (
       usageRequests.delete(requestId)
     }
   }
+  /** Cursor only advertises commands on a live session, so open a throwaway one in the workspace. */
+  const listCommands = async (requestId: string, workspacePath: string): Promise<void> => {
+    let session: Session | undefined
+    try {
+      session = await createSession(workspacePath, null, null)
+      const current = session
+      if (current.availableCommands === undefined)
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 3_000)
+          current.onCommands = () => {
+            clearTimeout(timer)
+            resolve()
+          }
+        })
+      const skills = await discoverCursorSkills(workspacePath)
+      if (stopping) return
+      publish({
+        type: "commands-result",
+        requestId,
+        commands: [
+          ...(current.availableCommands ?? []).flatMap((command) => {
+            const name = text(command.name)
+            if (!name) return []
+            const hint = text(record(command.input).hint)
+            return [
+              {
+                kind: "command",
+                name,
+                description: text(command.description),
+                ...(hint ? { argumentHint: hint } : {}),
+              },
+            ]
+          }),
+          ...skills,
+        ],
+      })
+    } catch (cause) {
+      if (!stopping) publish({ type: "commands-result", requestId, error: errorText(cause) })
+    } finally {
+      if (session) await closeSession(session).catch(() => undefined)
+    }
+  }
   const shutdown = async (): Promise<void> => {
     stopping = true
     for (const controller of usageRequests.values()) controller.abort()
@@ -608,6 +661,9 @@ export const runCursorWorker = (
           break
         case "cancel-usage":
           usageRequests.get(message.requestId)?.abort()
+          break
+        case "list-commands":
+          void listCommands(message.requestId, message.workspacePath)
           break
         case "shutdown":
           void shutdown().then(

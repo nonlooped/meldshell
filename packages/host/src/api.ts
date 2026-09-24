@@ -15,6 +15,7 @@ import {
   commitMessagePrompt,
 } from "./git"
 import { listDirectory, readWorkspaceFile } from "./workspace-files"
+import { searchWorkspacePaths } from "./workspace-search"
 import { requestGeneratedText } from "./generated-text"
 
 type Operation = {
@@ -96,6 +97,34 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.resolveApproval]: operation(C.ResolveApprovalInput, false, resolveApproval),
   [C.IPC.listDirectory]: operation(fileInput, true, (input) =>
     withWorkspace(input.workspaceId, (path) => listDirectory(path, input.path)),
+  ),
+  [C.IPC.searchWorkspacePaths]: operation(
+    Schema.Struct({
+      workspaceId: Schema.String,
+      query: Schema.String.pipe(Schema.maxLength(1024)),
+      limit: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.between(1, 200))),
+    }),
+    true,
+    (input) =>
+      withWorkspace(input.workspaceId, (path) =>
+        searchWorkspacePaths(path, input.query, input.limit),
+      ),
+  ),
+  [C.IPC.listComposerCommands]: operation(
+    Schema.Struct({
+      workspaceId: Schema.String,
+      harness: Schema.Literal("codex", "claude-code", "cursor"),
+    }),
+    true,
+    (input) =>
+      Effect.gen(function* () {
+        const core = yield* CoreClient
+        const snapshot = yield* core.GetSnapshot()
+        const workspace = snapshot.workspaces.find((entry) => entry.id === input.workspaceId)
+        if (!workspace) return yield* Effect.fail(new Error("Workspace not found."))
+        const service = yield* providerFor(input.harness)
+        return yield* service.commands(workspace.path)
+      }),
   ),
   [C.IPC.readWorkspaceFile]: operation(fileInput, true, (input) =>
     withWorkspace(input.workspaceId, (path) => readWorkspaceFile(path, input.path)),

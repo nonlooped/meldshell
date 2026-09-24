@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto"
 import {
   ProviderStatus as ProviderStatusSchema,
   CodexUsage as CodexUsageSchema,
+  ComposerCommand as ComposerCommandSchema,
   ProviderSessionInput as ProviderSessionInputSchema,
   RuntimeEventInput as RuntimeEventInputSchema,
   SetThreadTitleInput as SetThreadTitleInputSchema,
@@ -12,6 +13,7 @@ import {
   type AppSnapshot,
   type ProviderStatus,
   type CodexUsage,
+  type ComposerCommand,
   type RuntimeEventInput,
   type TurnDispatch,
   type ProviderWorkerInput,
@@ -27,6 +29,7 @@ export interface ProviderService {
   readonly interrupt: (threadId: string, turnId: string) => Effect.Effect<void, Error>
   readonly status: Effect.Effect<ProviderStatus>
   readonly usage: Effect.Effect<CodexUsage, Error>
+  readonly commands: (workspacePath: string) => Effect.Effect<ReadonlyArray<ComposerCommand>, Error>
   readonly refresh: Effect.Effect<void, Error>
   readonly send: (message: ProviderWorkerInput) => Effect.Effect<void, Error>
   readonly shutdown: Effect.Effect<void>
@@ -100,10 +103,19 @@ const deliverCommand = (
     }),
   )
 
-const requestUsage = (child: HostProcess, label: string): Effect.Effect<CodexUsage, Error> =>
-  Effect.async<CodexUsage, Error>((resume) => {
+/** Sends one request to a worker and decodes the reply that carries the same request ID. */
+const requestWorker = <A, I>(
+  child: HostProcess,
+  label: string,
+  request: { readonly type: string; readonly result: string; readonly cancel?: string },
+  fields: Record<string, unknown>,
+  schema: Schema.Schema<A, I, never>,
+  field: string,
+  timeout: { readonly duration: `${number} seconds`; readonly message: string },
+): Effect.Effect<A, Error> =>
+  Effect.async<A, Error>((resume) => {
     const requestId = randomUUID()
-    const finish = (result: Effect.Effect<CodexUsage, Error>): void => {
+    const finish = (result: Effect.Effect<A, Error>): void => {
       child.off("message", onMessage)
       child.off("exit", onExit)
       resume(result)
@@ -111,16 +123,16 @@ const requestUsage = (child: HostProcess, label: string): Effect.Effect<CodexUsa
     const onMessage = (message: unknown): void => {
       if (typeof message !== "object" || message === null) return
       const record = message as Record<string, unknown>
-      if (record.type !== "usage-result" || record.requestId !== requestId) return
+      if (record.type !== request.result || record.requestId !== requestId) return
       if (typeof record.error === "string") {
         finish(Effect.fail(new Error(record.error)))
         return
       }
-      const decoded = Schema.decodeUnknownEither(CodexUsageSchema)(record.usage)
+      const decoded = Schema.decodeUnknownEither(schema)(record[field])
       finish(
         Either.isRight(decoded)
           ? Effect.succeed(decoded.right)
-          : Effect.fail(new Error(`${label} returned an invalid usage response.`)),
+          : Effect.fail(new Error(`${label} returned an invalid ${field} response.`)),
       )
     }
     const onExit = (): void =>
@@ -128,24 +140,53 @@ const requestUsage = (child: HostProcess, label: string): Effect.Effect<CodexUsa
     child.on("message", onMessage)
     child.once("exit", onExit)
     try {
-      child.postMessage({ type: "get-usage", requestId })
+      child.postMessage({ ...fields, type: request.type, requestId })
     } catch (cause) {
       finish(Effect.fail(new Error(messageText(cause))))
     }
     return Effect.sync(() => {
       child.off("message", onMessage)
       child.off("exit", onExit)
+      if (request.cancel === undefined) return
       try {
-        child.postMessage({ type: "cancel-usage", requestId })
+        child.postMessage({ type: request.cancel, requestId })
       } catch {
         /* Worker already exited. */
       }
     })
   }).pipe(
     Effect.timeoutFail({
-      duration: "20 seconds",
-      onTimeout: () => new Error(`${label} usage took too long to load. Try again.`),
+      duration: timeout.duration,
+      onTimeout: () => new Error(timeout.message),
     }),
+  )
+
+const requestUsage = (child: HostProcess, label: string): Effect.Effect<CodexUsage, Error> =>
+  requestWorker(
+    child,
+    label,
+    { type: "get-usage", result: "usage-result", cancel: "cancel-usage" },
+    {},
+    CodexUsageSchema,
+    "usage",
+    { duration: "20 seconds", message: `${label} usage took too long to load. Try again.` },
+  )
+
+const ComposerCommands = Schema.Array(ComposerCommandSchema)
+
+const requestCommands = (
+  child: HostProcess,
+  label: string,
+  workspacePath: string,
+): Effect.Effect<ReadonlyArray<ComposerCommand>, Error> =>
+  requestWorker(
+    child,
+    label,
+    { type: "list-commands", result: "commands-result" },
+    { workspacePath },
+    ComposerCommands,
+    "commands",
+    { duration: "30 seconds", message: `${label} commands took too long to load.` },
   )
 
 const providerRuntime = (
@@ -698,6 +739,14 @@ const providerRuntime = (
           return requestUsage(child, config.label)
         }),
       ),
+      commands: (workspacePath) =>
+        Ref.get(processRef).pipe(
+          Effect.flatMap((child) =>
+            child === null
+              ? Effect.fail(new Error(`${config.label} is restarting. Try again shortly.`))
+              : requestCommands(child, config.label, workspacePath),
+          ),
+        ),
       status: Ref.get(statusRef),
       refresh: Effect.suspend(() =>
         publishStatus(probingStatus()).pipe(Effect.andThen(send("probe-now"))),
