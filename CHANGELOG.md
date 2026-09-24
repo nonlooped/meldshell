@@ -16,6 +16,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Restore built-in models only resets the provider it was chosen for instead of every provider.
 - Adding a model or editing an identifier warns when the provider already has a model with that identifier instead of silently ignoring it, and built-in identifiers can no longer be changed.
 - With Cursor, `/` lists Cursor's commands and `$` lists its skills, including built-in skills. Before, skills also showed up under `/` as commands.
+- With Codex, `/` says that Codex has no slash commands and points to `$` for skills instead of showing "No matching commands".
 
 ## [0.6.0] - 2026-09-24
 

@@ -47,11 +47,16 @@ const STATUS = {
 function completionStatus(
   trigger: CompletionTrigger | null,
   source: { readonly isError: boolean; readonly error: unknown; readonly isPending: boolean },
+  commands: readonly ComposerCommand[] | undefined,
 ): string {
   const copy = STATUS[trigger?.kind ?? "path"]
   if (source.isError)
     return source.error instanceof Error ? source.error.message : "Could not load suggestions."
-  return source.isPending ? copy.loading : copy.empty
+  if (source.isPending) return copy.loading
+  // Codex's app server exposes skills but no slash commands.
+  if (trigger?.kind === "command" && !commands?.some((command) => command.kind === "command"))
+    return "This harness has no slash commands. Type $ for skills."
+  return copy.empty
 }
 
 /** The text a completion inserts, and the pill that it leaves behind. */
@@ -238,7 +243,7 @@ export function useComposerCompletion({
       trigger={trigger}
       items={items}
       selected={selected}
-      status={completionStatus(trigger, trigger?.kind === "path" ? paths : commands)}
+      status={completionStatus(trigger, trigger?.kind === "path" ? paths : commands, commands.data)}
       onHover={setActive}
       onChoose={(index) => trigger !== null && accept(items[index]!, trigger)}
     />
