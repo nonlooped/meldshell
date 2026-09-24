@@ -11,6 +11,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 ### Changed
 
 - Stable releases are published automatically once a day when there are new changes, and each one is a new minor version.
+- The message composer is translucent and blurs the conversation scrolling behind it. With reduced transparency turned on, it keeps a solid background.
 
 ## [0.9.0] - 2026-09-24
 

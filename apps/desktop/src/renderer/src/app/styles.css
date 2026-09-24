@@ -90,6 +90,7 @@
     color-scheme: dark;
     --scrim: rgba(22, 22, 23, var(--app-opacity-preview, var(--app-opacity, 0.88)));
     --surface-raised: rgba(31, 31, 33, 0.774);
+    --surface-composer: rgba(31, 31, 33, 0.42);
     --surface-overlay: rgba(26, 26, 28, 0.81);
     --surface-menu: rgba(35, 35, 35, 0.96);
     --surface-hover: rgba(255, 255, 255, 0.0405);
@@ -276,6 +277,7 @@
     /* A dimmed paper base: surfaces stay a few steps lighter than it, never white. */
     --scrim: rgba(226, 225, 221, var(--app-opacity-preview, var(--app-opacity, 0.94)));
     --surface-raised: rgba(236, 235, 231, 0.95);
+    --surface-composer: rgba(236, 235, 231, 0.6);
     --surface-overlay: rgba(232, 231, 227, 0.98);
     --surface-menu: rgba(238, 237, 233, 0.97);
     --surface-hover: rgba(40, 36, 30, 0.05);
