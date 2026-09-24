@@ -538,6 +538,7 @@ export function Transcript({
   workspace,
   scope,
   branch,
+  origin,
   running = false,
 }: {
   readonly running?: boolean
@@ -548,6 +549,8 @@ export function Transcript({
   readonly scope?: WorkspaceScope
   /** The thread's own branch when it works in a worktree. */
   readonly branch?: string
+  /** Replaces the branch label on the workspace line before the first turn. */
+  readonly origin?: React.ReactNode
 }): React.JSX.Element {
   "use no memo"
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -620,19 +623,17 @@ export function Transcript({
       <div className="transcript-origin [padding:0_clamp(24px,_7vw,_104px)_12px]">
         <FadeDiv className="w-full max-w-[680px] [margin:0_auto]">
           {workspace !== undefined && (
-            <p
-              className="flex [align-items:baseline] gap-[8px] m-0 px-[2px] text-[12px] leading-[1.5] [&_span]:shrink-0 [&_span]:text-[var(--text-tertiary)] [&_strong]:overflow-hidden [&_strong]:text-[var(--text-secondary)] [&_strong]:font-medium [&_strong]:text-ellipsis [&_strong]:whitespace-nowrap"
-              title={workspace.path}
-            >
+            <div className="flex [align-items:baseline] gap-[8px] m-0 px-[2px] text-[12px] leading-[1.5] [&_>_span]:shrink-0 [&_>_span]:text-[var(--text-tertiary)] [&_>_strong]:overflow-hidden [&_>_strong]:text-[var(--text-secondary)] [&_>_strong]:font-medium [&_>_strong]:text-ellipsis [&_>_strong]:whitespace-nowrap">
               <span>Workspace</span>
-              <strong>{workspace.name}</strong>
-              {branch !== undefined && (
-                <>
-                  <span>Branch</span>
-                  <strong>{branch}</strong>
-                </>
-              )}
-            </p>
+              <strong title={workspace.path}>{workspace.name}</strong>
+              {origin ??
+                (branch !== undefined && (
+                  <>
+                    <span className="ml-[10px]">Branch</span>
+                    <strong>{branch}</strong>
+                  </>
+                ))}
+            </div>
           )}
         </FadeDiv>
       </div>

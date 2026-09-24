@@ -361,6 +361,17 @@ function NewThreadDialog({
   )
 }
 
+function DeleteWorktreeNote({ thread }: { thread: Thread | null }): React.JSX.Element | null {
+  const worktree = thread?.worktree
+  if (worktree === undefined || worktree.state === "removed") return null
+  return (
+    <p>
+      Its worktree folder is removed too. The branch <code>{worktree.branch}</code> and its commits
+      are kept.
+    </p>
+  )
+}
+
 export function App(): React.JSX.Element {
   const openThreadIds = useTabStore((state) => state.openThreadIds)
   const selectedThreadId = useTabStore((state) => state.selectedThreadId)
@@ -857,12 +868,7 @@ export function App(): React.JSX.Element {
           <p>
             “{deleteTarget?.title}” and its complete history will be removed. This cannot be undone.
           </p>
-          {deleteTarget?.worktree !== undefined && deleteTarget.worktree.state !== "removed" && (
-            <p>
-              Its worktree folder is removed too. The branch{" "}
-              <code>{deleteTarget.worktree.branch}</code> and its commits are kept.
-            </p>
-          )}
+          <DeleteWorktreeNote thread={deleteTarget} />
         </AppDialog>
       </Tabs.Root>
     </MotionPreferences>

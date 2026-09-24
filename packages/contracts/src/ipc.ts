@@ -187,6 +187,10 @@ export const requests = {
   getWorktreeStatus: request<(threadId: string) => Promise<WorktreeStatus>>(
     "meldshell:get-worktree-status",
   ),
+  /** Moves a thread that has not started onto its own branch, or back to the workspace folder. */
+  setThreadIsolated: request<
+    (input: { threadId: string; isolated: boolean }) => Promise<AppSnapshot>
+  >("meldshell:set-thread-isolated"),
   mergeWorktree: request<(threadId: string) => Promise<void>>("meldshell:merge-worktree"),
   removeWorktree: request<
     (input: { threadId: string; deleteBranch: boolean }) => Promise<AppSnapshot>

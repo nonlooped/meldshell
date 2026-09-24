@@ -56,6 +56,28 @@ export const scopePath = (scope: WorkspaceScope) =>
     return workspace.path
   })
 
+/**
+ * Creates a worktree and hands it to `record`. If the core refuses the record, the worktree and its
+ * branch are removed again so no orphaned checkout is left behind.
+ */
+const withNewWorktree = <A, E>(
+  workspacePath: string,
+  record: (worktree: Awaited<ReturnType<typeof createWorktree>>) => Effect.Effect<A, E>,
+) =>
+  Effect.gen(function* () {
+    const platform = yield* HostPlatform
+    const worktree = yield* attempt(() =>
+      createWorktree(workspacePath, join(dirname(platform.databasePath), "worktrees")),
+    )
+    return yield* record(worktree).pipe(
+      Effect.tapError(() =>
+        attempt(() =>
+          removeWorktree(workspacePath, worktree, { force: true, deleteBranch: true }),
+        ).pipe(Effect.catchAll(Effect.logError)),
+      ),
+    )
+  })
+
 export const createThread = (input: CreateThreadInput) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
@@ -65,19 +87,39 @@ export const createThread = (input: CreateThreadInput) =>
     }
     if (input.isolated !== true) return yield* core.CreateThread(record)
     const workspacePath = yield* scopePath({ workspaceId: input.workspaceId })
-    const platform = yield* HostPlatform
-    const worktree = yield* attempt(() =>
-      createWorktree(workspacePath, join(dirname(platform.databasePath), "worktrees")),
+    return yield* withNewWorktree(workspacePath, (worktree) =>
+      core.CreateThread({ ...record, worktree }),
     )
-    return yield* core
-      .CreateThread({ ...record, worktree })
-      .pipe(
-        Effect.tapError(() =>
-          attempt(() =>
-            removeWorktree(workspacePath, worktree, { force: true, deleteBranch: true }),
-          ).pipe(Effect.catchAll(Effect.logError)),
-        ),
+  })
+
+/**
+ * Moves a thread that has not started onto its own branch, or back to the workspace folder. Going
+ * back deletes the unused branch; uncommitted files in the worktree block it.
+ */
+export const setThreadIsolated = (input: {
+  readonly threadId: string
+  readonly isolated: boolean
+}) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const location = yield* core.GetThreadLocation({ threadId: input.threadId })
+    const current = location.worktree?.state === "removed" ? null : location.worktree
+    if (input.isolated) {
+      if (current !== null) return yield* core.GetSnapshot()
+      return yield* withNewWorktree(location.workspacePath, (worktree) =>
+        core.SetDraftWorktree({ threadId: input.threadId, worktree }),
       )
+    }
+    if (current === null) return yield* core.GetSnapshot()
+    if (yield* hasUncommittedWork(location))
+      return yield* Effect.fail(
+        new Error("This thread's worktree has uncommitted changes, so it was kept."),
+      )
+    const snapshot = yield* core.SetDraftWorktree({ threadId: input.threadId, worktree: null })
+    yield* attempt(() =>
+      removeWorktree(location.workspacePath, current, { force: false, deleteBranch: true }),
+    ).pipe(Effect.catchAll(Effect.logError))
+    return snapshot
   })
 
 /** Deleting a thread removes its checkout but keeps the branch, so committed work survives. */

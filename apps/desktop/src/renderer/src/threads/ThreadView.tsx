@@ -9,6 +9,7 @@ import { ErrorToast } from "../ui/Notice"
 import { Composer } from "./Composer"
 import { skillAttachments } from "./composer-completion"
 import { Transcript } from "./Transcript"
+import { ThreadBranchChoice } from "./ThreadBranchChoice"
 
 export function ThreadView({
   snapshot,
@@ -71,6 +72,7 @@ export function ThreadView({
           workspace={snapshot.workspaces.find((workspace) => workspace.id === thread.workspaceId)}
           scope={workspaceScope(thread)}
           branch={thread.worktree?.branch}
+          origin={<ThreadBranchChoice thread={thread} />}
           targetTurnId={
             searchTarget?.thread.id === thread.id
               ? (searchTarget.turnId ?? `event:${searchTarget.eventId}`)

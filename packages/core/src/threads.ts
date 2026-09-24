@@ -218,6 +218,34 @@ export const listWorktreeThreads = (workspaceId?: string) =>
     return rows.map(fromLocationRow)
   })
 
+/** Only a thread with no turns or queued input may change folders, so no work is split across two. */
+export const setDraftWorktree = (
+  threadId: string,
+  worktree: Omit<ThreadWorktree, "state"> | null,
+) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const started = yield* sql`
+      SELECT 1 FROM threads t WHERE t.id = ${threadId} AND (
+        EXISTS (SELECT 1 FROM turns r WHERE r.thread_id = t.id)
+        OR EXISTS (SELECT 1 FROM queued_inputs q WHERE q.thread_id = t.id)
+      )
+    `
+    if (started.length > 0)
+      return yield* Effect.fail(
+        new CoreProtocolError({
+          message: "A thread's branch can only be chosen before its first message.",
+        }),
+      )
+    yield* sql`UPDATE threads SET
+      worktree_path = ${worktree?.path ?? null},
+      worktree_branch = ${worktree?.branch ?? null},
+      worktree_base = ${worktree?.baseBranch ?? null},
+      worktree_state = ${worktree === null ? null : "ready"}
+      WHERE id = ${threadId}`
+    return yield* getSnapshot
+  }).pipe(transaction)
+
 export const setWorktreeState = (threadId: string, state: ThreadWorktree["state"]) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
