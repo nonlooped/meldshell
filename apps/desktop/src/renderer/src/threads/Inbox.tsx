@@ -4,13 +4,16 @@ import { useRef, useState } from "react"
 import type { Provider, Thread, Workspace } from "@meldshell/contracts"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import {
+  AlarmClock,
   Archive,
+  ArchiveRestore,
   ChevronDown,
   ChevronsUpDown,
   Columns2,
   Folder,
   FolderPlus,
   GitBranch,
+  Inbox as InboxIcon,
   CircleAlert,
   MoreHorizontal,
   Rows2,
@@ -24,9 +27,18 @@ import {
 import { ProviderIcon } from "../ui/ProviderIcon"
 import { useThreadDraggable } from "../app/thread-drag"
 import type { SplitEdge } from "../app/thread-layout"
-import { Button, DropdownMenu, MenuAction, MenuChoice, MenuRadioGroup } from "../ui/controls"
-import { kbdClasses } from "../ui/styles"
+import { ariaShortcut, useKeybindings, withShortcut } from "../app/keybindings"
+import {
+  Button,
+  ChordKeys,
+  DropdownMenu,
+  IconButton,
+  MenuAction,
+  MenuChoice,
+  MenuRadioGroup,
+} from "../ui/controls"
 import { relativeAge } from "../ui/relative-age"
+import { useScheduledThreadIds } from "../schedules/schedule-queries"
 
 type InboxRow =
   | {
@@ -36,6 +48,7 @@ type InboxRow =
       readonly count: number
     }
   | { readonly type: "thread"; readonly id: string; readonly thread: Thread }
+  | { readonly type: "notice"; readonly id: string; readonly message: string }
 
 interface InboxProps {
   readonly showSettled: boolean
@@ -73,6 +86,7 @@ function InboxThread({
   onSetStatus,
   onDelete,
   unseen,
+  scheduled,
 }: Pick<
   InboxProps,
   | "workspaceNames"
@@ -83,21 +97,39 @@ function InboxThread({
   | "onPin"
   | "onSetStatus"
   | "onDelete"
-> & { thread: Thread; workspaceId: string; unseen: boolean }): React.JSX.Element {
+> & {
+  thread: Thread
+  workspaceId: string
+  unseen: boolean
+  scheduled: boolean
+}): React.JSX.Element {
   const draggable = useThreadDraggable(thread.id, "inbox")
+  const archiveChord = useKeybindings((state) => state.bindings.archiveThread)
+  const selected = selectedThreadId === thread.id
+  const archiveLabel = thread.status === "active" ? "Archive" : "Restore to inbox"
+  const finishedUnseen = unseen && finishedActivities.has(thread.activity)
+  const attention = attentionColor(thread, finishedUnseen)
   return (
     <div
       className={`motion-colors ${threadRowClasses}`}
       data-status={thread.status}
       data-activity={thread.activity}
-      {...(selectedThreadId === thread.id ? { "data-selected": "" } : {})}
+      {...(selected ? { "data-selected": "" } : {})}
+      {...(attention !== null ? { "data-attention": "" } : {})}
     >
+      {attention !== null && (
+        <span
+          aria-hidden="true"
+          className="absolute left-[0] top-[12px] bottom-[12px] w-[2px] rounded-full"
+          style={{ background: attention }}
+        />
+      )}
       <BaseButton
         ref={draggable.ref}
         type="button"
         className="thread-open relative flex min-w-0 flex-1 flex-col justify-start gap-[5px] [padding:8px_10px] border-0 bg-transparent text-inherit cursor-default text-left [&:focus-visible]:[outline-offset:-2px]"
         data-dragging={draggable.isDragging ? "" : undefined}
-        aria-current={selectedThreadId === thread.id ? "true" : undefined}
+        aria-current={selected ? "true" : undefined}
         title={`${thread.title}\nDrag onto a pane to open it there`}
         onClick={() => onOpen(thread.id)}
       >
@@ -116,6 +148,16 @@ function InboxThread({
                   title={`Works on its own branch: ${thread.worktree.branch}`}
                 >
                   <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
+                </span>
+              )}
+              {scheduled && (
+                <span
+                  className="inline-flex shrink-0"
+                  role="img"
+                  aria-label="Has scheduled prompts"
+                  title="Has scheduled prompts"
+                >
+                  <AlarmClock size={12} strokeWidth={1.75} aria-hidden="true" />
                 </span>
               )}
               {workspaceId === "all" && (
@@ -158,10 +200,7 @@ function InboxThread({
                   Failed
                 </span>
               </PopPresence>
-              <PopPresence
-                className="inline-flex shrink-0"
-                show={unseen && ["completed", "idle", "interrupted"].includes(thread.activity)}
-              >
+              <PopPresence className="inline-flex shrink-0" show={finishedUnseen}>
                 <UnseenMark />
               </PopPresence>
               <time dateTime={thread.updatedAt} title={new Date(thread.updatedAt).toLocaleString()}>
@@ -183,48 +222,75 @@ function InboxThread({
           </>
         )}
       </BaseButton>
-      <DropdownMenu
-        align="end"
-        trigger={
-          <BaseButton
-            type="button"
-            className={`motion-colors ${iconButtonClasses}`}
-            aria-label={`Actions for ${thread.title}`}
-          >
-            <MoreHorizontal size={15} strokeWidth={1.75} />
-          </BaseButton>
-        }
-      >
-        <MenuAction
-          icon={<Columns2 size={13} strokeWidth={1.75} />}
-          onClick={() => onOpenBeside(thread.id, "right")}
-        >
-          Open to the right
-        </MenuAction>
-        <MenuAction
-          icon={<Rows2 size={13} strokeWidth={1.75} />}
-          onClick={() => onOpenBeside(thread.id, "bottom")}
-        >
-          Open below
-        </MenuAction>
-        <MenuAction
-          icon={thread.pinned ? <PinOff size={13} /> : <Pin size={13} />}
-          onClick={() => onPin(thread)}
-        >
-          {thread.pinned ? "Unpin thread" : "Pin thread"}
-        </MenuAction>
-        <MenuAction
-          icon={<Archive size={13} strokeWidth={1.75} />}
+      <div className={rowActionsClasses}>
+        <IconButton
+          unstyled
+          className={`motion-colors ${rowButtonClasses}`}
+          label={selected ? withShortcut(archiveLabel, archiveChord) : archiveLabel}
           onClick={() => onSetStatus(thread)}
         >
-          {thread.status === "active" ? "Archive thread" : "Restore thread"}
-        </MenuAction>
-        <MenuAction icon={<Trash2 size={13} strokeWidth={1.75} />} onClick={() => onDelete(thread)}>
-          Delete permanently
-        </MenuAction>
-      </DropdownMenu>
+          {thread.status === "active" ? (
+            <Archive size={14} strokeWidth={1.75} />
+          ) : (
+            <ArchiveRestore size={14} strokeWidth={1.75} />
+          )}
+        </IconButton>
+        <DropdownMenu
+          align="end"
+          trigger={
+            <BaseButton
+              type="button"
+              className={`motion-colors ${rowButtonClasses}`}
+              aria-label={`Actions for ${thread.title}`}
+            >
+              <MoreHorizontal size={15} strokeWidth={1.75} />
+            </BaseButton>
+          }
+        >
+          <MenuAction
+            icon={<Columns2 size={13} strokeWidth={1.75} />}
+            onClick={() => onOpenBeside(thread.id, "right")}
+          >
+            Open to the right
+          </MenuAction>
+          <MenuAction
+            icon={<Rows2 size={13} strokeWidth={1.75} />}
+            onClick={() => onOpenBeside(thread.id, "bottom")}
+          >
+            Open below
+          </MenuAction>
+          <MenuAction
+            icon={thread.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+            onClick={() => onPin(thread)}
+          >
+            {thread.pinned ? "Unpin thread" : "Pin thread"}
+          </MenuAction>
+          <MenuAction
+            icon={<Archive size={13} strokeWidth={1.75} />}
+            onClick={() => onSetStatus(thread)}
+          >
+            {thread.status === "active" ? "Archive thread" : "Restore to inbox"}
+          </MenuAction>
+          <MenuAction
+            icon={<Trash2 size={13} strokeWidth={1.75} />}
+            onClick={() => onDelete(thread)}
+          >
+            Delete permanently
+          </MenuAction>
+        </DropdownMenu>
+      </div>
     </div>
   )
+}
+
+const finishedActivities = new Set<Thread["activity"]>(["completed", "idle", "interrupted"])
+
+/** The colour that marks an inbox thread the operator should look at next, like an unread message. */
+function attentionColor(thread: Thread, finishedUnseen: boolean): string | null {
+  if (thread.status !== "active") return null
+  if (thread.activity === "approval") return "var(--color-modified)"
+  if (thread.activity === "failed") return "var(--color-deleted)"
+  return finishedUnseen ? "var(--color-info)" : null
 }
 
 function UnseenMark() {
@@ -237,6 +303,67 @@ function UnseenMark() {
       Done
     </span>
   )
+}
+
+const threadRow = (thread: Thread): InboxRow => ({ type: "thread", id: thread.id, thread })
+
+/** What the list says when nothing waits in the inbox, or null while something does. */
+function inboxNotice({
+  threads,
+  visibleThreads,
+  workspaceId,
+  pinnedThreads,
+  activeThreads,
+  settledThreads,
+}: {
+  threads: ReadonlyArray<Thread>
+  visibleThreads: ReadonlyArray<Thread>
+  workspaceId: string
+  pinnedThreads: ReadonlyArray<Thread>
+  activeThreads: ReadonlyArray<Thread>
+  settledThreads: ReadonlyArray<Thread>
+}): string | null {
+  if (pinnedThreads.length + activeThreads.length > 0) return null
+  if (visibleThreads.length === 0 && workspaceId !== "all")
+    return "No threads in this workspace yet."
+  if (threads.length === 0) return "No threads yet."
+  // The Archived section is right below; without it, search is the way back to them.
+  return settledThreads.length > 0
+    ? "All caught up."
+    : "All caught up. Archived threads stay in search."
+}
+
+/** The inbox's sections in order: pinned, the inbox itself, then archived threads when expanded. */
+function inboxRows({
+  notice,
+  pinnedThreads,
+  activeThreads,
+  settledThreads,
+  archivedExpanded,
+}: {
+  notice: string | null
+  pinnedThreads: ReadonlyArray<Thread>
+  activeThreads: ReadonlyArray<Thread>
+  settledThreads: ReadonlyArray<Thread>
+  archivedExpanded: boolean
+}): ReadonlyArray<InboxRow> {
+  const rows: InboxRow[] = []
+  if (notice !== null) rows.push({ type: "notice", id: "notice", message: notice })
+  if (pinnedThreads.length > 0)
+    rows.push(
+      { type: "heading", id: "pinned", label: "Pinned", count: pinnedThreads.length },
+      ...pinnedThreads.map(threadRow),
+    )
+  // A lone inbox needs no label; beside pinned or archived threads it names its section.
+  if (activeThreads.length > 0 && (pinnedThreads.length > 0 || settledThreads.length > 0))
+    rows.push({ type: "heading", id: "active", label: "Inbox", count: activeThreads.length })
+  rows.push(...activeThreads.map(threadRow))
+  if (settledThreads.length > 0)
+    rows.push(
+      { type: "heading", id: "settled", label: "Archived", count: settledThreads.length },
+      ...(archivedExpanded ? settledThreads.map(threadRow) : []),
+    )
+  return rows
 }
 
 export function Inbox({
@@ -262,7 +389,10 @@ export function Inbox({
 }: InboxProps): React.JSX.Element {
   "use no memo"
 
-  const [archivedExpanded, setArchivedExpanded] = useState(true)
+  const bindings = useKeybindings((state) => state.bindings)
+  const scheduledThreadIds = useScheduledThreadIds()
+  // Archived threads are done; they stay out of sight until asked for.
+  const [archivedExpanded, setArchivedExpanded] = useState(false)
   const [selectedWorkspaceId, setWorkspaceId] = useState("all")
   const workspaceId = workspaces.some((workspace) => workspace.id === selectedWorkspaceId)
     ? selectedWorkspaceId
@@ -277,48 +407,20 @@ export function Inbox({
   const settledThreads = visibleThreads.filter(
     (thread) => thread.status === "settled" && !thread.pinned && showSettled,
   )
-  const rows: ReadonlyArray<InboxRow> = [
-    ...(pinnedThreads.length
-      ? [
-          { type: "heading" as const, id: "pinned", label: "Pinned", count: pinnedThreads.length },
-          ...pinnedThreads.map((thread) => ({ type: "thread" as const, id: thread.id, thread })),
-          ...(activeThreads.length
-            ? [
-                {
-                  type: "heading" as const,
-                  id: "active",
-                  label: "Active",
-                  count: activeThreads.length,
-                },
-              ]
-            : []),
-        ]
-      : []),
-    ...activeThreads.map((thread) => ({ type: "thread" as const, id: thread.id, thread })),
-    ...(settledThreads.length === 0
-      ? []
-      : [
-          {
-            type: "heading" as const,
-            id: "settled",
-            label: "Archived",
-            count: settledThreads.length,
-          },
-          ...(archivedExpanded ? settledThreads : []).map((thread) => ({
-            type: "thread" as const,
-            id: thread.id,
-            thread,
-          })),
-        ]),
-  ]
-  const noResultsMessage =
-    rows.length > 0
-      ? null
-      : workspaceId !== "all"
-        ? "No threads to show in this workspace."
-        : threads.length === 0
-          ? "No threads yet."
-          : "No active threads. Search your history or start a new thread."
+  const rows = inboxRows({
+    notice: inboxNotice({
+      threads,
+      visibleThreads,
+      workspaceId,
+      pinnedThreads,
+      activeThreads,
+      settledThreads,
+    }),
+    pinnedThreads,
+    activeThreads,
+    settledThreads,
+    archivedExpanded,
+  })
   const listRef = useRef<HTMLDivElement>(null)
   // TanStack Virtual deliberately exposes mutable imperative methods. The compiler opt-out is
   // confined to this list so the rest of MeldShell remains React Compiler managed.
@@ -328,6 +430,7 @@ export function Inbox({
     estimateSize: (index) => {
       const row = rows[index]
       if (row?.type === "heading") return 34
+      if (row?.type === "notice") return 110
       return row?.thread.status === "active" ? 60 : 40
     },
     getItemKey: (index) => rows[index]?.id ?? index,
@@ -347,7 +450,7 @@ export function Inbox({
           block
           className="mb-[6px]"
           onClick={onNewThread}
-          aria-keyshortcuts="Control+n"
+          aria-keyshortcuts={ariaShortcut(bindings.newThread)}
           icon={<SquarePen size={15} strokeWidth={1.8} />}
         >
           New thread
@@ -357,11 +460,11 @@ export function Inbox({
           className={`motion-colors ${inboxSearchClasses}`}
           onClick={onSearch}
           aria-label="Search threads and messages"
-          aria-keyshortcuts="Control+k"
+          aria-keyshortcuts={ariaShortcut(bindings.threadPalette)}
         >
           <Search size={15} strokeWidth={1.7} aria-hidden="true" />
           <span>Search</span>
-          <kbd className={kbdClasses}>Ctrl K</kbd>
+          {bindings.threadPalette !== "" && <ChordKeys chord={bindings.threadPalette} />}
         </BaseButton>
         <DropdownMenu
           align="start"
@@ -402,22 +505,41 @@ export function Inbox({
         className="min-h-0 overflow-y-auto [scrollbar-gutter:stable]"
         aria-label="Thread inbox"
       >
-        {noResultsMessage !== null && (
-          <div className="m-0 [padding:18px_10px] text-[var(--text-secondary)] text-[11.5px] leading-[1.45] [&_p]:[margin:0_0_10px]">
-            <p role="status">{noResultsMessage}</p>
-            <BaseButton
-              type="button"
-              className="[padding:4px_8px] border-[1px] border-[color:var(--line)] rounded-[var(--radius-sm)] bg-transparent text-[var(--text-secondary)] cursor-default [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
-              onClick={workspaceId !== "all" ? () => setWorkspaceId("all") : onNewThread}
-            >
-              {workspaceId !== "all" ? "Show all workspaces" : "New thread"}
-            </BaseButton>
-          </div>
-        )}
         <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const row = rows[item.index]
             if (row === undefined) return null
+            if (row.type === "notice") {
+              const showAll = workspaceId !== "all" && visibleThreads.length === 0
+              // Its wrapped height depends on the sidebar width, so the list measures it.
+              return (
+                <div
+                  key={row.id}
+                  ref={virtualizer.measureElement}
+                  data-index={item.index}
+                  className="absolute top-[0] left-[0] w-full flex flex-col items-start gap-[8px] [padding:18px_10px_14px] text-[var(--text-secondary)] text-[11.5px] leading-[1.45]"
+                  style={{ transform: `translateY(${item.start}px)` }}
+                >
+                  <InboxIcon
+                    size={18}
+                    strokeWidth={1.6}
+                    aria-hidden="true"
+                    className="text-[var(--text-tertiary)]"
+                  />
+                  <p role="status" className="m-0">
+                    {row.message}
+                  </p>
+                  <Button
+                    size="sm"
+                    className="mt-[2px]"
+                    icon={showAll ? undefined : <SquarePen size={13} strokeWidth={1.8} />}
+                    onClick={showAll ? () => setWorkspaceId("all") : onNewThread}
+                  >
+                    {showAll ? "Show all workspaces" : "New thread"}
+                  </Button>
+                </div>
+              )
+            }
             return (
               <div
                 key={row.id}
@@ -428,7 +550,7 @@ export function Inbox({
                   row.id === "settled" ? (
                     <BaseButton
                       type="button"
-                      className="flex h-[34px] items-center gap-[7px] [padding:4px_10px_0] text-[var(--text-secondary)] text-[11px] font-medium w-full border-0 bg-transparent text-left cursor-default [&:hover]:text-[var(--text-primary)] [&[aria-expanded='false']_svg]:[transform:rotate(-90deg)]"
+                      className="flex h-[34px] items-center gap-[7px] [padding:4px_10px_0] text-[var(--text-secondary)] text-[11px] font-medium w-full border-0 bg-transparent text-left cursor-default motion-colors [&:hover]:text-[var(--text-primary)] [&_svg]:motion-transform [&[aria-expanded='false']_svg]:[transform:rotate(-90deg)]"
                       aria-expanded={archivedExpanded}
                       onClick={() => setArchivedExpanded((expanded) => !expanded)}
                     >
@@ -450,6 +572,7 @@ export function Inbox({
                     providersByThreadId={providersByThreadId}
                     selectedThreadId={selectedThreadId}
                     unseen={unseenThreadIds.has(row.thread.id)}
+                    scheduled={scheduledThreadIds.has(row.thread.id)}
                     onOpen={onOpen}
                     onOpenBeside={onOpenBeside}
                     onPin={onPin}
@@ -464,7 +587,7 @@ export function Inbox({
         {canLoadMore && (
           <BaseButton
             type="button"
-            className="sticky bottom-[0] w-full p-[7px] border-0 border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-secondary)] bg-[var(--surface-overlay)] cursor-pointer"
+            className="sticky bottom-[0] w-full p-[7px] border-0 border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[11.5px] bg-[var(--surface-overlay)] cursor-default motion-colors [&:hover:not(:disabled)]:text-[var(--text-primary)] [&:disabled]:text-[var(--text-tertiary)]"
             disabled={loadingMore}
             onClick={onLoadMore}
           >
@@ -489,7 +612,15 @@ const threadRowClasses = [
   "[&[data-status='settled']_.thread-open]:[padding:0_10px]",
   "[&[data-status='active']:not([data-selected])_.thread-title]:text-[var(--text-secondary)]",
   "[&[data-selected]_.thread-title]:text-[var(--text-primary)]",
+  "[&[data-status='active'][data-attention]:not([data-selected])_.thread-title]:text-[var(--text-primary)]",
+  "[&[data-status='settled']:not([data-selected])_.thread-title]:text-[var(--text-tertiary)]",
+  "[&[data-status='settled']:not([data-selected]):hover_.thread-title]:text-[var(--text-secondary)]",
   "[&[data-status='active']_.thread-title]:pr-[28px]",
+  // Room for the archive and menu buttons while they show.
+  "[&[data-status='active']:is(:hover,_:focus-within,_[data-selected])_.thread-title]:pr-[60px]",
+  "[&[data-status='settled']:is(:hover,_:focus-within,_[data-selected])_.thread-title]:pr-[14px]",
+  "[@media(hover:_none)]:[&[data-status='active']_.thread-title]:pr-[60px]",
+  "[@media(hover:_none)]:[&[data-status='settled']_.thread-title]:pr-[14px]",
   "[&[data-status='settled']_.thread-title]:min-w-0",
   "[&[data-status='settled']_.thread-title]:flex-[1_1_auto]",
   "[&[data-status='settled']_.thread-title]:font-normal [&[data-status='settled']_time]:min-w-[30px]",
@@ -497,13 +628,10 @@ const threadRowClasses = [
   "[&[data-status='settled']_time]:text-[11px] [&[data-status='settled']_time]:tabular-nums",
   "[&[data-status='settled']_time]:text-right",
   "[&[data-status='settled']:is(:hover,_:focus-within,_[data-selected])_time]:opacity-[0]",
-  "[&[data-status='settled']:has(.row-menu-trigger[data-popup-open])_time]:opacity-[0]",
-  "[&[data-status='settled']_.row-menu-trigger]:top-[4px]",
-  "[&:hover_.row-menu-trigger]:text-[var(--text-secondary)] [&:hover_.row-menu-trigger]:opacity-[1]",
-  "[&:focus-within_.row-menu-trigger]:text-[var(--text-secondary)]",
-  "[&:focus-within_.row-menu-trigger]:opacity-[1]",
-  "[&[data-selected]_.row-menu-trigger]:text-[var(--text-secondary)]",
-  "[&[data-selected]_.row-menu-trigger]:opacity-[1]",
+  "[&[data-status='settled']:has([data-popup-open])_time]:opacity-[0]",
+  "[&[data-status='settled']_.row-actions]:top-[4px]",
+  "[&:is(:hover,_:focus-within,_[data-selected])_.row-actions]:opacity-[1]",
+  "[&:is(:hover,_:focus-within,_[data-selected])_.row-button]:text-[var(--text-secondary)]",
 ].join(" ")
 
 const threadContextClasses = [
@@ -514,15 +642,17 @@ const threadContextClasses = [
   "[&_.thread-activity]:gap-[4px]",
 ].join(" ")
 
-const iconButtonClasses = [
-  "icon-button [display:inline-grid] w-[28px] h-[28px] flex-[0_0_28px] border-[1px] border-[color:transparent]",
-  "rounded-[var(--radius-sm)] bg-transparent text-[var(--text-secondary)] cursor-default",
+const rowActionsClasses = [
+  "row-actions absolute z-[1] top-[6px] right-[4px] flex gap-[2px] opacity-[0]",
+  "[&:has([data-popup-open])]:opacity-[1] [@media(hover:_none)]:opacity-[1]",
+].join(" ")
+
+const rowButtonClasses = [
+  "row-button [display:inline-grid] w-[28px] h-[28px] flex-[0_0_28px] border-[1px] border-[color:transparent]",
+  "rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default",
   "place-items-center [&:hover:not(:disabled)]:bg-[var(--surface-hover)]",
   "[&:hover:not(:disabled)]:text-[var(--text-primary)] [&[data-popup-open]]:bg-[var(--surface-hover)]",
   "[&[data-popup-open]]:text-[var(--text-primary)] [&:disabled]:text-[var(--text-disabled)]",
-  "row-menu-trigger absolute z-[1] top-[6px] right-[4px] text-[var(--text-tertiary)] opacity-[0]",
-  "[&:focus-visible]:text-[var(--text-secondary)] [&:focus-visible]:opacity-[1]",
-  "[&[data-popup-open]]:text-[var(--text-secondary)] [&[data-popup-open]]:opacity-[1]",
 ].join(" ")
 
 const inboxSearchClasses = [

@@ -1,9 +1,12 @@
 import { useState } from "react"
-import type { ScheduleCadence, ScheduledPrompt } from "@meldshell/contracts"
+import { Toggle } from "@base-ui-components/react/toggle"
+import { ToggleGroup } from "@base-ui-components/react/toggle-group"
+import { AlarmClock, CalendarClock, Repeat } from "lucide-react"
+import { firstRun, type ScheduleCadence, type ScheduledPrompt } from "@meldshell/contracts"
 import { AppDialog, Button, SelectField } from "../ui/controls"
-import { textInputClasses } from "../ui/styles"
-import { localInputValue, WEEKDAYS } from "./schedule-format"
-import { useScheduleActions } from "./schedule-queries"
+import { segmentClasses, segmentGroupClasses, textInputClasses } from "../ui/styles"
+import { describeMoment, localInputValue, WEEKDAYS } from "./schedule-format"
+import { useMinuteClock, useScheduleActions } from "./schedule-queries"
 
 type Repeat = ScheduleCadence["kind"]
 type Unit = "minutes" | "hours"
@@ -21,6 +24,7 @@ interface Form {
 }
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
+const WORK_DAYS = [1, 2, 3, 4, 5]
 
 function initialForm(schedule: ScheduledPrompt | null, prompt: string): Form {
   const inAnHour = new Date(Date.now() + 60 * 60_000)
@@ -81,8 +85,48 @@ function cadenceFrom(form: Form): ScheduleCadence | string {
   }
 }
 
-const fieldLabelClasses = "block [margin:14px_20px_6px] text-[var(--text-secondary)] text-[12px]"
+/** When the form's schedule would first send its prompt, or why it would not. */
+function firstRunNote(form: Form, now: Date): { text: string; problem: boolean } {
+  const cadence = cadenceFrom(form)
+  if (typeof cadence === "string") return { text: cadence, problem: true }
+  const first = firstRun(cadence, now)
+  if (first === null) return { text: "This time has passed. Choose a later one.", problem: true }
+  return { text: `First run ${describeMoment(first, now)}`, problem: false }
+}
+
+const labelClasses = "block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium"
 const fieldClasses = `motion-colors ${textInputClasses}`
+const sameDays = (left: readonly number[], right: readonly number[]) =>
+  left.length === right.length && right.every((day) => left.includes(day))
+
+function DayPresets({
+  weekdays,
+  onChange,
+}: {
+  weekdays: readonly number[]
+  onChange: (weekdays: readonly number[]) => void
+}): React.JSX.Element {
+  const presets = [
+    { label: "Every day", days: ALL_DAYS },
+    { label: "Weekdays", days: WORK_DAYS },
+  ]
+  return (
+    <span className="flex gap-[4px]">
+      {presets.map((preset) => (
+        <Button
+          key={preset.label}
+          size="sm"
+          variant="ghost"
+          className={sameDays(weekdays, preset.days) ? "text-[var(--text-primary)]!" : ""}
+          aria-pressed={sameDays(weekdays, preset.days)}
+          onClick={() => onChange(preset.days)}
+        >
+          {preset.label}
+        </Button>
+      ))}
+    </span>
+  )
+}
 
 function CadenceFields({
   form,
@@ -90,82 +134,96 @@ function CadenceFields({
 }: {
   form: Form
   update: (patch: Partial<Form>) => void
-}): React.JSX.Element | null {
+}): React.JSX.Element {
   switch (form.repeat) {
     case "once":
       return (
-        <div className="[padding:10px_20px_0]">
+        <label className="block">
+          <span className={labelClasses}>Date and time</span>
           <input
             type="datetime-local"
-            className={fieldClasses}
-            aria-label="Date and time"
+            className={`${fieldClasses} w-[240px]!`}
             value={form.at}
             onChange={(event) => update({ at: event.target.value })}
           />
-        </div>
+        </label>
       )
     case "interval":
       return (
-        <div className="flex gap-[8px] [padding:10px_20px_0]">
-          <input
-            type="number"
-            min={1}
-            className={`${fieldClasses} w-[96px]!`}
-            aria-label="Repeat every"
-            value={form.amount}
-            onChange={(event) => update({ amount: event.target.value })}
-          />
-          <SelectField<Unit>
-            label="Unit"
-            value={form.unit}
-            options={[
-              { value: "minutes", label: "minutes" },
-              { value: "hours", label: "hours" },
-            ]}
-            onValueChange={(unit) => update({ unit })}
-          />
+        <div>
+          <span className={labelClasses} id="schedule-every">
+            Every
+          </span>
+          <div className="flex gap-[8px]" role="group" aria-labelledby="schedule-every">
+            <input
+              type="number"
+              min={1}
+              className={`${fieldClasses} w-[88px]!`}
+              aria-label="Amount"
+              value={form.amount}
+              onChange={(event) => update({ amount: event.target.value })}
+            />
+            <div className="w-[132px]">
+              <SelectField<Unit>
+                label="Unit"
+                value={form.unit}
+                options={[
+                  { value: "minutes", label: "minutes" },
+                  { value: "hours", label: "hours" },
+                ]}
+                onValueChange={(unit) => update({ unit })}
+              />
+            </div>
+          </div>
         </div>
       )
     case "daily":
       return (
-        <div className="flex flex-wrap items-center gap-[8px] [padding:10px_20px_0]">
-          <input
-            type="time"
-            className={`${fieldClasses} w-[120px]!`}
-            aria-label="Time of day"
-            value={form.time}
-            onChange={(event) => update({ time: event.target.value || "09:00" })}
-          />
-          <fieldset className="flex gap-[3px] m-0 p-0 border-0" aria-label="Days">
-            {WEEKDAYS.map((label, day) => {
-              const chosen = form.weekdays.includes(day)
-              return (
-                <button
+        <div className="flex flex-col gap-[14px]">
+          <label className="block">
+            <span className={labelClasses}>Time of day</span>
+            <input
+              type="time"
+              className={`${fieldClasses} w-[132px]!`}
+              value={form.time}
+              onChange={(event) => update({ time: event.target.value || "09:00" })}
+            />
+          </label>
+          <div>
+            <span className="flex items-center justify-between gap-[8px] mb-[6px]">
+              <span className={`${labelClasses} mb-[0]!`} id="schedule-days">
+                On
+              </span>
+              <DayPresets weekdays={form.weekdays} onChange={(weekdays) => update({ weekdays })} />
+            </span>
+            <ToggleGroup
+              multiple
+              aria-labelledby="schedule-days"
+              value={form.weekdays.map(String)}
+              onValueChange={(value) => update({ weekdays: value.map(Number) })}
+              className={`${segmentGroupClasses} w-full`}
+            >
+              {WEEKDAYS.map((label, day) => (
+                <Toggle
                   key={label}
-                  type="button"
-                  aria-pressed={chosen}
-                  className={`motion-colors h-[30px] w-[38px] border-[1px] rounded-[var(--radius-sm)] cursor-default text-[11.5px] ${
-                    chosen
-                      ? "border-[color:var(--accent)] bg-[var(--surface-selected)] text-[var(--text-primary)]"
-                      : "border-[color:var(--line)] bg-transparent text-[var(--text-tertiary)]"
-                  }`}
-                  onClick={() =>
-                    update({
-                      weekdays: chosen
-                        ? form.weekdays.filter((entry) => entry !== day)
-                        : [...form.weekdays, day],
-                    })
-                  }
+                  value={String(day)}
+                  className={`${segmentClasses} flex-1 px-[0]!`}
                 >
                   {label}
-                </button>
-              )
-            })}
-          </fieldset>
+                </Toggle>
+              ))}
+            </ToggleGroup>
+          </div>
         </div>
       )
   }
 }
+
+const REPEAT_CHOICES: ReadonlyArray<{ value: Repeat; label: string; icon: React.ReactNode }> = [
+  { value: "once", label: "Once", icon: <AlarmClock size={13} strokeWidth={1.75} /> },
+  { value: "interval", label: "Interval", icon: <Repeat size={13} strokeWidth={1.75} /> },
+  { value: "daily", label: "Daily", icon: <CalendarClock size={13} strokeWidth={1.75} /> },
+]
 
 /**
  * Creates or edits a scheduled prompt. `prompt` fills a new schedule, as when scheduling the
@@ -186,6 +244,7 @@ export function ScheduleDialog({
 }): React.JSX.Element {
   const [form, setForm] = useState(() => initialForm(schedule, prompt))
   const [problem, setProblem] = useState<string | null>(null)
+  const now = useMinuteClock()
   const { save } = useScheduleActions()
   const update = (patch: Partial<Form>) => {
     setProblem(null)
@@ -213,6 +272,10 @@ export function ScheduleDialog({
       },
     )
   }
+  const paused = schedule !== null && !schedule.enabled
+  const note = paused
+    ? { text: "Paused. Resume it from the list to run it again.", problem: false }
+    : firstRunNote(form, now)
   const error = problem ?? save.error?.message ?? null
   return (
     <AppDialog
@@ -223,6 +286,15 @@ export function ScheduleDialog({
       title={schedule === null ? "Schedule a prompt" : "Edit scheduled prompt"}
       actions={
         <>
+          <span
+            className={`mr-[auto] inline-flex min-w-0 items-center gap-[6px] text-[12px] ${
+              note.problem ? "text-[var(--color-modified)]" : "text-[var(--text-secondary)]"
+            }`}
+            role="status"
+          >
+            <AlarmClock size={13} strokeWidth={1.75} className="flex-none" aria-hidden="true" />
+            {note.text}
+          </span>
           <Button onClick={onClose}>Cancel</Button>
           <Button variant="primary" disabled={save.isPending} onClick={submit}>
             {schedule === null ? "Schedule" : "Save"}
@@ -230,36 +302,49 @@ export function ScheduleDialog({
         </>
       }
     >
-      <p>
-        MeldShell sends the prompt to this thread while MeldShell is running, with the thread's
-        current model and settings. A run missed while it was closed happens once when it next
-        starts. A thread that is busy queues it. Attachments are not scheduled.
-      </p>
-      <label className={fieldLabelClasses} htmlFor="schedule-prompt">
-        Prompt
-      </label>
-      <div className="[padding:0_20px]">
-        <textarea
-          id="schedule-prompt"
-          className={`${fieldClasses} h-auto! min-h-[88px] [padding:8px_10px]! resize-y`}
-          value={form.prompt}
-          onChange={(event) => update({ prompt: event.target.value })}
-        />
+      <div className="flex flex-col gap-[16px] [padding:16px_20px_0]">
+        <label className="block">
+          <span className={labelClasses}>Prompt</span>
+          <textarea
+            className={`${fieldClasses} h-auto! min-h-[96px] max-h-[40vh] [padding:8px_10px]! leading-[1.5] resize-y`}
+            placeholder="What should the agent do each time?"
+            autoFocus={form.prompt === ""}
+            value={form.prompt}
+            onChange={(event) => update({ prompt: event.target.value })}
+          />
+        </label>
+        <div>
+          <span className={labelClasses} id="schedule-repeat">
+            Repeat
+          </span>
+          <ToggleGroup
+            aria-labelledby="schedule-repeat"
+            value={[form.repeat]}
+            onValueChange={(value) => {
+              const next = value[0] as Repeat | undefined
+              if (next !== undefined) update({ repeat: next })
+            }}
+            className={`${segmentGroupClasses} w-full`}
+          >
+            {REPEAT_CHOICES.map((choice) => (
+              <Toggle
+                key={choice.value}
+                value={choice.value}
+                className={`${segmentClasses} flex-1`}
+              >
+                {choice.icon}
+                {choice.label}
+              </Toggle>
+            ))}
+          </ToggleGroup>
+        </div>
+        <CadenceFields form={form} update={update} />
+        <p className="m-0 text-[var(--text-tertiary)] text-[11.5px] leading-[1.55]">
+          Sent to this thread with its current model while MeldShell is running, and queued if the
+          thread is busy. A run missed while MeldShell was closed happens once when it starts.
+          Attachments are not scheduled.
+        </p>
       </div>
-      <span className={fieldLabelClasses}>Repeat</span>
-      <div className="[padding:0_20px]">
-        <SelectField<Repeat>
-          label="Repeat"
-          value={form.repeat}
-          options={[
-            { value: "once", label: "Once" },
-            { value: "interval", label: "Every few minutes or hours" },
-            { value: "daily", label: "At a time of day" },
-          ]}
-          onValueChange={(repeat) => update({ repeat })}
-        />
-      </div>
-      <CadenceFields form={form} update={update} />
       {error !== null && (
         <p role="alert" className="text-[var(--color-deleted)]!">
           {error}

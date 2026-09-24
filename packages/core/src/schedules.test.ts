@@ -4,7 +4,7 @@ import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { Effect, Either, ManagedRuntime } from "effect"
 import { runMigrations } from "./database/migrations"
-import { firstRun, followingRun } from "./schedule-times"
+import { firstRun, followingRun } from "@meldshell/contracts"
 import {
   claimDueSchedules,
   deleteSchedule,

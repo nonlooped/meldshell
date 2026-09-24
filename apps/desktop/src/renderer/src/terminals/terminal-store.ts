@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { useShallow } from "zustand/react/shallow"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
 import { Unicode11Addon } from "@xterm/addon-unicode11"
@@ -66,6 +67,8 @@ interface TerminalStore {
    * a thread never runs two copies of the same servers.
    */
   readonly run: (threadId: string, name: string) => void
+  /** Ends the shell running the named run script, stopping its servers. */
+  readonly stopRun: (threadId: string, name: string) => void
   readonly close: (threadId: string, terminalId: string) => void
   readonly focus: (threadId: string, terminalId: string) => void
   readonly resizeSplit: (threadId: string, splitId: string, ratio: number) => void
@@ -184,6 +187,11 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     }))
   },
   run: (threadId, name) => {
+    const previous = runShellByScript.get(runKey(threadId, name))
+    // A run shell that ended with an error stays open to show why; running again replaces it.
+    const ended = previous === undefined ? undefined : get().info[previous]?.state
+    if (previous !== undefined && (ended === "exited" || ended === "failed"))
+      get().close(threadId, previous)
     const existing = runShellByScript.get(runKey(threadId, name))
     const current = get().threads[threadId]
     if (existing !== undefined && current !== undefined) {
@@ -214,6 +222,10 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       },
       info: { ...state.info, [id]: { state: "starting" } },
     }))
+  },
+  stopRun: (threadId, name) => {
+    const id = runShellByScript.get(runKey(threadId, name))
+    if (id !== undefined) get().close(threadId, id)
   },
   close: (threadId, terminalId) => {
     disposeTerminal(terminalId)
@@ -256,6 +268,22 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     for (const id of terminalIds(current.layout)) get().close(threadId, id)
   },
 }))
+
+const noScripts: readonly string[] = []
+
+/** The names of the run scripts whose shells are running in a thread's terminal. */
+export function useRunningScripts(threadId: string | null): readonly string[] {
+  return useTerminalStore(
+    useShallow((state) => {
+      const layout = threadId === null ? undefined : state.threads[threadId]?.layout
+      if (layout === undefined) return noScripts
+      return terminalIds(layout).flatMap((id) => {
+        const info = state.info[id]
+        return info?.state === "running" && info.run !== undefined ? [info.run.name] : []
+      })
+    }),
+  )
+}
 
 let listening = false
 function watchForServers(id: string, data: string): void {

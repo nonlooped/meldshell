@@ -20,6 +20,7 @@ interface EditorCommand {
 const EDITORS: readonly EditorCommand[] = [
   { id: "vscode", name: "Visual Studio Code", commands: ["code"] },
   { id: "vscode-insiders", name: "VS Code Insiders", commands: ["code-insiders"] },
+  { id: "vscodium", name: "VSCodium", commands: ["codium"] },
   { id: "cursor", name: "Cursor", commands: ["cursor"] },
   { id: "windsurf", name: "Windsurf", commands: ["windsurf"] },
   { id: "zed", name: "Zed", commands: ["zed", "zeditor"] },

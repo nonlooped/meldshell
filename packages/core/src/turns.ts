@@ -196,6 +196,8 @@ export const submitTurn = (input: SubmitTurnInput) =>
       SELECT title_locked, worktree_state, worktree_setup FROM threads WHERE id = ${input.threadId}
     `
     yield* requireWorktree(threads[0]?.worktree_state ?? null, threads[0]?.worktree_setup ?? null)
+    // New work returns an archived thread to the inbox, so its result is not filed away unseen.
+    yield* sql`UPDATE threads SET status = 'active' WHERE id = ${input.threadId} AND status = 'settled'`
     const unnamed = threads[0]?.title_locked === 0 && text !== ""
     if (unnamed) {
       const derivedTitle = derivedThreadTitle(text)

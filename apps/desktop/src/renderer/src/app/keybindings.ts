@@ -12,6 +12,7 @@ export type ShortcutAction =
   | "filePalette"
   | "settings"
   | "closeTab"
+  | "archiveThread"
   | "nextTab"
   | "previousTab"
   | "toggleInbox"
@@ -33,6 +34,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   { id: "newThread", label: "New thread", group: "Navigation", chord: "Ctrl+N" },
   { id: "settings", label: "Open settings", group: "Navigation", chord: "Ctrl+," },
   { id: "closeTab", label: "Close tab", group: "Tabs", chord: "Ctrl+W" },
+  { id: "archiveThread", label: "Archive or restore thread", group: "Tabs", chord: "Ctrl+E" },
   { id: "nextTab", label: "Next tab", group: "Tabs", chord: "Ctrl+Tab" },
   { id: "previousTab", label: "Previous tab", group: "Tabs", chord: "Ctrl+Shift+Tab" },
   { id: "toggleInbox", label: "Show or hide the inbox", group: "Panels", chord: "Ctrl+B" },
@@ -192,6 +194,10 @@ export function actionForEvent(event: ChordEvent, bindings: Keybindings): Shortc
 
 /** How a chord reads in labels and tooltips. */
 export const chordLabel = (chord: string): string => (chord === "" ? "None" : chord)
+
+/** A chord in `aria-keyshortcuts` form, as in `Control+Shift+K`; undefined without a chord. */
+export const ariaShortcut = (chord: string): string | undefined =>
+  chord === "" ? undefined : chord.replace(/^Ctrl\b/, "Control")
 
 /** A title with the action's shortcut appended, as in `Show terminal (Ctrl+`)`. */
 export const withShortcut = (title: string, chord: string): string =>

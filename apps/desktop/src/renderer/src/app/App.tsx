@@ -27,7 +27,7 @@ import { WorkspaceManager } from "../workspaces/WorkspaceManager"
 import { TitleBar } from "./TitleBar"
 import { AppScale } from "./AppScale"
 import { AppDialog, Button } from "../ui/controls"
-import { ErrorToast } from "../ui/Notice"
+import { ActionToast, ErrorToast } from "../ui/Notice"
 import { handleAppShortcut } from "./app-shortcuts"
 import { useKeybindings } from "./keybindings"
 import { useTabStore, type FileTab } from "./tab-store"
@@ -36,7 +36,7 @@ import { useViewStore } from "./view-store"
 import { ThreadWorkbench } from "./ThreadWorkbench"
 import { useThreadDrafts } from "./thread-drafts"
 import { useThreadSignals, useWatchedThreadIds } from "./thread-signals"
-import { terminalApi, useTerminalStore } from "../terminals/terminal-store"
+import { terminalApi, useRunningScripts, useTerminalStore } from "../terminals/terminal-store"
 import { useWorkspaceScripts } from "../terminals/workspace-scripts"
 import { useOpenInEditor } from "./editors"
 import { previewSupported, usePreviewStore } from "../preview/preview-store"
@@ -296,14 +296,25 @@ function useTerminalToggle(
     (name: string) => withThread((threadId) => useTerminalStore.getState().run(threadId, name)),
     [withThread],
   )
+  const stopRun = useCallback((name: string) => {
+    const { selectedThreadId: threadId } = useTabStore.getState()
+    if (threadId !== null) useTerminalStore.getState().stopRun(threadId, name)
+  }, [])
   const shown = terminalApi === undefined || !threadOnScreen ? null : open
+  const running = useRunningScripts(shown === null ? null : selectedThreadId)
   return {
     shown,
     toggle,
     runScripts: shown === null ? noRunScripts : (scripts.data?.run ?? noRunScripts),
+    running,
     run,
+    stopRun,
   }
 }
+
+/** Whether the editor opens the thread's own worktree or the shared workspace folder. */
+const editorFolder = (thread: Thread | undefined): "worktree" | "workspace" =>
+  thread?.worktree !== undefined && thread.worktree.state !== "removed" ? "worktree" : "workspace"
 
 /** The title bar's preview toggle for the thread on screen; `shown` is null without one. */
 function usePreviewToggle(closeSettings: () => void, selectTab: (id: string) => void) {
@@ -493,6 +504,15 @@ export function App(): React.JSX.Element {
     snapshot.settings.editor,
     appSettingsMutation.mutate,
   )
+  const [archivedThread, setArchivedThread] = useState<Thread | null>(null)
+  const dismissArchived = useCallback(() => setArchivedThread(null), [])
+  const toggleArchived = (thread: Thread) => {
+    const archiving = thread.status === "active"
+    setStatusMutation.mutate(
+      { threadId: thread.id, status: archiving ? "settled" : "active" },
+      { onSuccess: () => setArchivedThread(archiving ? thread : null) },
+    )
+  }
   const toggleInbox = () =>
     toggleSidebar(remotePhone, sourceControl.panelRef, inbox.toggle, panelMotion.animate)
   const toggleSourceControl = () =>
@@ -514,6 +534,10 @@ export function App(): React.JSX.Element {
       openSettings: () => openSettings(),
       selectedThreadId: selectedTabId,
       closeThread,
+      toggleArchived:
+        settingsOpen || selectedFile !== null || selectedThread === null
+          ? null
+          : () => toggleArchived(selectedThread),
       cycleTabs,
       toggleInbox,
       toggleSourceControl,
@@ -563,11 +587,13 @@ export function App(): React.JSX.Element {
           terminalShown={terminal.shown}
           onToggleTerminal={terminal.toggle}
           runScripts={terminal.runScripts}
+          runningScripts={terminal.running}
           onRun={terminal.run}
+          onStopRun={terminal.stopRun}
           previewShown={preview.shown}
           onTogglePreview={preview.toggle}
           editors={editor.editors}
-          preferredEditor={snapshot.settings.editor}
+          editorFolder={editorFolder(worktreeThread)}
           onOpenInEditor={editor.open}
         />
 
@@ -630,12 +656,7 @@ export function App(): React.JSX.Element {
                     closeSettings()
                     openBeside(threadId, edge)
                   }}
-                  onSetStatus={(thread) =>
-                    setStatusMutation.mutate({
-                      threadId: thread.id,
-                      status: thread.status === "active" ? "settled" : "active",
-                    })
-                  }
+                  onSetStatus={toggleArchived}
                   onDelete={setDeleteTarget}
                   canLoadMore={threadPagesQuery.hasNextPage}
                   loadingMore={threadPagesQuery.isFetchingNextPage}
@@ -706,6 +727,18 @@ export function App(): React.JSX.Element {
           </Group>
         )}
 
+        {archivedThread !== null && (
+          <ActionToast
+            key={archivedThread.id}
+            message={`Archived “${archivedThread.title}”`}
+            actionLabel="Undo"
+            onAction={() => {
+              setStatusMutation.mutate({ threadId: archivedThread.id, status: "active" })
+              setArchivedThread(null)
+            }}
+            onDismiss={dismissArchived}
+          />
+        )}
         <MutationErrors
           mutations={[
             pinMutation,

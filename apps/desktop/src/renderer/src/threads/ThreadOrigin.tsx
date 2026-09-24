@@ -8,16 +8,10 @@ import { replaceSnapshot } from "../data/cache"
 import { DropdownMenu, MenuChoice, MenuRadioGroup } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
 import { ErrorToast } from "../ui/Notice"
+import { segmentClasses, segmentGroupClasses } from "../ui/styles"
 import { WorktreeSetupNote } from "../files/WorktreeSetup"
 
 type DraftLocation = { workspaceId?: string; isolated?: boolean }
-
-const segmentClasses = [
-  "motion-colors inline-flex h-[24px] items-center gap-[6px] [padding:0_10px] border-0 rounded-[var(--radius-sm)]",
-  "bg-transparent text-[var(--text-tertiary)] text-[12px] cursor-default [&:hover]:text-[var(--text-primary)]",
-  "[&[data-pressed]]:bg-[var(--surface-selected)] [&[data-pressed]]:text-[var(--text-primary)]",
-  "[&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:disabled]:text-[var(--text-disabled)]",
-].join(" ")
 
 const draftLocationKey = (threadId: string) => ["draft-location", threadId] as const
 
@@ -130,7 +124,7 @@ export function ThreadBranchToggle({ thread }: { thread: Thread }): React.JSX.El
             const next = value[0]
             if (next !== undefined) mutation.mutate({ isolated: next === "own" })
           }}
-          className="flex shrink-0 gap-[2px] p-[2px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)]"
+          className={`shrink-0 ${segmentGroupClasses}`}
         >
           <Toggle
             value="shared"

@@ -9,6 +9,8 @@ interface ShortcutActions {
   openSettings: () => void
   selectedThreadId: string | null
   closeThread: (id: string) => void
+  /** Archives or restores the thread in front; null when no thread is. */
+  toggleArchived: (() => void) | null
   cycleTabs: (direction: 1 | -1) => void
   toggleInbox: () => void
   toggleSourceControl: () => void
@@ -35,6 +37,7 @@ export function handleAppShortcut(
   const action = actionForEvent(event, bindings)
   if (action === null) return
   if (action === "closeTab" && actions.selectedThreadId === null) return
+  if (action === "archiveThread" && actions.toggleArchived === null) return
   event.preventDefault()
   const run: Record<ShortcutAction, () => void> = {
     newThread: actions.requestNewThread,
@@ -44,6 +47,7 @@ export function handleAppShortcut(
     closeTab: () => {
       if (actions.selectedThreadId !== null) actions.closeThread(actions.selectedThreadId)
     },
+    archiveThread: () => actions.toggleArchived?.(),
     nextTab: () => actions.cycleTabs(1),
     previousTab: () => actions.cycleTabs(-1),
     toggleInbox: actions.toggleInbox,
