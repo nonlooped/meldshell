@@ -37,6 +37,7 @@ import { useThreadDrafts } from "./thread-drafts"
 import { useThreadSignals, useWatchedThreadIds } from "./thread-signals"
 import { terminalApi, useTerminalStore } from "../terminals/terminal-store"
 import { useWorkspaceScripts } from "../terminals/workspace-scripts"
+import { useOpenInEditor } from "./editors"
 
 import { SettingsView } from "../settings/SettingsView"
 
@@ -490,6 +491,11 @@ export function App(): React.JSX.Element {
     activeScope?.threadId === undefined
       ? undefined
       : allThreads.find((thread) => thread.id === activeScope.threadId)
+  const editor = useOpenInEditor(
+    settingsOpen ? undefined : activeScope,
+    snapshot.settings.editor,
+    appSettingsMutation.mutate,
+  )
   const openThreads = openThreadIds.flatMap((id) => {
     const thread = allThreads.find((candidate) => candidate.id === id)
     return thread === undefined ? [] : [thread]
@@ -528,6 +534,9 @@ export function App(): React.JSX.Element {
           onToggleTerminal={terminal.toggle}
           runScripts={terminal.runScripts}
           onRun={terminal.run}
+          editors={editor.editors}
+          preferredEditor={snapshot.settings.editor}
+          onOpenInEditor={editor.open}
         />
 
         {settingsOpen ? (
@@ -672,6 +681,7 @@ export function App(): React.JSX.Element {
             deleteThreadMutation,
             addWorkspaceMutation,
             createThreadMutation,
+            editor.mutation,
           ]}
         />
         <AppDialog

@@ -40,6 +40,7 @@ export const readAppSettings = Effect.gen(function* () {
           : "medium",
     reduceMotion: values.get("reduceMotion") === "true",
     sounds: values.get("sounds") !== "false",
+    editor: values.get("editor"),
   } satisfies AppSettings
 })
 
@@ -53,6 +54,7 @@ export const setAppSettings = (input: SetAppSettingsInput) =>
       "transcriptSize",
       "reduceMotion",
       "sounds",
+      "editor",
     ] as const) {
       if (input[key] !== undefined) {
         yield* sql`INSERT INTO settings (key, value) VALUES (${key}, ${String(input[key])})

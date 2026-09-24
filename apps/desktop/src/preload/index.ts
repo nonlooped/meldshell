@@ -49,6 +49,10 @@ const api: MeldShellApi = {
     ipcRenderer.on(IPC.updateStatusChanged, handleStatus)
     return () => ipcRenderer.removeListener(IPC.updateStatusChanged, handleStatus)
   },
+  desktop: {
+    listEditors: () => ipcRenderer.invoke(IPC.listEditors),
+    openInEditor: (input) => ipcRenderer.invoke(IPC.openInEditor, input),
+  },
   terminal: {
     open: (input) => ipcRenderer.invoke(IPC.terminalOpen, input),
     // Keystrokes and resizes need no reply, so they skip invoke's round trip.

@@ -5,6 +5,7 @@ import { Separator } from "@base-ui-components/react/separator"
 import type { Provider, Thread } from "@meldshell/contracts"
 import {
   Columns2,
+  FolderCode,
   Rows2,
   PanelLeftClose,
   PanelLeftOpen,
@@ -15,7 +16,7 @@ import {
   X,
 } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
-import type { RunScript } from "@meldshell/contracts/ipc"
+import type { ExternalEditor, RunScript } from "@meldshell/contracts/ipc"
 import { DropdownMenu, IconButton, MenuAction } from "../ui/controls"
 import { Pressable, TextSwap, useMotionPreference } from "../ui/motion"
 import { iconButtonClasses } from "../ui/styles"
@@ -40,6 +41,10 @@ interface TitleBarProps {
   /** The workspace run scripts for the thread on screen. */
   readonly runScripts: readonly RunScript[]
   readonly onRun: (name: string) => void
+  /** Null while nothing is on screen or this client cannot start editors; the preferred is first. */
+  readonly editors: readonly ExternalEditor[] | null
+  readonly preferredEditor: string | undefined
+  readonly onOpenInEditor: (editorId: string) => void
 }
 
 const noDrag = "[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
@@ -92,6 +97,45 @@ function RunButton({
   )
 }
 
+/** Lists the editors found on this computer; the one used last comes first. */
+function OpenInEditorButton({
+  editors,
+  preferred,
+  onOpen,
+}: {
+  editors: readonly ExternalEditor[]
+  preferred: string | undefined
+  onOpen: (editorId: string) => void
+}): React.JSX.Element {
+  return (
+    <DropdownMenu
+      align="end"
+      trigger={
+        <BaseButton
+          render={<Pressable />}
+          type="button"
+          className={`motion-colors ${iconButtonClasses} ${noDrag}`}
+          aria-label="Open in editor"
+          title="Open in editor"
+        >
+          <FolderCode size={15} />
+        </BaseButton>
+      }
+    >
+      {editors.map((editor) => (
+        <MenuAction key={editor.id} onClick={() => onOpen(editor.id)}>
+          <span className="flex min-w-[180px] items-baseline justify-between gap-[16px]">
+            <span className="text-[var(--text-primary)]">{editor.name}</span>
+            {editor.id === preferred && editors.length > 1 && (
+              <span className="text-[var(--text-tertiary)] text-[11px]">Last used</span>
+            )}
+          </span>
+        </MenuAction>
+      ))}
+    </DropdownMenu>
+  )
+}
+
 function ThreadTabFrame({
   threadId,
   selected,
@@ -136,6 +180,9 @@ export function TitleBar({
   onToggleTerminal,
   runScripts,
   onRun,
+  editors,
+  preferredEditor,
+  onOpenInEditor,
 }: TitleBarProps): React.JSX.Element {
   const files = useTabStore((state) => state.files)
   const threadTabs = useTabStore((state) => state.threadTabs)
@@ -262,6 +309,9 @@ export function TitleBar({
           </div>
         ))}
       </Tabs.List>
+      {sidebarsVisible && editors !== null && editors.length > 0 && (
+        <OpenInEditorButton editors={editors} preferred={preferredEditor} onOpen={onOpenInEditor} />
+      )}
       {sidebarsVisible && <RunButton scripts={runScripts} onRun={onRun} />}
       {sidebarsVisible && terminalShown !== null && (
         <IconButton
