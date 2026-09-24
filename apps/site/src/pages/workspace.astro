@@ -83,7 +83,7 @@ import "../../../desktop/src/renderer/src/app/styles.css"
       })().catch(cause => show("ended", describe(cause)))
     </script>
     <style is:global>
-      html[data-platform=web] { --caption-inset: 12px; --remote-bar: 36px; }
+      html[data-platform=web] { --remote-bar: 36px; }
       #remote-bar { height: var(--remote-bar); display: flex; align-items: center; gap: 10px; padding: 0 10px 0 6px; font-size: 12px; border-bottom: 1px solid var(--line); background: var(--surface-overlay); color: var(--text-secondary); min-width: 0; }
       #remote-bar .remote-back { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px 0 4px; border-radius: var(--radius-sm); color: var(--text-primary); flex-shrink: 0; }
       #remote-bar .remote-back:hover { background: var(--surface-hover); }

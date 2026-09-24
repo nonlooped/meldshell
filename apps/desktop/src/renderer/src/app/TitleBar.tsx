@@ -86,7 +86,7 @@ export function TitleBar({
     foldAway(button.closest<HTMLElement>("[data-tab-frame]"), () => onCloseTab(tabId))
   }
   return (
-    <header className="[-webkit-app-region:drag] flex items-center gap-[10px] min-w-0 [padding:0_var(--caption-inset)_0_12px] border-b-[1px] border-b-[color:var(--line-subtle)] select-none">
+    <header className="titlebar [-webkit-app-region:drag] flex items-center gap-[10px] min-w-0 border-b-[1px] border-b-[color:var(--line-subtle)] select-none">
       <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
       {sidebarsVisible && (
         <IconButton
