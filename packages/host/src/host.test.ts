@@ -130,12 +130,15 @@ test("isolated threads work in their own worktree until merged or removed", {
   }
   let host: Host | undefined
   try {
-    execFileSync("git", ["init", "-q", "-b", "main", repository])
-    run(repository, "config", "user.email", "test@example.com")
-    run(repository, "config", "user.name", "Test")
-    await writeFile(join(repository, "a.txt"), "one\n")
-    run(repository, "add", ".")
-    run(repository, "commit", "-q", "-m", "first")
+    const initRepository = async (path: string) => {
+      execFileSync("git", ["init", "-q", "-b", "main", path])
+      run(path, "config", "user.email", "test@example.com")
+      run(path, "config", "user.name", "Test")
+      await writeFile(join(path, "a.txt"), "one\n")
+      run(path, "add", ".")
+      run(path, "commit", "-q", "-m", "first")
+    }
+    await initRepository(repository)
 
     host = await startHost(directory, platform)
     const workspaceId = (await host.addWorkspace(repository)).workspaces[0]!.id
@@ -154,17 +157,36 @@ test("isolated threads work in their own worktree until merged or removed", {
       { workspaceId, title: "Draft" },
     ])) as AppSnapshot
     const draftId = drafted.threads.find((entry) => entry.title === "Draft")!.id
-    const isolated = (await host.call(IPC.setThreadIsolated, [
+    const isolated = (await host.call(IPC.setDraftLocation, [
       { threadId: draftId, isolated: true },
     ])) as AppSnapshot
     const draftWorktree = isolated.threads.find((entry) => entry.id === draftId)!.worktree!
     assert.equal(draftWorktree.state, "ready")
-    const shared = (await host.call(IPC.setThreadIsolated, [
+    const shared = (await host.call(IPC.setDraftLocation, [
       { threadId: draftId, isolated: false },
     ])) as AppSnapshot
     assert.equal(shared.threads.find((entry) => entry.id === draftId)!.worktree, undefined)
     await assert.rejects(stat(draftWorktree.path))
     assert.equal(run(repository, "branch", "--list", draftWorktree.branch), "")
+
+    // Moving a draft to another workspace recreates its worktree in that repository.
+    const otherRepository = join(directory, "other")
+    await initRepository(otherRepository)
+    const otherWorkspaceId = (await host.addWorkspace(otherRepository)).workspaces.find(
+      (entry) => entry.path === otherRepository,
+    )!.id
+    const reisolated = (await host.call(IPC.setDraftLocation, [
+      { threadId: draftId, isolated: true },
+    ])) as AppSnapshot
+    const firstWorktree = reisolated.threads.find((entry) => entry.id === draftId)!.worktree!
+    const moved = (await host.call(IPC.setDraftLocation, [
+      { threadId: draftId, workspaceId: otherWorkspaceId },
+    ])) as AppSnapshot
+    const movedThread = moved.threads.find((entry) => entry.id === draftId)!
+    assert.equal(movedThread.workspaceId, otherWorkspaceId)
+    assert.notEqual(movedThread.worktree?.path, firstWorktree.path)
+    await assert.rejects(stat(firstWorktree.path))
+    assert.notEqual(run(otherRepository, "branch", "--list", movedThread.worktree!.branch), "")
 
     // Turns and Git requests for the thread use its worktree rather than the workspace folder.
     const provider = created.providers.find((entry) => entry.harness === "codex")!
@@ -179,7 +201,7 @@ test("isolated threads work in their own worktree until merged or removed", {
     ])) as SubmitTurnResult
     assert.equal(submitted.dispatch?.workspacePath, worktree.path)
     await assert.rejects(
-      host.call(IPC.setThreadIsolated, [{ threadId: thread.id, isolated: false }]),
+      host.call(IPC.setDraftLocation, [{ threadId: thread.id, isolated: false }]),
       /before its first message/,
     )
     const git = (await host.call(IPC.getGitSnapshot, [

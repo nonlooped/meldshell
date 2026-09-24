@@ -1,10 +1,5 @@
-import {
-  buttonClasses,
-  centeredStateClasses,
-  threadContentClasses,
-  textInputClasses,
-} from "../ui/styles"
-import { FadeDiv, Pressable, MotionPreferences } from "../ui/motion"
+import { centeredStateClasses, threadContentClasses, textInputClasses } from "../ui/styles"
+import { FadeDiv, MotionPreferences } from "../ui/motion"
 import { useAppData } from "../data/queries"
 import {
   useWorkspaceActions,
@@ -13,14 +8,13 @@ import {
   useAppSettingsMutation,
 } from "../data/mutations"
 import { useAppAppearance } from "./appearance"
-import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Tabs } from "@base-ui-components/react/tabs"
 import { Combobox } from "@base-ui-components/react/combobox"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Thread, TranscriptSearchResult, Workspace } from "@meldshell/contracts"
+import type { Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { workspaceScope } from "../data/workspace-scope"
-import { ChevronDown, Plus, Settings } from "lucide-react"
+import { Plus, Settings } from "lucide-react"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import { InteractionDialog } from "../threads/InteractionDialog"
 import { SearchDialog } from "../threads/SearchDialog"
@@ -32,14 +26,7 @@ import { MeldMark } from "../ui/MeldMark"
 import { WorkspaceManager } from "../workspaces/WorkspaceManager"
 import { TitleBar } from "./TitleBar"
 import { AppScale } from "./AppScale"
-import {
-  AppDialog,
-  Button,
-  Checkbox,
-  DropdownMenu,
-  MenuChoice,
-  MenuRadioGroup,
-} from "../ui/controls"
+import { AppDialog, Button } from "../ui/controls"
 import { ErrorToast } from "../ui/Notice"
 import { handleAppShortcut } from "./app-shortcuts"
 import { useTabStore, type FileTab } from "./tab-store"
@@ -255,112 +242,6 @@ function useSelectedTab() {
   }
 }
 
-function NewThreadDialog({
-  open,
-  onOpenChange,
-  workspaces,
-  workspaceId,
-  onWorkspaceChange,
-  mutation,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  workspaces: readonly Workspace[]
-  workspaceId: string
-  onWorkspaceChange: (workspaceId: string) => void
-  mutation: ReturnType<typeof useThreadActions>["createThreadMutation"]
-}): React.JSX.Element {
-  const [isolated, setIsolated] = useState(false)
-  const workspace = workspaces.find((entry) => entry.id === workspaceId)
-  return (
-    <AppDialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) mutation.reset()
-        onOpenChange(next)
-      }}
-      title="New thread"
-      actions={
-        <>
-          <Button onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button
-            variant="primary"
-            disabled={workspaceId === "" || mutation.isPending}
-            onClick={() => mutation.mutate({ workspaceId, isolated })}
-          >
-            {mutation.isPending && isolated ? "Creating worktree…" : "Create thread"}
-          </Button>
-        </>
-      }
-    >
-      <p>Choose the workspace folder this conversation belongs to.</p>
-      <div className="[padding:14px_20px_0] mt-[0]">
-        <span className="block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium">
-          Workspace
-        </span>
-        <DropdownMenu
-          align="start"
-          trigger={
-            <BaseButton
-              render={<Pressable />}
-              type="button"
-              className={`motion-colors ${buttonClasses} justify-between!`}
-              data-block="true"
-              aria-label="Workspace"
-            >
-              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                {workspace?.name ?? "Select a workspace"}
-              </span>
-              <ChevronDown
-                size={14}
-                strokeWidth={2}
-                className="flex-none text-[var(--text-tertiary)]"
-              />
-            </BaseButton>
-          }
-        >
-          <MenuRadioGroup
-            value={workspaceId}
-            onValueChange={(value) => onWorkspaceChange(String(value))}
-          >
-            {workspaces.map((entry) => (
-              <MenuChoice
-                key={entry.id}
-                value={entry.id}
-                className="h-auto [padding:7px_9px] items-start"
-              >
-                <span className="flex min-w-0 flex-1 flex-col gap-[1px]">
-                  <span className="model-item-name text-inherit text-[12.5px]">{entry.name}</span>
-                  <span className="text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10px]">
-                    {entry.path}
-                  </span>
-                </span>
-              </MenuChoice>
-            ))}
-          </MenuRadioGroup>
-        </DropdownMenu>
-      </div>
-      <label className="flex items-start gap-[8px] [padding:16px_20px_0] text-[12.5px] leading-[1.5]">
-        <span className="flex pt-[2px]">
-          <Checkbox checked={isolated} onCheckedChange={setIsolated} />
-        </span>
-        <span>
-          Work on its own branch
-          <span className="block text-[var(--text-secondary)] text-[11.5px]">
-            Creates a Git worktree from the workspace's current commit, so threads running at the
-            same time never edit the same files.
-          </span>
-        </span>
-      </label>
-      {mutation.isError && (
-        <p role="alert" className="text-[var(--color-deleted)]!">
-          {mutation.error.message}
-        </p>
-      )}
-    </AppDialog>
-  )
-}
-
 function DeleteWorktreeNote({ thread }: { thread: Thread | null }): React.JSX.Element | null {
   const worktree = thread?.worktree
   if (worktree === undefined || worktree.state === "removed") return null
@@ -391,9 +272,7 @@ export function App(): React.JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTarget, setSearchTarget] = useState<TranscriptSearchResult | null>(null)
   const [searchThreads, setSearchThreads] = useState<ReadonlyArray<Thread>>([])
-  const [newThreadOpen, setNewThreadOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Thread | null>(null)
-  const [newThreadWorkspaceId, setNewThreadWorkspaceId] = useState("")
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [switcherQuery, setSwitcherQuery] = useState("")
   const remotePhone = useRemotePhone()
@@ -407,25 +286,6 @@ export function App(): React.JSX.Element {
   const { snapshotQuery, threadPagesQuery, snapshot } = useAppData()
 
   const {
-    addWorkspaceMutation,
-    manageAddWorkspaceMutation,
-    renameWorkspaceMutation,
-    removeWorkspaceMutation,
-  } = useWorkspaceActions(snapshot, {
-    added: (workspaceId) => {
-      setNewThreadWorkspaceId(workspaceId)
-      setNewThreadOpen(true)
-    },
-    removed: (workspaceId, threadIds) => {
-      for (const id of threadIds) {
-        removeThread(id)
-        useThreadDrafts.getState().forget(id)
-      }
-      setSearchThreads((threads) => threads.filter((thread) => thread.workspaceId !== workspaceId))
-      setSearchTarget(null)
-    },
-  })
-  const {
     pinMutation,
     createThreadMutation,
     setStatusMutation,
@@ -434,7 +294,6 @@ export function App(): React.JSX.Element {
   } = useThreadActions(snapshot, {
     created: (threadId) => {
       if (threadId !== undefined) openThread(threadId)
-      setNewThreadOpen(false)
     },
     deleted: (threadId) => {
       removeThread(threadId)
@@ -444,6 +303,22 @@ export function App(): React.JSX.Element {
     },
     submitted: () => {
       // ThreadView handles submitted drafts.
+    },
+  })
+  const {
+    addWorkspaceMutation,
+    manageAddWorkspaceMutation,
+    renameWorkspaceMutation,
+    removeWorkspaceMutation,
+  } = useWorkspaceActions(snapshot, {
+    added: (workspaceId) => createThreadMutation.mutate({ workspaceId }),
+    removed: (workspaceId, threadIds) => {
+      for (const id of threadIds) {
+        removeThread(id)
+        useThreadDrafts.getState().forget(id)
+      }
+      setSearchThreads((threads) => threads.filter((thread) => thread.workspaceId !== workspaceId))
+      setSearchTarget(null)
     },
   })
   const { updateProviderMutation, upsertModelMutation, deleteModelMutation, resetCatalogMutation } =
@@ -484,12 +359,18 @@ export function App(): React.JSX.Element {
       openThread(draftThread.id)
       return
     }
-    if (snapshot.workspaces.length === 0) addWorkspaceMutation.mutate()
-    else {
-      setNewThreadWorkspaceId(snapshot.workspaces[0]?.id ?? "")
-      setNewThreadOpen(true)
-    }
-  }, [addWorkspaceMutation, closeSettings, openThread, snapshot.threads, snapshot.workspaces])
+    // The draft's workspace line can move it, so it starts in the most recently used workspace.
+    const workspace = snapshot.workspaces[0]
+    if (workspace === undefined) addWorkspaceMutation.mutate()
+    else createThreadMutation.mutate({ workspaceId: workspace.id })
+  }, [
+    addWorkspaceMutation,
+    closeSettings,
+    createThreadMutation,
+    openThread,
+    snapshot.threads,
+    snapshot.workspaces,
+  ])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void =>
@@ -727,7 +608,13 @@ export function App(): React.JSX.Element {
         )}
 
         <MutationErrors
-          mutations={[pinMutation, setStatusMutation, deleteThreadMutation, addWorkspaceMutation]}
+          mutations={[
+            pinMutation,
+            setStatusMutation,
+            deleteThreadMutation,
+            addWorkspaceMutation,
+            createThreadMutation,
+          ]}
         />
         <AppDialog
           open={workspacesOpen}
@@ -823,15 +710,6 @@ export function App(): React.JSX.Element {
             </Combobox.List>
           </Combobox.Root>
         </AppDialog>
-
-        <NewThreadDialog
-          open={newThreadOpen}
-          onOpenChange={setNewThreadOpen}
-          workspaces={snapshot.workspaces}
-          workspaceId={newThreadWorkspaceId}
-          onWorkspaceChange={setNewThreadWorkspaceId}
-          mutation={createThreadMutation}
-        />
 
         {selectedApproval !== null && (
           <InteractionDialog

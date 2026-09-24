@@ -218,15 +218,19 @@ export const listWorktreeThreads = (workspaceId?: string) =>
     return rows.map(fromLocationRow)
   })
 
-/** Only a thread with no turns or queued input may change folders, so no work is split across two. */
-export const setDraftWorktree = (
-  threadId: string,
-  worktree: Omit<ThreadWorktree, "state"> | null,
-) =>
+/**
+ * Moves a thread that has not started to another workspace or worktree. Only a thread with no turns
+ * or queued input may move, so no work is split across two folders.
+ */
+export const setDraftLocation = (input: {
+  readonly threadId: string
+  readonly workspaceId: string
+  readonly worktree: Omit<ThreadWorktree, "state"> | null
+}) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const started = yield* sql`
-      SELECT 1 FROM threads t WHERE t.id = ${threadId} AND (
+      SELECT 1 FROM threads t WHERE t.id = ${input.threadId} AND (
         EXISTS (SELECT 1 FROM turns r WHERE r.thread_id = t.id)
         OR EXISTS (SELECT 1 FROM queued_inputs q WHERE q.thread_id = t.id)
       )
@@ -234,15 +238,19 @@ export const setDraftWorktree = (
     if (started.length > 0)
       return yield* Effect.fail(
         new CoreProtocolError({
-          message: "A thread's branch can only be chosen before its first message.",
+          message: "A thread's workspace and branch can only change before its first message.",
         }),
       )
+    const { worktree } = input
+    const timestamp = new Date().toISOString()
     yield* sql`UPDATE threads SET
+      workspace_id = ${input.workspaceId},
       worktree_path = ${worktree?.path ?? null},
       worktree_branch = ${worktree?.branch ?? null},
       worktree_base = ${worktree?.baseBranch ?? null},
       worktree_state = ${worktree === null ? null : "ready"}
-      WHERE id = ${threadId}`
+      WHERE id = ${input.threadId}`
+    yield* sql`UPDATE workspaces SET last_opened_at = ${timestamp} WHERE id = ${input.workspaceId}`
     return yield* getSnapshot
   }).pipe(transaction)
 
