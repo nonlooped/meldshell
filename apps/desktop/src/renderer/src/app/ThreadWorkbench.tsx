@@ -1,12 +1,19 @@
-import { centeredStateClasses, textInputClasses, iconButtonClasses } from "../ui/styles"
+import {
+  centeredStateClasses,
+  textInputClasses,
+  iconButtonClasses,
+  paneSeparatorClasses,
+} from "../ui/styles"
 import { Pressable, FadeDiv } from "../ui/motion"
 import { useState } from "react"
 import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import { Group, Panel, Separator } from "react-resizable-panels"
-import { Columns2, Maximize2, MoreHorizontal, Rows2, X } from "lucide-react"
+import { Columns2, Maximize2, MoreHorizontal, Rows2, SquareTerminal, X } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { AppDialog, Button, DropdownMenu, IconButton, MenuAction } from "../ui/controls"
 import { ThreadView } from "../threads/ThreadView"
+import { TerminalPanel } from "../terminals/TerminalPanel"
+import { terminalApi, useTerminalStore } from "../terminals/terminal-store"
 import { useTabStore } from "./tab-store"
 import {
   movePane,
@@ -103,6 +110,7 @@ function ThreadTileHeader({
 }): React.JSX.Element {
   const [picker, setPicker] = useState<SplitEdge | null>(null)
   const draggable = useThreadDraggable(thread.id, "pane")
+  const terminalShown = useTerminalStore((state) => state.threads[thread.id]?.open === true)
   return (
     <div className="thread-tile-header flex min-w-0 items-center gap-[2px] [padding:3px_6px] border-b-[1px] border-b-[color:var(--line-subtle)] text-[var(--text-tertiary)]">
       <BaseButton
@@ -143,6 +151,14 @@ function ThreadTileHeader({
         >
           Show only this thread
         </MenuAction>
+        {terminalApi !== undefined && (
+          <MenuAction
+            icon={<SquareTerminal size={13} />}
+            onClick={() => useTerminalStore.getState().toggle(thread.id)}
+          >
+            {terminalShown ? "Hide terminal" : "Show terminal"}
+          </MenuAction>
+        )}
       </DropdownMenu>
       <IconButton
         label={`Close ${thread.title}`}
@@ -184,8 +200,45 @@ function ThreadTile({
       onPointerDownCapture={focus}
     >
       {split && <ThreadTileHeader thread={thread} threads={threads} onFocus={focus} />}
-      <ThreadView snapshot={snapshot} thread={thread} searchTarget={searchTarget} />
+      <ThreadBody snapshot={snapshot} thread={thread} searchTarget={searchTarget} />
     </section>
+  )
+}
+
+/** The conversation, with the thread's terminal panel below it while that panel is shown. */
+function ThreadBody({
+  snapshot,
+  thread,
+  searchTarget,
+}: Omit<WorkbenchProps, "threads"> & { thread: Thread }): React.JSX.Element {
+  const terminals = useTerminalStore((state) => state.threads[thread.id])
+  const terminalPanelId = `terminals:${thread.id}`
+  // The group stays mounted either way, so showing the terminal never remounts the conversation.
+  return (
+    <Group
+      className="w-full h-full min-w-0 min-h-0"
+      orientation="vertical"
+      onLayoutChanged={(layout, meta) => {
+        const size = layout[terminalPanelId]
+        if (meta.isUserInteraction && size !== undefined)
+          useTerminalStore.getState().resizePanel(thread.id, size)
+      }}
+    >
+      <Panel id={`conversation:${thread.id}`} minSize="160px">
+        <ThreadView snapshot={snapshot} thread={thread} searchTarget={searchTarget} />
+      </Panel>
+      {terminals?.open && (
+        <>
+          <Separator
+            className={`motion-colors ${paneSeparatorClasses}`}
+            aria-label="Resize terminal"
+          />
+          <Panel id={terminalPanelId} defaultSize={`${terminals.size}%`} minSize="96px">
+            <TerminalPanel thread={thread} terminals={terminals} />
+          </Panel>
+        </>
+      )}
+    </Group>
   )
 }
 
@@ -308,12 +361,4 @@ const dropPreviewPaneClasses = [
   "[&[data-dropped]]:border-[color:var(--accent)] [&[data-dropped]]:bg-[var(--surface-selected)]",
   "[&_>_span]:[padding:5px_9px] [&_>_span]:rounded-[var(--radius-sm)] [&_>_span]:bg-[var(--accent)]",
   "[&_>_span]:text-[var(--accent-foreground)] [&_>_span]:text-[12px]",
-].join(" ")
-
-const paneSeparatorClasses = [
-  "relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute",
-  "[&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)]",
-  "[&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]",
-  "[&[aria-orientation='horizontal']]:w-auto [&[aria-orientation='horizontal']]:h-[1px]",
-  "[&[aria-orientation='horizontal']::after]:[inset:-3px_0]",
 ].join(" ")

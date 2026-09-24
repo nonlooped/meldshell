@@ -35,6 +35,7 @@ import { useViewStore } from "./view-store"
 import { ThreadWorkbench } from "./ThreadWorkbench"
 import { useThreadDrafts } from "./thread-drafts"
 import { useThreadSignals, useWatchedThreadIds } from "./thread-signals"
+import { terminalApi, useTerminalStore } from "../terminals/terminal-store"
 
 import { SettingsView } from "../settings/SettingsView"
 
@@ -253,6 +254,25 @@ function DeleteWorktreeNote({ thread }: { thread: Thread | null }): React.JSX.El
   )
 }
 
+/** The title bar's terminal toggle for the thread on screen; `shown` is null without one. */
+function useTerminalToggle(closeSettings: () => void, selectTab: (id: string) => void) {
+  const threadOnScreen = useTabStore(
+    (state) => state.selectedFileId === null && state.selectedThreadId !== null,
+  )
+  const selectedThreadId = useTabStore((state) => state.selectedThreadId)
+  const open = useTerminalStore((state) =>
+    selectedThreadId === null ? false : state.threads[selectedThreadId]?.open === true,
+  )
+  const toggle = useCallback((): void => {
+    const { selectedThreadId: threadId, selectedThreadTabId } = useTabStore.getState()
+    if (terminalApi === undefined || threadId === null || selectedThreadTabId === null) return
+    closeSettings()
+    selectTab(selectedThreadTabId)
+    useTerminalStore.getState().toggle(threadId)
+  }, [closeSettings, selectTab])
+  return { shown: terminalApi === undefined || !threadOnScreen ? null : open, toggle }
+}
+
 export function App(): React.JSX.Element {
   const openThreadIds = useTabStore((state) => state.openThreadIds)
   const selectedThreadId = useTabStore((state) => state.selectedThreadId)
@@ -297,6 +317,7 @@ export function App(): React.JSX.Element {
     },
     deleted: (threadId) => {
       removeThread(threadId)
+      useTerminalStore.getState().forget(threadId)
       useThreadDrafts.getState().forget(threadId)
       setSearchThreads((threads) => threads.filter((thread) => thread.id !== threadId))
       setDeleteTarget(null)
@@ -315,6 +336,7 @@ export function App(): React.JSX.Element {
     removed: (workspaceId, threadIds) => {
       for (const id of threadIds) {
         removeThread(id)
+        useTerminalStore.getState().forget(id)
         useThreadDrafts.getState().forget(id)
       }
       setSearchThreads((threads) => threads.filter((thread) => thread.workspaceId !== workspaceId))
@@ -372,6 +394,8 @@ export function App(): React.JSX.Element {
     snapshot.workspaces,
   ])
 
+  const terminal = useTerminalToggle(closeSettings, selectThread)
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void =>
       handleAppShortcut(event, {
@@ -385,6 +409,7 @@ export function App(): React.JSX.Element {
         selectedThreadId: selectedTabId,
         closeThread,
         cycleTabs,
+        toggleTerminal: terminal.toggle,
       })
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
@@ -396,6 +421,7 @@ export function App(): React.JSX.Element {
     requestNewThread,
     selectedTabId,
     settingsOpen,
+    terminal.toggle,
   ])
 
   const pagedThreads = threadPagesQuery.data?.pages.flatMap((page) => page.threads) ?? []
@@ -470,6 +496,8 @@ export function App(): React.JSX.Element {
           onToggleSourceControl={() =>
             toggleSidebar(remotePhone, inbox.panelRef, sourceControl.toggle, panelMotion.animate)
           }
+          terminalShown={terminal.shown}
+          onToggleTerminal={terminal.toggle}
         />
 
         {settingsOpen ? (

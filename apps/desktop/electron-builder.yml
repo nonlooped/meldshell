@@ -21,6 +21,8 @@ files:
 asar: true
 asarUnpack:
   - node_modules/better-sqlite3/**
+  # Terminals: the native addon and, on Windows, the ConPTY helpers it launches as programs.
+  - node_modules/node-pty/**
   - resources/**
 win:
   executableName: MeldShell

@@ -54,6 +54,7 @@
     "better-sqlite3@13.0.3": true,
     "electron@44.1.1": true,
     "esbuild@0.25.12": true,
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "node-pty@1.1.0": true
   }
 }

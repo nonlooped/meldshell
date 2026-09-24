@@ -10,6 +10,7 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  SquareTerminal,
   X,
 } from "lucide-react"
 import { IconButton } from "../ui/controls"
@@ -29,6 +30,9 @@ interface TitleBarProps {
   readonly sourceControlCollapsed: boolean
   readonly onToggleInbox: () => void
   readonly onToggleSourceControl: () => void
+  /** Null while no thread is on screen or this client cannot run shells. */
+  readonly terminalShown: boolean | null
+  readonly onToggleTerminal: () => void
 }
 
 function ThreadTabFrame({
@@ -71,6 +75,8 @@ export function TitleBar({
   sourceControlCollapsed,
   onToggleInbox,
   onToggleSourceControl,
+  terminalShown,
+  onToggleTerminal,
 }: TitleBarProps): React.JSX.Element {
   const files = useTabStore((state) => state.files)
   const threadTabs = useTabStore((state) => state.threadTabs)
@@ -197,6 +203,16 @@ export function TitleBar({
           </div>
         ))}
       </Tabs.List>
+      {sidebarsVisible && terminalShown !== null && (
+        <IconButton
+          className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag] [&[aria-pressed='true']]:text-[var(--text-primary)]"
+          label={terminalShown ? "Hide terminal (Ctrl+`)" : "Show terminal (Ctrl+`)"}
+          aria-pressed={terminalShown}
+          onClick={onToggleTerminal}
+        >
+          <SquareTerminal size={16} />
+        </IconButton>
+      )}
       {sidebarsVisible && (
         <IconButton
           className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"

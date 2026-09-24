@@ -4,6 +4,7 @@
 /* Vendor typesetting is kept below application utilities in the cascade. */
 @import "katex/dist/katex.min.css" layer(base);
 @import "react-diff-view/style/index.css" layer(base);
+@import "@xterm/xterm/css/xterm.css" layer(base);
 /* Bundled so every platform renders the same faces instead of a system fallback. */
 @import "@fontsource-variable/mona-sans/wght.css" layer(base);
 @import "@fontsource/monaspace-neon/400.css" layer(base);
@@ -116,6 +117,24 @@
     --spin-top: #b6d3ef;
     --spin-middle: #edb185;
     --spin-bottom: #f888a0;
+
+    /* ANSI colours for thread terminals, drawn from the status colours above. */
+    --terminal-black: #2c2c30;
+    --terminal-red: var(--color-deleted);
+    --terminal-green: var(--color-added);
+    --terminal-yellow: var(--color-modified);
+    --terminal-blue: var(--color-info);
+    --terminal-magenta: var(--color-renamed);
+    --terminal-cyan: #82c7c3;
+    --terminal-white: var(--text-secondary);
+    --terminal-bright-black: #75757c;
+    --terminal-bright-red: #f4abab;
+    --terminal-bright-green: #9dd8ab;
+    --terminal-bright-yellow: #edcc92;
+    --terminal-bright-blue: #a4caf2;
+    --terminal-bright-magenta: #cab8f3;
+    --terminal-bright-cyan: #9dd7d3;
+    --terminal-bright-white: var(--text-primary);
 
     --font-text: "Mona Sans Variable", "Segoe UI Variable Text", system-ui, sans-serif;
     --font-display: "Mona Sans Variable", "Segoe UI Variable Display", system-ui, sans-serif;
@@ -283,6 +302,17 @@
     --spin-top: #4f8cc9;
     --spin-middle: #d7803f;
     --spin-bottom: #e0536f;
+    --terminal-black: #3b3a40;
+    --terminal-cyan: #1d6b68;
+    --terminal-white: #6e6d74;
+    --terminal-bright-black: #6f6e75;
+    --terminal-bright-red: #bd4750;
+    --terminal-bright-green: #2e7c45;
+    --terminal-bright-yellow: #986515;
+    --terminal-bright-blue: #2d70b3;
+    --terminal-bright-magenta: #8761bf;
+    --terminal-bright-cyan: #28807c;
+    --terminal-bright-white: #86858c;
     --shadow-popup: 0 8px 28px rgba(40, 36, 30, 0.16), 0 0 0 1px rgba(40, 36, 30, 0.08);
     --shadow-raised: 0 4px 16px rgba(40, 36, 30, 0.1);
   }
@@ -319,5 +349,19 @@
     height: calc(100vh / var(--app-scale, 1));
     --caption-inset: calc(146px / var(--app-scale, 1));
     --titlebar-height: calc(44px / var(--app-scale, 1));
+  }
+}
+
+/* Thread terminals: the scrim shows through xterm, and its own chrome follows the theme. */
+@layer components {
+  .xterm .xterm-viewport {
+    background-color: transparent;
+  }
+  .xterm .composition-view {
+    background: var(--surface-menu);
+    color: var(--text-primary);
+  }
+  .xterm .xterm-scrollable-element > .shadow {
+    box-shadow: none;
   }
 }
