@@ -149,6 +149,20 @@ interface TerminalApi {
   readonly onExit: (listener: (id: string, exitCode: number) => void) => () => void
 }
 
+/** An application on the workstation that can open a folder, such as a code editor. */
+export interface ExternalEditor {
+  readonly id: string
+  readonly name: string
+}
+
+/** Workstation-only actions; a remote client leaves `MeldShellApi.desktop` undefined. */
+interface DesktopApi {
+  /** Editors found on this workstation, in a stable order, followed by the file manager. */
+  readonly listEditors: () => Promise<readonly ExternalEditor[]>
+  /** Opens the folder a thread works in, or the workspace folder, in the chosen editor. */
+  readonly openInEditor: (input: WorkspaceScope & { editorId: string }) => Promise<void>
+}
+
 export type GitFileAction = "stage" | "unstage" | "restore"
 export type GitDiffSide = "staged" | "unstaged"
 
@@ -331,6 +345,8 @@ export const IPC = {
   terminalClose: "meldshell:terminal-close",
   terminalData: "meldshell:terminal-data",
   terminalExit: "meldshell:terminal-exit",
+  listEditors: "meldshell:list-editors",
+  openInEditor: "meldshell:open-in-editor",
 } as const
 
 export type MeldShellApi = InvokeApi & {
@@ -343,6 +359,7 @@ export type MeldShellApi = InvokeApi & {
   readonly onOpenAttention: (listener: (threadId: string) => void) => () => void
   readonly onUpdateStatus: (listener: (status: AppUpdateStatus) => void) => () => void
   readonly terminal?: TerminalApi
+  readonly desktop?: DesktopApi
 }
 
 /** Only registered methods cross the preload boundary; callers cannot choose arbitrary channels. */

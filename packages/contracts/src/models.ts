@@ -316,6 +316,8 @@ export const AppSettings = Schema.Struct({
   reduceMotion: Schema.optional(Schema.Boolean),
   /** Chimes when a thread finishes or needs attention out of view. */
   sounds: Schema.optional(Schema.Boolean),
+  /** The external editor that opens a thread's folder; an `ExternalEditor` id. */
+  editor: Schema.optional(Schema.String),
 
   /** A `ProviderModel` id, or `CURRENT_TITLE_MODEL`. */
   titleModelId: Schema.String,
@@ -522,6 +524,7 @@ export const SetAppSettingsInput = Schema.Struct({
   transcriptSize: Schema.optional(Schema.Literal("small", "medium", "large")),
   reduceMotion: Schema.optional(Schema.Boolean),
   sounds: Schema.optional(Schema.Boolean),
+  editor: Schema.optional(Schema.String.pipe(Schema.maxLength(64))),
 
   titleModelId: Schema.optional(Schema.String),
 })
