@@ -1,6 +1,17 @@
-# Release checklist
+# Releasing MeldShell
 
 Use this checklist for an installer candidate. Routine edits follow [AGENTS.md](../AGENTS.md#verification). A recorded result applies only to its exact artifact.
+
+## Usual release path
+
+1. Commit the intended changes and Unreleased entries, and push `main`.
+2. If account API or relay behavior changed, complete the [remote service cutover](#remote-service-cutover).
+3. Optionally preview with `npm run release -- minor --dry-run` (use `patch` for fixes or an explicit version).
+4. Run `npm run release -- minor --push`. This cuts the release and pushes the commit and tag together. The printed Actions link shows builds and publication; agent monitoring follows the [repository verification policy](../AGENTS.md#verification).
+
+The preview prints the release notes and whether the version reaches stable downloads. It changes nothing and does not check the remote. Publishing requires a clean `main` matching freshly fetched `origin/main`, consistent version fields, Unreleased entries, and an unused version tag. If pushing fails after the cut, the script retains the local commit/tag and prints the exact push command to retry; do not bump again.
+
+The tag workflow owns full automated validation and packaging. Routine releases do not need duplicate local builds or suites before tagging. Use the candidate path below when installer or runtime changes need manual evidence. Keep the manual matrix as the coverage reference and record skipped cases; a routine release does not imply that every manual case was certified.
 
 ## Remote service cutover
 
@@ -19,7 +30,7 @@ Every user-visible change adds an entry under `## [Unreleased]` in [CHANGELOG.md
 
 Before 1.0.0, `0.x.0` tags publish as normal GitHub Releases and `0.x.y` tags with `y > 0` publish as prereleases. Prereleases are not the latest stable download or update.
 
-To cut a release from a clean, up-to-date `main`, run `npm run release -- <patch|minor|major|X.Y.Z>`. The script moves the Unreleased entries under the new version and date, bumps every version field, commits `chore(release): vX.Y.Z`, and creates an annotated tag. Push both with `git push --atomic origin main vX.Y.Z`. A [test](../tests/changelog.test.ts) keeps the version fields and changelog consistent.
+To cut a release from a clean, up-to-date `main`, run `npm run release -- <patch|minor|major|X.Y.Z>`. The script moves the Unreleased entries under the new version and date, bumps every version field, commits `chore(release): vX.Y.Z`, and creates an annotated tag. Add `--push` to also publish the commit and tag, or push both later with `git push --atomic origin main vX.Y.Z`. A [test](../tests/changelog.test.ts) keeps the version fields and changelog consistent.
 
 ## Build and assemble
 
@@ -30,7 +41,7 @@ Running the workflow manually from the Actions tab packages installers from any 
 For a local candidate:
 
 1. Use Node.js 24 or newer on Windows 11 x64 for NSIS and x64 Linux for AppImage.
-2. Install with `npm ci`. Run `npm run check` and `npm test` for candidate validation.
+2. Install with `npm ci`. For full local candidate validation, run `npm run knip`, `npm run check:fast`, and `npm test` once. The packaging command in the next step includes the desktop build. When using workflow artifacts, use the workflow's automated verdict instead of repeating these checks locally.
 3. Run `npm run package:win` on Windows or `npm run package:linux` on Linux.
 4. Inspect the repository-root `release` output. Confirm SQLite loads outside ASAR and no Claude Code native executable is packaged.
 5. Record hashes and complete the applicable manual matrix against those exact artifacts before tagging. Results from a pretag build apply only to that build; record any checks on the published installers separately.
