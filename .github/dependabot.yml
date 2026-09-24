@@ -7,3 +7,15 @@ updates:
     groups:
       actions:
         patterns: ['*']
+
+  # package.json `allowScripts` pins exact versions. When a PR bumps a pinned package, run
+  # `npm install-scripts approve <pkg>` so its install script keeps running locally; CI installs
+  # with --ignore-scripts and will not catch a stale pin.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 10
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
