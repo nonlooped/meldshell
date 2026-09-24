@@ -21,11 +21,13 @@ User instructions take precedence over skills. Keep skills within the requested 
 
 ## Verification
 
-Use the smallest existing check that covers the change's concrete risk. Documentation changes need a diff and reference review only. Add regression tests when they can expose the broken behavior.
+Before running checks, choose the smallest existing check that covers the change's concrete risk and state that scope in one sentence. Use the [focused command examples](CONTRIBUTING.md#choose-checks-by-impact). Documentation changes need a diff and reference review only. Add regression tests when they can expose the broken behavior.
 
 Visual verification and manual testing belong to the user unless explicitly requested of the agent. Do not launch a browser, Electron, Playwright, screenshots, or a substitute UI harness for verification without that request. Finish code work first; if visual evidence is needed, request a specific manual check or screenshot and use the feedback without asking for the same evidence again. Targeted static checks do not certify UI behavior.
 
-Run repository-wide lint, builds, typechecks, suites, or aggregate checks only when requested or when targeted checks cannot cover the impact; state the reason first. Release certification follows its checklist. Batch checks after coherent changes, then finish once relevant checks pass. Repeat only for new changes, failures, or unresolved risks.
+Run repository-wide lint, builds, typechecks, suites, or aggregate checks only when requested or when targeted checks cannot cover the impact; state the reason first. Editing installer configuration, release tooling, or documentation does not itself request candidate certification. Run the release checklist only when preparing or certifying an actual release candidate. Batch checks after coherent changes, then finish once relevant checks pass. Repeat only for new changes, failures, or unresolved risks.
+
+Do not watch, poll, or wait for CI or GitHub Actions runs unless the user explicitly asks. Pushing changes, opening a PR, or cutting a release does not authorize CI monitoring. Report the available run or workflow link and finish without waiting; leave the CI outcome unverified unless it was actually checked at the user's request.
 
 Report what changed, what was checked, and any remaining failure or verification limit.
 

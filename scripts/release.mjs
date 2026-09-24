@@ -80,7 +80,11 @@ const readJson = (path) => JSON.parse(readFileSync(path, "utf8"))
 const writeJson = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`)
 const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trim()
 
-function release(bump) {
+function release(bump, options) {
+  const unknown = options.find((option) => !["--dry-run", "--push"].includes(option))
+  if (unknown) throw new Error(`Unknown option: ${unknown}`)
+  const dryRun = options.includes("--dry-run")
+  const push = options.includes("--push")
   if (git("status", "--porcelain")) throw new Error("Commit or stash local changes first")
   if (git("branch", "--show-current") !== "main") throw new Error("Release from main")
 
@@ -89,15 +93,44 @@ function release(bump) {
   if (git("tag", "--list", `v${version}`)) throw new Error(`Tag v${version} already exists`)
   const date = new Date().toISOString().slice(0, 10)
   const previousTag = git("tag", "--list", `v${current}`) || null
-  writeFileSync(
-    "CHANGELOG.md",
-    cutChangelog(readFileSync("CHANGELOG.md", "utf8"), version, date, previousTag),
-  )
+  const changelog = cutChangelog(readFileSync("CHANGELOG.md", "utf8"), version, date, previousTag)
 
   const lock = readJson("package-lock.json")
+  const manifests = VERSIONED_WORKSPACES.map((workspace) => {
+    const path = workspace ? `${workspace}/package.json` : "package.json"
+    const manifest = readJson(path)
+    if (manifest.version !== current || lock.packages[workspace]?.version !== current) {
+      throw new Error(`Version mismatch in ${path} or package-lock.json`)
+    }
+    return { path, manifest }
+  })
+  if (lock.version !== current) throw new Error("Version mismatch in package-lock.json")
+
+  const classification =
+    version.startsWith("0.") && !version.endsWith(".0")
+      ? "prerelease (excluded from stable downloads and updates)"
+      : "normal release"
+  console.log(`${current} → ${version}: ${classification}\n\n${releaseNotes(changelog, version)}`)
+  const pushCommand = `git push --atomic origin main v${version}`
+  if (dryRun) {
+    console.log(`Preview only; no files, commits, tags, or remote refs changed.\n${pushCommand}`)
+    return
+  }
+  if (push) {
+    git("fetch", "--no-tags", "origin", "refs/heads/main")
+    if (git("rev-parse", "HEAD") !== git("rev-parse", "FETCH_HEAD")) {
+      throw new Error(
+        "Publish requires main to match origin/main. Push or integrate local commits first.",
+      )
+    }
+    if (git("ls-remote", "--tags", "origin", `refs/tags/v${version}`)) {
+      throw new Error(`Remote tag v${version} already exists`)
+    }
+  }
+
+  writeFileSync("CHANGELOG.md", changelog)
+  for (const { path, manifest } of manifests) writeJson(path, { ...manifest, version })
   for (const workspace of VERSIONED_WORKSPACES) {
-    const manifest = workspace ? `${workspace}/package.json` : "package.json"
-    writeJson(manifest, { ...readJson(manifest), version })
     lock.packages[workspace].version = version
   }
   lock.version = version
@@ -106,15 +139,32 @@ function release(bump) {
   git("add", "CHANGELOG.md", "package.json", "apps/desktop/package.json", "package-lock.json")
   git("commit", "--quiet", "--message", `chore(release): v${version}`)
   git("tag", "--annotate", `v${version}`, "--message", `MeldShell ${version}`)
-  console.log(`Tagged v${version}. Publish with: git push --atomic origin main v${version}`)
+  console.log(`Tagged v${version}. Publish with: ${pushCommand}`)
+  if (push) {
+    try {
+      git("push", "--atomic", "origin", "main", `v${version}`)
+    } catch {
+      throw new Error(
+        `Push failed; the release commit and tag are kept locally. Retry: ${pushCommand}`,
+      )
+    }
+    console.log(
+      `Pushed v${version}. Follow build and publication: ${REPOSITORY}/actions/workflows/release.yml`,
+    )
+  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try {
-    const [command, argument] = process.argv.slice(2)
+    const [command, ...options] = process.argv.slice(2)
+    const [argument] = options
     if (command === "notes")
       process.stdout.write(releaseNotes(readFileSync("CHANGELOG.md", "utf8"), argument))
-    else release(command)
+    else if (command === "--help") {
+      console.log(
+        "Usage: npm run release -- <patch|minor|major|X.Y.Z> [--dry-run] [--push]\n       npm run release -- notes X.Y.Z\n--push cuts and pushes the release, triggering automatic publication.\n--dry-run previews locally without changes or network access; remote readiness is checked on --push.",
+      )
+    } else release(command, options)
   } catch (error) {
     console.error(error instanceof Error ? error.message : error)
     process.exit(1)
