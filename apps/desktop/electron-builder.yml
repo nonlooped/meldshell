@@ -9,6 +9,7 @@ publish:
   repo: meldshell
 files:
   - out/**
+  - resources/icon.png
   - package.json
   - "!**/.vscode/*"
   - "!src/*"
@@ -23,6 +24,7 @@ asarUnpack:
   - resources/**
 win:
   executableName: MeldShell
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:
@@ -30,6 +32,7 @@ win:
 linux:
   category: Development
   executableName: meldshell
+  icon: build/icon.png
   syncDesktopName: true
   target:
     - target: AppImage
@@ -39,6 +42,11 @@ appImage:
   artifactName: ${productName}-${version}-${arch}.${ext}
 nsis:
   artifactName: ${productName}-${version}-setup.${ext}
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeader: build/installerHeader.bmp
+  installerSidebar: build/installerSidebar.bmp
+  uninstallerSidebar: build/installerSidebar.bmp
   allowElevation: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
