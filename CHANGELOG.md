@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+
+- 0.7.0 was never published because its release checks failed. This release delivers every change listed under 0.7.0 below.
+
 ## [0.7.0] - 2026-09-24
 
 ### Added
