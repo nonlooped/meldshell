@@ -13,12 +13,13 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Play,
+  Square,
   SquareTerminal,
   X,
 } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { ExternalEditor, RunScript } from "@meldshell/contracts/ipc"
-import { DropdownMenu, IconButton, MenuAction } from "../ui/controls"
+import { DropdownMenu, IconButton, MenuAction, MenuGroup, MenuSeparator } from "../ui/controls"
 import { Pressable, TextSwap, useMotionPreference } from "../ui/motion"
 import { iconButtonClasses } from "../ui/styles"
 import { MeldMark } from "../ui/MeldMark"
@@ -42,34 +43,59 @@ interface TitleBarProps {
   readonly onToggleTerminal: () => void
   /** The workspace run scripts for the thread on screen. */
   readonly runScripts: readonly RunScript[]
+  /** Names of the run scripts running in the thread's terminal. */
+  readonly runningScripts: readonly string[]
   readonly onRun: (name: string) => void
+  readonly onStopRun: (name: string) => void
   /** Null while no thread is on screen or this client cannot show previews. */
   readonly previewShown: boolean | null
   readonly onTogglePreview: () => void
   /** Null while nothing is on screen or this client cannot start editors; the preferred is first. */
   readonly editors: readonly ExternalEditor[] | null
-  readonly preferredEditor: string | undefined
+  /** What the editor opens: the thread's own worktree or the shared workspace folder. */
+  readonly editorFolder: "worktree" | "workspace"
   readonly onOpenInEditor: (editorId: string) => void
 }
 
 const noDrag = "[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
 
-/** Starts a lone run script directly; several are chosen from a menu. */
+/** Marks a title bar button whose work is running, like a server started by a run script. */
+function RunningDot(): React.JSX.Element {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute top-[5px] right-[5px] w-[6px] h-[6px] rounded-full bg-[var(--color-added)] [box-shadow:0_0_0_2px_var(--scrim)]"
+    />
+  )
+}
+
+/**
+ * Starts a lone run script directly. Several scripts, or any that are running, are chosen from a
+ * menu that shows which are running and can stop them.
+ */
 function RunButton({
   scripts,
+  running,
   onRun,
+  onStop,
 }: {
   scripts: readonly RunScript[]
+  running: readonly string[]
   onRun: (name: string) => void
+  onStop: (name: string) => void
 }): React.JSX.Element | null {
   const only = scripts.length === 1 ? scripts[0] : undefined
-  if (only !== undefined)
+  if (only !== undefined && running.length === 0)
     return (
       <IconButton className={noDrag} label={`Run ${only.command}`} onClick={() => onRun(only.name)}>
         <Play size={15} />
       </IconButton>
     )
   if (scripts.length === 0) return null
+  const label =
+    running.length === 0
+      ? "Run a script"
+      : `${running.length === 1 ? running[0] : `${running.length} scripts`} running`
   return (
     <DropdownMenu
       align="end"
@@ -77,25 +103,56 @@ function RunButton({
         <BaseButton
           render={<Pressable />}
           type="button"
-          className={`motion-colors ${iconButtonClasses} ${noDrag}`}
-          aria-label="Run a script"
-          title="Run a script"
+          className={`motion-colors relative ${iconButtonClasses} ${noDrag} ${
+            running.length > 0 ? "text-[var(--text-primary)]" : ""
+          }`}
+          aria-label={label}
+          title={label}
         >
           <Play size={15} />
+          {running.length > 0 && <RunningDot />}
         </BaseButton>
       }
     >
-      {scripts.map((script) => (
-        <MenuAction key={script.name} onClick={() => onRun(script.name)}>
-          <span
-            className="flex min-w-0 max-w-[360px] items-baseline gap-[10px]"
-            title={script.command}
-          >
-            <span className="flex-none text-[var(--text-primary)]">{script.name}</span>
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] [font:11px_var(--font-mono)]">
-              {script.command}
-            </span>
-          </span>
+      <MenuGroup label="Run scripts">
+        {scripts.map((script) => {
+          const isRunning = running.includes(script.name)
+          return (
+            <MenuAction
+              key={script.name}
+              icon={
+                isRunning ? (
+                  <span className="block w-[7px] h-[7px] rounded-full bg-[var(--color-added)]" />
+                ) : (
+                  <Play size={13} strokeWidth={1.75} />
+                )
+              }
+              onClick={() => onRun(script.name)}
+            >
+              <span
+                className="flex min-w-0 max-w-[360px] flex-1 items-baseline gap-[10px]"
+                title={isRunning ? `Show ${script.command}` : script.command}
+              >
+                <span className="flex-none text-[var(--text-primary)]">{script.name}</span>
+                <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] [font:11px_var(--font-mono)]">
+                  {script.command}
+                </span>
+                {isRunning && (
+                  <span className="flex-none text-[var(--color-added)] text-[11px]">Running</span>
+                )}
+              </span>
+            </MenuAction>
+          )
+        })}
+      </MenuGroup>
+      {running.length > 0 && <MenuSeparator />}
+      {running.map((name) => (
+        <MenuAction
+          key={name}
+          icon={<Square size={11} strokeWidth={2} />}
+          onClick={() => onStop(name)}
+        >
+          Stop {name}
         </MenuAction>
       ))}
     </DropdownMenu>
@@ -105,14 +162,30 @@ function RunButton({
 /** Lists the editors found on this computer; the one used last comes first. */
 function OpenInEditorButton({
   editors,
-  preferred,
+  folder,
   onOpen,
 }: {
   editors: readonly ExternalEditor[]
-  preferred: string | undefined
+  folder: "worktree" | "workspace"
   onOpen: (editorId: string) => void
 }): React.JSX.Element {
   const shortcut = useKeybindings((state) => state.bindings.openInEditor)
+  // The file manager is always last; editors come before it. The first entry, the one used last,
+  // is what the shortcut opens.
+  const apps = editors.filter((editor) => editor.id !== "file-manager")
+  const fileManager = editors.find((editor) => editor.id === "file-manager")
+  const item = (editor: ExternalEditor, first: boolean) => (
+    <MenuAction key={editor.id} onClick={() => onOpen(editor.id)}>
+      <span className="flex min-w-[200px] flex-1 items-baseline justify-between gap-[16px]">
+        <span className="text-[var(--text-primary)]">{editor.name}</span>
+        {first && shortcut !== "" && (
+          <span className="text-[var(--text-tertiary)] [font:10.5px_var(--font-mono)]">
+            {shortcut}
+          </span>
+        )}
+      </span>
+    </MenuAction>
+  )
   return (
     <DropdownMenu
       align="end"
@@ -128,16 +201,11 @@ function OpenInEditorButton({
         </BaseButton>
       }
     >
-      {editors.map((editor) => (
-        <MenuAction key={editor.id} onClick={() => onOpen(editor.id)}>
-          <span className="flex min-w-[180px] items-baseline justify-between gap-[16px]">
-            <span className="text-[var(--text-primary)]">{editor.name}</span>
-            {editor.id === preferred && editors.length > 1 && (
-              <span className="text-[var(--text-tertiary)] text-[11px]">Last used</span>
-            )}
-          </span>
-        </MenuAction>
-      ))}
+      <MenuGroup label={folder === "worktree" ? "Open this worktree in" : "Open this workspace in"}>
+        {apps.map((editor) => item(editor, editor.id === editors[0]?.id))}
+        {fileManager !== undefined && apps.length > 0 && <MenuSeparator />}
+        {fileManager !== undefined && item(fileManager, fileManager.id === editors[0]?.id)}
+      </MenuGroup>
     </DropdownMenu>
   )
 }
@@ -185,17 +253,20 @@ export function TitleBar({
   terminalShown,
   onToggleTerminal,
   runScripts,
+  runningScripts,
   onRun,
+  onStopRun,
   previewShown,
   onTogglePreview,
   editors,
-  preferredEditor,
+  editorFolder,
   onOpenInEditor,
 }: TitleBarProps): React.JSX.Element {
   const files = useTabStore((state) => state.files)
   const threadTabs = useTabStore((state) => state.threadTabs)
   const reduced = useMotionPreference()
   const bindings = useKeybindings((state) => state.bindings)
+  const hasThreadTools = (editors !== null && editors.length > 0) || runScripts.length > 0
   const closeTab = (button: HTMLElement, tabId: string) => {
     if (reduced) return onCloseTab(tabId)
     foldAway(button.closest<HTMLElement>("[data-tab-frame]"), () => onCloseTab(tabId))
@@ -321,13 +392,27 @@ export function TitleBar({
           </div>
         ))}
       </Tabs.List>
-      {sidebarsVisible && editors !== null && editors.length > 0 && (
-        <OpenInEditorButton editors={editors} preferred={preferredEditor} onOpen={onOpenInEditor} />
+      {sidebarsVisible && hasThreadTools && (
+        <div className="flex flex-none items-center gap-[2px]">
+          {editors !== null && editors.length > 0 && (
+            <OpenInEditorButton editors={editors} folder={editorFolder} onOpen={onOpenInEditor} />
+          )}
+          <RunButton
+            scripts={runScripts}
+            running={runningScripts}
+            onRun={onRun}
+            onStop={onStopRun}
+          />
+          <Separator
+            className="w-[1px] h-[18px] flex-[0_0_1px] [margin:0_6px] bg-[var(--line)]"
+            orientation="vertical"
+            aria-hidden="true"
+          />
+        </div>
       )}
-      {sidebarsVisible && <RunButton scripts={runScripts} onRun={onRun} />}
       {sidebarsVisible && previewShown !== null && (
         <IconButton
-          className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag] [&[aria-pressed='true']]:text-[var(--text-primary)]"
+          className={`${noDrag} ${pressedClasses}`}
           label={withShortcut(
             previewShown ? "Hide preview" : "Show preview",
             bindings.togglePreview,
@@ -340,7 +425,7 @@ export function TitleBar({
       )}
       {sidebarsVisible && terminalShown !== null && (
         <IconButton
-          className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag] [&[aria-pressed='true']]:text-[var(--text-primary)]"
+          className={`${noDrag} ${pressedClasses}`}
           label={withShortcut(
             terminalShown ? "Hide terminal" : "Show terminal",
             bindings.toggleTerminal,
@@ -368,6 +453,12 @@ export function TitleBar({
     </header>
   )
 }
+
+/** A panel toggle that is on keeps a raised surface, like a selected tab. */
+const pressedClasses = [
+  "[&[aria-pressed='true']]:text-[var(--text-primary)] [&[aria-pressed='true']]:bg-[var(--surface-selected)]",
+  "[&[aria-pressed='true']]:[border-color:var(--line-subtle)]",
+].join(" ")
 
 const tabClasses = [
   "flex h-[30px] max-w-[224px] min-w-0 items-center gap-[3px] [padding:0_4px]",

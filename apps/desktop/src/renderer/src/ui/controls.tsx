@@ -1,4 +1,4 @@
-import { buttonClasses, textInputClasses, iconButtonClasses } from "./styles"
+import { buttonClasses, textInputClasses, iconButtonClasses, kbdClasses } from "./styles"
 import { Pressable, MotionSurface } from "./motion"
 import type { ReactElement, ReactNode } from "react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
@@ -290,6 +290,35 @@ export function SelectField<Value extends string>({
   )
 }
 
+/**
+ * A shortcut chord such as `Ctrl+Shift+B` drawn as one keycap per key. `Ctrl++` ends in the plus
+ * key itself.
+ */
+export function ChordKeys({
+  chord,
+  className = "",
+}: {
+  chord: string
+  className?: string
+}): React.JSX.Element {
+  const match = /^(.*?)\+?([^+]+|\+)$/.exec(chord)
+  const keys = match
+    ? [...(match[1] ?? "").split("+").filter((part) => part !== ""), match[2] ?? ""]
+    : [chord]
+  return (
+    <kbd
+      className={`inline-flex items-center gap-[3px] [font:inherit] ${className}`}
+      aria-label={chord}
+    >
+      {keys.map((key) => (
+        <kbd key={key} className={kbdClasses} aria-hidden="true">
+          {key}
+        </kbd>
+      ))}
+    </kbd>
+  )
+}
+
 interface MenuRootProps {
   /** Base UI merges its trigger props into this element, so it must be a single element. */
   readonly trigger: ReactElement<Record<string, unknown>>
@@ -529,7 +558,7 @@ const dialogClasses = [
   "[&_.cursor-plan]:[margin:0_20px_20px] [&_.cursor-plan]:max-h-[50vh] [&_.cursor-plan]:overflow-auto",
   "[&_>_.text-input]:w-[calc(100%_-_40px)] [&_>_.text-input]:[margin:12px_20px_0]",
   "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
-  "[&:has(.workspace-manager)]:w-[640px] [&_>_.field]:[margin:18px_20px_0]",
+  "[&:has(.workspace-manager)]:w-[640px] [&:has(.setup-log)]:w-[680px] [&_>_.field]:[margin:18px_20px_0]",
   "[&:has(.search-controls)]:w-[680px] [&:has(.markdown-lightbox)]:w-[min(1100px,_90vw)]",
   "[&:has(.markdown-lightbox)]:max-w-[90vw] [&:has(.markdown-table-expanded)]:w-[min(1400px,_94vw)]",
   "[&:has(.markdown-table-expanded)]:max-w-[94vw]",

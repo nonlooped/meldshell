@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { Thread, WorktreeSetup } from "@meldshell/contracts"
+import { CircleAlert, CircleCheck, CircleStop } from "lucide-react"
 import { AppDialog, Button } from "../ui/controls"
+import { GradientSpinner } from "../ui/motion"
 import { replaceSnapshot } from "../data/cache"
 
 const setupNotes: Record<WorktreeSetup, string> = {
@@ -12,10 +14,38 @@ const setupNotes: Record<WorktreeSetup, string> = {
 }
 
 const noteColors: Record<WorktreeSetup, string> = {
-  running: "text-[var(--text-tertiary)]",
-  succeeded: "text-[var(--text-tertiary)]",
+  running: "text-[var(--text-secondary)]",
+  succeeded: "text-[var(--color-added)]",
   failed: "text-[var(--color-deleted)]",
   interrupted: "text-[var(--color-modified)]",
+}
+
+function SetupIcon({ setup }: { setup: WorktreeSetup }): React.JSX.Element {
+  switch (setup) {
+    case "running":
+      return <GradientSpinner />
+    case "succeeded":
+      return <CircleCheck size={13} strokeWidth={1.75} aria-hidden="true" />
+    case "failed":
+      return <CircleAlert size={13} strokeWidth={1.75} aria-hidden="true" />
+    case "interrupted":
+      return <CircleStop size={13} strokeWidth={1.75} aria-hidden="true" />
+  }
+}
+
+/** A setup state with its icon, coloured by how it went. */
+function SetupState({ setup }: { setup: WorktreeSetup }): React.JSX.Element {
+  return (
+    <span
+      className={`inline-flex min-w-0 items-center gap-[6px] ${noteColors[setup]}`}
+      role="status"
+    >
+      <span className="inline-flex flex-none">
+        <SetupIcon setup={setup} />
+      </span>
+      <span className="min-w-0">{setupNotes[setup]}</span>
+    </span>
+  )
 }
 
 /** Stops or reruns a thread's setup script; either returns the snapshot that shows the change. */
@@ -98,9 +128,11 @@ export function SetupLogDialog({
       }
     >
       {setup !== undefined && (
-        <p className={noteColors[setup]} role="status">
-          {setupNotes[setup]}
-          {log.data?.truncated && " · showing the end of a long log"}
+        <p className="setup-log flex items-center gap-[8px] text-[12px]!">
+          <SetupState setup={setup} />
+          {log.data?.truncated && (
+            <span className="text-[var(--text-tertiary)]">· showing the end of a long log</span>
+          )}
         </p>
       )}
       <pre
@@ -110,7 +142,7 @@ export function SetupLogDialog({
           const output = event.currentTarget
           following.current = output.scrollHeight - output.scrollTop - output.clientHeight < 24
         }}
-        className="[margin:10px_20px_0] max-h-[50vh] min-h-[120px] p-[10px] overflow-auto border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-hover)] text-[var(--text-primary)] [font:11.5px_/_1.6_var(--font-mono)] whitespace-pre-wrap [overflow-wrap:anywhere] [&:focus-visible]:[outline:1px_solid_var(--focus-ring)]"
+        className="[margin:10px_20px_0] max-h-[50vh] min-h-[160px] p-[10px] overflow-auto border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-hover)] text-[var(--text-primary)] [font:11.5px_/_1.6_var(--font-mono)] whitespace-pre-wrap [overflow-wrap:anywhere] [&:focus-visible]:[outline:1px_solid_var(--focus-ring)]"
       >
         {text === undefined ? (log.isFetching ? "Loading…" : "") : text || "No output yet."}
       </pre>
@@ -139,9 +171,7 @@ export function WorktreeSetupNote({
   if (setup === undefined || setup === "succeeded") return null
   return (
     <span className={`inline-flex min-w-0 items-center gap-[6px] ${className}`}>
-      <span className={`min-w-0 ${noteColors[setup]}`} role="status">
-        {setupNotes[setup]}
-      </span>
+      <SetupState setup={setup} />
       <Button size="sm" variant="ghost" onClick={() => setShowingLog(true)}>
         {setup === "running" ? "Output" : "Details"}
       </Button>

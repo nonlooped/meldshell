@@ -1,14 +1,33 @@
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import type { SaveScheduleInput } from "@meldshell/contracts"
+import type { SaveScheduleInput, ScheduledPrompt } from "@meldshell/contracts"
 import { queryKeys } from "../data/cache"
 
-/** Every scheduled prompt, or one thread's when `threadId` is given. */
+const noSchedules: readonly ScheduledPrompt[] = []
+
+/**
+ * Every scheduled prompt, or one thread's when `threadId` is given. Both read one shared listing,
+ * so the inbox, a thread, and Settings never ask the host separately.
+ */
 export function useSchedules(threadId?: string) {
   return useQuery({
-    queryKey: [...queryKeys.schedules, threadId ?? "all"],
-    queryFn: () => window.meldshell.listSchedules(threadId === undefined ? {} : { threadId }),
+    queryKey: queryKeys.schedules,
+    queryFn: () => window.meldshell.listSchedules({}),
+    select: (schedules: readonly ScheduledPrompt[]) =>
+      threadId === undefined
+        ? schedules
+        : schedules.filter((schedule) => schedule.threadId === threadId),
   })
+}
+
+/** Threads with a schedule still to run, for marking them in lists. */
+export function useScheduledThreadIds(): ReadonlySet<string> {
+  const schedules = useSchedules().data ?? noSchedules
+  return new Set(
+    schedules
+      .filter((schedule) => schedule.nextRunAt !== null)
+      .map((schedule) => schedule.threadId),
+  )
 }
 
 export function useScheduleActions() {

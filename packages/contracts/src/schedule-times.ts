@@ -1,4 +1,4 @@
-import type { ScheduleCadence } from "@meldshell/contracts"
+import type { ScheduleCadence } from "./models"
 
 /*
  * When scheduled prompts run. Daily times are local to this computer, so a schedule set for 09:00

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react"
-import { Check, CircleAlert, Copy, TriangleAlert } from "lucide-react"
+import { Check, CircleAlert, Copy, TriangleAlert, X } from "lucide-react"
 import { FadeDiv } from "./motion"
 import { Button, IconButton } from "./controls"
 
@@ -85,6 +85,53 @@ export function ErrorToast({
       <Button size="sm" className="flex-none" onClick={onDismiss}>
         Dismiss
       </Button>
+    </FadeDiv>
+  )
+}
+
+/** How long an undoable action stays offered before its toast leaves. */
+const ACTION_TOAST_MS = 6_000
+
+/**
+ * A floating confirmation of something just done, with a way to take it back. It leaves on its own
+ * after a few seconds, but not while the pointer rests on it.
+ */
+export function ActionToast({
+  message,
+  actionLabel,
+  onAction,
+  onDismiss,
+}: {
+  message: string
+  actionLabel: string
+  onAction: () => void
+  onDismiss: () => void
+}): React.JSX.Element {
+  const [hovered, setHovered] = useState(false)
+  useEffect(() => {
+    if (hovered) return
+    const timer = window.setTimeout(onDismiss, ACTION_TOAST_MS)
+    return () => window.clearTimeout(timer)
+  }, [hovered, onDismiss])
+  return (
+    <FadeDiv
+      duration={0.2}
+      className="fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] flex items-center gap-[8px] [padding:6px_6px_6px_14px] w-max max-w-[min(480px,_80vw)] bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] text-[var(--text-primary)] border-[1px] border-[color:var(--line)] rounded-[var(--radius-lg)] text-[12px] leading-[1.5] [box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)] [@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]"
+      role="status"
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+    >
+      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{message}</span>
+      <Button size="sm" className="flex-none" onClick={onAction}>
+        {actionLabel}
+      </Button>
+      <IconButton
+        label="Dismiss"
+        className="w-[24px]! h-[24px]! flex-[0_0_24px]!"
+        onClick={onDismiss}
+      >
+        <X size={13} />
+      </IconButton>
     </FadeDiv>
   )
 }

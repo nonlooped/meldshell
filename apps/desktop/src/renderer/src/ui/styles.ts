@@ -88,6 +88,18 @@ export const panelTabsClasses = [
   "[&_button[data-active]]:bg-[var(--surface-selected)] [&_button[data-active]]:text-[var(--text-primary)]",
 ].join(" ")
 
+/** A row of mutually exclusive choices, as Base UI `ToggleGroup` and `Toggle` render them. */
+export const segmentGroupClasses =
+  "flex gap-[2px] p-[2px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)]"
+
+export const segmentClasses = [
+  "motion-colors inline-flex h-[24px] items-center justify-center gap-[6px] [padding:0_10px] border-0",
+  "rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] text-[12px] cursor-default",
+  "[&:hover]:text-[var(--text-primary)] [&[data-pressed]]:bg-[var(--surface-selected)]",
+  "[&[data-pressed]]:text-[var(--text-primary)] [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)]",
+  "[&:disabled]:text-[var(--text-disabled)]",
+].join(" ")
+
 /** A keycap for shortcut hints; sized in `em` so it follows the surrounding label. */
 export const kbdClasses = [
   "inline-flex h-[1.7em] min-w-[1.7em] items-center justify-center [padding:0_0.45em]",

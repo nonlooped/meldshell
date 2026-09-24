@@ -2,13 +2,14 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
   CoreProtocolError,
+  firstRun,
+  followingRun,
   type SaveScheduleInput,
   ScheduleCadence,
   type ScheduledPrompt,
 } from "@meldshell/contracts"
 import { Effect, Option, Schema } from "effect"
 import { transaction } from "./database/persistence"
-import { firstRun, followingRun } from "./schedule-times"
 
 interface ScheduleRow {
   readonly id: string

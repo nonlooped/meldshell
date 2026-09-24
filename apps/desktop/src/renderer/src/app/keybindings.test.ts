@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import {
   actionForEvent,
+  ariaShortcut,
   chordFromEvent,
   chordProblem,
   normalizeChord,
@@ -73,4 +74,10 @@ test("chords that would swallow typing or editing are refused", () => {
   assert.notEqual(chordProblem("Escape"), null)
   assert.equal(chordProblem("F6"), null)
   assert.equal(chordProblem("Alt+K"), null)
+})
+
+test("hints announce the chord in effect, or nothing once it is removed", () => {
+  assert.equal(ariaShortcut("Ctrl+Shift+K"), "Control+Shift+K")
+  assert.equal(ariaShortcut("Alt+F4"), "Alt+F4")
+  assert.equal(ariaShortcut(""), undefined)
 })
