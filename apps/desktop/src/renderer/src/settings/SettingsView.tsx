@@ -279,11 +279,11 @@ export function SettingsView({
                 <div className="mt-[32px] max-w-[380px] [&_h3]:text-[12px] [&_h3]:font-medium [&_h3]:text-[var(--text-secondary)] [&_p]:flex [&_p]:items-center [&_p]:justify-between [&_p]:m-0 [&_p]:[padding:8px_0] [&_p+p]:border-t-[1px] [&_p+p]:border-t-[color:var(--line-subtle)] [&_p]:text-[12px] [&_kbd]:text-[10.5px]">
                   <h3>Keyboard shortcuts</h3>
                   <p>
-                    <span>Search transcripts</span>
+                    <span>Go to thread or message</span>
                     <kbd className={kbdClasses}>Ctrl+K</kbd>
                   </p>
                   <p>
-                    <span>Open thread</span>
+                    <span>Go to file</span>
                     <kbd className={kbdClasses}>Ctrl+P</kbd>
                   </p>
                   <p>

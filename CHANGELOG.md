@@ -24,6 +24,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Each model has one Shown, Hidden, or Off choice instead of separate Hidden and Enabled switches, and the model list shows identifiers, compact reasoning ranges, and Default, Custom, and Fast labels. Long lists can be filtered.
 - Only custom models can be removed; built-in models are turned off instead, because the provider adds them back.
 - The inbox and source control sidebars slide open and closed when toggled instead of snapping.
+- Ctrl+P and Ctrl+K open a compact search bar at the top of the window. Ctrl+P finds files by name in the current thread's workspace or worktree and opens the chosen file in a tab. Ctrl+K, and the inbox's Search button, find threads by title and messages anywhere in their transcripts; choosing a message opens its thread at that message. Ctrl+K replaces the transcript search dialog, which also means results can no longer be limited to one workspace or paged beyond the first 50 matches.
 
 ### Fixed
 

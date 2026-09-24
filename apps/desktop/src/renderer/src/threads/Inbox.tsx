@@ -356,7 +356,7 @@ export function Inbox({
           type="button"
           className={`motion-colors ${inboxSearchClasses}`}
           onClick={onSearch}
-          aria-label="Search transcripts"
+          aria-label="Search threads and messages"
           aria-keyshortcuts="Control+k"
         >
           <Search size={15} strokeWidth={1.7} aria-hidden="true" />
