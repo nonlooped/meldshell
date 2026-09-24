@@ -22,6 +22,7 @@ import { Pressable, TextSwap, useMotionPreference } from "../ui/motion"
 import { iconButtonClasses } from "../ui/styles"
 import { MeldMark } from "../ui/MeldMark"
 import { ProviderIcon } from "../ui/ProviderIcon"
+import { useKeybindings, withShortcut } from "./keybindings"
 import { useThreadDraggable } from "./thread-drag"
 import { type ThreadLayout, visibleThreads } from "./thread-layout"
 
@@ -107,6 +108,7 @@ function OpenInEditorButton({
   preferred: string | undefined
   onOpen: (editorId: string) => void
 }): React.JSX.Element {
+  const shortcut = useKeybindings((state) => state.bindings.openInEditor)
   return (
     <DropdownMenu
       align="end"
@@ -116,7 +118,7 @@ function OpenInEditorButton({
           type="button"
           className={`motion-colors ${iconButtonClasses} ${noDrag}`}
           aria-label="Open in editor"
-          title="Open in editor"
+          title={withShortcut("Open in editor", shortcut)}
         >
           <FolderCode size={15} />
         </BaseButton>
@@ -187,6 +189,7 @@ export function TitleBar({
   const files = useTabStore((state) => state.files)
   const threadTabs = useTabStore((state) => state.threadTabs)
   const reduced = useMotionPreference()
+  const bindings = useKeybindings((state) => state.bindings)
   const closeTab = (button: HTMLElement, tabId: string) => {
     if (reduced) return onCloseTab(tabId)
     foldAway(button.closest<HTMLElement>("[data-tab-frame]"), () => onCloseTab(tabId))
@@ -197,7 +200,10 @@ export function TitleBar({
       {sidebarsVisible && (
         <IconButton
           className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
-          label={inboxCollapsed ? "Expand inbox" : "Collapse inbox"}
+          label={withShortcut(
+            inboxCollapsed ? "Expand inbox" : "Collapse inbox",
+            bindings.toggleInbox,
+          )}
           aria-expanded={!inboxCollapsed}
           aria-controls="inbox"
           onClick={onToggleInbox}
@@ -316,7 +322,10 @@ export function TitleBar({
       {sidebarsVisible && terminalShown !== null && (
         <IconButton
           className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag] [&[aria-pressed='true']]:text-[var(--text-primary)]"
-          label={terminalShown ? "Hide terminal (Ctrl+`)" : "Show terminal (Ctrl+`)"}
+          label={withShortcut(
+            terminalShown ? "Hide terminal" : "Show terminal",
+            bindings.toggleTerminal,
+          )}
           aria-pressed={terminalShown}
           onClick={onToggleTerminal}
         >
@@ -326,7 +335,10 @@ export function TitleBar({
       {sidebarsVisible && (
         <IconButton
           className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
-          label={sourceControlCollapsed ? "Expand files and changes" : "Collapse files and changes"}
+          label={withShortcut(
+            sourceControlCollapsed ? "Expand files and changes" : "Collapse files and changes",
+            bindings.toggleSourceControl,
+          )}
           aria-expanded={!sourceControlCollapsed}
           aria-controls="source-control"
           onClick={onToggleSourceControl}

@@ -11,6 +11,12 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - The **Run** button in the title bar starts the run script in the thread's terminal, in its worktree when it has one. With several named run scripts, it opens a menu to choose one, and each starts in its own terminal. Running a script again shows its terminal instead of starting a second copy. The remote web client has no Run button because it has no terminals.
 - Scripts and thread terminals receive `MELDSHELL_ROOT_PATH` (the workspace's main checkout), `MELDSHELL_WORKSPACE_PATH` (the folder the thread works in), `MELDSHELL_THREAD_ID`, `MELDSHELL_BRANCH` in a worktree, and `MELDSHELL_PORT`, the first of ten ports assigned to the thread. The port stays the same across restarts and rarely matches another thread's.
 - **Open in editor** in the title bar opens the thread's folder, its worktree when it has one, in an editor found on this computer: Visual Studio Code, VS Code Insiders, Cursor, Windsurf, Zed, Sublime Text, or a JetBrains IDE, or in the file manager. Editors are found through the command-line launchers they add to `PATH`. The editor chosen last is listed first. The remote web client has no Open in editor button.
+- Settings › Keyboard shortcuts lists every shortcut by group and changes one when you select it and press new keys. A shortcut can also be removed or restored to its default, and **Restore all defaults** resets them all. Choosing keys that another command uses moves them to the new command and says which one lost its shortcut. Shortcuts need Ctrl, Alt, or the system key unless they use a function key, and cannot take Escape or the text editing keys Ctrl+A, C, V, X, Y, and Z. Tooltips show the shortcuts you chose.
+- New shortcuts: Ctrl+B shows or hides the inbox, Ctrl+Alt+B shows or hides files and changes, and Ctrl+Shift+E opens the thread's folder in the editor used last.
+
+### Changed
+
+- Settings › About no longer lists keyboard shortcuts; they are in Settings › Keyboard shortcuts. Shortcuts now match their exact keys, so Ctrl+Shift+K no longer opens thread search as Ctrl+K does.
 
 ## [0.8.0] - 2026-09-24
 

@@ -1,3 +1,5 @@
+import { actionForEvent, type Keybindings, type ShortcutAction } from "./keybindings"
+
 interface ShortcutActions {
   settingsOpen: boolean
   closeSettings: () => void
@@ -8,23 +10,16 @@ interface ShortcutActions {
   selectedThreadId: string | null
   closeThread: (id: string) => void
   cycleTabs: (direction: 1 | -1) => void
+  toggleInbox: () => void
+  toggleSourceControl: () => void
   toggleTerminal: () => void
+  openInEditor: () => void
 }
 
 export function handleAppShortcut(
   event: KeyboardEvent,
-  {
-    settingsOpen,
-    closeSettings,
-    requestNewThread,
-    openThreadPalette,
-    openFilePalette,
-    openSettings,
-    selectedThreadId,
-    closeThread,
-    cycleTabs,
-    toggleTerminal,
-  }: ShortcutActions,
+  bindings: Keybindings,
+  actions: ShortcutActions,
 ): void {
   if (
     event.defaultPrevented ||
@@ -32,42 +27,28 @@ export function handleAppShortcut(
       event.target.closest('[role="dialog"], [role="alertdialog"]'))
   )
     return
-  if (event.key === "Escape" && settingsOpen) {
-    closeSettings()
+  if (event.key === "Escape" && actions.settingsOpen) {
+    actions.closeSettings()
     return
   }
-  if (!event.ctrlKey) return
-  // By position, so layouts that put another character on that key still reach the terminal.
-  if (event.code === "Backquote") {
-    event.preventDefault()
-    toggleTerminal()
-    return
+  const action = actionForEvent(event, bindings)
+  if (action === null) return
+  if (action === "closeTab" && actions.selectedThreadId === null) return
+  event.preventDefault()
+  const run: Record<ShortcutAction, () => void> = {
+    newThread: actions.requestNewThread,
+    threadPalette: actions.openThreadPalette,
+    filePalette: actions.openFilePalette,
+    settings: actions.openSettings,
+    closeTab: () => {
+      if (actions.selectedThreadId !== null) actions.closeThread(actions.selectedThreadId)
+    },
+    nextTab: () => actions.cycleTabs(1),
+    previousTab: () => actions.cycleTabs(-1),
+    toggleInbox: actions.toggleInbox,
+    toggleSourceControl: actions.toggleSourceControl,
+    toggleTerminal: actions.toggleTerminal,
+    openInEditor: actions.openInEditor,
   }
-  switch (event.key.toLowerCase()) {
-    case "n":
-      event.preventDefault()
-      requestNewThread()
-      break
-    case "k":
-      event.preventDefault()
-      openThreadPalette()
-      break
-    case "p":
-      event.preventDefault()
-      openFilePalette()
-      break
-    case ",":
-      event.preventDefault()
-      openSettings()
-      break
-    case "w":
-      if (selectedThreadId === null) return
-      event.preventDefault()
-      closeThread(selectedThreadId)
-      break
-    case "tab":
-      event.preventDefault()
-      cycleTabs(event.shiftKey ? -1 : 1)
-      break
-  }
+  run[action]()
 }

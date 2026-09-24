@@ -4,6 +4,7 @@ import { Group, Panel, Separator } from "react-resizable-panels"
 import { ChevronDown, Columns2, Rows2, SquareTerminal, Trash2, X } from "lucide-react"
 import { IconButton } from "../ui/controls"
 import { paneSeparatorClasses } from "../ui/styles"
+import { useKeybindings, withShortcut } from "../app/keybindings"
 import type { TerminalLayout } from "./terminal-layout"
 import {
   attachTerminal,
@@ -142,6 +143,7 @@ export function TerminalPanel({
 }): React.JSX.Element {
   const info = useTerminalStore((state) => state.info[terminals.focusedId])
   const store = useTerminalStore.getState
+  const toggleChord = useKeybindings((state) => state.bindings.toggleTerminal)
   return (
     <section
       className="grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)]"
@@ -164,7 +166,10 @@ export function TerminalPanel({
         >
           <Trash2 size={14} />
         </IconButton>
-        <IconButton label="Hide terminal (Ctrl+`)" onClick={() => store().toggle(thread.id)}>
+        <IconButton
+          label={withShortcut("Hide terminal", toggleChord)}
+          onClick={() => store().toggle(thread.id)}
+        >
           <ChevronDown size={15} />
         </IconButton>
       </div>

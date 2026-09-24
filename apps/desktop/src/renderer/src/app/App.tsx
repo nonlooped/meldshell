@@ -29,6 +29,7 @@ import { AppScale } from "./AppScale"
 import { AppDialog, Button } from "../ui/controls"
 import { ErrorToast } from "../ui/Notice"
 import { handleAppShortcut } from "./app-shortcuts"
+import { useKeybindings } from "./keybindings"
 import { useTabStore, type FileTab } from "./tab-store"
 import { visibleThreads } from "./thread-layout"
 import { useViewStore } from "./view-store"
@@ -426,33 +427,6 @@ export function App(): React.JSX.Element {
 
   const terminal = useTerminalToggle(closeSettings, selectThread, snapshot.threads)
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent): void =>
-      handleAppShortcut(event, {
-        settingsOpen,
-        closeSettings,
-        requestNewThread,
-        openThreadPalette: () => setThreadPaletteOpen(true),
-        openFilePalette: () => setFilePaletteOpen(true),
-        openSettings,
-        selectedThreadId: selectedTabId,
-        closeThread,
-        cycleTabs,
-        toggleTerminal: terminal.toggle,
-      })
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [
-    closeSettings,
-    closeThread,
-    cycleTabs,
-    openSettings,
-    requestNewThread,
-    selectedTabId,
-    settingsOpen,
-    terminal.toggle,
-  ])
-
   const pagedThreads = threadPagesQuery.data?.pages.flatMap((page) => page.threads) ?? []
   const threadMap = new Map(
     [...searchThreads, ...pagedThreads].map((thread) => [thread.id, thread]),
@@ -496,6 +470,42 @@ export function App(): React.JSX.Element {
     snapshot.settings.editor,
     appSettingsMutation.mutate,
   )
+  const toggleInbox = () =>
+    toggleSidebar(remotePhone, sourceControl.panelRef, inbox.toggle, panelMotion.animate)
+  const toggleSourceControl = () =>
+    toggleSidebar(remotePhone, inbox.panelRef, sourceControl.toggle, panelMotion.animate)
+
+  const keybindingOverrides = snapshot.settings.keybindings
+  useEffect(() => {
+    useKeybindings.getState().setOverrides(keybindingOverrides)
+  }, [keybindingOverrides])
+  // The listener stays registered; each render hands it the current actions.
+  const shortcutActions = useRef<Parameters<typeof handleAppShortcut>[2] | null>(null)
+  useEffect(() => {
+    shortcutActions.current = {
+      settingsOpen,
+      closeSettings,
+      requestNewThread,
+      openThreadPalette: () => setThreadPaletteOpen(true),
+      openFilePalette: () => setFilePaletteOpen(true),
+      openSettings: () => openSettings(),
+      selectedThreadId: selectedTabId,
+      closeThread,
+      cycleTabs,
+      toggleInbox,
+      toggleSourceControl,
+      toggleTerminal: terminal.toggle,
+      openInEditor: () => editor.open(),
+    }
+  })
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (shortcutActions.current !== null)
+        handleAppShortcut(event, useKeybindings.getState().bindings, shortcutActions.current)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
   const openThreads = openThreadIds.flatMap((id) => {
     const thread = allThreads.find((candidate) => candidate.id === id)
     return thread === undefined ? [] : [thread]
@@ -524,12 +534,8 @@ export function App(): React.JSX.Element {
           sidebarsVisible={!settingsOpen}
           inboxCollapsed={inbox.collapsed}
           sourceControlCollapsed={sourceControl.collapsed}
-          onToggleInbox={() =>
-            toggleSidebar(remotePhone, sourceControl.panelRef, inbox.toggle, panelMotion.animate)
-          }
-          onToggleSourceControl={() =>
-            toggleSidebar(remotePhone, inbox.panelRef, sourceControl.toggle, panelMotion.animate)
-          }
+          onToggleInbox={toggleInbox}
+          onToggleSourceControl={toggleSourceControl}
           terminalShown={terminal.shown}
           onToggleTerminal={terminal.toggle}
           runScripts={terminal.runScripts}
