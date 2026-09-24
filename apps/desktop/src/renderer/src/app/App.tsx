@@ -11,7 +11,7 @@ import { useAppAppearance } from "./appearance"
 import { Tabs } from "@base-ui-components/react/tabs"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Thread, TranscriptSearchResult } from "@meldshell/contracts"
-import type { WorkspaceScope } from "@meldshell/contracts/ipc"
+import type { RunScript, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { workspaceScope } from "../data/workspace-scope"
 import { Plus, Settings } from "lucide-react"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
@@ -36,6 +36,7 @@ import { ThreadWorkbench } from "./ThreadWorkbench"
 import { useThreadDrafts } from "./thread-drafts"
 import { useThreadSignals, useWatchedThreadIds } from "./thread-signals"
 import { terminalApi, useTerminalStore } from "../terminals/terminal-store"
+import { useWorkspaceScripts } from "../terminals/workspace-scripts"
 
 import { SettingsView } from "../settings/SettingsView"
 
@@ -254,8 +255,17 @@ function DeleteWorktreeNote({ thread }: { thread: Thread | null }): React.JSX.El
   )
 }
 
-/** The title bar's terminal toggle for the thread on screen; `shown` is null without one. */
-function useTerminalToggle(closeSettings: () => void, selectTab: (id: string) => void) {
+/**
+ * The title bar's terminal toggle and Run button for the thread on screen. `shown` is null without
+ * one, and `runScripts` is empty unless its workspace has run scripts.
+ */
+const noRunScripts: readonly RunScript[] = []
+
+function useTerminalToggle(
+  closeSettings: () => void,
+  selectTab: (id: string) => void,
+  threads: readonly Thread[],
+) {
   const threadOnScreen = useTabStore(
     (state) => state.selectedFileId === null && state.selectedThreadId !== null,
   )
@@ -263,14 +273,33 @@ function useTerminalToggle(closeSettings: () => void, selectTab: (id: string) =>
   const open = useTerminalStore((state) =>
     selectedThreadId === null ? false : state.threads[selectedThreadId]?.open === true,
   )
-  const toggle = useCallback((): void => {
-    const { selectedThreadId: threadId, selectedThreadTabId } = useTabStore.getState()
-    if (terminalApi === undefined || threadId === null || selectedThreadTabId === null) return
-    closeSettings()
-    selectTab(selectedThreadTabId)
-    useTerminalStore.getState().toggle(threadId)
-  }, [closeSettings, selectTab])
-  return { shown: terminalApi === undefined || !threadOnScreen ? null : open, toggle }
+  const workspaceId = threads.find((thread) => thread.id === selectedThreadId)?.workspaceId
+  const scripts = useWorkspaceScripts(terminalApi === undefined ? undefined : workspaceId)
+  const withThread = useCallback(
+    (action: (threadId: string) => void): void => {
+      const { selectedThreadId: threadId, selectedThreadTabId } = useTabStore.getState()
+      if (terminalApi === undefined || threadId === null || selectedThreadTabId === null) return
+      closeSettings()
+      selectTab(selectedThreadTabId)
+      action(threadId)
+    },
+    [closeSettings, selectTab],
+  )
+  const toggle = useCallback(
+    () => withThread((threadId) => useTerminalStore.getState().toggle(threadId)),
+    [withThread],
+  )
+  const run = useCallback(
+    (name: string) => withThread((threadId) => useTerminalStore.getState().run(threadId, name)),
+    [withThread],
+  )
+  const shown = terminalApi === undefined || !threadOnScreen ? null : open
+  return {
+    shown,
+    toggle,
+    runScripts: shown === null ? noRunScripts : (scripts.data?.run ?? noRunScripts),
+    run,
+  }
 }
 
 export function App(): React.JSX.Element {
@@ -394,7 +423,7 @@ export function App(): React.JSX.Element {
     snapshot.workspaces,
   ])
 
-  const terminal = useTerminalToggle(closeSettings, selectThread)
+  const terminal = useTerminalToggle(closeSettings, selectThread, snapshot.threads)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void =>
@@ -497,6 +526,8 @@ export function App(): React.JSX.Element {
           }
           terminalShown={terminal.shown}
           onToggleTerminal={terminal.toggle}
+          runScripts={terminal.runScripts}
+          onRun={terminal.run}
         />
 
         {settingsOpen ? (

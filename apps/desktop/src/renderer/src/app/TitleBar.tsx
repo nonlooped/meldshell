@@ -10,11 +10,15 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  Play,
   SquareTerminal,
   X,
 } from "lucide-react"
-import { IconButton } from "../ui/controls"
-import { TextSwap, useMotionPreference } from "../ui/motion"
+import { Button as BaseButton } from "@base-ui-components/react/button"
+import type { RunScript } from "@meldshell/contracts/ipc"
+import { DropdownMenu, IconButton, MenuAction } from "../ui/controls"
+import { Pressable, TextSwap, useMotionPreference } from "../ui/motion"
+import { iconButtonClasses } from "../ui/styles"
 import { MeldMark } from "../ui/MeldMark"
 import { ProviderIcon } from "../ui/ProviderIcon"
 import { useThreadDraggable } from "./thread-drag"
@@ -33,6 +37,59 @@ interface TitleBarProps {
   /** Null while no thread is on screen or this client cannot run shells. */
   readonly terminalShown: boolean | null
   readonly onToggleTerminal: () => void
+  /** The workspace run scripts for the thread on screen. */
+  readonly runScripts: readonly RunScript[]
+  readonly onRun: (name: string) => void
+}
+
+const noDrag = "[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
+
+/** Starts a lone run script directly; several are chosen from a menu. */
+function RunButton({
+  scripts,
+  onRun,
+}: {
+  scripts: readonly RunScript[]
+  onRun: (name: string) => void
+}): React.JSX.Element | null {
+  const only = scripts.length === 1 ? scripts[0] : undefined
+  if (only !== undefined)
+    return (
+      <IconButton className={noDrag} label={`Run ${only.command}`} onClick={() => onRun(only.name)}>
+        <Play size={15} />
+      </IconButton>
+    )
+  if (scripts.length === 0) return null
+  return (
+    <DropdownMenu
+      align="end"
+      trigger={
+        <BaseButton
+          render={<Pressable />}
+          type="button"
+          className={`motion-colors ${iconButtonClasses} ${noDrag}`}
+          aria-label="Run a script"
+          title="Run a script"
+        >
+          <Play size={15} />
+        </BaseButton>
+      }
+    >
+      {scripts.map((script) => (
+        <MenuAction key={script.name} onClick={() => onRun(script.name)}>
+          <span
+            className="flex min-w-0 max-w-[360px] items-baseline gap-[10px]"
+            title={script.command}
+          >
+            <span className="flex-none text-[var(--text-primary)]">{script.name}</span>
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] [font:11px_var(--font-mono)]">
+              {script.command}
+            </span>
+          </span>
+        </MenuAction>
+      ))}
+    </DropdownMenu>
+  )
 }
 
 function ThreadTabFrame({
@@ -77,6 +134,8 @@ export function TitleBar({
   onToggleSourceControl,
   terminalShown,
   onToggleTerminal,
+  runScripts,
+  onRun,
 }: TitleBarProps): React.JSX.Element {
   const files = useTabStore((state) => state.files)
   const threadTabs = useTabStore((state) => state.threadTabs)
@@ -203,6 +262,7 @@ export function TitleBar({
           </div>
         ))}
       </Tabs.List>
+      {sidebarsVisible && <RunButton scripts={runScripts} onRun={onRun} />}
       {sidebarsVisible && terminalShown !== null && (
         <IconButton
           className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag] [&[aria-pressed='true']]:text-[var(--text-primary)]"

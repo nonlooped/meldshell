@@ -2,6 +2,7 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
   type RecordThreadInput,
+  type WorktreeSetup,
   type ProviderModel,
   type ReasoningEffort,
   type Thread,
@@ -168,7 +169,7 @@ export const setProviderSession = (threadId: string, nativeThreadId: string, har
 
 type LocationRow = Pick<
   ThreadRow,
-  "worktree_path" | "worktree_branch" | "worktree_base" | "worktree_state"
+  "worktree_path" | "worktree_branch" | "worktree_base" | "worktree_state" | "worktree_setup"
 > & {
   readonly id: string
   readonly workspace_id: string
@@ -179,7 +180,7 @@ type LocationRow = Pick<
 const locationRows = (sql: SqlClient.SqlClient, where: ReturnType<SqlClient.SqlClient["and"]>) =>
   sql<LocationRow>`
     SELECT t.id, t.workspace_id, w.path AS workspace_path,
-      t.worktree_path, t.worktree_branch, t.worktree_base, t.worktree_state,
+      t.worktree_path, t.worktree_branch, t.worktree_base, t.worktree_state, t.worktree_setup,
       EXISTS (SELECT 1 FROM turns r WHERE r.thread_id = t.id AND r.status = 'running')
         OR EXISTS (SELECT 1 FROM queued_inputs q WHERE q.thread_id = t.id) AS busy
     FROM threads t JOIN workspaces w ON w.id = t.workspace_id
@@ -225,7 +226,7 @@ export const listWorktreeThreads = (workspaceId?: string) =>
 export const setDraftLocation = (input: {
   readonly threadId: string
   readonly workspaceId: string
-  readonly worktree: Omit<ThreadWorktree, "state"> | null
+  readonly worktree: Omit<ThreadWorktree, "state" | "setup"> | null
 }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
@@ -248,7 +249,8 @@ export const setDraftLocation = (input: {
       worktree_path = ${worktree?.path ?? null},
       worktree_branch = ${worktree?.branch ?? null},
       worktree_base = ${worktree?.baseBranch ?? null},
-      worktree_state = ${worktree === null ? null : "ready"}
+      worktree_state = ${worktree === null ? null : "ready"},
+      worktree_setup = NULL
       WHERE id = ${input.threadId}`
     yield* sql`UPDATE workspaces SET last_opened_at = ${timestamp} WHERE id = ${input.workspaceId}`
     return yield* getSnapshot
@@ -258,6 +260,15 @@ export const setWorktreeState = (threadId: string, state: ThreadWorktree["state"
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`UPDATE threads SET worktree_state = ${state}
+      WHERE id = ${threadId} AND worktree_path IS NOT NULL`
+    return yield* getSnapshot
+  })
+
+/** Records the setup script's progress in a thread's worktree; `null` clears it. */
+export const setWorktreeSetup = (threadId: string, setup: WorktreeSetup | null) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`UPDATE threads SET worktree_setup = ${setup}
       WHERE id = ${threadId} AND worktree_path IS NOT NULL`
     return yield* getSnapshot
   })

@@ -18,11 +18,15 @@ import {
 import { listDirectory, readWorkspaceFile } from "./workspace-files"
 import { searchWorkspacePaths } from "./workspace-search"
 import { requestGeneratedText } from "./generated-text"
+import { readWorkspaceScripts } from "./workspace-scripts"
 import {
   createThread,
   deleteThread,
+  getWorktreeSetupLog,
   getWorktreeStatus,
   mergeThreadWorktree,
+  rerunWorktreeSetup,
+  stopThreadWorktreeSetup,
   removeThreadWorktree,
   removeWorkspace,
   scopePath,
@@ -82,6 +86,13 @@ export const hostOperations: Record<string, Operation> = {
     setDraftLocation,
   ),
   [C.IPC.mergeWorktree]: operation(Schema.String, false, mergeThreadWorktree),
+  // Scripts always come from the workspace's main checkout, never from a thread's worktree.
+  [C.IPC.getWorkspaceScripts]: operation(Schema.Struct(scopeFields), true, (input) =>
+    withWorkspace({ workspaceId: input.workspaceId }, readWorkspaceScripts),
+  ),
+  [C.IPC.getWorktreeSetupLog]: operation(Schema.String, true, getWorktreeSetupLog),
+  [C.IPC.rerunWorktreeSetup]: operation(Schema.String, false, rerunWorktreeSetup),
+  [C.IPC.stopWorktreeSetup]: operation(Schema.String, false, stopThreadWorktreeSetup),
   [C.IPC.removeWorktree]: operation(
     Schema.Struct({ threadId: Schema.String, deleteBranch: Schema.Boolean }),
     false,

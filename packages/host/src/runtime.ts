@@ -11,6 +11,7 @@ import {
   CursorProvider,
   providerFor,
 } from "./worker-provider"
+import { stopAllWorktreeSetups } from "./workspace-scripts"
 
 export const createHostRuntime = (platform: typeof HostPlatform.Service) =>
   ManagedRuntime.make(
@@ -29,6 +30,7 @@ export type HostServices =
   | CursorProvider
 export const stopHost = Effect.gen(function* () {
   const core = yield* CoreClient
+  yield* stopAllWorktreeSetups.pipe(Effect.catchAll(Effect.logError))
   const turns = yield* core
     .BeginShutdown()
     .pipe(Effect.catchAll((cause) => Effect.as(Effect.logError(cause), [])))

@@ -1,9 +1,11 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { Thread, ThreadWorktree } from "@meldshell/contracts"
-import { GitBranch, GitMerge, MoreHorizontal, Trash2 } from "lucide-react"
+import { GitBranch, GitMerge, MoreHorizontal, RotateCw, ScrollText, Trash2 } from "lucide-react"
 import { AppDialog, Button, Checkbox, DropdownMenu, MenuAction } from "../ui/controls"
 import { replaceSnapshot } from "../data/cache"
+import { useWorkspaceScripts } from "../terminals/workspace-scripts"
+import { SetupLogDialog, WorktreeSetupNote, useWorktreeSetupActions } from "./WorktreeSetup"
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`
 
@@ -99,7 +101,12 @@ function RemoveWorktreeDialog({
 export function WorktreeBar({ thread }: { thread: Thread }): React.JSX.Element | null {
   const client = useQueryClient()
   const [removing, setRemoving] = useState(false)
+  const [showingSetupLog, setShowingSetupLog] = useState(false)
   const [notice, setNotice] = useState("")
+  const scripts = useWorkspaceScripts(
+    thread.worktree === undefined ? undefined : thread.workspaceId,
+  )
+  const { rerun } = useWorktreeSetupActions(thread.id)
   const merge = useMutation({
     mutationFn: () => window.meldshell.mergeWorktree(thread.id),
     onMutate: () => setNotice(""),
@@ -109,6 +116,7 @@ export function WorktreeBar({ thread }: { thread: Thread }): React.JSX.Element |
   const worktree = thread.worktree
   if (worktree === undefined) return null
   const ready = worktree.state === "ready"
+  const busy = thread.activity === "running" || thread.queuedCount > 0
   return (
     <section
       className="shrink-0 border-b-[1px] border-b-[color:var(--line-subtle)] [padding:6px_6px_6px_12px] text-[12px]"
@@ -151,9 +159,26 @@ export function WorktreeBar({ thread }: { thread: Thread }): React.JSX.Element |
                 ? "No branch to merge into"
                 : `Merge into ${worktree.baseBranch}`}
             </MenuAction>
+            {worktree.setup !== undefined && (
+              <MenuAction
+                icon={<ScrollText size={13} strokeWidth={1.75} />}
+                onClick={() => setShowingSetupLog(true)}
+              >
+                Setup script output…
+              </MenuAction>
+            )}
+            {scripts.data?.setup != null && (
+              <MenuAction
+                icon={<RotateCw size={13} strokeWidth={1.75} />}
+                disabled={!ready || busy || worktree.setup === "running" || rerun.isPending}
+                onClick={() => rerun.mutate()}
+              >
+                Run setup script again
+              </MenuAction>
+            )}
             <MenuAction
               icon={<Trash2 size={13} strokeWidth={1.75} />}
-              disabled={thread.activity === "running" || thread.queuedCount > 0}
+              disabled={busy}
               onClick={() => setRemoving(true)}
             >
               Remove worktree…
@@ -161,6 +186,15 @@ export function WorktreeBar({ thread }: { thread: Thread }): React.JSX.Element |
           </DropdownMenu>
         )}
       </div>
+      <WorktreeSetupNote thread={thread} className="[margin:4px_0_0] text-[11px]" />
+      {rerun.isError && (
+        <p
+          className="[margin:4px_0_0] text-[var(--color-deleted)] text-[11px] [overflow-wrap:anywhere]"
+          role="alert"
+        >
+          {rerun.error.message}
+        </p>
+      )}
       {merge.isPending && (
         <p className="[margin:4px_0_0] text-[var(--text-tertiary)] text-[11px]" role="status">
           Merging…
@@ -179,6 +213,7 @@ export function WorktreeBar({ thread }: { thread: Thread }): React.JSX.Element |
           {merge.error.message}
         </p>
       )}
+      <SetupLogDialog thread={thread} open={showingSetupLog} onOpenChange={setShowingSetupLog} />
       <RemoveWorktreeDialog
         thread={thread}
         worktree={worktree}

@@ -1,11 +1,11 @@
 import { randomBytes } from "node:crypto"
-import { mkdir, stat } from "node:fs/promises"
+import { mkdir, rm, stat } from "node:fs/promises"
 import { basename, join } from "node:path"
 import type { ThreadWorktree } from "@meldshell/contracts"
 import type { WorktreeStatus } from "@meldshell/contracts/ipc"
 import { git, statusAt, writeRepository } from "./git"
 
-type NewWorktree = Omit<ThreadWorktree, "state">
+type NewWorktree = Omit<ThreadWorktree, "state" | "setup">
 type WorktreeRef = Pick<ThreadWorktree, "path" | "branch">
 
 const currentBranch = (root: string): Promise<string | null> =>
@@ -19,6 +19,9 @@ const branchExists = (root: string, branch: string): Promise<boolean> =>
     () => true,
     () => false,
   )
+
+/** The setup script's output sits beside the worktree, so it never shows up as a change. */
+export const setupLogPath = (worktreePath: string): string => `${worktreePath}.setup.log`
 
 /** A checkout created by Git has a `.git` file; an empty or foreign folder is not the worktree. */
 export const worktreePresent = (path: string): Promise<boolean> =>
@@ -124,4 +127,5 @@ export async function removeWorktree(
     if (options.deleteBranch && (await branchExists(root, worktree.branch)))
       await git(root, ["branch", "-D", worktree.branch])
   })
+  await rm(setupLogPath(worktree.path), { force: true })
 }

@@ -3,7 +3,7 @@ import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
 import { Unicode11Addon } from "@xterm/addon-unicode11"
 import { WebLinksAddon } from "@xterm/addon-web-links"
-import type { WorkspaceScope } from "@meldshell/contracts/ipc"
+import type { RunScript, WorkspaceScope } from "@meldshell/contracts/ipc"
 import {
   removeTerminal,
   resizeTerminalSplit,
@@ -36,11 +36,17 @@ export interface ThreadTerminals {
 
 export type TerminalInfo =
   | { readonly state: "starting" }
-  | { readonly state: "running"; readonly shell: string; readonly cwd: string }
+  | {
+      readonly state: "running"
+      readonly shell: string
+      readonly cwd: string
+      readonly run?: RunScript
+    }
   | {
       readonly state: "exited"
       readonly shell: string
       readonly cwd: string
+      readonly run?: RunScript
       readonly code: number
     }
   | { readonly state: "failed"; readonly message: string }
@@ -52,6 +58,11 @@ interface TerminalStore {
   readonly toggle: (threadId: string) => void
   /** Starts another shell beside the focused one. */
   readonly split: (threadId: string, orientation: "horizontal" | "vertical") => void
+  /**
+   * Starts the named workspace run script in a new shell, or shows the one already running it, so
+   * a thread never runs two copies of the same servers.
+   */
+  readonly run: (threadId: string, name: string) => void
   readonly close: (threadId: string, terminalId: string) => void
   readonly focus: (threadId: string, terminalId: string) => void
   readonly resizeSplit: (threadId: string, splitId: string, ratio: number) => void
@@ -81,6 +92,14 @@ interface Instance {
 
 const instances = new Map<string, Instance>()
 let pendingFocus: string | null = null
+// The run script each run shell starts, and the open shell for each thread's run script.
+const runShells = new Map<string, string>()
+const runShellByScript = new Map<string, string>()
+const runKey = (threadId: string, name: string) => `${threadId}\n${name}`
+
+function forgetRunShell(id: string): void {
+  for (const [key, runId] of runShellByScript) if (runId === id) runShellByScript.delete(key)
+}
 
 function setInfo(id: string, info: TerminalInfo): void {
   useTerminalStore.setState((state) =>
@@ -97,6 +116,8 @@ function focusTerminal(id: string): void {
 }
 
 function disposeTerminal(id: string): void {
+  runShells.delete(id)
+  forgetRunShell(id)
   terminalApi?.close(id)
   instances.get(id)?.term.dispose()
   instances.delete(id)
@@ -151,6 +172,38 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
             `split:${crypto.randomUUID()}`,
           ),
         },
+      },
+      info: { ...state.info, [id]: { state: "starting" } },
+    }))
+  },
+  run: (threadId, name) => {
+    const existing = runShellByScript.get(runKey(threadId, name))
+    const current = get().threads[threadId]
+    if (existing !== undefined && current !== undefined) {
+      set((state) => ({
+        threads: { ...state.threads, [threadId]: { ...current, open: true, focusedId: existing } },
+      }))
+      focusTerminal(existing)
+      return
+    }
+    const id = newTerminalId()
+    runShells.set(id, name)
+    runShellByScript.set(runKey(threadId, name), id)
+    pendingFocus = id
+    const layout: TerminalLayout =
+      current === undefined
+        ? { kind: "terminal", id }
+        : splitTerminal(
+            current.layout,
+            current.focusedId,
+            id,
+            "horizontal",
+            `split:${crypto.randomUUID()}`,
+          )
+    set((state) => ({
+      threads: {
+        ...state.threads,
+        [threadId]: { size: current?.size ?? 38, layout, focusedId: id, open: true },
       },
       info: { ...state.info, [id]: { state: "starting" } },
     }))
@@ -300,19 +353,26 @@ function createInstance(id: string): Instance {
 
 function startShell(id: string, scope: Required<WorkspaceScope>, instance: Instance): void {
   const { term } = instance
-  terminalApi?.open({ id, ...scope, cols: term.cols, rows: term.rows }).then(
-    ({ shell, cwd }) => {
-      setInfo(id, { state: "running", shell, cwd })
-      // The pane may have been fitted while the shell was starting.
-      terminalApi?.resize(id, term.cols, term.rows)
-    },
-    (error: unknown) => {
-      instance.exited = true
-      const message = error instanceof Error ? error.message : String(error)
-      setInfo(id, { state: "failed", message })
-      term.write(`\x1b[31m${message.replace(/^Error invoking remote method '[^']+': /, "")}\x1b[0m`)
-    },
-  )
+  const run = runShells.get(id)
+  terminalApi
+    ?.open({ id, ...scope, cols: term.cols, rows: term.rows, ...(run ? { run } : {}) })
+    .then(
+      ({ shell, cwd, run }) => {
+        setInfo(id, { state: "running", shell, cwd, ...(run === undefined ? {} : { run }) })
+        // The pane may have been fitted while the shell was starting.
+        terminalApi?.resize(id, term.cols, term.rows)
+      },
+      (error: unknown) => {
+        instance.exited = true
+        // A failed run shell stays to show why; the next Run starts a fresh one.
+        forgetRunShell(id)
+        const message = error instanceof Error ? error.message : String(error)
+        setInfo(id, { state: "failed", message })
+        term.write(
+          `\x1b[31m${message.replace(/^Error invoking remote method '[^']+': /, "")}\x1b[0m`,
+        )
+      },
+    )
 }
 
 // The bundled monospace face must be ready before xterm measures its cells.

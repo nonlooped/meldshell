@@ -38,6 +38,7 @@ export interface ThreadRow {
   readonly worktree_branch: string | null
   readonly worktree_base: string | null
   readonly worktree_state: NonNullable<Thread["worktree"]>["state"] | null
+  readonly worktree_setup: NonNullable<Thread["worktree"]>["setup"] | null
 }
 
 export interface EventRow {
@@ -126,7 +127,7 @@ export const fromThreadRow = (row: ThreadRow): Thread => {
 
 type WorktreeColumns = Pick<
   ThreadRow,
-  "worktree_path" | "worktree_branch" | "worktree_base" | "worktree_state"
+  "worktree_path" | "worktree_branch" | "worktree_base" | "worktree_state" | "worktree_setup"
 >
 
 export const fromWorktreeColumns = (row: WorktreeColumns): ThreadWorktree | null =>
@@ -137,6 +138,7 @@ export const fromWorktreeColumns = (row: WorktreeColumns): ThreadWorktree | null
         branch: row.worktree_branch ?? "",
         baseBranch: row.worktree_base,
         state: row.worktree_state ?? "ready",
+        ...(row.worktree_setup === null ? {} : { setup: row.worktree_setup }),
       }
 
 export const parseProviderData = (value: string): unknown => {

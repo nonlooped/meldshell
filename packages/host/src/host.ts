@@ -8,6 +8,7 @@ import { createHostRuntime, stopHost } from "./runtime"
 import type { HostPlatform } from "./platform"
 import { connectRelay } from "./remote-connection"
 import { beginLink, readCredential, unlinkDevice } from "./identity"
+import { readWorkspaceScripts, scriptEnvironment } from "./workspace-scripts"
 
 /** Runs the host in this process: core writer, provider workers, and the relay connection. */
 export async function startHost(
@@ -125,6 +126,27 @@ export async function startHost(
     activeTurns: () => core((client) => client.GetActiveTurnCount()),
     /** The folder a thread works in: its worktree when it has one, otherwise its workspace. */
     scopePath: (scope: WorkspaceScope) => runtime.runPromise(scopePath(scope)),
+    /**
+     * Where a thread's terminal starts, the script variables it receives, and, when `run` names
+     * one, the workspace run script it should start.
+     */
+    terminalContext: async (
+      scope: { workspaceId: string; threadId: string },
+      run: string | undefined,
+    ) => {
+      const cwd = await runtime.runPromise(scopePath(scope))
+      const location = await core((client) =>
+        client.GetThreadLocation({ threadId: scope.threadId }),
+      )
+      const env = await scriptEnvironment(location)
+      if (run === undefined) return { cwd, env, run: null }
+      const script = (await readWorkspaceScripts(location.workspacePath)).run.find(
+        (entry) => entry.name === run,
+      )
+      if (script === undefined)
+        throw new Error(`meldshell.json no longer has a run script named "${run}".`)
+      return { cwd, env, run: script }
+    },
     remote,
     close,
   }

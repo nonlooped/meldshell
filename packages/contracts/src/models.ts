@@ -12,6 +12,11 @@ export type Workspace = typeof Workspace.Type
 
 const ThreadStatus = Schema.Literal("active", "settled")
 
+/** Progress of the workspace setup script in a thread's worktree. */
+export const WorktreeSetup = Schema.Literal("running", "succeeded", "failed", "interrupted")
+
+export type WorktreeSetup = typeof WorktreeSetup.Type
+
 /** A thread's own branch and checkout, created from the workspace so parallel threads cannot collide. */
 export const ThreadWorktree = Schema.Struct({
   path: Schema.String,
@@ -20,6 +25,11 @@ export const ThreadWorktree = Schema.Struct({
   baseBranch: Schema.NullOr(Schema.String),
   /** `missing` means the folder disappeared outside MeldShell; `removed` means MeldShell removed it. */
   state: Schema.Literal("ready", "missing", "removed"),
+  /**
+   * The workspace setup script's last run in this worktree; absent when none has run. `interrupted`
+   * means it was stopped, or MeldShell quit, before it finished.
+   */
+  setup: Schema.optional(WorktreeSetup),
 })
 
 export type ThreadWorktree = typeof ThreadWorktree.Type
@@ -429,7 +439,7 @@ export type CreateThreadInput = typeof CreateThreadInput.Type
 export const RecordThreadInput = Schema.Struct({
   workspaceId: Schema.String,
   title: Schema.optional(Schema.String),
-  worktree: Schema.optional(ThreadWorktree.pipe(Schema.omit("state"))),
+  worktree: Schema.optional(ThreadWorktree.pipe(Schema.omit("state", "setup"))),
 })
 
 export type RecordThreadInput = typeof RecordThreadInput.Type

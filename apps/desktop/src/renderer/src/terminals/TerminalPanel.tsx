@@ -22,10 +22,13 @@ function TerminalTitle({ info }: { info: TerminalInfo | undefined }): React.JSX.
   if (info === undefined || info.state === "starting" || info.state === "failed")
     return <span>{info?.state === "failed" ? "Terminal could not start" : "Terminal"}</span>
   return (
-    <span className="flex min-w-0 items-baseline gap-[7px]" title={info.cwd}>
+    <span
+      className="flex min-w-0 items-baseline gap-[7px]"
+      title={info.run === undefined ? info.cwd : `${info.run.command}\n${info.cwd}`}
+    >
       <span className="flex-none text-[var(--text-secondary)]">{info.shell}</span>
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-        {shortPath(info.cwd)}
+        {info.run === undefined ? shortPath(info.cwd) : `Run: ${info.run.name}`}
       </span>
       {info.state === "exited" && (
         <small className="flex-none text-[var(--color-modified)] text-[11px]">

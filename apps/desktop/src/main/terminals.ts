@@ -39,7 +39,7 @@ function shellCommand(): { readonly file: string; readonly args: string[] } {
   return { file, args: process.platform === "darwin" ? ["-l"] : [] }
 }
 
-function shellEnvironment(): Record<string, string> {
+function shellEnvironment(scripts: Record<string, string>): Record<string, string> {
   const env: Record<string, string> = {}
   for (const [key, value] of Object.entries(process.env)) {
     // Electron's own switches would change how child Node or Electron processes start.
@@ -47,6 +47,7 @@ function shellEnvironment(): Record<string, string> {
   }
   return {
     ...env,
+    ...scripts,
     TERM: "xterm-256color",
     COLORTERM: "truecolor",
     TERM_PROGRAM: "MeldShell",
@@ -101,12 +102,15 @@ async function open(owner: WebContents, input: TerminalOpenInput): Promise<Termi
     throw new Error("A terminal needs a thread.")
   if (sessions.has(input.id)) throw new Error("This terminal is already open.")
   const host = await desktopHost.start()
-  const cwd = await host.scopePath({ workspaceId: input.workspaceId, threadId: input.threadId })
+  const { cwd, env, run } = await host.terminalContext(
+    { workspaceId: input.workspaceId, threadId: input.threadId },
+    typeof input.run === "string" ? input.run : undefined,
+  )
   const shell = shellCommand()
   const pty = spawn(shell.file, shell.args, {
     name: "xterm-256color",
     cwd,
-    env: shellEnvironment(),
+    env: shellEnvironment(env),
     cols: dimension(input.cols, 80),
     rows: dimension(input.rows, 24),
   })
@@ -124,7 +128,13 @@ async function open(owner: WebContents, input: TerminalOpenInput): Promise<Termi
     sessions.delete(input.id)
     send(session, IPC.terminalExit, input.id, exitCode)
   })
-  return { cwd, shell: basename(shell.file).replace(/\.exe$/i, "") }
+  // Typed into the shell rather than passed as its command, so stopping the script leaves a prompt.
+  if (run !== null) pty.write(`${run.command}\r`)
+  return {
+    cwd,
+    shell: basename(shell.file).replace(/\.exe$/i, ""),
+    ...(run === null ? {} : { run }),
+  }
 }
 
 export function registerTerminalIpc(): void {

@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "setup": "npm ci",
+    "run": {
+      "desktop": "npm run dev --workspace=@meldshell/desktop -- -- --user-data-dir=.dev-data",
+      "site": "npm run dev --workspace=@meldshell/site"
+    }
+  }
+}
