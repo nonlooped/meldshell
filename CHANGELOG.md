@@ -12,6 +12,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Changed
 
+- The light theme is softer on the eyes: a dimmed warm-grey base replaces the near-white background, panels and inputs are no longer pure white, and text contrast is slightly gentler.
 - New thread opens a thread right away in the most recently used workspace instead of asking for a workspace first. Until its first message, the workspace name in the thread's start screen heading opens a menu to move it to any workspace.
 - Push publishes a branch with no upstream to `origin`, or to the only remote, and sets it as the upstream.
 - Deleting a thread that has its own worktree removes the worktree folder but keeps its branch, and is refused while the worktree has uncommitted changes. Removing a workspace does the same for all of its threads' worktrees.

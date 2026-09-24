@@ -255,41 +255,42 @@
   }
   :root[data-theme="light"] {
     color-scheme: light;
-    --scrim: rgba(246, 246, 248, var(--app-opacity-preview, var(--app-opacity, 0.94)));
-    --surface-raised: rgba(255, 255, 255, 0.95);
-    --surface-overlay: rgba(250, 250, 252, 0.98);
-    --surface-menu: rgba(250, 250, 250, 0.96);
-    --surface-hover: rgba(0, 0, 0, 0.045);
-    --surface-active: rgba(0, 0, 0, 0.075);
-    --surface-selected: rgba(0, 0, 0, 0.065);
-    --line-subtle: rgba(0, 0, 0, 0.07);
-    --line: rgba(0, 0, 0, 0.12);
-    --line-strong: rgba(0, 0, 0, 0.24);
-    --edge-highlight: rgba(255, 255, 255, 0.7);
-    --text-primary: #202024;
-    --text-secondary: #53535c;
-    --text-tertiary: #6e6e77;
-    --text-disabled: #9898a0;
-    --accent: #4a5bc4;
-    --accent-hover: #3d4db0;
+    /* A dimmed paper base: surfaces stay a few steps lighter than it, never white. */
+    --scrim: rgba(226, 225, 221, var(--app-opacity-preview, var(--app-opacity, 0.94)));
+    --surface-raised: rgba(236, 235, 231, 0.95);
+    --surface-overlay: rgba(232, 231, 227, 0.98);
+    --surface-menu: rgba(238, 237, 233, 0.97);
+    --surface-hover: rgba(40, 36, 30, 0.05);
+    --surface-active: rgba(40, 36, 30, 0.085);
+    --surface-selected: rgba(40, 36, 30, 0.07);
+    --line-subtle: rgba(40, 36, 30, 0.08);
+    --line: rgba(40, 36, 30, 0.13);
+    --line-strong: rgba(40, 36, 30, 0.25);
+    --edge-highlight: rgba(255, 255, 255, 0.35);
+    --text-primary: #26262a;
+    --text-secondary: #4d4c53;
+    --text-tertiary: #5f5e65;
+    --text-disabled: #97969b;
+    --accent: #4454ba;
+    --accent-hover: #3a49a6;
     --accent-foreground: #ffffff;
-    --focus-ring: rgba(74, 91, 196, 0.65);
-    --color-added: #28733e;
-    --color-modified: #8c5c13;
-    --color-deleted: #b53e46;
+    --focus-ring: rgba(68, 84, 186, 0.65);
+    --color-added: #246b39;
+    --color-modified: #845610;
+    --color-deleted: #a83a42;
     --color-renamed: #7650af;
-    --color-info: #2869aa;
+    --color-info: #24619f;
     --spin-top: #4f8cc9;
     --spin-middle: #d7803f;
     --spin-bottom: #e0536f;
-    --shadow-popup: 0 8px 28px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.06);
-    --shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-popup: 0 8px 28px rgba(40, 36, 30, 0.16), 0 0 0 1px rgba(40, 36, 30, 0.08);
+    --shadow-raised: 0 4px 16px rgba(40, 36, 30, 0.1);
   }
   @media (prefers-reduced-transparency: reduce) {
     :root[data-theme="light"] {
-      --scrim: #f6f6f8;
-      --surface-raised: #fff;
-      --surface-overlay: #fafafc;
+      --scrim: #e2e1dd;
+      --surface-raised: #ecebe7;
+      --surface-overlay: #e8e7e3;
     }
   }
   :root[data-text-size="small"] {
@@ -310,7 +311,7 @@
     --scrim: #161617;
   }
   :root[data-platform="linux"][data-theme="light"] {
-    --scrim: #f6f6f8;
+    --scrim: #e2e1dd;
   }
   html body {
     zoom: var(--app-scale, 1);
