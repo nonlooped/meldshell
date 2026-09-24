@@ -18,6 +18,7 @@ const setup = async (t, selection = {}) => {
     controller = new AbortController()
     prompt = Promise.withResolvers()
     prompting = false
+    requests = []
     constructor(_command, _cwd, callbacks) {
       this.callbacks = callbacks
       clients.push(this)
@@ -27,7 +28,8 @@ const setup = async (t, selection = {}) => {
     }
     async run(operation) {
       return operation({
-        request: async (method) => {
+        request: async (method, params) => {
+          this.requests.push({ method, params })
           if (method === "cursor/list_available_models")
             return { models: [{ value: "model", name: "Model" }] }
           if (method === "session/new") return { sessionId: "session" }
@@ -85,7 +87,7 @@ const setup = async (t, selection = {}) => {
   const client = clients.find((client) => client.prompting)
   const call = (handler, params) =>
     client.callbacks[handler]({ params, signal: client.controller.signal })
-  return { output, send, call, worker }
+  return { output, send, call, worker, client }
 }
 const permission = {
   sessionId: "session",
@@ -123,6 +125,22 @@ test("worker keeps an approval pending after invalid input and resolves the SDK 
   })
   assert.deepEqual(await response, { outcome: { outcome: "selected", optionId: "allow" } })
   assert.equal(output.find((message) => message.commandId === "valid").error, undefined)
+})
+
+test("a turn runs in the Cursor mode the thread chose", async (t) => {
+  for (const [mode, modeId] of [
+    ["default", "agent"],
+    ["plan", "plan"],
+    ["ask", "ask"],
+  ]) {
+    await t.test(mode, async (t) => {
+      const { client } = await setup(t, { mode })
+      assert.deepEqual(
+        client.requests.filter((request) => request.method === "session/set_mode"),
+        [{ method: "session/set_mode", params: { sessionId: "session", modeId } }],
+      )
+    })
+  }
 })
 
 test("automatic permission policies return the advertised option through the SDK handler", async (t) => {
