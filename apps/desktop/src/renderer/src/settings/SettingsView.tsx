@@ -59,18 +59,18 @@ const SECTIONS: ReadonlyArray<{
   readonly caption: string
 }> = [
   {
-    id: "account",
-    label: "Account & devices",
-    icon: <Monitor size={16} />,
-    title: "Account & devices",
-    caption: "Continue your work from another device.",
-  },
-  {
     id: "general",
     label: "General",
     icon: <Settings size={16} />,
     title: "General",
     caption: "Choose how you send messages and organize your inbox.",
+  },
+  {
+    id: "account",
+    label: "Account & devices",
+    icon: <Monitor size={16} />,
+    title: "Account & devices",
+    caption: "Continue your work from another device.",
   },
   {
     id: "appearance",

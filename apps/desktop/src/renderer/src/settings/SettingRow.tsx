@@ -8,9 +8,9 @@ export function SettingRow({
   children,
 }: {
   readonly label: string
-  readonly description: string
+  readonly description: ReactNode
   readonly controlId?: string
-  readonly children: ReactNode
+  readonly children?: ReactNode
 }): React.JSX.Element {
   return (
     <Field.Root className="setting-row flex min-h-[76px] items-center justify-between gap-[32px] [padding:18px_0] [&_+_.setting-row]:border-t-[1px] [&_+_.setting-row]:border-t-[color:var(--line-subtle)] [@container(max-width:_540px)]:items-start [@container(max-width:_540px)]:flex-col [@container(max-width:_540px)]:gap-[12px]">
@@ -25,7 +25,7 @@ export function SettingRow({
           {description}
         </Field.Description>
       </div>
-      <div className={settingControlClasses}>{children}</div>
+      {children !== undefined && <div className={settingControlClasses}>{children}</div>}
     </Field.Root>
   )
 }

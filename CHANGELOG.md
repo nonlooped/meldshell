@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Changed
+
+- General is now first in Settings, and Account & devices uses the same setting rows as the other sections instead of cards.
+
 ## [0.5.0] - 2026-09-24
 
 ### Added
