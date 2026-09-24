@@ -9,7 +9,7 @@ import { ErrorToast } from "../ui/Notice"
 import { Composer } from "./Composer"
 import { skillAttachments } from "./composer-completion"
 import { Transcript } from "./Transcript"
-import { ThreadOrigin } from "./ThreadOrigin"
+import { ThreadBranchToggle, ThreadOrigin } from "./ThreadOrigin"
 
 export function ThreadView({
   snapshot,
@@ -69,9 +69,7 @@ export function ThreadView({
         <Transcript
           threadId={thread.id}
           running={thread.activity === "running"}
-          workspace={snapshot.workspaces.find((workspace) => workspace.id === thread.workspaceId)}
           scope={workspaceScope(thread)}
-          branch={thread.worktree?.branch}
           origin={<ThreadOrigin thread={thread} workspaces={snapshot.workspaces} />}
           targetTurnId={
             searchTarget?.thread.id === thread.id
@@ -113,6 +111,7 @@ export function ThreadView({
           onInterrupt={() => interruptMutation.mutate(thread.id)}
           interrupting={interruptMutation.isPending}
         />
+        {thread.turnCount === 0 && <ThreadBranchToggle thread={thread} />}
       </FadeDiv>
       {error && (
         <ErrorToast

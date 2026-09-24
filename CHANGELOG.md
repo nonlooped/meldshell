@@ -6,13 +6,13 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
-- A new thread can work on its own branch: choose **Own branch** from the Branch menu on the thread's workspace line before the first message. MeldShell creates a Git worktree for it from the workspace's current commit, so threads running at the same time never edit the same files. Every harness in that thread, the Files and Changes sidebars, file links, and `@` completions use the thread's worktree.
+- A new thread can work on its own branch: choose **Own branch** below an empty thread's composer before the first message. MeldShell creates a Git worktree for it from the workspace's current commit, so threads running at the same time never edit the same files. Every harness in that thread, the Files and Changes sidebars, file links, and `@` completions use the thread's worktree.
 - Threads on their own branch show a branch mark in the inbox and a branch bar in the source control sidebar, with actions to merge the branch into the branch it started from or remove the worktree. A merge that conflicts is undone instead of leaving the workspace half-merged.
 - A worktree folder deleted outside MeldShell is marked missing at startup, and its thread will not start turns until the folder is back when MeldShell next starts, or the worktree is removed.
 
 ### Changed
 
-- New thread opens a thread right away in the most recently used workspace instead of asking for a workspace first. Until its first message, the thread's workspace line has a Workspace menu to move it to any workspace.
+- New thread opens a thread right away in the most recently used workspace instead of asking for a workspace first. Until its first message, the workspace name in the thread's start screen heading opens a menu to move it to any workspace.
 - Push publishes a branch with no upstream to `origin`, or to the only remote, and sets it as the upstream.
 - Deleting a thread that has its own worktree removes the worktree folder but keeps its branch, and is refused while the worktree has uncommitted changes. Removing a workspace does the same for all of its threads' worktrees.
 - Settings › Providers shows each provider's connection status and version without expanding it, and opens providers that need attention. Connection problems say what to do next.

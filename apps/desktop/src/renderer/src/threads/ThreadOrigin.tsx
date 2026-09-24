@@ -1,80 +1,43 @@
 import { Button as BaseButton } from "@base-ui-components/react/button"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useIsMutating, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query"
 import type { Thread, Workspace } from "@meldshell/contracts"
-import { ChevronDown } from "lucide-react"
+import { Toggle } from "@base-ui-components/react/toggle"
+import { ToggleGroup } from "@base-ui-components/react/toggle-group"
+import { Folder, GitBranch } from "lucide-react"
 import { replaceSnapshot } from "../data/cache"
 import { DropdownMenu, MenuChoice, MenuRadioGroup } from "../ui/controls"
+import { MeldMark } from "../ui/MeldMark"
 import { ErrorToast } from "../ui/Notice"
 
-type Choice = { readonly value: string; readonly name: string; readonly detail: string }
+type DraftLocation = { workspaceId?: string; isolated?: boolean }
 
-/** A label and a quiet value that opens a menu of choices, sized to sit in the workspace line. */
-function OriginMenu({
-  label,
-  separated = false,
-  value,
-  text,
-  title,
-  choices,
-  disabled,
-  onChange,
-}: {
-  label: string
-  /** Leaves extra room before the label so each pair reads as a unit. */
-  separated?: boolean
-  value: string
-  text: string
-  title?: string | undefined
-  choices: readonly Choice[]
-  disabled: boolean
-  onChange: (value: string) => void
-}): React.JSX.Element {
-  return (
-    <>
-      <span className={separated ? "ml-[10px]" : undefined}>{label}</span>
-      <DropdownMenu
-        align="start"
-        trigger={
-          <BaseButton
-            type="button"
-            disabled={disabled}
-            title={title}
-            className="motion-colors inline-flex min-w-0 items-center gap-[3px] p-0 border-0 bg-transparent text-[var(--text-secondary)] font-medium cursor-default [&:hover]:text-[var(--text-primary)] [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px] [&:disabled]:text-[var(--text-tertiary)]"
-            aria-label={`${label}: ${text}`}
-          >
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{text}</span>
-            <ChevronDown
-              size={12}
-              strokeWidth={2}
-              className="flex-none text-[var(--text-tertiary)]"
-            />
-          </BaseButton>
-        }
-      >
-        <MenuRadioGroup value={value} onValueChange={(next) => onChange(String(next))}>
-          {choices.map((choice) => (
-            <MenuChoice
-              key={choice.value}
-              value={choice.value}
-              className="h-auto [padding:7px_9px] items-start"
-            >
-              <span className="flex min-w-0 flex-1 flex-col gap-[1px]">
-                <span className="text-inherit text-[12.5px]">{choice.name}</span>
-                <span className="text-[var(--text-tertiary)] text-[11px] [overflow-wrap:anywhere]">
-                  {choice.detail}
-                </span>
-              </span>
-            </MenuChoice>
-          ))}
-        </MenuRadioGroup>
-      </DropdownMenu>
-    </>
-  )
+const segmentClasses = [
+  "motion-colors inline-flex h-[24px] items-center gap-[6px] [padding:0_10px] border-0 rounded-[var(--radius-sm)]",
+  "bg-transparent text-[var(--text-tertiary)] text-[12px] cursor-default [&:hover]:text-[var(--text-primary)]",
+  "[&[data-pressed]]:bg-[var(--surface-selected)] [&[data-pressed]]:text-[var(--text-primary)]",
+  "[&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:disabled]:text-[var(--text-disabled)]",
+].join(" ")
+
+const draftLocationKey = (threadId: string) => ["draft-location", threadId] as const
+
+/**
+ * Moves an empty thread or switches its worktree. The heading and the branch toggle share one
+ * mutation key, so either control is disabled while the other's change is in flight.
+ */
+function useDraftLocation(threadId: string) {
+  const client = useQueryClient()
+  const mutation = useMutation({
+    mutationKey: draftLocationKey(threadId),
+    mutationFn: (input: DraftLocation) => window.meldshell.setDraftLocation({ threadId, ...input }),
+    onSuccess: (snapshot) => replaceSnapshot(client, snapshot),
+  })
+  const busy = useIsMutating({ mutationKey: draftLocationKey(threadId) }) > 0
+  return { mutation, busy }
 }
 
 /**
- * An empty thread's workspace line. Until the first message, it moves the thread to another
- * workspace and chooses between the shared workspace folder and the thread's own Git worktree.
+ * An empty thread's heading. Until the first message, its workspace name opens a menu that moves
+ * the thread to another workspace.
  */
 export function ThreadOrigin({
   thread,
@@ -83,60 +46,115 @@ export function ThreadOrigin({
   thread: Thread
   workspaces: readonly Workspace[]
 }): React.JSX.Element {
-  const client = useQueryClient()
-  const mutation = useMutation({
-    mutationFn: (input: { workspaceId?: string; isolated?: boolean }) =>
-      window.meldshell.setDraftLocation({ threadId: thread.id, ...input }),
-    onSuccess: (snapshot) => replaceSnapshot(client, snapshot),
-  })
+  const { mutation, busy } = useDraftLocation(thread.id)
   const workspace = workspaces.find((entry) => entry.id === thread.workspaceId)
-  const worktree = thread.worktree?.state === "removed" ? undefined : thread.worktree
-  const pending = mutation.isPending ? mutation.variables : undefined
-  const branchText =
-    pending?.isolated === true
-      ? "Creating worktree…"
-      : pending !== undefined
-        ? "Moving…"
-        : (worktree?.branch ?? "Workspace folder")
   return (
-    <>
-      <OriginMenu
-        label="Workspace"
-        value={thread.workspaceId}
-        text={workspace?.name ?? "Unknown workspace"}
-        title={workspace?.path}
-        choices={workspaces.map((entry) => ({
-          value: entry.id,
-          name: entry.name,
-          detail: entry.path,
-        }))}
-        disabled={mutation.isPending}
-        onChange={(workspaceId) => mutation.mutate({ workspaceId })}
-      />
-      <OriginMenu
-        label="Branch"
-        separated
-        value={worktree === undefined ? "shared" : "own"}
-        text={branchText}
-        title={worktree?.path}
-        choices={[
-          {
-            value: "shared",
-            name: "Workspace folder",
-            detail: "Shares files with other threads in this workspace",
-          },
-          {
-            value: "own",
-            name: "Own branch",
-            detail: "A Git worktree from the current commit, so parallel threads never collide",
-          },
-        ]}
-        disabled={mutation.isPending}
-        onChange={(value) => mutation.mutate({ isolated: value === "own" })}
-      />
+    <div className="flex flex-col items-center text-center">
+      <MeldMark className="w-[24px] h-[24px] mb-[18px] text-[var(--text-tertiary)] opacity-[0.7]" />
+      <h2 className="m-0 [font-family:var(--font-display)] text-[21px] font-semibold leading-[1.35] tracking-[-0.015em] text-[var(--text-primary)] [text-wrap:balance]">
+        What should we work on in{" "}
+        <DropdownMenu
+          align="center"
+          trigger={
+            <BaseButton
+              type="button"
+              disabled={busy}
+              title={workspace?.path}
+              aria-label={`Workspace: ${workspace?.name ?? "Unknown workspace"}`}
+              className="motion-colors inline-flex max-w-full [margin:0_-4px] [padding:0_4px] border-0 rounded-[var(--radius-sm)] bg-transparent text-inherit [font:inherit] cursor-default [&:hover:not(:disabled)]:bg-[var(--surface-hover)] [&[data-popup-open]]:bg-[var(--surface-hover)] [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)]"
+            >
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap [text-decoration:underline_dotted] [text-decoration-color:var(--line-strong)] [text-decoration-thickness:1.5px] [text-underline-offset:5px]">
+                {workspace?.name ?? "an unknown workspace"}
+              </span>
+            </BaseButton>
+          }
+        >
+          <MenuRadioGroup
+            value={thread.workspaceId}
+            onValueChange={(next) => mutation.mutate({ workspaceId: String(next) })}
+          >
+            {workspaces.map((entry) => (
+              <MenuChoice
+                key={entry.id}
+                value={entry.id}
+                // Paths only disambiguate workspaces that share a name.
+                detail={
+                  workspaces.some((other) => other.id !== entry.id && other.name === entry.name)
+                    ? entry.path
+                    : undefined
+                }
+              >
+                {entry.name}
+              </MenuChoice>
+            ))}
+          </MenuRadioGroup>
+        </DropdownMenu>
+        ?
+      </h2>
       {mutation.isError && (
         <ErrorToast message={mutation.error.message} onDismiss={() => mutation.reset()} />
       )}
-    </>
+    </div>
+  )
+}
+
+/**
+ * Sits under an empty thread's composer and chooses between the shared workspace folder and the
+ * thread's own Git worktree until the first message.
+ */
+export function ThreadBranchToggle({ thread }: { thread: Thread }): React.JSX.Element {
+  const { mutation, busy } = useDraftLocation(thread.id)
+  const pending = useMutationState({
+    filters: { mutationKey: draftLocationKey(thread.id), status: "pending" },
+    select: (entry) => entry.state.variables as DraftLocation | undefined,
+  }).at(-1)
+  const worktree = thread.worktree?.state === "removed" ? undefined : thread.worktree
+  const isolated = pending?.isolated ?? worktree !== undefined
+  const note =
+    pending?.isolated === true
+      ? "Creating a worktree…"
+      : pending?.isolated === false
+        ? "Removing the worktree…"
+        : pending !== undefined
+          ? "Moving the thread…"
+          : undefined
+  return (
+    <div className="thread-branch-toggle [padding:10px_clamp(24px,_7vw,_104px)_0]">
+      <div className="flex w-full max-w-[680px] min-w-0 items-center justify-center gap-[10px] [margin:0_auto]">
+        <ToggleGroup
+          aria-label="Where the thread works"
+          value={[isolated ? "own" : "shared"]}
+          disabled={busy}
+          onValueChange={(value) => {
+            const next = value[0]
+            if (next !== undefined) mutation.mutate({ isolated: next === "own" })
+          }}
+          className="flex shrink-0 gap-[2px] p-[2px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)]"
+        >
+          <Toggle
+            value="shared"
+            title="Shares files with the other threads in this workspace"
+            className={segmentClasses}
+          >
+            <Folder size={13} strokeWidth={2} aria-hidden="true" />
+            Workspace folder
+          </Toggle>
+          <Toggle
+            value="own"
+            title="A Git worktree from the current commit, so parallel threads never collide"
+            className={segmentClasses}
+          >
+            <GitBranch size={13} strokeWidth={2} aria-hidden="true" />
+            Own branch
+          </Toggle>
+        </ToggleGroup>
+        {note !== undefined && (
+          <span className="min-w-0 text-[var(--text-tertiary)] text-[12px]">{note}</span>
+        )}
+      </div>
+      {mutation.isError && (
+        <ErrorToast message={mutation.error.message} onDismiss={() => mutation.reset()} />
+      )}
+    </div>
   )
 }

@@ -14,7 +14,7 @@ import { Collapsible } from "@base-ui-components/react/collapsible"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Button, IconButton } from "../ui/controls"
-import type { CanonicalEvent, Workspace } from "@meldshell/contracts"
+import type { CanonicalEvent } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { TurnChanges } from "./TurnChanges"
@@ -535,21 +535,16 @@ function useEnteringTurn(turns: ReadonlyArray<TranscriptTurn> | undefined): stri
 export function Transcript({
   threadId,
   targetTurnId,
-  workspace,
   scope,
-  branch,
   origin,
   running = false,
 }: {
   readonly running?: boolean
   readonly targetTurnId?: string
   readonly threadId: string
-  readonly workspace?: Workspace
   /** Where file references resolve; a worktree thread reads its own checkout. */
   readonly scope?: WorkspaceScope
-  /** The thread's own branch when it works in a worktree. */
-  readonly branch?: string
-  /** Replaces the workspace line's contents before the first turn, such as with pickers. */
+  /** Shown in place of the transcript before the first turn. */
   readonly origin?: React.ReactNode
 }): React.JSX.Element {
   "use no memo"
@@ -620,25 +615,8 @@ export function Transcript({
     )
   if (turns.length === 0)
     return (
-      <div className="transcript-origin [padding:0_clamp(24px,_7vw,_104px)_12px]">
-        <FadeDiv className="w-full max-w-[680px] [margin:0_auto]">
-          {workspace !== undefined && (
-            <div className="flex [align-items:baseline] gap-[8px] m-0 px-[2px] text-[12px] leading-[1.5] [&_>_span]:shrink-0 [&_>_span]:text-[var(--text-tertiary)] [&_>_strong]:overflow-hidden [&_>_strong]:text-[var(--text-secondary)] [&_>_strong]:font-medium [&_>_strong]:text-ellipsis [&_>_strong]:whitespace-nowrap">
-              {origin ?? (
-                <>
-                  <span>Workspace</span>
-                  <strong title={workspace.path}>{workspace.name}</strong>
-                  {branch !== undefined && (
-                    <>
-                      <span className="ml-[10px]">Branch</span>
-                      <strong>{branch}</strong>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </FadeDiv>
+      <div className="transcript-origin [padding:0_clamp(24px,_7vw,_104px)_24px]">
+        <FadeDiv className="w-full max-w-[680px] [margin:0_auto]">{origin}</FadeDiv>
       </div>
     )
 
