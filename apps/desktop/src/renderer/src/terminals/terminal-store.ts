@@ -18,6 +18,8 @@ import {
   watchAppearance,
 } from "./terminal-theme"
 import { actionForEvent, useKeybindings } from "../app/keybindings"
+import { usePreviewStore } from "../preview/preview-store"
+import { detectServerUrls } from "../preview/server-urls"
 
 /*
  * Thread terminals outlive their views. The store keeps each thread's pane tree; the xterm
@@ -96,6 +98,9 @@ let pendingFocus: string | null = null
 // The run script each run shell starts, and the open shell for each thread's run script.
 const runShells = new Map<string, string>()
 const runShellByScript = new Map<string, string>()
+// The end of each shell's output, so an address split across two chunks is still found.
+const outputTails = new Map<string, string>()
+
 const runKey = (threadId: string, name: string) => `${threadId}\n${name}`
 
 function forgetRunShell(id: string): void {
@@ -117,6 +122,7 @@ function focusTerminal(id: string): void {
 }
 
 function disposeTerminal(id: string): void {
+  outputTails.delete(id)
   runShells.delete(id)
   forgetRunShell(id)
   terminalApi?.close(id)
@@ -252,10 +258,23 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
 }))
 
 let listening = false
+function watchForServers(id: string, data: string): void {
+  const text = (outputTails.get(id) ?? "") + data
+  outputTails.set(id, text.slice(-160))
+  // Cheap test first: most output never names a web address.
+  if (!text.includes("://")) return
+  const urls = detectServerUrls(text)
+  const threadId = urls.length === 0 ? undefined : threadOf(id)
+  if (threadId !== undefined) usePreviewStore.getState().noteServers(threadId, urls)
+}
+
 function listen(): void {
   if (listening || terminalApi === undefined) return
   listening = true
-  terminalApi.onData((id, data) => instances.get(id)?.term.write(data))
+  terminalApi.onData((id, data) => {
+    instances.get(id)?.term.write(data)
+    watchForServers(id, data)
+  })
   terminalApi.onExit((id, code) => {
     const instance = instances.get(id)
     if (instance === undefined) return

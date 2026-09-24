@@ -6,6 +6,7 @@ import type { Provider, Thread } from "@meldshell/contracts"
 import {
   Columns2,
   FolderCode,
+  Globe,
   Rows2,
   PanelLeftClose,
   PanelLeftOpen,
@@ -42,6 +43,9 @@ interface TitleBarProps {
   /** The workspace run scripts for the thread on screen. */
   readonly runScripts: readonly RunScript[]
   readonly onRun: (name: string) => void
+  /** Null while no thread is on screen or this client cannot show previews. */
+  readonly previewShown: boolean | null
+  readonly onTogglePreview: () => void
   /** Null while nothing is on screen or this client cannot start editors; the preferred is first. */
   readonly editors: readonly ExternalEditor[] | null
   readonly preferredEditor: string | undefined
@@ -182,6 +186,8 @@ export function TitleBar({
   onToggleTerminal,
   runScripts,
   onRun,
+  previewShown,
+  onTogglePreview,
   editors,
   preferredEditor,
   onOpenInEditor,
@@ -319,6 +325,19 @@ export function TitleBar({
         <OpenInEditorButton editors={editors} preferred={preferredEditor} onOpen={onOpenInEditor} />
       )}
       {sidebarsVisible && <RunButton scripts={runScripts} onRun={onRun} />}
+      {sidebarsVisible && previewShown !== null && (
+        <IconButton
+          className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag] [&[aria-pressed='true']]:text-[var(--text-primary)]"
+          label={withShortcut(
+            previewShown ? "Hide preview" : "Show preview",
+            bindings.togglePreview,
+          )}
+          aria-pressed={previewShown}
+          onClick={onTogglePreview}
+        >
+          <Globe size={15} />
+        </IconButton>
+      )}
       {sidebarsVisible && terminalShown !== null && (
         <IconButton
           className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag] [&[aria-pressed='true']]:text-[var(--text-primary)]"

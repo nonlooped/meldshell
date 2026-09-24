@@ -17,6 +17,7 @@ export type ShortcutAction =
   | "toggleInbox"
   | "toggleSourceControl"
   | "toggleTerminal"
+  | "togglePreview"
   | "openInEditor"
 
 export interface ShortcutDefinition {
@@ -42,6 +43,12 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     chord: "Ctrl+Alt+B",
   },
   { id: "toggleTerminal", label: "Show or hide the terminal", group: "Panels", chord: "Ctrl+`" },
+  {
+    id: "togglePreview",
+    label: "Show or hide the preview",
+    group: "Panels",
+    chord: "Ctrl+Shift+B",
+  },
   { id: "openInEditor", label: "Open in editor", group: "Workspace", chord: "Ctrl+Shift+E" },
 ]
 

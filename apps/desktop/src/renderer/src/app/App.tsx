@@ -39,6 +39,7 @@ import { useThreadSignals, useWatchedThreadIds } from "./thread-signals"
 import { terminalApi, useTerminalStore } from "../terminals/terminal-store"
 import { useWorkspaceScripts } from "../terminals/workspace-scripts"
 import { useOpenInEditor } from "./editors"
+import { previewSupported, usePreviewStore } from "../preview/preview-store"
 
 import { SettingsView } from "../settings/SettingsView"
 
@@ -304,6 +305,25 @@ function useTerminalToggle(
   }
 }
 
+/** The title bar's preview toggle for the thread on screen; `shown` is null without one. */
+function usePreviewToggle(closeSettings: () => void, selectTab: (id: string) => void) {
+  const threadOnScreen = useTabStore(
+    (state) => state.selectedFileId === null && state.selectedThreadId !== null,
+  )
+  const selectedThreadId = useTabStore((state) => state.selectedThreadId)
+  const open = usePreviewStore((state) =>
+    selectedThreadId === null ? false : state.threads[selectedThreadId]?.open === true,
+  )
+  const toggle = useCallback(() => {
+    const { selectedThreadId: threadId, selectedThreadTabId } = useTabStore.getState()
+    if (!previewSupported || threadId === null || selectedThreadTabId === null) return
+    closeSettings()
+    selectTab(selectedThreadTabId)
+    usePreviewStore.getState().toggle(threadId)
+  }, [closeSettings, selectTab])
+  return { shown: !previewSupported || !threadOnScreen ? null : open, toggle }
+}
+
 export function App(): React.JSX.Element {
   const openThreadIds = useTabStore((state) => state.openThreadIds)
   const selectedThreadId = useTabStore((state) => state.selectedThreadId)
@@ -349,6 +369,7 @@ export function App(): React.JSX.Element {
     deleted: (threadId) => {
       removeThread(threadId)
       useTerminalStore.getState().forget(threadId)
+      usePreviewStore.getState().forget(threadId)
       useThreadDrafts.getState().forget(threadId)
       setSearchThreads((threads) => threads.filter((thread) => thread.id !== threadId))
       setDeleteTarget(null)
@@ -368,6 +389,7 @@ export function App(): React.JSX.Element {
       for (const id of threadIds) {
         removeThread(id)
         useTerminalStore.getState().forget(id)
+        usePreviewStore.getState().forget(id)
         useThreadDrafts.getState().forget(id)
       }
       setSearchThreads((threads) => threads.filter((thread) => thread.workspaceId !== workspaceId))
@@ -426,6 +448,7 @@ export function App(): React.JSX.Element {
   ])
 
   const terminal = useTerminalToggle(closeSettings, selectThread, snapshot.threads)
+  const preview = usePreviewToggle(closeSettings, selectThread)
 
   const pagedThreads = threadPagesQuery.data?.pages.flatMap((page) => page.threads) ?? []
   const threadMap = new Map(
@@ -495,6 +518,7 @@ export function App(): React.JSX.Element {
       toggleInbox,
       toggleSourceControl,
       toggleTerminal: terminal.toggle,
+      togglePreview: preview.toggle,
       openInEditor: () => editor.open(),
     }
   })
@@ -540,6 +564,8 @@ export function App(): React.JSX.Element {
           onToggleTerminal={terminal.toggle}
           runScripts={terminal.runScripts}
           onRun={terminal.run}
+          previewShown={preview.shown}
+          onTogglePreview={preview.toggle}
           editors={editor.editors}
           preferredEditor={snapshot.settings.editor}
           onOpenInEditor={editor.open}

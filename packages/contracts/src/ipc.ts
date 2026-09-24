@@ -161,6 +161,10 @@ interface DesktopApi {
   readonly listEditors: () => Promise<readonly ExternalEditor[]>
   /** Opens the folder a thread works in, or the workspace folder, in the chosen editor. */
   readonly openInEditor: (input: WorkspaceScope & { editorId: string }) => Promise<void>
+  /** The first of the ports assigned to a thread, as scripts receive it in `MELDSHELL_PORT`. */
+  readonly threadPort: (threadId: string) => Promise<number>
+  /** Opens an http or https address in the system browser. */
+  readonly openExternal: (url: string) => Promise<void>
 }
 
 export type GitFileAction = "stage" | "unstage" | "restore"
@@ -347,6 +351,8 @@ export const IPC = {
   terminalExit: "meldshell:terminal-exit",
   listEditors: "meldshell:list-editors",
   openInEditor: "meldshell:open-in-editor",
+  threadPort: "meldshell:thread-port",
+  openExternal: "meldshell:open-external",
 } as const
 
 export type MeldShellApi = InvokeApi & {
