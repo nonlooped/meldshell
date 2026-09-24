@@ -38,7 +38,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Explain why Commit is unavailable, show stage and discard actions on hover, and show branch labels and commit ages in the graph.
 - Center settings content, move the way back to the top of settings, and show the relay privacy note as a callout.
 - Show every subscription reset as a countdown, with the exact time on hover.
-- Host the website, account API, and relay together at meldshell.nonlooped.xyz on Cloudflare: the site on Pages, and the account API and relay in a Worker with Durable Objects and D1, instead of Vercel and a self-hosted Node service.
+- Host the website, account API, and relay together at meldshell.nonlooped.xyz on Cloudflare: the site on Pages, and the account API and relay in a Worker with Durable Objects and D1.
 - Sign in with Google or Discord; accounts that share a verified email are linked. Desktop builds connect to meldshell.nonlooped.xyz by default. Computers linked to the old account service must be linked again.
 - Hosts no longer stream events through the relay while no browser is connected; browsers refetch state when they connect.
 

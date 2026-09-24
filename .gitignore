@@ -6,7 +6,6 @@ release/
 .vite/
 .astro/
 .wrangler/
-.vercel/
 *.tsbuildinfo
 .cache/
 
