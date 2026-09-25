@@ -23,6 +23,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Updated dependencies across the desktop app, remote site, account worker, and providers. Mermaid 12 also adds support for its new diagram types while keeping existing diagrams' layout and appearance.
 - Collapsing the inbox now leaves a narrow strip of its icons instead of hiding it. New thread, search, the workspace picker, Settings, and each thread's provider icon stay where they were, and threads that need attention keep their colored marker. The New thread button's label is now left-aligned so its icon stays put.
 - On macOS and Linux, stopping or restarting Codex, Claude Code, or Cursor also stops the processes they started, such as running commands, as it already did on Windows.
+- The Windows installer and Linux AppImage are smaller because they no longer carry extra copies of interface libraries that are already built into the app. The AppImage shrinks from 214 MB to 150 MB.
 
 ## [0.10.0] - 2026-09-25
 
