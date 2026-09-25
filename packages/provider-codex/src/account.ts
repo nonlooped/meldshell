@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { Schema } from "effect"
+import { jwtDecode } from "jwt-decode"
 
 const Auth = Schema.Struct({
   tokens: Schema.optional(
@@ -15,11 +16,8 @@ const Auth = Schema.Struct({
  */
 function emailFromIdToken(idToken: string | null | undefined): string | null {
   if (!idToken) return null
-  const payload = idToken.split(".")[1]
-  if (!payload || !/^[A-Za-z0-9_-]+$/.test(payload)) return null
   try {
-    const claims: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"))
-    const email = (claims as { email?: unknown }).email
+    const { email } = jwtDecode<{ readonly email?: unknown }>(idToken)
     return typeof email === "string" && email.includes("@") ? email : null
   } catch {
     return null

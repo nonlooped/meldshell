@@ -9,13 +9,16 @@
   },
   "dependencies": {
     "@meldshell/contracts": "*",
+    "@meldshell/provider-runtime": "*",
     "ajv": "8.20.0",
+    "cross-spawn": "7.0.6",
     "effect": "3.22.1",
+    "jwt-decode": "4.0.0",
     "semver": "7.8.5",
-    "which": "7.0.0",
-    "@meldshell/provider-runtime": "*"
+    "which": "7.0.0"
   },
   "devDependencies": {
+    "@types/cross-spawn": "6.0.6",
     "@types/semver": "7.7.1",
     "@types/which": "3.0.4"
   },

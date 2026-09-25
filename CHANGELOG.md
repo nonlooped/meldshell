@@ -15,11 +15,14 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Cursor threads now run in the mode the thread is set to. Before, every Cursor turn ran in Agent mode.
 - When a Cursor model cannot write a commit message or a thread title, the failure shows right away. Before, the commit message button waited 75 seconds before reporting it.
+- Files that Cursor edits show only the lines that changed, and files it creates show their contents. Before, an edit showed the whole file removed and added again, and a new file showed patch markers as if they were its text.
+- Error messages from Git, files, and commit message generation no longer start with "Error:".
 
 ### Changed
 
 - Stable releases are published automatically once a day when there are new changes, and each one is a new minor version.
 - The message composer is translucent and blurs the conversation scrolling behind it. With reduced transparency turned on, it keeps a solid background.
+- On macOS and Linux, stopping or restarting Codex, Claude Code, or Cursor also stops the processes they started, such as running commands, as it already did on Windows.
 
 ## [0.9.0] - 2026-09-24
 

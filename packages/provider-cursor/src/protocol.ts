@@ -8,7 +8,8 @@ import {
 } from "@meldshell/contracts"
 import type { ContentBlock, RequestPermissionResponse } from "@agentclientprotocol/sdk"
 import { readFile } from "node:fs/promises"
-import { extname, isAbsolute } from "node:path"
+import { isAbsolute } from "node:path"
+import mime from "mime/lite"
 
 export const cursorModels = (
   session: UnknownRecord,
@@ -44,6 +45,9 @@ const referenceText = ({ type, value }: TurnDispatch["attachments"][number]): st
   return isAbsolute(value) ? `Read and follow this skill: ${value}` : `Use the ${value} skill.`
 }
 
+/** The image formats Cursor accepts in a prompt. */
+const CURSOR_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"])
+
 export const cursorPrompt = async (
   dispatch: TurnDispatch,
   images: boolean,
@@ -59,26 +63,18 @@ export const cursorPrompt = async (
     }
     if (!images) throw new Error("This Cursor release does not advertise image input.")
     if (attachment.type === "localImage") {
-      const mime = (
-        {
-          ".png": "image/png",
-          ".jpg": "image/jpeg",
-          ".jpeg": "image/jpeg",
-          ".webp": "image/webp",
-          ".gif": "image/gif",
-        } as Record<string, string>
-      )[extname(attachment.value).toLowerCase()]
-      if (!mime) throw new Error("Unsupported Cursor image format.")
+      const mimeType = mime.getType(attachment.value)
+      if (mimeType === null || !CURSOR_IMAGE_TYPES.has(mimeType))
+        throw new Error("Unsupported Cursor image format.")
       prompt.push({
         type: "image",
-        mimeType: mime,
+        mimeType,
         data: (await readFile(attachment.value)).toString("base64"),
       })
     } else {
-      const match = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=\r\n]+)$/.exec(
-        attachment.value,
-      )
-      if (!match) throw new Error("Cursor image attachments must contain image data.")
+      const match = /^data:(image\/[\w.+-]+);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(attachment.value)
+      if (!match || !CURSOR_IMAGE_TYPES.has(match[1]!))
+        throw new Error("Cursor image attachments must contain image data.")
       prompt.push({ type: "image", mimeType: match[1]!, data: match[2]! })
     }
   }

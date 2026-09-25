@@ -1,4 +1,5 @@
 import type { ScheduleCadence } from "@meldshell/contracts"
+import { differenceInCalendarDays, format } from "date-fns"
 
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
 
@@ -46,9 +47,6 @@ export function describeCadence(cadence: ScheduleCadence): string {
   }
 }
 
-const startOfDay = (date: Date) =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-
 /** A moment relative to `now`: `in 5 minutes`, `today at 2:00 PM`, `tomorrow at 9:30 AM`. */
 export function describeMoment(moment: Date, now: Date): string {
   const ahead = moment.getTime() - now.getTime()
@@ -57,7 +55,7 @@ export function describeMoment(moment: Date, now: Date): string {
     const minutes = Math.round(ahead / 60_000)
     return `in ${minutes} ${minutes === 1 ? "minute" : "minutes"}`
   }
-  const dayDifference = Math.round((startOfDay(moment) - startOfDay(now)) / 86_400_000)
+  const dayDifference = differenceInCalendarDays(moment, now)
   const time = timeFormat.format(moment)
   if (dayDifference === 0) return `today at ${time}`
   if (dayDifference === 1) return `tomorrow at ${time}`
@@ -66,9 +64,4 @@ export function describeMoment(moment: Date, now: Date): string {
 }
 
 /** A `datetime-local` value for a moment in local time. */
-export function localInputValue(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, "0")
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`
-}
+export const localInputValue = (date: Date): string => format(date, "yyyy-MM-dd'T'HH:mm")

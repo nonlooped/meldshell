@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process"
 import { lstat, readFile, readlink, stat } from "node:fs/promises"
 import { join } from "node:path"
+import { createTwoFilesPatch, FILE_HEADERS_ONLY } from "diff"
 import type {
   GitChange,
   GitCommit,
@@ -11,7 +12,12 @@ import type {
 
 const MAX_BYTES = 2 * 1024 * 1024
 
-export async function git(cwd: string, args: string[], timeout = 15_000): Promise<string> {
+export async function git(
+  cwd: string,
+  args: string[],
+  timeout = 15_000,
+  maxBytes = MAX_BYTES,
+): Promise<string> {
   const directory = await stat(cwd).catch(() => null)
   if (!directory?.isDirectory()) throw new Error(`Git working directory is unavailable: ${cwd}`)
   return new Promise((resolve, reject) => {
@@ -22,7 +28,7 @@ export async function git(cwd: string, args: string[], timeout = 15_000): Promis
         cwd,
         windowsHide: true,
         timeout,
-        maxBuffer: MAX_BYTES,
+        maxBuffer: maxBytes,
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
       },
       (error, stdout, stderr) => {
@@ -33,7 +39,7 @@ export async function git(cwd: string, args: string[], timeout = 15_000): Promis
               error.code === "ENOENT"
                 ? "Git is not installed or is not on PATH."
                 : error.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
-                  ? "This Git result is too large to display (2 MB limit)."
+                  ? `This Git result is too large to display (${maxBytes / 1024 / 1024} MB limit).`
                   : stderr.trim() || "Git could not read this repository. Try refreshing.",
             ),
           )
@@ -41,6 +47,23 @@ export async function git(cwd: string, args: string[], timeout = 15_000): Promis
     )
   })
 }
+
+/** Whether a Git command succeeds, for checks such as whether a ref exists. */
+export const gitSucceeds = (cwd: string, args: string[]): Promise<boolean> =>
+  git(cwd, args).then(
+    () => true,
+    () => false,
+  )
+
+/** A Git command's trimmed output, or null when it fails, as it does for an unborn HEAD. */
+export const gitValue = (cwd: string, args: string[]): Promise<string | null> =>
+  git(cwd, args).then(
+    (value) => value.trim(),
+    () => null,
+  )
+
+export const currentBranch = (root: string): Promise<string | null> =>
+  gitValue(root, ["symbolic-ref", "--short", "HEAD"])
 
 export function parseStatus(output: string): GitChange[] {
   const fields = output.split("\0")
@@ -60,14 +83,8 @@ async function repository(
   workspacePath: string,
 ): Promise<{ root: string; head: string | null; branch: string }> {
   const root = (await git(workspacePath, ["rev-parse", "--show-toplevel"])).trim()
-  const head = await git(root, ["rev-parse", "--verify", "HEAD"]).then(
-    (value) => value.trim(),
-    () => null,
-  )
-  const branch = await git(root, ["symbolic-ref", "--short", "HEAD"]).then(
-    (value) => value.trim(),
-    () => `Detached at ${head?.slice(0, 7) ?? "HEAD"}`,
-  )
+  const head = await gitValue(root, ["rev-parse", "--verify", "HEAD"])
+  const branch = (await currentBranch(root)) ?? `Detached at ${head?.slice(0, 7) ?? "HEAD"}`
   return { root, head, branch }
 }
 
@@ -127,11 +144,13 @@ async function untrackedDiff(root: string, path: string): Promise<string> {
     : await readFile(absolute)
   if (content.includes(0)) return "Binary file added. No text diff is available."
   const text = content.toString("utf8")
-  const lines = text.split("\n")
-  if (lines.at(-1) === "") lines.pop()
-  const header = `diff --git ${JSON.stringify(`a/${path}`)} ${JSON.stringify(`b/${path}`)}\nnew file mode ${stat.isSymbolicLink() ? "120000" : "100644"}\n--- /dev/null\n+++ ${JSON.stringify(`b/${path}`)}\n`
-  if (!text) return `${header}\nEmpty file added.`
-  return `${header}@@ -0,0 +1,${lines.length} @@\n${lines.map((line) => `+${line}`).join("\n")}\n${text.endsWith("\n") ? "" : "\\ No newline at end of file\n"}`
+  const mode = stat.isSymbolicLink() ? "120000" : "100644"
+  const header = `diff --git ${JSON.stringify(`a/${path}`)} ${JSON.stringify(`b/${path}`)}\nnew file mode ${mode}\n`
+  // jsdiff quotes the file headers as Git does, which the diff viewer decodes.
+  const patch = createTwoFilesPatch("/dev/null", `b/${path}`, "", text, undefined, undefined, {
+    headerOptions: FILE_HEADERS_ONLY,
+  })
+  return text ? `${header}${patch}` : `${header}${patch}\nEmpty file added.`
 }
 
 export async function getGitDiff(
@@ -268,21 +287,14 @@ export async function gitCommit(workspacePath: string, message: string): Promise
 
 export async function gitPush(workspacePath: string): Promise<void> {
   await writeRepository(workspacePath, async (root) => {
-    const upstream = await git(root, ["rev-parse", "--abbrev-ref", "@{upstream}"]).then(
-      () => true,
-      () => false,
-    )
+    const upstream = await gitSucceeds(root, ["rev-parse", "--abbrev-ref", "@{upstream}"])
     if (upstream) {
       await git(root, ["push"], 120_000)
       return
     }
     // A new branch, such as a thread's worktree branch, publishes to the only or `origin` remote.
-    const branch = await git(root, ["symbolic-ref", "--short", "HEAD"]).then(
-      (value) => value.trim(),
-      () => {
-        throw new Error("Check out a branch before pushing.")
-      },
-    )
+    const branch = await currentBranch(root)
+    if (branch === null) throw new Error("Check out a branch before pushing.")
     const remotes = (await git(root, ["remote"])).split("\n").filter(Boolean)
     const remote = remotes.includes("origin") ? "origin" : remotes.length === 1 ? remotes[0] : null
     if (remote === null || remote === undefined)

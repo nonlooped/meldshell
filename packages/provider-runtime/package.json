@@ -5,11 +5,14 @@
   "type": "module",
   "exports": {
     ".": "./src/worker.ts",
-    "./process-tree": "./src/process-tree.ts"
+    "./process-tree": "./src/process-tree.ts",
+    "./command": "./src/command.ts"
   },
   "dependencies": {
     "@meldshell/contracts": "*",
-    "effect": "3.22.1"
+    "effect": "3.22.1",
+    "execa": "10.0.1",
+    "tree-kill": "1.2.2"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"

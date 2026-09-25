@@ -15,6 +15,7 @@ const bundledMainPackages = [
   // ESM-only. Externalizing it would turn the default import into a CommonJS module object.
   "electron-context-menu",
   "htmlparser2",
+  "p-limit",
 ]
 
 export default defineConfig({

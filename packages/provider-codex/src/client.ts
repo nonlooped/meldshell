@@ -1,5 +1,4 @@
-import { stopProcessTree } from "../../provider-runtime/src/process-tree"
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
+import type { ChildProcessWithoutNullStreams } from "node:child_process"
 import { createInterface } from "node:readline"
 import {
   isRecord,
@@ -7,7 +6,10 @@ import {
   type CodexStatus,
   type ProviderModelCatalogEntry,
 } from "@meldshell/contracts"
+import { runCommand } from "@meldshell/provider-runtime/command"
+import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import Ajv, { type ValidateFunction } from "ajv"
+import spawn from "cross-spawn"
 import { Effect } from "effect"
 import semver from "semver"
 import which from "which"
@@ -21,55 +23,12 @@ import modelListResponseSchema from "../schema/v2/ModelListResponse.json"
 
 const MINIMUM_CODEX_VERSION = "0.153.0"
 
-interface CommandResult {
-  readonly exitCode: number | null
-  readonly stdout: string
-  readonly stderr: string
-}
-
-const run = (executablePath: string, args: ReadonlyArray<string>) =>
-  Effect.async<CommandResult, Error>((resume) => {
-    try {
-      const isCommandScript = /\.(?:cmd|bat)$/i.test(executablePath)
-      const commandLine = `"${executablePath.replaceAll('"', '""')}" ${args
-        .map((argument) => `"${argument.replaceAll('"', '""')}"`)
-        .join(" ")}`
-      const child = isCommandScript
-        ? spawn(commandLine, {
-            shell: true,
-            windowsHide: true,
-            stdio: ["ignore", "pipe", "pipe"],
-          })
-        : spawn(executablePath, args, {
-            windowsHide: true,
-            stdio: ["ignore", "pipe", "pipe"],
-          })
-      let stdout = ""
-      let stderr = ""
-
-      child.stdout.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString("utf8")
-      })
-      child.stderr.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString("utf8")
-      })
-      child.once("error", (cause) => {
-        resume(Effect.fail(cause))
-      })
-      child.once("close", (exitCode) => {
-        resume(Effect.succeed({ exitCode, stdout: stdout.trim(), stderr: stderr.trim() }))
-      })
-      return Effect.sync(() => child.kill())
-    } catch (cause) {
-      resume(Effect.fail(toError(cause)))
-      return undefined
-    }
-  }).pipe(
-    Effect.timeoutFail({
-      duration: "8 seconds",
-      onTimeout: () => new Error(`Codex command "${args.join(" ")}" timed out.`),
-    }),
-  )
+/** A CLI check's result; a check that cannot run at all reads as a failed one. */
+const check = (executablePath: string, args: ReadonlyArray<string>) =>
+  Effect.tryPromise({
+    try: (signal) => runCommand(executablePath, args, { timeoutMs: 8_000, signal }),
+    catch: toError,
+  }).pipe(Effect.orElseSucceed(() => ({ exitCode: null, stdout: "", stderr: "" })))
 
 const status = (
   availability: CodexStatus["availability"],
@@ -98,9 +57,7 @@ export const probeCodex: Effect.Effect<CodexStatus> = Effect.gen(function* () {
     return status("missing", "Codex is not installed or is not available on PATH.")
   }
 
-  const versionResult = yield* run(executablePath, ["--version"]).pipe(
-    Effect.catchAll(() => Effect.succeed({ exitCode: null, stdout: "", stderr: "" })),
-  )
+  const versionResult = yield* check(executablePath, ["--version"])
   const parsedVersion = semver.coerce(versionResult.stdout)?.version ?? null
 
   if (versionResult.exitCode !== 0 || parsedVersion === null) {
@@ -116,9 +73,7 @@ export const probeCodex: Effect.Effect<CodexStatus> = Effect.gen(function* () {
     )
   }
 
-  const loginResult = yield* run(executablePath, ["login", "status"]).pipe(
-    Effect.catchAll(() => Effect.succeed({ exitCode: null, stdout: "", stderr: "" })),
-  )
+  const loginResult = yield* check(executablePath, ["login", "status"])
 
   if (loginResult.exitCode !== 0) {
     return status(
@@ -329,17 +284,12 @@ export class CodexAppServer {
 
   async start(): Promise<void> {
     if (this.child !== null) return
-    const isCommandScript = /\.(?:cmd|bat)$/i.test(this.executablePath)
-    const child = isCommandScript
-      ? spawn(`"${this.executablePath.replaceAll('"', '""')}" app-server`, {
-          shell: true,
-          windowsHide: true,
-          stdio: ["pipe", "pipe", "pipe"],
-        })
-      : spawn(this.executablePath, ["app-server"], {
-          windowsHide: true,
-          stdio: ["pipe", "pipe", "pipe"],
-        })
+    // cross-spawn starts Windows command shims such as codex.cmd with correct quoting. Its types do
+    // not narrow on `stdio`, but every stream is piped here.
+    const child = spawn(this.executablePath, ["app-server"], {
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    }) as ChildProcessWithoutNullStreams
     this.child = child
     if (child.pid !== undefined) this.callbacks.onSpawn?.(child.pid)
 

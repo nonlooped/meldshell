@@ -1,8 +1,8 @@
-import { execFile } from "node:child_process"
 import { open, readdir, realpath, stat } from "node:fs/promises"
 import { extname, isAbsolute, relative, resolve, sep } from "node:path"
 import type { DirectoryEntry, FilePreview } from "@meldshell/contracts/ipc"
-import { parseStatus } from "./git"
+import mime from "mime"
+import { git, gitValue, parseStatus } from "./git"
 
 async function workspaceFile(root: string, path: string): Promise<string> {
   const canonicalRoot = await realpath(root)
@@ -13,25 +13,13 @@ async function workspaceFile(root: string, path: string): Promise<string> {
   return target
 }
 
-function directoryStatus(cwd: string): Promise<string> {
-  return new Promise((done) => {
-    execFile(
-      "git",
-      [
-        "--no-optional-locks",
-        "status",
-        "--porcelain=v1",
-        "-z",
-        "--ignored=matching",
-        "--untracked-files=normal",
-        "--",
-        ".",
-      ],
-      { cwd, windowsHide: true, timeout: 10000, maxBuffer: 2 * 1024 * 1024 },
-      (error, stdout) => done(error ? "" : stdout),
-    )
-  })
-}
+/** Entry states for one directory; a folder outside Git has none. */
+const directoryStatus = (cwd: string): Promise<string> =>
+  git(
+    cwd,
+    ["status", "--porcelain=v1", "-z", "--ignored=matching", "--untracked-files=normal", "--", "."],
+    10_000,
+  ).catch(() => "")
 
 export async function listDirectory(root: string, path: string): Promise<DirectoryEntry[]> {
   const directory = await workspaceFile(root, path)
@@ -42,14 +30,7 @@ export async function listDirectory(root: string, path: string): Promise<Directo
   ])
   const changes = parseStatus(status)
   // Git porcelain paths are repository-relative, even when invoked in a subdirectory.
-  const prefix = await new Promise<string>((done) => {
-    execFile(
-      "git",
-      ["rev-parse", "--show-prefix"],
-      { cwd: directory, windowsHide: true, timeout: 5000 },
-      (error, stdout) => done(error ? "" : stdout.trim()),
-    )
-  })
+  const prefix = (await gitValue(directory, ["rev-parse", "--show-prefix"])) ?? ""
   const result: DirectoryEntry[] = []
   for (const entry of entries) {
     const entryPath = path ? `${path.replaceAll("\\", "/")}/${entry.name}` : entry.name
@@ -75,16 +56,21 @@ export async function listDirectory(root: string, path: string): Promise<Directo
   )
 }
 
-const imageTypes: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-  ".svg": "image/svg+xml",
-  ".ico": "image/x-icon",
-  ".bmp": "image/bmp",
-  ".avif": "image/avif",
+/** Image formats the viewer shows as pictures; any other file previews as text or not at all. */
+const PREVIEWABLE_IMAGES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  "image/vnd.microsoft.icon",
+  "image/bmp",
+  "image/avif",
+])
+
+const imageType = (path: string): string | null => {
+  const type = mime.getType(path)
+  return type !== null && PREVIEWABLE_IMAGES.has(type) ? type : null
 }
 
 export async function readWorkspaceFile(root: string, path: string): Promise<FilePreview> {
@@ -93,8 +79,8 @@ export async function readWorkspaceFile(root: string, path: string): Promise<Fil
   try {
     const info = await file.stat()
     if (!info.isFile()) throw new Error("This entry is not a regular file.")
-    const mime = imageTypes[extname(path).toLowerCase()]
-    const limit = (mime ? 20 : 2) * 1024 * 1024
+    const image = imageType(path)
+    const limit = (image ? 20 : 2) * 1024 * 1024
     if (info.size > limit)
       return {
         kind: "unsupported",
@@ -105,7 +91,7 @@ export async function readWorkspaceFile(root: string, path: string): Promise<Fil
     const { bytesRead } = await file.read(bytes, 0, bytes.length, 0)
     if (bytesRead > limit) return { kind: "unsupported", content: "File is too large to preview." }
     const data = bytes.subarray(0, bytesRead)
-    if (mime) return { kind: "image", content: `data:${mime};base64,${data.toString("base64")}` }
+    if (image) return { kind: "image", content: `data:${image};base64,${data.toString("base64")}` }
     if (data.includes(0))
       return { kind: "unsupported", content: "Binary file preview is unavailable." }
     const extension = extname(path).toLowerCase()

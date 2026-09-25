@@ -16,6 +16,19 @@ test("provider additions retain zero old lines and newline markers after the laz
   assert.deepEqual(diffLineCounts(files), { insertions: 1, deletions: 0 })
 })
 
+test("provider deletions and non-ASCII paths parse back to their file", () => {
+  const [{ patch }] = fileChangePatches({
+    payload: {
+      item: { changes: [{ path: "docs/café.md", diff: "one\ntwo\n", kind: { type: "delete" } }] },
+    },
+  })
+  const files = parseFileDiffs(patch)
+  assert.equal(files.length, 1)
+  assert.equal(files[0].type, "delete")
+  assert.equal(files[0].oldPath, "docs/café.md")
+  assert.deepEqual(diffLineCounts(files), { insertions: 0, deletions: 2 })
+})
+
 test("incomplete streamed patches retain the raw-text fallback", () => {
   assert.deepEqual(parseFileDiffs("--- src/a.ts\n+++ src/a.ts\n@@ -1,2 +1,2 @@\n-old\n+new\n"), [])
 })

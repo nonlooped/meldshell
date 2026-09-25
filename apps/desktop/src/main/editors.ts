@@ -1,8 +1,9 @@
-import { spawn } from "node:child_process"
 import { stat } from "node:fs/promises"
 import { ipcMain, shell } from "electron"
+import spawn from "cross-spawn"
 import which from "which"
 import { IPC, type ExternalEditor, type WorkspaceScope } from "@meldshell/contracts/ipc"
+import { childEnvironment } from "@meldshell/host/environment"
 import { desktopHost } from "./runtime/services"
 
 /*
@@ -53,23 +54,15 @@ async function listEditors(): Promise<ExternalEditor[]> {
   return [...found.flat().map(({ id, name }) => ({ id, name })), FILE_MANAGER]
 }
 
-/** Electron's own switches would make an Electron-based editor start as plain Node. */
-const launchEnvironment = () =>
-  Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("ELECTRON_")))
-
 const launch = (file: string, folder: string): Promise<void> =>
   new Promise((resolve, reject) => {
-    // Windows launchers are batch files, which only start through the command interpreter.
-    const batch = process.platform === "win32" && /\.(cmd|bat)$/i.test(file)
-    const child = batch
-      ? spawn(`"${file}" "${folder}"`, {
-          shell: true,
-          detached: true,
-          stdio: "ignore",
-          windowsHide: true,
-          env: launchEnvironment(),
-        })
-      : spawn(file, [folder], { detached: true, stdio: "ignore", env: launchEnvironment() })
+    // cross-spawn runs Windows launchers, which are batch files, with the folder quoted safely.
+    const child = spawn(file, [folder], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      env: childEnvironment(),
+    })
     child.once("error", reject)
     child.once("spawn", () => {
       child.unref()

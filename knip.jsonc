@@ -46,6 +46,8 @@
         "@xterm/addon-unicode11",
         "@xterm/addon-web-links",
         "@xterm/xterm",
+        "date-fns",
+        "diff",
         "katex",
         "lucide-react",
         "mermaid",

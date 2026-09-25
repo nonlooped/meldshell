@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect"
 import * as C from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
+import { attempt } from "./attempt"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
 import { submitTurn, interruptTurn, resolveApproval } from "./operations"
@@ -54,12 +55,7 @@ const coreCall = <A, I>(
 const scopeFields = { workspaceId: Schema.String, threadId: Schema.optional(Schema.String) }
 const fileInput = Schema.Struct({ ...scopeFields, path: Schema.String })
 const withWorkspace = <A>(scope: WorkspaceScope, run: (path: string) => Promise<A>) =>
-  Effect.flatMap(scopePath(scope), (path) =>
-    Effect.tryPromise({
-      try: () => run(path),
-      catch: (cause) => new Error(String(cause)),
-    }),
-  )
+  Effect.flatMap(scopePath(scope), (path) => attempt(() => run(path)))
 
 export const hostOperations: Record<string, Operation> = {
   [C.IPC.getSnapshot]: coreCall(noInput, true, (core) => core.GetSnapshot()),
@@ -239,25 +235,23 @@ hostOperations[C.IPC.generateCommitMessage] = operation(
       const workspacePath = yield* scopePath(input)
       const prompt = yield* withWorkspace(input, commitMessagePrompt)
       const service = yield* providerFor(harness)
-      return yield* Effect.tryPromise({
-        try: () =>
-          requestGeneratedText((threadId) =>
-            Effect.runPromise(
-              service.send({
-                type: "generate-title",
-                request: {
-                  threadId,
-                  workspacePath,
-                  model: model.slug,
-                  harness,
-                  reasoningEffort: model.defaultReasoningEffort,
-                  prompt,
-                },
-              }),
-            ),
+      return yield* attempt(() =>
+        requestGeneratedText((threadId) =>
+          Effect.runPromise(
+            service.send({
+              type: "generate-title",
+              request: {
+                threadId,
+                workspacePath,
+                model: model.slug,
+                harness,
+                reasoningEffort: model.defaultReasoningEffort,
+                prompt,
+              },
+            }),
           ),
-        catch: (cause) => new Error(String(cause)),
-      })
+        ),
+      )
     }),
 )
 for (const [harness, status, refresh, usage] of [
