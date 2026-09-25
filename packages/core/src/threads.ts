@@ -1,3 +1,4 @@
+import { readRows } from "./database/rows"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
@@ -13,22 +14,24 @@ import {
   HARNESSES,
   type Harness,
 } from "@meldshell/contracts"
-import { Effect } from "effect"
-import { transaction } from "./database/persistence"
+import { Effect, Schema } from "effect"
+import { transaction } from "./database/transaction"
 import {
-  type ProviderModelRow,
-  type ThreadRow,
+  ProviderModelRow,
+  WorktreeColumns,
   fromProviderModelRow,
   fromWorktreeColumns,
+  modelColumns,
 } from "./database/rows"
 import { DEFAULT_THREAD_TITLE, resolveThreadTitle } from "./titles"
 import { defaultSelection } from "./catalog"
 import { getSnapshot } from "./snapshots"
 
-interface RecentSelectionRow extends ProviderModelRow {
-  readonly last_reasoning_effort: string | null
-  readonly last_speed: "standard" | "fast"
-}
+const RecentSelectionRow = Schema.Struct({
+  ...ProviderModelRow.fields,
+  last_reasoning_effort: Schema.NullOr(Schema.String),
+  last_speed: Schema.Literal("standard", "fast"),
+})
 
 interface NewThreadSelection {
   readonly model: ProviderModel
@@ -38,9 +41,10 @@ interface NewThreadSelection {
 
 const selectionForNewThread = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  const recent = yield* sql<RecentSelectionRow>`
-    SELECT m.id, m.provider_id, m.slug, m.display_name, m.reasoning_efforts, m.metadata,
-           m.supports_fast, m.enabled, m.hidden, m.sort_order, m.built_in,
+  const recent = yield* readRows(
+    RecentSelectionRow,
+    sql`
+    SELECT ${sql.unsafe(modelColumns("m"))},
            t.reasoning_effort AS last_reasoning_effort, t.speed AS last_speed
     FROM turns t
     JOIN providers p ON p.key = t.provider AND p.harness = t.harness
@@ -48,7 +52,8 @@ const selectionForNewThread = Effect.gen(function* () {
     WHERE p.enabled = 1 AND m.enabled = 1
     ORDER BY t.started_at DESC, t.rowid DESC
     LIMIT 1
-  `
+  `,
+  )
   const row = recent[0]
   if (row !== undefined) {
     const model = fromProviderModelRow(row)
@@ -176,25 +181,27 @@ export const setProviderSession = (
     return yield* getSnapshot
   })
 
-type LocationRow = Pick<
-  ThreadRow,
-  "worktree_path" | "worktree_branch" | "worktree_base" | "worktree_state" | "worktree_setup"
-> & {
-  readonly id: string
-  readonly workspace_id: string
-  readonly workspace_path: string
-  readonly busy: number
-}
+const LocationRow = Schema.Struct({
+  ...WorktreeColumns.fields,
+  id: Schema.String,
+  workspace_id: Schema.String,
+  workspace_path: Schema.String,
+  busy: Schema.Literal(0, 1),
+})
+type LocationRow = typeof LocationRow.Type
 
 const locationRows = (sql: SqlClient.SqlClient, where: ReturnType<SqlClient.SqlClient["and"]>) =>
-  sql<LocationRow>`
+  readRows(
+    LocationRow,
+    sql`
     SELECT t.id, t.workspace_id, w.path AS workspace_path,
       t.worktree_path, t.worktree_branch, t.worktree_base, t.worktree_state, t.worktree_setup,
       EXISTS (SELECT 1 FROM turns r WHERE r.thread_id = t.id AND r.status = 'running')
         OR EXISTS (SELECT 1 FROM queued_inputs q WHERE q.thread_id = t.id) AS busy
     FROM threads t JOIN workspaces w ON w.id = t.workspace_id
     WHERE ${where}
-  `
+  `,
+  )
 
 const fromLocationRow = (row: LocationRow): ThreadLocation => ({
   threadId: row.id,

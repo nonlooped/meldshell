@@ -1,9 +1,10 @@
+import { readRows } from "./database/rows"
 import * as SqlClient from "@effect/sql/SqlClient"
-import { threadActivitySql } from "./thread-activity"
+import { THREAD_SUMMARY } from "./thread-listing"
 import type { SearchTranscriptsInput } from "@meldshell/contracts"
 import { prepareTranscriptEvents } from "@meldshell/projection"
-import { Effect } from "effect"
-import { type ThreadRow, type EventRow, fromThreadRow, fromEventRow } from "./database/rows"
+import { Effect, Schema } from "effect"
+import { ThreadRow, EventFromRow, fromThreadRow } from "./database/rows"
 
 export const refreshTranscriptSearch = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -15,10 +16,12 @@ export const refreshTranscriptSearch = Effect.gen(function* () {
     Effect.gen(function* () {
       for (const group of dirty) {
         const turnId = group.turn_key || null
-        const events =
-          yield* sql<EventRow>`SELECT * FROM events WHERE thread_id = ${group.thread_id} AND turn_id IS ${turnId} ORDER BY sequence`
+        const events = yield* readRows(
+          EventFromRow,
+          sql`SELECT * FROM events WHERE thread_id = ${group.thread_id} AND turn_id IS ${turnId} ORDER BY sequence`,
+        )
         yield* sql`DELETE FROM transcript_documents WHERE thread_id = ${group.thread_id} AND turn_id IS ${turnId}`
-        for (const event of prepareTranscriptEvents(events.map(fromEventRow))) {
+        for (const event of prepareTranscriptEvents(events)) {
           if (!event.text?.trim()) continue
           yield* sql`INSERT INTO transcript_documents(id, thread_id, event_id, turn_id, text, created_at)
           VALUES (${`${event.threadId}:${event.turnId ?? ""}:${event.id}`}, ${event.threadId}, ${event.id}, ${event.turnId}, ${event.text}, ${event.createdAt})`
@@ -36,20 +39,24 @@ export const searchTranscripts = (input: SearchTranscriptsInput) =>
     const match = terms.map((term) => `"${term}"*`).join(" AND ")
     const sql = yield* SqlClient.SqlClient
     const offset = Number.isFinite(input.offset) ? Math.max(0, Math.floor(input.offset ?? 0)) : 0
-    const rows = yield* sql<
-      ThreadRow & { event_id: string; turn_id: string | null; snippet: string }
-    >`
+    const rows = yield* readRows(
+      Schema.Struct({
+        ...ThreadRow.fields,
+        event_id: Schema.String,
+        turn_id: Schema.NullOr(Schema.String),
+        snippet: Schema.String,
+      }),
+      sql`
       SELECT t.*, e.event_id, e.turn_id,
         snippet(transcript_document_search, 0, '[match]', '[/match]', '…', 32) AS snippet,
-        ${sql.unsafe(threadActivitySql)} AS activity,
-        (SELECT COUNT(*) FROM queued_inputs q WHERE q.thread_id = t.id) AS queued_count,
-        (SELECT COUNT(*) FROM turns r WHERE r.thread_id = t.id) AS turn_count
+        ${sql.unsafe(THREAD_SUMMARY)}
       FROM transcript_document_search JOIN transcript_documents e ON e.rowid = transcript_document_search.rowid
       JOIN threads t ON t.id = e.thread_id
       WHERE transcript_document_search MATCH ${match}
         AND (${input.workspaceId ?? null} IS NULL OR t.workspace_id = ${input.workspaceId ?? null})
       ORDER BY rank, e.created_at DESC, e.id
-      LIMIT 51 OFFSET ${offset}`
+      LIMIT 51 OFFSET ${offset}`,
+    )
     return {
       results: rows.slice(0, 50).map((row) => ({
         thread: fromThreadRow(row),

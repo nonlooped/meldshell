@@ -4,9 +4,8 @@ import { randomUUID } from "node:crypto"
 import type { CanonicalEventKind } from "@meldshell/contracts"
 import { Effect } from "effect"
 import { seedCatalog } from "../catalog"
-
-export const transaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.flatMap(SqlClient.SqlClient, (sql) => sql.withTransaction(effect))
+import { clearShuttingDown } from "../settings"
+import { transaction } from "./transaction"
 
 export const initializeDatabase = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -53,5 +52,5 @@ const recoverInterruptedWork = Effect.gen(function* () {
     WHERE status = 'running'
   `
   yield* sql`DELETE FROM approvals`
-  yield* sql`DELETE FROM settings WHERE key = 'shutting_down'`
+  yield* clearShuttingDown
 })

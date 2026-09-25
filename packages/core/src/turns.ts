@@ -1,7 +1,9 @@
 import * as SqlClient from "@effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
-  asRecord,
+  ProviderModelCatalogEntry,
+  InputAttachment,
+  CursorPayload,
   type ApprovalPolicy,
   type CollaborationMode,
   type SandboxMode,
@@ -16,9 +18,9 @@ import {
   supportsMode,
   TurnSubmissionError,
 } from "@meldshell/contracts"
-import { Effect } from "effect"
-import { transaction, appendEvent } from "./database/persistence"
-import { parseProviderData } from "./database/rows"
+import { Effect, Schema } from "effect"
+import { appendEvent } from "./database/persistence"
+import { transaction } from "./database/transaction"
 import {
   DEFAULT_THREAD_TITLE,
   THREAD_TITLE_LIMIT,
@@ -26,6 +28,7 @@ import {
   buildTitleRequest,
 } from "./titles"
 import { getSnapshot } from "./snapshots"
+import { isShuttingDown, markShuttingDown } from "./settings"
 import {
   CLAUDE_EXIT_PLAN_MODE,
   CLAUDE_PERMISSION_MODE,
@@ -87,8 +90,10 @@ const createDispatch = (
           message: "This mode is not supported by this provider integration.",
         }),
       )
-    const metadata = parseProviderData(row.model_metadata)
-    const fastServiceTier = asRecord(metadata).fastServiceTier
+    const metadata = yield* Schema.decodeUnknown(
+      Schema.parseJson(Schema.partial(ProviderModelCatalogEntry)),
+    )(row.model_metadata)
+    const fastServiceTier = metadata.fastServiceTier
     const serviceTier =
       row.speed === "fast" && row.model_supports_fast === 1
         ? typeof fastServiceTier === "string"
@@ -179,9 +184,7 @@ const requireWorktree = (state: string | null, setup: string | null) => {
 export const submitTurn = (input: SubmitTurnInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const closing =
-      yield* sql`SELECT 1 FROM settings WHERE key = 'shutting_down' AND value = 'true'`
-    if (closing.length > 0)
+    if (yield* isShuttingDown)
       return yield* Effect.fail(new CoreProtocolError({ message: "MeldShell is shutting down." }))
     const text = input.text.trim()
     if (text === "" && (input.attachments?.length ?? 0) === 0) {
@@ -238,9 +241,7 @@ export const submitTurn = (input: SubmitTurnInput) =>
 const promoteQueue = (threadId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const closing =
-      yield* sql`SELECT 1 FROM settings WHERE key = 'shutting_down' AND value = 'true'`
-    if (closing.length > 0) return null
+    if (yield* isShuttingDown) return null
     const queued = yield* sql<{
       readonly id: number
       readonly text: string
@@ -254,10 +255,10 @@ const promoteQueue = (threadId: string) =>
       .map((entry) => entry.text)
       .filter(Boolean)
       .join("\n\n")
-    const attachments = queued.flatMap((entry) => {
-      const parsed = parseProviderData(entry.attachments)
-      return Array.isArray(parsed) ? (parsed as NonNullable<SubmitTurnInput["attachments"]>) : []
-    })
+    const decodedAttachments = yield* Effect.forEach(queued, (entry) =>
+      Schema.decodeUnknown(Schema.parseJson(Schema.Array(InputAttachment)))(entry.attachments),
+    )
+    const attachments = decodedAttachments.flat()
     const dispatch = yield* createDispatch(threadId, text, attachments)
     yield* sql`DELETE FROM queued_inputs WHERE thread_id = ${threadId}`
     return dispatch
@@ -360,7 +361,7 @@ export const getActiveTurnCount = Effect.gen(function* () {
 
 export const beginShutdown = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  yield* sql`INSERT INTO settings(key, value) VALUES ('shutting_down', 'true') ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+  yield* markShuttingDown
   return yield* sql<{
     threadId: string
     turnId: string
@@ -422,7 +423,9 @@ const updateThreadName = (input: RuntimeEventInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (input.method === "thread/name/updated") {
-      const params = input.params as { readonly threadName?: unknown }
+      const params = yield* Schema.decodeUnknown(
+        Schema.Struct({ threadName: Schema.optional(Schema.String) }),
+      )(input.params)
       if (typeof params.threadName === "string" && params.threadName.trim() !== "") {
         yield* sql`
           UPDATE threads SET title = ${params.threadName.trim().slice(0, THREAD_TITLE_LIMIT)}
@@ -437,7 +440,9 @@ const updateClaudeMode = (input: RuntimeEventInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (input.method !== CLAUDE_PERMISSION_MODE) return
-    const mode = (input.params as { permissionMode?: unknown }).permissionMode
+    const { permissionMode: mode } = yield* Schema.decodeUnknown(
+      Schema.Struct({ permissionMode: Schema.optional(Schema.String) }),
+    )(input.params)
     if (typeof mode === "string" && mode !== "plan")
       yield* sql`UPDATE thread_settings SET mode = 'default'
         WHERE thread_id = ${input.threadId} AND provider_id IN (SELECT id FROM providers WHERE harness = 'claude-code')`
@@ -447,15 +452,7 @@ const updateCursorMode = (input: RuntimeEventInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (input.method === "cursor/acp/session/update") {
-      const update = (
-        input.params as {
-          update?: {
-            sessionUpdate?: string
-            currentModeId?: string
-            configOptions?: Array<{ category?: string; id?: string; currentValue?: string }>
-          }
-        }
-      ).update
+      const { update } = yield* Schema.decodeUnknown(CursorPayload)(input.params)
       const nativeMode =
         update?.sessionUpdate === "current_mode_update"
           ? update.currentModeId
@@ -503,7 +500,9 @@ const clearApproval = (input: RuntimeEventInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (input.method === "serverRequest/resolved") {
-      const params = input.params as { readonly requestId?: unknown }
+      const params = yield* Schema.decodeUnknown(
+        Schema.Struct({ requestId: Schema.optional(Schema.Union(Schema.String, Schema.Number)) }),
+      )(input.params)
       if (typeof params.requestId === "string" || typeof params.requestId === "number")
         yield* sql`DELETE FROM approvals WHERE turn_id = ${input.turnId} AND request_id = ${String(params.requestId)}`
     }
@@ -514,9 +513,16 @@ const finishTurn = (input: RuntimeEventInput) =>
     const sql = yield* SqlClient.SqlClient
     let nextDispatch: TurnDispatch | null = null
 
-    const params = input.params as {
-      readonly turn?: { readonly status?: unknown; readonly error?: unknown }
-    }
+    const params = yield* Schema.decodeUnknown(
+      Schema.Struct({
+        turn: Schema.optional(
+          Schema.Struct({
+            status: Schema.optional(Schema.String),
+            error: Schema.optional(Schema.Unknown),
+          }),
+        ),
+      }),
+    )(input.params)
     const nativeStatus = String(params.turn?.status)
     if (!["completed", "interrupted", "failed"].includes(nativeStatus)) return null
     const status = nativeStatus

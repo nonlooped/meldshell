@@ -8,8 +8,8 @@ import {
   ScheduleCadence,
   type ScheduledPrompt,
 } from "@meldshell/contracts"
-import { Effect, Option, Schema } from "effect"
-import { transaction } from "./database/persistence"
+import { Clock, Effect, Option, Schema } from "effect"
+import { transaction } from "./database/transaction"
 
 interface ScheduleRow {
   readonly id: string
@@ -70,16 +70,17 @@ const getSchedule = (id: string) =>
     return schedule
   })
 
-export const saveSchedule = (input: SaveScheduleInput, now = new Date()) =>
+export const saveSchedule = (input: SaveScheduleInput, now?: Date) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const currentTime = now ?? new Date(yield* Clock.currentTimeMillis)
     const prompt = input.prompt.trim()
     if (prompt === "")
       return yield* Effect.fail(new CoreProtocolError({ message: "Write the prompt to send." }))
     const threads = yield* sql<{ id: string }>`SELECT id FROM threads WHERE id = ${input.threadId}`
     if (threads.length === 0)
       return yield* Effect.fail(new CoreProtocolError({ message: "Thread not found." }))
-    const next = input.enabled ? firstRun(input.cadence, now) : null
+    const next = input.enabled ? firstRun(input.cadence, currentTime) : null
     if (input.enabled && next === null)
       return yield* Effect.fail(
         new CoreProtocolError({ message: "Choose a time in the future for this prompt." }),
@@ -93,7 +94,7 @@ export const saveSchedule = (input: SaveScheduleInput, now = new Date()) =>
           id, thread_id, prompt, cadence, enabled, next_run_at, created_at
         ) VALUES (
           ${id}, ${input.threadId}, ${prompt}, ${cadence}, ${enabled}, ${nextRunAt},
-          ${now.toISOString()}
+          ${currentTime.toISOString()}
         )`
     } else {
       yield* getSchedule(id)
@@ -115,18 +116,19 @@ export const deleteSchedule = (id: string) =>
  * The enabled schedules due at `now`, each moved on to its following run in the same transaction,
  * so a schedule is handed out once however often this is called. A one-time prompt is disabled.
  */
-export const claimDueSchedules = (now: Date) =>
+export const claimDueSchedules = (now?: Date) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const currentTime = now ?? new Date(yield* Clock.currentTimeMillis)
     const rows = yield* sql<ScheduleRow>`SELECT ${sql.unsafe(COLUMNS)} FROM scheduled_prompts
-      WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ${now.toISOString()}
+      WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ${currentTime.toISOString()}
       ORDER BY next_run_at`
     const due = rows.flatMap(fromScheduleRow)
     for (const schedule of due) {
-      const next = followingRun(schedule.cadence, now)
+      const next = followingRun(schedule.cadence, currentTime)
       yield* sql`UPDATE scheduled_prompts
         SET next_run_at = ${next?.toISOString() ?? null}, enabled = ${next === null ? 0 : 1},
-          last_run_at = ${now.toISOString()}
+          last_run_at = ${currentTime.toISOString()}
         WHERE id = ${schedule.id}`
     }
     return due

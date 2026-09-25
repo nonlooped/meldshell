@@ -1,3 +1,4 @@
+import { readRows } from "./database/rows"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
@@ -13,13 +14,15 @@ import {
   CoreProtocolError,
 } from "@meldshell/contracts"
 import { Effect } from "effect"
-import { transaction } from "./database/persistence"
+import { transaction } from "./database/transaction"
 import {
-  type ProviderRow,
-  type ProviderModelRow,
-  type ThreadSettingsRow,
-  modelMetadata,
+  ProviderRow,
+  ProviderModelRow,
+  ThreadSettingsRow,
+  modelColumns,
   fromProviderModelRow,
+  providerColumns,
+  threadSettingsColumns,
 } from "./database/rows"
 import { getSnapshot } from "./snapshots"
 
@@ -59,14 +62,16 @@ export const seedCatalog = Effect.gen(function* () {
 /** The first selectable model, used as the starting selection for a newly created thread. */
 export const defaultSelection = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  const rows = yield* sql<ProviderModelRow>`
-    SELECT m.id, m.provider_id, m.slug, m.display_name, m.reasoning_efforts, m.metadata,
-           m.supports_fast, m.enabled, m.hidden, m.sort_order, m.built_in
+  const rows = yield* readRows(
+    ProviderModelRow,
+    sql`
+    SELECT ${sql.unsafe(modelColumns("m"))}
     FROM provider_models m
     JOIN providers p ON p.id = m.provider_id
     WHERE m.enabled = 1 AND m.hidden = 0 AND p.enabled = 1
     ORDER BY p.sort_order, m.sort_order
-  `
+  `,
+  )
   const row = rows.find((candidate) => fromProviderModelRow(candidate).isDefault) ?? rows[0]
   return row === undefined ? null : fromProviderModelRow(row)
 })
@@ -74,10 +79,13 @@ export const defaultSelection = Effect.gen(function* () {
 export const updateProvider = (input: UpdateProviderInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<ProviderRow>`
-      SELECT id, key, harness, display_name, enabled, sort_order, built_in
+    const rows = yield* readRows(
+      ProviderRow,
+      sql`
+      SELECT ${sql.unsafe(providerColumns())}
       FROM providers WHERE id = ${input.providerId}
-    `
+    `,
+    )
     const current = rows[0]
     if (current === undefined) return yield* getSnapshot
 
@@ -130,11 +138,13 @@ export const upsertModel = (input: UpsertModelInput) =>
     const modelId = input.modelId
     if (modelId === undefined) return yield* createModel(input)
 
-    const rows = yield* sql<ProviderModelRow>`
-      SELECT id, provider_id, slug, display_name, reasoning_efforts, metadata,
-             supports_fast, enabled, hidden, sort_order, built_in
+    const rows = yield* readRows(
+      ProviderModelRow,
+      sql`
+      SELECT ${sql.unsafe(modelColumns())}
       FROM provider_models WHERE id = ${modelId}
-    `
+    `,
+    )
     const current = rows[0]
     if (current === undefined) return yield* getSnapshot
 
@@ -144,7 +154,7 @@ export const upsertModel = (input: UpsertModelInput) =>
     const nextDisplayName = displayName || current.display_name
     const nextEfforts =
       input.reasoningEfforts === undefined
-        ? current.reasoning_efforts
+        ? JSON.stringify(current.reasoning_efforts)
         : JSON.stringify(input.reasoningEfforts)
     const nextFast =
       input.supportsFast === undefined ? current.supports_fast : Number(input.supportsFast)
@@ -179,20 +189,25 @@ export const syncProviderCatalog = (input: SyncProviderCatalogInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (input.models.length === 0) return yield* getSnapshot
-    const providers = yield* sql<ProviderRow>`
-      SELECT id, key, harness, display_name, enabled, sort_order, built_in
+    const providers = yield* readRows(
+      ProviderRow,
+      sql`
+      SELECT ${sql.unsafe(providerColumns())}
       FROM providers WHERE key = ${input.providerKey}
-    `
+    `,
+    )
     const provider = providers[0]
     if (provider === undefined) return yield* getSnapshot
 
     yield* sql.withTransaction(
       Effect.gen(function* () {
-        const existing = yield* sql<ProviderModelRow>`
-          SELECT id, provider_id, slug, display_name, reasoning_efforts, metadata,
-                 supports_fast, enabled, hidden, sort_order, built_in
+        const existing = yield* readRows(
+          ProviderModelRow,
+          sql`
+          SELECT ${sql.unsafe(modelColumns())}
           FROM provider_models WHERE provider_id = ${provider.id}
-        `
+        `,
+        )
 
         for (const [sortOrder, model] of input.models.entries()) {
           const current = existing.find((candidate) => candidate.slug === model.slug)
@@ -220,11 +235,13 @@ export const syncProviderCatalog = (input: SyncProviderCatalogInput) =>
           }
         }
 
-        const refreshed = yield* sql<ProviderModelRow>`
-          SELECT id, provider_id, slug, display_name, reasoning_efforts, metadata,
-                 supports_fast, enabled, hidden, sort_order, built_in
+        const refreshed = yield* readRows(
+          ProviderModelRow,
+          sql`
+          SELECT ${sql.unsafe(modelColumns())}
           FROM provider_models WHERE provider_id = ${provider.id}
-        `
+        `,
+        )
         const discoveredSlugs = new Set(input.models.map((model) => model.slug))
         const discoveredRows = refreshed.filter((row) => discoveredSlugs.has(row.slug))
         const defaultRow = catalogDefault(discoveredRows)
@@ -270,13 +287,15 @@ export const syncProviderCatalog = (input: SyncProviderCatalogInput) =>
 export const resetProviderCatalog = (providerId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<ProviderModelRow>`
-    SELECT id, provider_id, slug, display_name, reasoning_efforts, metadata,
-           supports_fast, enabled, hidden, sort_order, built_in
+    const rows = yield* readRows(
+      ProviderModelRow,
+      sql`
+    SELECT ${sql.unsafe(modelColumns())}
     FROM provider_models WHERE built_in = 1 AND provider_id = ${providerId}
-  `
+  `,
+    )
     for (const row of rows) {
-      const metadata = modelMetadata(row)
+      const metadata = row.metadata
       const efforts = Array.isArray(metadata.reasoningEfforts) ? metadata.reasoningEfforts : []
       yield* sql`
       UPDATE provider_models
@@ -294,28 +313,34 @@ export const resetProviderCatalog = (providerId: string) =>
 export const setThreadSettings = (input: SetThreadSettingsInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const existing = yield* sql<ThreadSettingsRow>`
-      SELECT thread_id, provider_id, model_id, reasoning_effort, speed,
-             mode, sandbox, approval_policy
+    const existing = yield* readRows(
+      ThreadSettingsRow,
+      sql`
+      SELECT ${sql.unsafe(threadSettingsColumns())}
       FROM thread_settings WHERE thread_id = ${input.threadId}
-    `
+    `,
+    )
     const current = existing[0]
     const modelId = input.modelId ?? current?.model_id
     if (modelId == null) return yield* getSnapshot
 
-    const modelRows = yield* sql<ProviderModelRow>`
-      SELECT id, provider_id, slug, display_name, reasoning_efforts, metadata,
-             supports_fast, enabled, hidden, sort_order, built_in
+    const modelRows = yield* readRows(
+      ProviderModelRow,
+      sql`
+      SELECT ${sql.unsafe(modelColumns())}
       FROM provider_models WHERE id = ${modelId}
-    `
+    `,
+    )
     const modelRow = modelRows[0]
     if (modelRow === undefined) return yield* getSnapshot
     const model = fromProviderModelRow(modelRow)
 
     // Revalidate persisted settings when a model change removes an effort or speed tier.
     const { reasoningEffort, speed } = selectedEffortAndSpeed(model, current, input)
-    const providers =
-      yield* sql<ProviderRow>`SELECT * FROM providers WHERE id = ${model.providerId}`
+    const providers = yield* readRows(
+      ProviderRow,
+      sql`SELECT ${sql.unsafe(providerColumns())} FROM providers WHERE id = ${model.providerId}`,
+    )
     const harness = providers[0]?.harness
     if (current !== undefined && current.provider_id !== model.providerId) {
       const active =
@@ -365,13 +390,15 @@ export const setThreadSettings = (input: SetThreadSettingsInput) =>
 export const enabledModel = (modelId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<ProviderModelRow>`
-      SELECT m.id, m.provider_id, m.slug, m.display_name, m.reasoning_efforts, m.metadata,
-             m.supports_fast, m.enabled, m.hidden, m.sort_order, m.built_in
+    const rows = yield* readRows(
+      ProviderModelRow,
+      sql`
+      SELECT ${sql.unsafe(modelColumns("m"))}
       FROM provider_models m
       JOIN providers p ON p.id = m.provider_id
       WHERE m.id = ${modelId} AND m.enabled = 1 AND p.enabled = 1
-    `
+    `,
+    )
     const row = rows[0]
     return row === undefined ? null : fromProviderModelRow(row)
   })
@@ -380,11 +407,13 @@ const reconcileModelSettings = (row: ProviderModelRow) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const model = fromProviderModelRow(row)
-    const settings = yield* sql<ThreadSettingsRow>`
-            SELECT thread_id, provider_id, model_id, reasoning_effort, speed,
-                   mode, sandbox, approval_policy
+    const settings = yield* readRows(
+      ThreadSettingsRow,
+      sql`
+            SELECT ${sql.unsafe(threadSettingsColumns())}
             FROM thread_settings WHERE model_id = ${row.id}
-          `
+          `,
+    )
     for (const setting of settings) {
       const effort =
         setting.reasoning_effort !== null &&
