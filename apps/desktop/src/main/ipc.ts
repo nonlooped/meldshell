@@ -1,7 +1,7 @@
 import { basename, dirname, extname } from "node:path"
 import { dialog, ipcMain, nativeImage, shell } from "electron"
 import { Effect } from "effect"
-import { IPC, type AppSnapshot } from "@meldshell/contracts"
+import { toError, IPC, type AppSnapshot } from "@meldshell/contracts"
 import type { ComposerAttachment } from "@meldshell/contracts/ipc"
 import { hostOperations } from "@meldshell/host/api"
 import { desktopHost } from "./runtime/services"
@@ -30,7 +30,7 @@ const selectAttachments = Effect.gen(function* () {
       currentWindow === null
         ? dialog.showOpenDialog(options)
         : dialog.showOpenDialog(currentWindow, options),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+    catch: toError,
   })
   if (choice.canceled) return []
   const imageExtensions = new Set([".avif", ".bmp", ".gif", ".jpeg", ".jpg", ".png", ".webp"])

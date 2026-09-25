@@ -2,6 +2,7 @@ import { unsupportedMode } from "./catalog"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
+  asRecord,
   type ApprovalPolicy,
   type CollaborationMode,
   type SandboxMode,
@@ -86,10 +87,7 @@ const createDispatch = (
     if (row.harness !== "codex" && row.harness !== "claude-code" && row.harness !== "cursor")
       return yield* Effect.fail(new CoreProtocolError({ message: "Unsupported provider harness." }))
     const metadata = parseProviderData(row.model_metadata)
-    const fastServiceTier =
-      typeof metadata === "object" && metadata !== null && "fastServiceTier" in metadata
-        ? (metadata as { readonly fastServiceTier?: unknown }).fastServiceTier
-        : null
+    const fastServiceTier = asRecord(metadata).fastServiceTier
     const serviceTier =
       row.speed === "fast" && row.model_supports_fast === 1
         ? typeof fastServiceTier === "string"

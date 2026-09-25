@@ -4,7 +4,7 @@ import { createWriteStream } from "node:fs"
 import { open, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Effect, Either, Schema } from "effect"
-import type { ThreadLocation } from "@meldshell/contracts"
+import { toError, type ThreadLocation } from "@meldshell/contracts"
 import type { RunScript, WorkspaceScripts, WorktreeSetupLog } from "@meldshell/contracts/ipc"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import { CoreClient } from "./core-client"
@@ -121,7 +121,7 @@ export const setupRunning = (threadId: string): boolean => running.has(threadId)
 const attempt = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({
     try: run,
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+    catch: toError,
   })
 
 const killTree = (child: ChildProcess, signal: NodeJS.Signals) => {

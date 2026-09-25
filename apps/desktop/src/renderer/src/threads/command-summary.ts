@@ -1,10 +1,7 @@
-const record = (value: unknown): Record<string, unknown> =>
-  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
-
-const text = (value: unknown): string => (typeof value === "string" ? value : "")
+import { asRecord, asText } from "@meldshell/contracts"
 
 export function commandLabel(payload: unknown, fallback: string): string {
-  const item = record(record(payload).item)
+  const item = asRecord(asRecord(payload).item)
   // The Claude adapter preserves the native tool name on Bash executions.
   if (item.tool === "Bash")
     return item.status === "inProgress" ? "Running a command" : "Ran a command"
@@ -13,23 +10,23 @@ export function commandLabel(payload: unknown, fallback: string): string {
   if (summary !== null) return summary
   const actions = item.commandActions
   if (Array.isArray(actions) && actions.length > 0) {
-    const commands = actions.map((action) => text(record(action).command))
+    const commands = actions.map((action) => asText(asRecord(action).command))
     if (commands.every(Boolean)) return commands.join("; ")
   }
-  return text(item.command) || fallback
+  return asText(item.command) || fallback
 }
 
 // Only summarize when the provider describes every action in the command.
 function commandSummary(payload: unknown): string | null {
-  const actions = record(record(payload).item).commandActions
+  const actions = asRecord(asRecord(payload).item).commandActions
   if (!Array.isArray(actions) || actions.length === 0) return null
   const summaries: string[] = []
   for (const value of actions) {
-    const action = record(value)
-    const path = text(action.path)
+    const action = asRecord(value)
+    const path = asText(action.path)
     switch (action.type) {
       case "read": {
-        const name = text(action.name) || path
+        const name = asText(action.name) || path
         if (!name) return null
         summaries.push(`Read ${name}`)
         break
@@ -38,7 +35,7 @@ function commandSummary(payload: unknown): string | null {
         summaries.push(path ? `List files in ${path}` : "List files")
         break
       case "search": {
-        const query = text(action.query)
+        const query = asText(action.query)
         summaries.push(`Search${query ? ` for ${query}` : ""}${path ? ` in ${path}` : ""}`)
         break
       }

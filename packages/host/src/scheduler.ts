@@ -2,6 +2,7 @@ import { Effect, Either, Schedule } from "effect"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
 import { submitTurn } from "./operations"
+import { errorMessage } from "@meldshell/contracts"
 
 /*
  * Scheduled prompts. The host checks for due schedules every few seconds while it runs and sends
@@ -10,11 +11,6 @@ import { submitTurn } from "./operations"
  */
 
 const CHECK_EVERY = "15 seconds"
-
-const failureMessage = (cause: unknown): string =>
-  typeof cause === "object" && cause !== null && "message" in cause
-    ? String(cause.message)
-    : String(cause)
 
 const runDueSchedules = Effect.gen(function* () {
   const core = yield* CoreClient
@@ -26,7 +22,7 @@ const runDueSchedules = Effect.gen(function* () {
     )
     yield* core.RecordScheduleRun({
       scheduleId: schedule.id,
-      error: Either.isLeft(sent) ? failureMessage(sent.left) : null,
+      error: Either.isLeft(sent) ? errorMessage(sent.left) : null,
     })
   }
   const events = yield* HostEvents

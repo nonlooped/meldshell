@@ -2,20 +2,18 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { resolveSettings } from "@anthropic-ai/claude-agent-sdk"
+import { asRecord } from "@meldshell/contracts"
 
 const modelId = /^claude-[a-z]+-\d+(?:-\d{1,2})?(?:-\d{8})?$/
-const record = (value: unknown): Record<string, unknown> =>
-  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
-
 /** Public version IDs are candidates only. Claude Code supplies capabilities and applies policy. */
 const historyCandidates = (data: unknown): string[] => {
-  const models = record(record(record(data).anthropic).models)
+  const models = asRecord(asRecord(asRecord(data).anthropic).models)
   const ids = Object.entries(models)
-    .filter(([id, value]) => modelId.test(id) && record(value).status !== "deprecated")
+    .filter(([id, value]) => modelId.test(id) && asRecord(value).status !== "deprecated")
     .sort(
       ([a, av], [b, bv]) =>
-        String(record(bv).release_date ?? "").localeCompare(
-          String(record(av).release_date ?? ""),
+        String(asRecord(bv).release_date ?? "").localeCompare(
+          String(asRecord(av).release_date ?? ""),
         ) || a.localeCompare(b),
     )
     .map(([id]) => id)

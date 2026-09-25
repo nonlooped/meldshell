@@ -1,17 +1,19 @@
-import type { CanonicalEvent, CanonicalEventKind } from "@meldshell/contracts"
+import {
+  asRecord,
+  asRecords,
+  asText,
+  type CanonicalEvent,
+  type CanonicalEventKind,
+  type UnknownRecord,
+} from "@meldshell/contracts"
 
-type RecordValue = Record<string, unknown>
-const record = (value: unknown): RecordValue =>
-  typeof value === "object" && value !== null ? (value as RecordValue) : {}
-const records = (value: unknown): RecordValue[] => (Array.isArray(value) ? value.map(record) : [])
-const text = (value: unknown): string => (typeof value === "string" ? value : "")
 const contentText = (value: unknown): string => {
-  const block = record(value)
-  if (block.type === "text") return text(block.text)
+  const block = asRecord(value)
+  if (block.type === "text") return asText(block.text)
   if (block.type === "resource")
-    return text(record(block.resource).text) || text(record(block.resource).uri)
+    return asText(asRecord(block.resource).text) || asText(asRecord(block.resource).uri)
   if (block.type === "resource_link")
-    return text(block.title) || text(block.name) || text(block.uri)
+    return asText(block.title) || asText(block.name) || asText(block.uri)
   if (block.type === "image") return "Image"
   if (block.type === "audio") return "Audio"
   return ""
@@ -29,7 +31,7 @@ export const cursorEventKind = (method: string, params: unknown): CanonicalEvent
   if (method === "cursor/task" || method === "cursor/generate_image") return "tool"
   if (method !== "cursor/acp/session/update")
     return method.includes("/session/") ? "status" : "unknown"
-  const update = record(record(params).update)
+  const update = asRecord(asRecord(params).update)
   switch (update.sessionUpdate) {
     case "agent_message_chunk":
       return "assistant"
@@ -55,12 +57,12 @@ export const cursorEventKind = (method: string, params: unknown): CanonicalEvent
 }
 
 export const cursorEventText = (method: string, params: unknown): string | null => {
-  const p = record(params)
-  if (method === "cursor/acp/error") return text(p.message)
-  if (method === "cursor/create_plan") return text(p.plan)
-  if (method === "cursor/task" || method === "cursor/generate_image") return text(p.description)
-  const update = record(p.update)
-  return contentText(update.content) || text(update.title) || null
+  const p = asRecord(params)
+  if (method === "cursor/acp/error") return asText(p.message)
+  if (method === "cursor/create_plan") return asText(p.plan)
+  if (method === "cursor/task" || method === "cursor/generate_image") return asText(p.description)
+  const update = asRecord(p.update)
+  return contentText(update.content) || asText(update.title) || null
 }
 
 const diffText = (oldText: string, newText: string): string => {
@@ -71,8 +73,8 @@ const diffText = (oldText: string, newText: string): string => {
   return `@@ -${before.length ? 1 : 0},${before.length} +${after.length ? 1 : 0},${after.length} @@\n${[...before.map((line) => `-${line}`), ...after.map((line) => `+${line}`)].join("\n")}\n`
 }
 
-const toolEvent = (event: CanonicalEvent, tool: RecordValue): CanonicalEvent => {
-  const content = records(tool.content)
+const toolEvent = (event: CanonicalEvent, tool: UnknownRecord): CanonicalEvent => {
+  const content = asRecords(tool.content)
   const output = content
     .map((entry) => (entry.type === "content" ? contentText(entry.content) : ""))
     .filter(Boolean)
@@ -80,12 +82,12 @@ const toolEvent = (event: CanonicalEvent, tool: RecordValue): CanonicalEvent => 
   const changes = content
     .filter((entry) => entry.type === "diff")
     .map((entry) => ({
-      path: text(entry.path),
+      path: asText(entry.path),
       kind: { type: entry.oldText === null ? "add" : "update" },
-      diff: diffText(text(entry.oldText), text(entry.newText)),
+      diff: diffText(asText(entry.oldText), asText(entry.newText)),
     }))
   const kind = tool.kind === "execute" ? "command" : changes.length ? "file-change" : "tool"
-  const title = text(tool.title) || text(tool.kind) || "Cursor tool"
+  const title = asText(tool.title) || asText(tool.kind) || "Cursor tool"
   return {
     ...event,
     kind,
@@ -103,7 +105,7 @@ const toolEvent = (event: CanonicalEvent, tool: RecordValue): CanonicalEvent => 
         tool: title,
         arguments: tool.rawInput,
         result: tool.rawOutput ?? content,
-        command: kind === "command" ? text(record(tool.rawInput).command) || title : undefined,
+        command: kind === "command" ? asText(asRecord(tool.rawInput).command) || title : undefined,
         aggregatedOutput: output,
         changes,
         status:
@@ -116,18 +118,18 @@ const toolEvent = (event: CanonicalEvent, tool: RecordValue): CanonicalEvent => 
 /** Project native ACP history at read time. Stored events never become Codex protocol items. */
 export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): CanonicalEvent[] => {
   const result: CanonicalEvent[] = []
-  const tools = new Map<string, { index: number; state: RecordValue }>()
+  const tools = new Map<string, { index: number; state: UnknownRecord }>()
   const chunks = new Map<string, { kind: string; index: number }>()
-  const todos = new Map<string, Map<string, RecordValue>>()
+  const todos = new Map<string, Map<string, UnknownRecord>>()
   const todoEvents = new Map<string, number>()
   const appendChunk = (
     event: CanonicalEvent,
     turn: string,
-    _params: RecordValue,
-    update: RecordValue,
+    _params: UnknownRecord,
+    update: UnknownRecord,
   ): void => {
     const kind = update.sessionUpdate === "agent_message_chunk" ? "assistant" : "reasoning"
-    const content = record(update.content)
+    const content = asRecord(update.content)
     if (content.type !== "text") {
       result.push({
         ...event,
@@ -141,20 +143,20 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
     const previous = chunks.get(turn)
     if (previous?.kind === kind) {
       const first = result[previous.index]!
-      result[previous.index] = { ...first, text: (first.text ?? "") + text(content.text) }
+      result[previous.index] = { ...first, text: (first.text ?? "") + asText(content.text) }
     } else {
       chunks.set(turn, { kind, index: result.length })
-      result.push({ ...event, kind, text: text(content.text) })
+      result.push({ ...event, kind, text: asText(content.text) })
     }
   }
   const appendTool = (
     event: CanonicalEvent,
     turn: string,
-    _params: RecordValue,
-    update: RecordValue,
+    _params: UnknownRecord,
+    update: UnknownRecord,
   ): void => {
     chunks.delete(turn)
-    const key = `${turn}:${text(update.toolCallId)}`
+    const key = `${turn}:${asText(update.toolCallId)}`
     const previous = tools.get(key)
     const state = { ...previous?.state, ...update }
     const projected = toolEvent(previous ? result[previous.index]! : event, state)
@@ -165,18 +167,18 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
   const appendPlan = (
     event: CanonicalEvent,
     turn: string,
-    params: RecordValue,
-    update: RecordValue,
+    params: UnknownRecord,
+    update: UnknownRecord,
   ): void => {
     const state =
-      params.merge === true ? new Map(todos.get(event.threadId)) : new Map<string, RecordValue>()
-    for (const [index, entry] of records(params.todos ?? update.entries).entries())
-      state.set(text(entry.id) || String(index), entry)
+      params.merge === true ? new Map(todos.get(event.threadId)) : new Map<string, UnknownRecord>()
+    for (const [index, entry] of asRecords(params.todos ?? update.entries).entries())
+      state.set(asText(entry.id) || String(index), entry)
     todos.set(event.threadId, state)
     const body = [...state.values()]
       .map(
         (entry) =>
-          `- ${entry.status === "completed" ? "[x]" : "[ ]"} ${text(entry.content)} (${text(entry.status)})`,
+          `- ${entry.status === "completed" ? "[x]" : "[ ]"} ${asText(entry.content)} (${asText(entry.status)})`,
       )
       .join("\n")
     const previous = todoEvents.get(turn)
@@ -191,7 +193,11 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
       result.push(projected)
     } else result[previous] = projected
   }
-  const appendStatus = (event: CanonicalEvent, params: RecordValue, update: RecordValue): void => {
+  const appendStatus = (
+    event: CanonicalEvent,
+    params: UnknownRecord,
+    update: UnknownRecord,
+  ): void => {
     const stateText = cursorStateText(event.method, params, update)
     if (stateText)
       result.push({
@@ -209,16 +215,16 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
     }
     if (event.method === "cursor/acp/session/replay" || event.kind === "unknown") return
     const turn = event.turnId ?? event.threadId
-    const params = record(event.payload),
-      update = record(params.update)
+    const params = asRecord(event.payload),
+      update = asRecord(params.update)
     if (
       event.method === "cursor/acp/session/update" &&
-      ["agent_message_chunk", "agent_thought_chunk"].includes(text(update.sessionUpdate))
+      ["agent_message_chunk", "agent_thought_chunk"].includes(asText(update.sessionUpdate))
     ) {
       appendChunk(event, turn, params, update)
       return
     }
-    if (["tool_call", "tool_call_update"].includes(text(update.sessionUpdate))) {
+    if (["tool_call", "tool_call_update"].includes(asText(update.sessionUpdate))) {
       appendTool(event, turn, params, update)
       return
     }
@@ -231,7 +237,7 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
       result.push({
         ...event,
         kind: "tool",
-        text: text(params.description) || "Cursor activity",
+        text: asText(params.description) || "Cursor activity",
         payload: {
           native: event.payload,
           item: {
@@ -251,20 +257,20 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
   return result
 }
 
-const cursorStateText = (method: string, params: RecordValue, update: RecordValue): string => {
+const cursorStateText = (method: string, params: UnknownRecord, update: UnknownRecord): string => {
   if (update.sessionUpdate === "usage_update")
     return `Context: ${String(update.used)} / ${String(update.size)} tokens${update.cost ? ` · ${JSON.stringify(update.cost)}` : ""}`
   if (update.sessionUpdate === "current_mode_update")
-    return `Cursor mode: ${text(update.currentModeId)}`
+    return `Cursor mode: ${asText(update.currentModeId)}`
   if (update.sessionUpdate === "config_option_update")
-    return records(update.configOptions)
-      .map((option) => `${text(option.name)}: ${text(option.currentValue)}`)
+    return asRecords(update.configOptions)
+      .map((option) => `${asText(option.name)}: ${asText(option.currentValue)}`)
       .join(" · ")
   if (update.sessionUpdate === "available_commands_update")
-    return records(update.availableCommands)
-      .map((command) => `/${text(command.name)} — ${text(command.description)}`)
+    return asRecords(update.availableCommands)
+      .map((command) => `/${asText(command.name)} — ${asText(command.description)}`)
       .join("\n")
   if (method === "cursor/acp/session/prompt/result" && params.stopReason !== "end_turn")
-    return `Cursor stopped: ${text(params.stopReason).replaceAll("_", " ")}`
+    return `Cursor stopped: ${asText(params.stopReason).replaceAll("_", " ")}`
   return ""
 }

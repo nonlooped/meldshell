@@ -1,10 +1,15 @@
-import { record, records, text, type RecordValue } from "./client"
+import {
+  asRecord,
+  asRecords,
+  asText,
+  type ProviderModelCatalogEntry,
+  type UnknownRecord,
+} from "@meldshell/contracts"
 import { cursorModels } from "./protocol"
-import type { ProviderModelCatalogEntry } from "@meldshell/contracts"
 
-export const effortOption = (options: RecordValue[]): RecordValue | undefined =>
+export const effortOption = (options: UnknownRecord[]): UnknownRecord | undefined =>
   options.find((option) =>
-    ["effort", "reasoning", "reasoning_effort", "thought_level"].includes(text(option.id)),
+    ["effort", "reasoning", "reasoning_effort", "thought_level"].includes(asText(option.id)),
   )
 
 export const modelSelection = (
@@ -28,22 +33,24 @@ export const modelSelection = (
 
 /** Use Cursor's advertised parameter values, never a guessed matrix of model capabilities. */
 export const parameterizedModels = (
-  catalog: RecordValue,
-  session: RecordValue,
+  catalog: UnknownRecord,
+  session: UnknownRecord,
   image: boolean,
 ): ProviderModelCatalogEntry[] =>
-  records(catalog.models).flatMap((model) => {
-    const id = text(model.value)
+  asRecords(catalog.models).flatMap((model) => {
+    const id = asText(model.value)
     if (!id) return []
-    const options = records(model.configOptions)
+    const options = asRecords(model.configOptions)
     const thinking = options.find((option) => option.id === "thinking")
-    const values = thinking ? records(thinking.options).map((option) => text(option.value)) : [null]
+    const values = thinking
+      ? asRecords(thinking.options).map((option) => asText(option.value))
+      : [null]
     const effort = effortOption(options)
     const fast = options.find((option) => option.id === "fast")
     return values.map((value) => {
       const parameters = options.map(
         (option) =>
-          `${text(option.id)}=${option.id === "thinking" ? value : text(option.currentValue)}`,
+          `${asText(option.id)}=${option.id === "thinking" ? value : asText(option.currentValue)}`,
       )
       const slug = `${id}[${parameters.join(",")}]`
       const base = cursorModels(
@@ -52,7 +59,7 @@ export const parameterizedModels = (
             availableModels: [
               {
                 modelId: slug,
-                name: `${text(model.name) || id}${value === "true" ? " Thinking" : ""}`,
+                name: `${asText(model.name) || id}${value === "true" ? " Thinking" : ""}`,
               },
             ],
           },
@@ -61,15 +68,15 @@ export const parameterizedModels = (
       )[0]!
       return {
         ...base,
-        reasoningEfforts: records(effort?.options)
-          .map((option) => text(option.value))
+        reasoningEfforts: asRecords(effort?.options)
+          .map((option) => asText(option.value))
           .filter(Boolean),
-        defaultReasoningEffort: text(effort?.currentValue) || null,
-        fastServiceTier: records(fast?.options).some((option) => option.value === "true")
+        defaultReasoningEffort: asText(effort?.currentValue) || null,
+        fastServiceTier: asRecords(fast?.options).some((option) => option.value === "true")
           ? "fast"
           : null,
         isDefault:
-          id === record(session.models).currentModelId &&
+          id === asRecord(session.models).currentModelId &&
           (value === null || value === thinking?.currentValue),
       }
     })

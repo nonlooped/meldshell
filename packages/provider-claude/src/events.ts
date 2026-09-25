@@ -1,7 +1,6 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk"
+import { asRecord } from "@meldshell/contracts"
 
-const record = (value: unknown): Record<string, unknown> =>
-  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
 const display = (value: unknown): string =>
   typeof value === "string" ? value : (JSON.stringify(value) ?? "")
 
@@ -156,7 +155,7 @@ export class ClaudeEvents {
     message: AssistantMessage,
     block: Extract<AssistantBlock, { type: "tool_use" }>,
   ): void {
-    const input = record(block.input)
+    const input = asRecord(block.input)
     const item: Record<string, unknown> = {
       id: block.id,
       type: "dynamicToolCall",
@@ -221,13 +220,13 @@ export class ClaudeEvents {
     failed: boolean | undefined,
     nativeResult: unknown,
   ): void {
-    const result = record(nativeResult)
+    const result = asRecord(nativeResult)
     if (failed) Object.assign(item, { type: "dynamicToolCall", changes: [] })
     else if (typeof result.filePath === "string") {
       const patch = Array.isArray(result.structuredPatch)
         ? result.structuredPatch
             .map((value) => {
-              const hunk = record(value)
+              const hunk = asRecord(value)
               if (
                 ![hunk.oldStart, hunk.oldLines, hunk.newStart, hunk.newLines].every(
                   Number.isSafeInteger,

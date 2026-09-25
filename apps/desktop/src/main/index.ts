@@ -15,6 +15,7 @@ import {
 import { createWindow, getMainWindow, installApplicationMenu } from "./window"
 import { registerIpc } from "./ipc"
 import { updateService } from "./updater"
+import { toError } from "@meldshell/contracts"
 
 const openWindow = (): void =>
   createWindow((event) => {
@@ -72,7 +73,7 @@ const startApplication = Effect.promise(() => desktopHost.start())
 
 const disposeRuntime = Effect.tryPromise({
   try: () => runtime.dispose(),
-  catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+  catch: toError,
 }).pipe(
   Effect.catchAll((cause) =>
     Effect.sync(() => console.error("MeldShell runtime cleanup failed.", cause)),
@@ -95,7 +96,7 @@ const desktopProgram = Effect.scoped(
     yield* appListeners
     yield* Effect.tryPromise({
       try: () => app.whenReady(),
-      catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+      catch: toError,
     })
     yield* Effect.sync(() => {
       logStartupTiming("whenReady")
@@ -110,7 +111,7 @@ const desktopProgram = Effect.scoped(
       awaitQuitRequest,
       Effect.tryPromise({
         try: () => runtime.runPromise(startApplication),
-        catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+        catch: toError,
       }).pipe(Effect.andThen(Effect.never)),
     )
     yield* stopProviders

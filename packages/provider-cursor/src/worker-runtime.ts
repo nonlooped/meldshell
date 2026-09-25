@@ -2,7 +2,16 @@ import { workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { RequestError, type RequestPermissionResponse } from "@agentclientprotocol/sdk"
-import { type TitleRequest, type TurnDispatch, type CursorStatus } from "@meldshell/contracts"
+import {
+  asRecord,
+  asRecords,
+  asText,
+  errorMessage,
+  type CursorStatus,
+  type TitleRequest,
+  type TurnDispatch,
+  type UnknownRecord,
+} from "@meldshell/contracts"
 import { effortOption, modelSelection, parameterizedModels } from "./model-config"
 import { readCursorUsage } from "./usage"
 import { cursorCommands, discoverCursorSkills } from "./skills"
@@ -10,12 +19,8 @@ import {
   CursorClient,
   discoverCursor,
   readCursorAccountEmail,
-  record,
-  records,
-  text,
   type CursorCommand,
   type NativeMessage,
-  type RecordValue,
 } from "./client"
 import {
   cursorModels,
@@ -25,19 +30,17 @@ import {
   nativeMethod,
 } from "./protocol"
 
-const errorText = (cause: unknown): string =>
-  cause instanceof Error ? cause.message : String(cause)
 type Emit = (method: string, params: unknown, validated?: boolean, requestId?: string) => void
 interface Session {
   client: CursorClient
   sessionId: string
-  init: RecordValue
-  configuration: RecordValue
+  init: UnknownRecord
+  configuration: UnknownRecord
   emit: Emit | null
   replaying: boolean
   interactive: boolean
   permissions?: Pick<TurnDispatch, "sandbox" | "approvalPolicy">
-  availableCommands?: readonly RecordValue[]
+  availableCommands?: readonly UnknownRecord[]
   onCommands?: () => void
 }
 interface RunningTurn {
@@ -57,12 +60,12 @@ interface PendingInteraction {
 
 const automaticPermission = (
   session: Session,
-  params: RecordValue,
+  params: UnknownRecord,
 ): { decision: string; optionId?: string } | null => {
   if (session.permissions?.approvalPolicy !== "never") return null
   const kind = session.permissions.sandbox === "danger-full-access" ? "allow_once" : "reject_once"
-  const option = records(params.options).find((entry) => entry.kind === kind)
-  if (option) return { decision: "accept", optionId: text(option.optionId) }
+  const option = asRecords(params.options).find((entry) => entry.kind === kind)
+  if (option) return { decision: "accept", optionId: asText(option.optionId) }
   return kind === "reject_once" ? { decision: "cancel" } : null
 }
 
@@ -106,7 +109,7 @@ export const runCursorWorker = (
   const onRequest = <Response>(
     session: Session,
     method: string,
-    params: RecordValue,
+    params: UnknownRecord,
     signal: AbortSignal,
     response: (
       decision: string,
@@ -154,7 +157,7 @@ export const runCursorWorker = (
     return pending
   }
   const onMessage = (session: Session, message: NativeMessage): void => {
-    const params = record(message.params)
+    const params = asRecord(message.params)
     if (
       typeof params.sessionId === "string" &&
       session.sessionId &&
@@ -200,7 +203,7 @@ export const runCursorWorker = (
           (!session.sessionId || sessionId === session.sessionId) &&
           update.sessionUpdate === "available_commands_update"
         ) {
-          session.availableCommands = records(update.availableCommands)
+          session.availableCommands = asRecords(update.availableCommands)
           session.onCommands?.()
         }
       },
@@ -229,14 +232,14 @@ export const runCursorWorker = (
     try {
       session.init = await session.client.initialize()
       if (options.catalogOnly) return session
-      if (nativeId && record(session.init.agentCapabilities).loadSession !== true)
+      if (nativeId && asRecord(session.init.agentCapabilities).loadSession !== true)
         throw new Error("This Cursor release cannot resume the saved conversation.")
       session.configuration = await session.client.run((agent) =>
         nativeId
           ? agent.request("session/load", { cwd, mcpServers: [], sessionId: nativeId })
           : agent.request("session/new", { cwd, mcpServers: [] }),
       )
-      session.sessionId = nativeId ?? text(session.configuration.sessionId)
+      session.sessionId = nativeId ?? asText(session.configuration.sessionId)
       if (!session.sessionId) throw new Error("Cursor returned no session ID.")
       session.replaying = false
       return session
@@ -257,14 +260,14 @@ export const runCursorWorker = (
       ["model", model, "session/set_model"],
       ["mode", mode, "session/set_mode"],
     ] as const) {
-      const option = records(session.configuration.configOptions).find(
+      const option = asRecords(session.configuration.configOptions).find(
         (entry) => entry.category === category || entry.id === category,
       )
       if (option) {
         const result = await session.client.run((agent) =>
           agent.request("session/set_config_option", {
             sessionId: session.sessionId,
-            configId: text(option.id),
+            configId: asText(option.id),
             value,
           }),
         )
@@ -286,22 +289,22 @@ export const runCursorWorker = (
     speed?: "standard" | "fast",
   ): Promise<void> => {
     const selection = modelSelection(model)
-    const modelOption = records(session.configuration.configOptions).find(
+    const modelOption = asRecords(session.configuration.configOptions).find(
       (option) => option.category === "model" || option.id === "model",
     )
-    const parameterized = records(modelOption?.options).some(
+    const parameterized = asRecords(modelOption?.options).some(
       (option) => option.value === selection.model,
     )
     await configure(session, parameterized ? selection.model : model, mode)
     if (!parameterized) return
-    const options = records(session.configuration.configOptions)
+    const options = asRecords(session.configuration.configOptions)
     const reasoning = effortOption(options)
-    if (reasoning && effort !== null) selection.parameters.set(text(reasoning.id), effort)
+    if (reasoning && effort !== null) selection.parameters.set(asText(reasoning.id), effort)
     if (speed && options.some((option) => option.id === "fast"))
       selection.parameters.set("fast", String(speed === "fast"))
     for (const [id, value] of selection.parameters) {
-      const option = records(session.configuration.configOptions).find((entry) => entry.id === id)
-      if (!option || !records(option.options).some((entry) => entry.value === value))
+      const option = asRecords(session.configuration.configOptions).find((entry) => entry.id === id)
+      if (!option || !asRecords(option.options).some((entry) => entry.value === value))
         throw new Error(
           `Cursor no longer supports ${id}=${value} for ${selection.model}. Refresh the model catalog.`,
         )
@@ -316,11 +319,12 @@ export const runCursorWorker = (
     }
   }
   const discoverModels = async (session: Session) => {
-    const image = record(record(session.init.agentCapabilities).promptCapabilities).image === true
+    const image =
+      asRecord(asRecord(session.init.agentCapabilities).promptCapabilities).image === true
     let models
     try {
       const catalog = await session.client.run((agent) =>
-        agent.request<RecordValue>("cursor/list_available_models", {}),
+        agent.request<UnknownRecord>("cursor/list_available_models", {}),
       )
       models = parameterizedModels(catalog, session.configuration, image)
     } catch (cause) {
@@ -343,10 +347,10 @@ export const runCursorWorker = (
         status(
           command === null
             ? "missing"
-            : /auth|login|sign.?in|credential/i.test(errorText(cause))
+            : /auth|login|sign.?in|credential/i.test(errorMessage(cause))
               ? "unauthenticated"
               : "error",
-          `Could not connect to Cursor: ${errorText(cause)}`,
+          `Could not connect to Cursor: ${errorMessage(cause)}`,
         ),
       )
   }
@@ -428,7 +432,8 @@ export const runCursorWorker = (
           method,
           params,
           validated,
-          ...(method === "turn/completed" && record(record(params).cursor).stopReason !== "end_turn"
+          ...(method === "turn/completed" &&
+          asRecord(asRecord(params).cursor).stopReason !== "end_turn"
             ? { promoteQueue: false }
             : {}),
           ...(requestId ? { requestId } : {}),
@@ -451,7 +456,7 @@ export const runCursorWorker = (
       emit("cursor/acp/session/configuration", session.configuration)
       const prompt = await cursorPrompt(
         dispatch,
-        record(record(session.init.agentCapabilities).promptCapabilities).image === true,
+        asRecord(asRecord(session.init.agentCapabilities).promptCapabilities).image === true,
       )
       if (turn.interrupted) throw new Error("Cursor turn interrupted.")
       const result = await session.client.run(
@@ -461,7 +466,7 @@ export const runCursorWorker = (
       emit("cursor/acp/session/prompt/result", result)
       if (
         !["end_turn", "cancelled", "max_tokens", "max_turn_requests", "refusal"].includes(
-          text(result.stopReason),
+          asText(result.stopReason),
         )
       )
         throw new Error("Cursor returned an unknown stop reason.")
@@ -478,7 +483,7 @@ export const runCursorWorker = (
       emit("turn/completed", {
         turn: {
           status: turn.interrupted || stopping ? "interrupted" : "failed",
-          error: errorText(cause),
+          error: errorMessage(cause),
         },
       })
     }
@@ -513,12 +518,12 @@ export const runCursorWorker = (
     let title = ""
     try {
       session = await createSession(request.workspacePath, null, (method, params) => {
-        const update = record(record(params).update)
+        const update = asRecord(asRecord(params).update)
         if (
           method === "cursor/acp/session/update" &&
           update.sessionUpdate === "agent_message_chunk"
         )
-          title += text(record(update.content).text)
+          title += asText(asRecord(update.content).text)
       })
       await configureModel(session, request.model, "ask")
       const activeSession = session
@@ -547,7 +552,7 @@ export const runCursorWorker = (
         publish({ type: "usage-result", requestId, usage })
     } catch (cause) {
       if (!stopping && !controller.signal.aborted)
-        publish({ type: "usage-result", requestId, error: errorText(cause) })
+        publish({ type: "usage-result", requestId, error: errorMessage(cause) })
     } finally {
       usageRequests.delete(requestId)
     }
@@ -569,20 +574,20 @@ export const runCursorWorker = (
       const skills = await discoverCursorSkills(workspacePath)
       if (stopping) return
       const advertised = (current.availableCommands ?? []).flatMap((command) => {
-        const name = text(command.name)
+        const name = asText(command.name)
         if (!name) return []
-        const argumentHint = text(record(command.input).hint)
+        const argumentHint = asText(asRecord(command.input).hint)
         return [
           {
             name,
-            description: text(command.description),
+            description: asText(command.description),
             ...(argumentHint ? { argumentHint } : {}),
           },
         ]
       })
       publish({ type: "commands-result", requestId, commands: cursorCommands(advertised, skills) })
     } catch (cause) {
-      if (!stopping) publish({ type: "commands-result", requestId, error: errorText(cause) })
+      if (!stopping) publish({ type: "commands-result", requestId, error: errorMessage(cause) })
     } finally {
       if (session) await closeSession(session).catch(() => undefined)
     }
@@ -664,12 +669,12 @@ export const runCursorWorker = (
         case "shutdown":
           void shutdown().then(
             () => ack(),
-            (cause) => ack(errorText(cause)),
+            (cause) => ack(errorMessage(cause)),
           )
           break
       }
     } catch (cause) {
-      ack(errorText(cause))
+      ack(errorMessage(cause))
     }
   })
   void probe()

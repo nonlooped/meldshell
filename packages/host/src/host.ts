@@ -10,6 +10,7 @@ import { connectRelay } from "./remote-connection"
 import { beginLink, readCredential, unlinkDevice } from "./identity"
 import { readWorkspaceScripts, scriptEnvironment } from "./workspace-scripts"
 import { scheduleLoop } from "./scheduler"
+import { errorMessage } from "@meldshell/contracts"
 
 /** Runs the host in this process: core writer, provider workers, and the relay connection. */
 export async function startHost(
@@ -83,7 +84,7 @@ export async function startHost(
       linkError = null
       pending.complete
         .then(relay.sync, (cause: unknown) => {
-          linkError = cause instanceof Error ? cause.message : String(cause)
+          linkError = errorMessage(cause)
         })
         .finally(() => {
           linking = null

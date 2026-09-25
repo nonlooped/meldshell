@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import { desktopHost } from "./services"
 import { getMainWindow } from "../window"
 import { closeTerminals } from "../terminals"
+import { toError } from "@meldshell/contracts"
 
 let closePromptOpen = false
 export let quitting = false
@@ -36,7 +37,7 @@ export const prepareToClose = Effect.gen(function* () {
             defaultId: 0,
             cancelId: 0,
           }),
-        catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+        catch: toError,
       })
       if (answer.response === 0) return false
     }

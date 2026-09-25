@@ -4,6 +4,7 @@ import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import which from "which"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
+import { asRecord } from "@meldshell/contracts"
 
 export interface ClaudeCommand {
   /**
@@ -21,11 +22,6 @@ const exists = async (path: string): Promise<boolean> =>
     () => true,
     () => false,
   )
-
-const record = (value: unknown): Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
 
 const versionArgs = async (claudePath: string): Promise<{ command: string; args: string[] }> => {
   if (!/\.m?js$/i.test(claudePath)) return { command: claudePath, args: [] }
@@ -67,8 +63,8 @@ const versionOf = (command: string, args: ReadonlyArray<string>): Promise<string
 const npmEntry = async (shim: string): Promise<string | null> => {
   const root = join(dirname(shim), "node_modules", "@anthropic-ai", "claude-code")
   try {
-    const manifest = record(JSON.parse(await readFile(join(root, "package.json"), "utf8")))
-    const binValue = record(manifest.bin).claude
+    const manifest = asRecord(JSON.parse(await readFile(join(root, "package.json"), "utf8")))
+    const binValue = asRecord(manifest.bin).claude
     const bin = typeof binValue === "string" ? binValue : ""
     if (!bin) return null
     const entry = join(root, bin)

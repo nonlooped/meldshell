@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { Workspace } from "@meldshell/contracts"
+import { errorMessage, type Workspace } from "@meldshell/contracts"
 import { Folder, FolderPlus } from "lucide-react"
 import { AppDialog, Button, TextField } from "../ui/controls"
 
@@ -27,7 +27,7 @@ export function WorkspaceManager({
       setEditing(null)
       setRemoving(null)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The workspace could not be updated.")
+      setError(errorMessage(cause, "The workspace could not be updated."))
     } finally {
       setPending(false)
     }
