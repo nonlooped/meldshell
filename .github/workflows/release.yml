@@ -124,19 +124,12 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      # electron-builder downloads Electron itself and rebuilds native modules for its ABI.
+      # electron-builder downloads Electron itself, and the Node-API addons need no Electron rebuild.
       - run: npm ci --ignore-scripts
-      # @electron/rebuild skips a module whose build/Release/.forge-meta matches the Electron ABI.
-      # Without this cache, node-pty compiles winpty and conpty with MSVC on every Windows run
-      # (about two minutes); the lockfile pins the Electron and module versions the outputs depend on.
-      - name: Cache native module builds
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            node_modules/better-sqlite3/build
-            node_modules/msgpackr-extract/build
-            node_modules/node-pty/build
-          key: native-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
+      # node-pty ships prebuilds for Windows and macOS only.
+      - name: Build the Linux terminal addon
+        if: matrix.platform == 'linux'
+        run: npm rebuild node-pty
       - name: Set the release version
         if: needs.plan.outputs.publish == 'true'
         shell: bash

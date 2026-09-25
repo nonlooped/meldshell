@@ -43,11 +43,11 @@
     "p-limit": "7.3.3",
     "semver": "7.8.5",
     "which": "7.0.0",
-    "ws": "8.21.3",
-    "@meldshell/ui": "*"
+    "ws": "8.21.3"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "2.0.0",
+    "@meldshell/ui": "*",
     "@tailwindcss/vite": "4.3.3",
     "@types/cross-spawn": "6.0.6",
     "@vitejs/plugin-react": "5.2.0",

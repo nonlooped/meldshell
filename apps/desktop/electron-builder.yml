@@ -18,6 +18,8 @@ files:
   - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
   # Claude Code is discovered on the user's machine; never ship the SDK's native CLI.
   - "!node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+  # SQLite's C sources only compile the addon; the package loads its bundled prebuilds.
+  - "!node_modules/better-sqlite3/{deps,src}/**"
 asar: true
 asarUnpack:
   - node_modules/better-sqlite3/**
@@ -56,4 +58,7 @@ nsis:
   perMachine: false
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
-npmRebuild: true
+# Every native dependency uses Node-API, so a binary built for Node also loads in Electron.
+# better-sqlite3, msgpackr-extract, and node-pty on Windows load their bundled prebuilds;
+# node-pty on Linux uses the addon that its install script compiles.
+npmRebuild: false
