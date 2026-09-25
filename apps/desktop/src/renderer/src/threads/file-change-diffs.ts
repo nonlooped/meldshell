@@ -1,15 +1,19 @@
 import { asRecord, type CanonicalEvent } from "@meldshell/contracts"
+import { createTwoFilesPatch, FILE_HEADERS_ONLY } from "diff"
 
-function wholeFilePatch(diff: string, name: string, destination: string, added: boolean): string {
-  if (diff === "") return ""
-  const lines = diff.replace(/\n$/, "").split("\n")
-  const body = lines.map((line) => `${added ? "+" : "-"}${line}`).join("\n")
-  const sourceHeader = added ? "/dev/null" : name
-  const destinationHeader = added ? destination : "/dev/null"
-  const sourceRange = added ? "0,0" : `1,${lines.length}`
-  const destinationRange = added ? `1,${lines.length}` : "0,0"
-  const endMarker = diff.endsWith("\n") ? "" : "\\ No newline at end of file\n"
-  return `--- ${sourceHeader}\n+++ ${destinationHeader}\n@@ -${sourceRange} +${destinationRange} @@\n${body}\n${endMarker}`
+const headers = { headerOptions: FILE_HEADERS_ONLY }
+
+/** A patch that adds or deletes a whole file, from the file's content. */
+function wholeFilePatch(
+  content: string,
+  name: string,
+  destination: string,
+  added: boolean,
+): string {
+  if (content === "") return ""
+  return added
+    ? createTwoFilesPatch("/dev/null", destination, "", content, undefined, undefined, headers)
+    : createTwoFilesPatch(name, "/dev/null", content, "", undefined, undefined, headers)
 }
 
 export function fileChangePatches(event: CanonicalEvent): Array<{ path: string; patch: string }> {

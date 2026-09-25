@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { access, readdir } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
+import { stripVTControlCharacters } from "node:util"
 import { Readable, Writable } from "node:stream"
 import {
   client,
@@ -17,6 +18,7 @@ import {
 } from "@agentclientprotocol/sdk"
 import which from "which"
 import { asRecords, type UnknownRecord } from "@meldshell/contracts"
+import { runCommand } from "@meldshell/provider-runtime/command"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import {
   parseCursorQuestion,
@@ -75,9 +77,7 @@ export const discoverCursor = async (): Promise<CursorCommand> => {
 
 /** Extracts the account line printed by `cursor-agent status`, ignoring its surrounding chrome. */
 const parseCursorAccountEmail = (output: string): string | null =>
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: Strip ANSI colour escapes from CLI output.
-  output.replaceAll(/\u001B\[[0-9;]*m/g, "").match(/logged in as\s+(\S+@\S+?)[\s.]*$/im)?.[1] ??
-  null
+  stripVTControlCharacters(output).match(/logged in as\s+(\S+@\S+?)[\s.]*$/im)?.[1] ?? null
 
 /**
  * Asks the CLI which account is signed in. Cursor does not expose this over ACP, and a failure
@@ -85,28 +85,11 @@ const parseCursorAccountEmail = (output: string): string | null =>
  */
 export const readCursorAccountEmail = async (command: CursorCommand): Promise<string | null> => {
   try {
-    return await new Promise<string | null>((resolve) => {
-      const child = spawn(command.command, [...command.args, "status"], {
-        windowsHide: true,
-        stdio: ["ignore", "pipe", "ignore"],
-        env: { ...process.env, CURSOR_INVOKED_AS: "cursor-agent" },
-      })
-      let output = ""
-      const timer = setTimeout(() => {
-        if (child.pid) void stopProcessTree(child.pid)
-        resolve(null)
-      }, 8_000)
-      const finish = (value: string | null): void => {
-        clearTimeout(timer)
-        resolve(value)
-      }
-      child.stdout.setEncoding("utf8")
-      child.stdout.on("data", (chunk: string) => {
-        output = (output + chunk).slice(-4_096)
-      })
-      child.on("error", () => finish(null))
-      child.on("close", () => finish(parseCursorAccountEmail(output)))
+    const result = await runCommand(command.command, [...command.args, "status"], {
+      timeoutMs: 8_000,
+      env: { CURSOR_INVOKED_AS: "cursor-agent" },
     })
+    return parseCursorAccountEmail(result.stdout)
   } catch {
     return null
   }

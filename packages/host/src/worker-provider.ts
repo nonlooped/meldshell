@@ -18,6 +18,7 @@ import {
 } from "@meldshell/contracts"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import { Context, Effect, Either, Layer, Ref, Runtime, Schedule, Schema, type Scope } from "effect"
+import { attempt } from "./attempt"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
 import { handleGeneratedText } from "./generated-text"
@@ -61,8 +62,7 @@ type ProviderConfig = {
 
 const decodeEvent = Schema.decodeUnknownEither(WorkerEvent)
 
-const stopPid = (pid: number): Effect.Effect<void, Error> =>
-  Effect.tryPromise({ try: () => stopProcessTree(pid), catch: toError })
+const stopPid = (pid: number): Effect.Effect<void, Error> => attempt(() => stopProcessTree(pid))
 
 const restartSchedule = Schedule.exponential("1 second").pipe(
   Schedule.union(Schedule.spaced("30 seconds")),

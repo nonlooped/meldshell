@@ -3,13 +3,16 @@ import { createHash } from "node:crypto"
 import { createWriteStream } from "node:fs"
 import { open, readFile } from "node:fs/promises"
 import { join } from "node:path"
+import { stripVTControlCharacters } from "node:util"
 import { Effect, Either, Schema } from "effect"
-import { toError, type ThreadLocation } from "@meldshell/contracts"
+import type { ThreadLocation } from "@meldshell/contracts"
 import type { RunScript, WorkspaceScripts, WorktreeSetupLog } from "@meldshell/contracts/ipc"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
+import { attempt } from "./attempt"
+import { childEnvironment } from "./environment"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
-import { git } from "./git"
+import { gitValue } from "./git"
 import { setupLogPath } from "./worktrees"
 
 /*
@@ -50,11 +53,8 @@ const runScripts = (value: string | Readonly<Record<string, string>> | undefined
 }
 
 /** The main checkout, where scripts and ignored files such as `.env` live. */
-const repositoryRoot = (workspacePath: string): Promise<string> =>
-  git(workspacePath, ["rev-parse", "--show-toplevel"]).then(
-    (value) => value.trim(),
-    () => workspacePath,
-  )
+const repositoryRoot = async (workspacePath: string): Promise<string> =>
+  (await gitValue(workspacePath, ["rev-parse", "--show-toplevel"])) ?? workspacePath
 
 export async function readWorkspaceScripts(workspacePath: string): Promise<WorkspaceScripts> {
   const root = await repositoryRoot(workspacePath)
@@ -103,10 +103,6 @@ export async function scriptEnvironment(
   }
 }
 
-/** Electron's own switches would change how the script's Node or Electron processes start. */
-const inheritedEnvironment = () =>
-  Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("ELECTRON_")))
-
 interface RunningSetup {
   readonly child: ChildProcess
   readonly done: Promise<void>
@@ -117,12 +113,6 @@ interface RunningSetup {
 const running = new Map<string, RunningSetup>()
 
 export const setupRunning = (threadId: string): boolean => running.has(threadId)
-
-const attempt = <A>(run: () => Promise<A>) =>
-  Effect.tryPromise({
-    try: run,
-    catch: toError,
-  })
 
 const killTree = (child: ChildProcess, signal: NodeJS.Signals) => {
   const pid = child.pid
@@ -181,7 +171,7 @@ export const beginWorktreeSetup = (
     const child = spawn(command, {
       cwd: worktree.path,
       shell: true,
-      env: { ...inheritedEnvironment(), ...env },
+      env: childEnvironment(env),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
       detached: process.platform !== "win32",
@@ -234,9 +224,6 @@ export const stopAllWorktreeSetups = Effect.suspend(() =>
 )
 
 const LOG_LIMIT = 256 * 1024
-// Colour and cursor sequences mean nothing outside a terminal.
-// biome-ignore lint/suspicious/noControlCharactersInRegex: matches ANSI escape sequences.
-const ansi = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g
 
 /** The end of a worktree's setup log; empty when no setup has run there. */
 export async function readSetupLog(worktreePath: string): Promise<WorktreeSetupLog> {
@@ -251,9 +238,8 @@ export async function readSetupLog(worktreePath: string): Promise<WorktreeSetupL
     const buffer = Buffer.alloc(length)
     await file.read(buffer, 0, length, size - length)
     return {
-      text: buffer
-        .toString("utf8")
-        .replace(ansi, "")
+      // Colour and cursor sequences mean nothing outside a terminal.
+      text: stripVTControlCharacters(buffer.toString("utf8"))
         .split("\n")
         // A carriage return redraws its line, as progress bars do; keep what was drawn last.
         .map((line) => line.replace(/\r+$/, "").split("\r").at(-1))

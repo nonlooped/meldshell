@@ -6,6 +6,7 @@ import {
   type CanonicalEventKind,
   type UnknownRecord,
 } from "@meldshell/contracts"
+import { createTwoFilesPatch, OMIT_HEADERS } from "diff"
 
 const contentText = (value: unknown): string => {
   const block = asRecord(value)
@@ -65,12 +66,29 @@ export const cursorEventText = (method: string, params: unknown): string | null 
   return contentText(update.content) || asText(update.title) || null
 }
 
-const diffText = (oldText: string, newText: string): string => {
-  const lines = (value: string): string[] =>
-    value === "" ? [] : value.replace(/\n$/, "").split("\n")
-  const before = lines(oldText),
-    after = lines(newText)
-  return `@@ -${before.length ? 1 : 0},${before.length} +${after.length ? 1 : 0},${after.length} @@\n${[...before.map((line) => `-${line}`), ...after.map((line) => `+${line}`)].join("\n")}\n`
+/**
+ * One ACP diff as a file change in the shape Codex reports: a new file carries its whole content,
+ * and an edit carries a unified diff whose file headers the viewer supplies.
+ */
+const fileChange = (entry: UnknownRecord) => {
+  const path = asText(entry.path)
+  if (entry.oldText === null) return { path, kind: { type: "add" }, diff: asText(entry.newText) }
+  return {
+    path,
+    kind: { type: "update" },
+    diff: createTwoFilesPatch(
+      path,
+      path,
+      asText(entry.oldText),
+      asText(entry.newText),
+      undefined,
+      undefined,
+      {
+        context: 3,
+        headerOptions: OMIT_HEADERS,
+      },
+    ),
+  }
 }
 
 const toolEvent = (event: CanonicalEvent, tool: UnknownRecord): CanonicalEvent => {
@@ -79,13 +97,7 @@ const toolEvent = (event: CanonicalEvent, tool: UnknownRecord): CanonicalEvent =
     .map((entry) => (entry.type === "content" ? contentText(entry.content) : ""))
     .filter(Boolean)
     .join("\n\n")
-  const changes = content
-    .filter((entry) => entry.type === "diff")
-    .map((entry) => ({
-      path: asText(entry.path),
-      kind: { type: entry.oldText === null ? "add" : "update" },
-      diff: diffText(asText(entry.oldText), asText(entry.newText)),
-    }))
+  const changes = content.filter((entry) => entry.type === "diff").map(fileChange)
   const kind = tool.kind === "execute" ? "command" : changes.length ? "file-change" : "tool"
   const title = asText(tool.title) || asText(tool.kind) || "Cursor tool"
   return {

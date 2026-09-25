@@ -13,7 +13,9 @@
     "@meldshell/contracts": "*",
     "@meldshell/core": "*",
     "@meldshell/provider-runtime": "*",
+    "diff": "9.0.0",
     "effect": "3.22.1",
+    "mime": "4.1.0",
     "partysocket": "^1.3.0",
     "ws": "8.21.3"
   },

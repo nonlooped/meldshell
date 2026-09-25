@@ -4,6 +4,8 @@ import { get as getHttps } from "node:https"
 import { isIP } from "node:net"
 import { Address4, Address6 } from "ip-address"
 import { Parser } from "htmlparser2"
+import { LRUCache } from "lru-cache"
+import pLimit from "p-limit"
 
 // Only literal host addresses reach this policy; DNS answers and every redirect use it.
 export function publicAddress(address: string): boolean {
@@ -134,33 +136,23 @@ async function requestTitle(url: URL, signal: AbortSignal, redirects = 0): Promi
   })
 }
 
-const cache = new Map<string, { expires: number; result: Promise<string | null> }>()
-let active = 0
-const waiting: (() => void)[] = []
+/** Page titles fetched in the last hour; a failed fetch is remembered as having no title. */
+const titles = new LRUCache<string, Promise<string | null>>({ max: 256, ttl: 60 * 60 * 1000 })
+const requests = pLimit(4)
 
-async function fetchTitle(url: URL): Promise<string | null> {
-  if (active >= 4) await new Promise<void>((resolve) => waiting.push(resolve))
-  else active++
-  try {
-    return await requestTitle(url, AbortSignal.timeout(8000))
-  } catch {
-    return null
-  } finally {
-    const next = waiting.shift()
-    if (next) next()
-    else active--
-  }
-}
+/** How many title requests may wait for a free slot before new ones are refused. */
+const MAX_WAITING = 64
+
+const fetchTitle = (url: URL): Promise<string | null> =>
+  requests(() => requestTitle(url, AbortSignal.timeout(8000))).catch(() => null)
 
 export function getWebPageTitle(value: string): Promise<string | null> {
   const url = pageUrl(value)
   if (!url) return Promise.resolve(null)
-  const existing = cache.get(url.href)
-  if (existing && existing.expires > Date.now()) return existing.result
-  if (waiting.length >= 64) return Promise.resolve(null)
+  const cached = titles.get(url.href)
+  if (cached) return cached
+  if (requests.pendingCount >= MAX_WAITING) return Promise.resolve(null)
   const result = fetchTitle(url)
-  cache.delete(url.href)
-  cache.set(url.href, { result, expires: Date.now() + 60 * 60 * 1000 })
-  if (cache.size > 256) cache.delete(cache.keys().next().value!)
+  titles.set(url.href, result)
   return result
 }

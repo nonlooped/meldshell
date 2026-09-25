@@ -1,3 +1,5 @@
+import { differenceInMinutes, subMonths } from "date-fns"
+
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
@@ -66,9 +68,7 @@ export function resetTitle(seconds: number | null | undefined): string | undefin
 /** Monthly allowances report no duration; they span the calendar month ending at the reset. */
 export function monthlyWindowMins(resetsAt: number): number {
   const end = new Date(resetsAt * 1_000)
-  const start = new Date(end)
-  start.setMonth(start.getMonth() - 1)
-  return (end.getTime() - start.getTime()) / MINUTE
+  return differenceInMinutes(end, subMonths(end, 1))
 }
 
 export type UsagePace = "ok" | "fast" | "low" | "reached"

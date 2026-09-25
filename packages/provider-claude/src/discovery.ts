@@ -1,9 +1,8 @@
-import { spawn } from "node:child_process"
 import { access, readFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import which from "which"
-import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
+import { runCommand } from "@meldshell/provider-runtime/command"
 import { asRecord } from "@meldshell/contracts"
 
 export interface ClaudeCommand {
@@ -34,30 +33,12 @@ const versionArgs = async (claudePath: string): Promise<{ command: string; args:
  * Read `claude --version` for provider status. MeldShell does not hard-gate on this number:
  * the user's installed CLI is the harness. Protocol compatibility is checked by connecting.
  */
-const versionOf = (command: string, args: ReadonlyArray<string>): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const child = spawn(command, [...args, "--version"], { windowsHide: true, stdio: "pipe" })
-    let output = ""
-    const timer = setTimeout(() => {
-      if (child.pid) void stopProcessTree(child.pid).catch(() => undefined)
-      reject(new Error("Claude version check timed out."))
-    }, 8_000)
-    child.stdout.setEncoding("utf8")
-    child.stdout.on("data", (chunk: string) => {
-      output = (output + chunk).slice(-4096)
-    })
-    child.stderr.resume()
-    child.once("error", (cause) => {
-      clearTimeout(timer)
-      reject(cause)
-    })
-    child.once("close", (code) => {
-      clearTimeout(timer)
-      const version = output.trim().match(/(?:^|\s)(\d+\.\d+\.\d+)(?:\s|$)/)?.[1]
-      if (code === 0 && version) resolve(version)
-      else reject(new Error("The selected executable did not report a Claude Code version."))
-    })
-  })
+const versionOf = async (command: string, args: ReadonlyArray<string>): Promise<string> => {
+  const result = await runCommand(command, [...args, "--version"], { timeoutMs: 8_000 })
+  const version = result.stdout.match(/(?:^|\s)(\d+\.\d+\.\d+)(?:\s|$)/)?.[1]
+  if (result.exitCode === 0 && version) return version
+  throw new Error("The selected executable did not report a Claude Code version.")
+}
 
 /** Resolve npm's Windows shim to the installed bin, never through cmd.exe. */
 const npmEntry = async (shim: string): Promise<string | null> => {

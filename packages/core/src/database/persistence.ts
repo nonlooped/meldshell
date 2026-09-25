@@ -1,7 +1,7 @@
 import * as SqlClient from "@effect/sql/SqlClient"
 import { runMigrations } from "./migrations"
 import { randomUUID } from "node:crypto"
-import { type CanonicalEventKind } from "@meldshell/contracts"
+import type { CanonicalEventKind } from "@meldshell/contracts"
 import { Effect } from "effect"
 import { seedCatalog } from "../catalog"
 

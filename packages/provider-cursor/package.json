@@ -12,6 +12,7 @@
     "@meldshell/contracts": "*",
     "@meldshell/provider-runtime": "*",
     "effect": "3.22.1",
+    "mime": "4.1.0",
     "which": "7.0.0"
   },
   "scripts": {

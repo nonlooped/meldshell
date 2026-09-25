@@ -3,22 +3,13 @@ import { mkdir, rm, stat } from "node:fs/promises"
 import { basename, join } from "node:path"
 import type { ThreadWorktree } from "@meldshell/contracts"
 import type { WorktreeStatus } from "@meldshell/contracts/ipc"
-import { git, statusAt, writeRepository } from "./git"
+import { currentBranch, git, gitSucceeds, gitValue, statusAt, writeRepository } from "./git"
 
 type NewWorktree = Omit<ThreadWorktree, "state" | "setup">
 type WorktreeRef = Pick<ThreadWorktree, "path" | "branch">
 
-const currentBranch = (root: string): Promise<string | null> =>
-  git(root, ["symbolic-ref", "--short", "HEAD"]).then(
-    (value) => value.trim(),
-    () => null,
-  )
-
 const branchExists = (root: string, branch: string): Promise<boolean> =>
-  git(root, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`]).then(
-    () => true,
-    () => false,
-  )
+  gitSucceeds(root, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`])
 
 /** The setup script's output sits beside the worktree, so it never shows up as a change. */
 export const setupLogPath = (worktreePath: string): string => `${worktreePath}.setup.log`
@@ -39,10 +30,7 @@ export async function createWorktree(
   directory: string,
 ): Promise<NewWorktree> {
   const root = (await git(workspacePath, ["rev-parse", "--show-toplevel"])).trim()
-  const head = await git(root, ["rev-parse", "--verify", "HEAD"]).then(
-    (value) => value.trim(),
-    () => null,
-  )
+  const head = await gitValue(root, ["rev-parse", "--verify", "HEAD"])
   if (head === null)
     throw new Error("Make a first commit in this workspace before starting an isolated thread.")
   const baseBranch = await currentBranch(root)
@@ -94,10 +82,7 @@ export async function mergeWorktree(
     try {
       await git(root, ["merge", "--no-edit", worktree.branch], 120_000)
     } catch (cause) {
-      const merging = await git(root, ["rev-parse", "-q", "--verify", "MERGE_HEAD"]).then(
-        () => true,
-        () => false,
-      )
+      const merging = await gitSucceeds(root, ["rev-parse", "-q", "--verify", "MERGE_HEAD"])
       if (!merging) throw cause
       await git(root, ["merge", "--abort"]).catch(() => undefined)
       throw new Error(

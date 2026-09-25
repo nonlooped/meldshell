@@ -1,7 +1,7 @@
-import { execFile } from "node:child_process"
 import { readdir, realpath } from "node:fs/promises"
 import { join } from "node:path"
 import type { WorkspacePathMatch } from "@meldshell/contracts/ipc"
+import { git } from "./git"
 
 const INDEX_TTL_MS = 10_000
 const MAX_FILES = 50_000
@@ -15,17 +15,16 @@ interface WorkspaceIndex {
 
 const indexes = new Map<string, { readonly at: number; readonly index: Promise<WorkspaceIndex> }>()
 
-function gitFiles(root: string): Promise<string[] | null> {
-  return new Promise((done) => {
-    execFile(
-      "git",
-      ["--no-optional-locks", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-      { cwd: root, windowsHide: true, timeout: 10_000, maxBuffer: 64 * 1024 * 1024 },
-      (error, stdout) =>
-        done(error ? null : stdout.split("\0").filter(Boolean).slice(0, MAX_FILES)),
-    )
-  })
-}
+/** Tracked and unignored files, or null outside a Git repository. */
+const gitFiles = (root: string): Promise<string[] | null> =>
+  git(
+    root,
+    ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+    10_000,
+    64 * 1024 * 1024,
+  )
+    .then((output) => output.split("\0").filter(Boolean).slice(0, MAX_FILES))
+    .catch(() => null)
 
 async function walkFiles(root: string): Promise<string[]> {
   const files: string[] = []

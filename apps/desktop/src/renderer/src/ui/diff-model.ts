@@ -33,6 +33,12 @@ function gitHeaderPath(path: string): string {
   return decoded.replace(/^[ab]\//, "")
 }
 
+/** A provider path with Git's side prefix, inside the quotes of a quoted name. */
+const prefixedPath = (side: "a" | "b", path: string): string => {
+  if (path === "/dev/null") return path
+  return path.startsWith('"') ? `"${side}/${path.slice(1)}` : `${side}/${path}`
+}
+
 function parseFilePatch(patch: string): FileDiff {
   let source = patch
   // Provider patches have no Git preamble or a/b prefixes. The library's
@@ -41,8 +47,8 @@ function parseFilePatch(patch: string): FileDiff {
     const header = /^--- (.+)\n\+\+\+ (.+)\n/.exec(source)
     if (!header) throw new Error("Missing file headers")
     const [, oldPath, newPath] = header
-    const oldHeader = oldPath === "/dev/null" ? oldPath : `a/${oldPath}`
-    const newHeader = newPath === "/dev/null" ? newPath : `b/${newPath}`
+    const oldHeader = prefixedPath("a", oldPath!)
+    const newHeader = prefixedPath("b", newPath!)
     source = `diff --git a/file b/file\n--- ${oldHeader}\n+++ ${newHeader}\n${source.slice(header[0].length)}`
   }
   if (!source.startsWith("diff --git ")) throw new Error("Missing Git headers")

@@ -1,6 +1,6 @@
 import * as SqlClient from "@effect/sql/SqlClient"
 import { threadActivitySql } from "./thread-activity"
-import { type SearchTranscriptsInput } from "@meldshell/contracts"
+import type { SearchTranscriptsInput } from "@meldshell/contracts"
 import { prepareTranscriptEvents } from "@meldshell/projection"
 import { Effect } from "effect"
 import { type ThreadRow, type EventRow, fromThreadRow, fromEventRow } from "./database/rows"

@@ -3,6 +3,7 @@ import { ipcMain, type WebContents } from "electron"
 import { spawn, type IPty } from "node-pty"
 import which from "which"
 import { IPC, type TerminalOpenInput, type TerminalSession } from "@meldshell/contracts/ipc"
+import { childEnvironment } from "@meldshell/host/environment"
 import { desktopHost } from "./runtime/services"
 
 /*
@@ -39,20 +40,13 @@ function shellCommand(): { readonly file: string; readonly args: string[] } {
   return { file, args: process.platform === "darwin" ? ["-l"] : [] }
 }
 
-function shellEnvironment(scripts: Record<string, string>): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const [key, value] of Object.entries(process.env)) {
-    // Electron's own switches would change how child Node or Electron processes start.
-    if (value !== undefined && !key.startsWith("ELECTRON_")) env[key] = value
-  }
-  return {
-    ...env,
+const shellEnvironment = (scripts: Record<string, string>): Record<string, string> =>
+  childEnvironment({
     ...scripts,
     TERM: "xterm-256color",
     COLORTERM: "truecolor",
     TERM_PROGRAM: "MeldShell",
-  }
-}
+  })
 
 const dimension = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value)

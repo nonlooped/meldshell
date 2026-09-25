@@ -1,12 +1,8 @@
 import { dirname, join } from "node:path"
 import { Effect } from "effect"
-import {
-  toError,
-  type AppSnapshot,
-  type CreateThreadInput,
-  type ThreadLocation,
-} from "@meldshell/contracts"
+import type { AppSnapshot, CreateThreadInput, ThreadLocation } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
+import { attempt } from "./attempt"
 import { CoreClient } from "./core-client"
 import { HostPlatform } from "./platform"
 import { statusAt } from "./git"
@@ -24,12 +20,6 @@ import {
   setupRunning,
   stopWorktreeSetup,
 } from "./workspace-scripts"
-
-const attempt = <A>(run: () => Promise<A>) =>
-  Effect.tryPromise({
-    try: run,
-    catch: toError,
-  })
 
 const readyWorktree = (location: ThreadLocation) => {
   const worktree = location.worktree

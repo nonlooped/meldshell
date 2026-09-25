@@ -1,31 +1,27 @@
-import { spawn } from "node:child_process"
+import treeKill from "tree-kill"
 
-export const stopProcessTree = (pid: number): Promise<void> =>
+/** A Windows `taskkill` that has not finished by then is abandoned. */
+const TIMEOUT_MS = 5_000
+
+const running = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (cause) {
+    return (cause as NodeJS.ErrnoException).code === "EPERM"
+  }
+}
+
+/** Ends a process and every process it started. A process that has already exited is not an error. */
+export const stopProcessTree = (pid: number, signal: NodeJS.Signals = "SIGTERM"): Promise<void> =>
   new Promise((resolve, reject) => {
-    if (process.platform !== "win32") {
-      try {
-        process.kill(pid, "SIGTERM")
-        resolve()
-      } catch (cause) {
-        if ((cause as NodeJS.ErrnoException).code === "ESRCH") resolve()
-        else reject(cause)
-      }
-      return
-    }
-    const child = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-      windowsHide: true,
-      stdio: "ignore",
-    })
-    const timeout = setTimeout(() => {
-      child.kill()
-      reject(new Error("Timed out terminating the Codex process tree."))
-    }, 5_000)
-    child.once("error", (cause) => {
+    const timeout = setTimeout(
+      () => reject(new Error(`Timed out stopping process ${pid} and its children.`)),
+      TIMEOUT_MS,
+    )
+    treeKill(pid, signal, (error) => {
       clearTimeout(timeout)
-      reject(cause)
-    })
-    child.once("exit", () => {
-      clearTimeout(timeout)
-      resolve()
+      if (error === undefined || !running(pid)) resolve()
+      else reject(error)
     })
   })
