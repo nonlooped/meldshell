@@ -7,6 +7,8 @@ import type {
   CursorStatus,
   ProviderStatus,
   CodexUsage,
+  Harness,
+  ProviderUpdateStatus,
   CreateThreadInput,
   SetAppSettingsInput,
   SetThreadSettingsInput,
@@ -316,6 +318,17 @@ export const requests = {
   getClaudeUsage: request<() => Promise<CodexUsage>>("meldshell:get-claude-usage"),
   getCursorUsage: request<() => Promise<CodexUsage>>("meldshell:get-cursor-usage"),
   refreshCodexStatus: request<() => Promise<void>>("meldshell:refresh-codex-status"),
+  getProviderUpdate: request<(harness: Harness) => Promise<ProviderUpdateStatus>>(
+    "meldshell:get-provider-update",
+  ),
+  /** Compares the installed harness with its latest release; the result also arrives as an event. */
+  checkProviderUpdate: request<(harness: Harness) => Promise<ProviderUpdateStatus>>(
+    "meldshell:check-provider-update",
+  ),
+  /** Starts the harness's update; progress and the outcome arrive as `onProviderUpdate` events. */
+  installProviderUpdate: request<(harness: Harness) => Promise<ProviderUpdateStatus>>(
+    "meldshell:install-provider-update",
+  ),
   closeApp: request<() => Promise<boolean>>("meldshell:close-app"),
   getUpdateStatus: request<() => Promise<AppUpdateStatus>>("meldshell:get-update-status"),
   checkForUpdates: request<() => Promise<AppUpdateStatus>>("meldshell:check-for-updates"),
@@ -356,6 +369,7 @@ export const IPC = {
     [Key in keyof typeof requests]: string
   }),
   providerStatusChanged: "meldshell:provider-status-changed",
+  providerUpdateChanged: "meldshell:provider-update-changed",
   runtimeChanged: "meldshell:runtime-changed",
   attentionRequested: "meldshell:attention-requested",
   updateStatusChanged: "meldshell:update-status-changed",
@@ -374,6 +388,7 @@ export const IPC = {
 export type MeldShellApi = InvokeApi & {
   readonly platform: string
   readonly onProviderStatus: (listener: (status: ProviderStatus) => void) => () => void
+  readonly onProviderUpdate: (listener: (status: ProviderUpdateStatus) => void) => () => void
   readonly onRuntimeChanged: (
     listener: (threadId: string, snapshotChanged?: boolean) => void,
   ) => () => void

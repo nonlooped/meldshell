@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- Settings › Providers shows when a newer release of Codex, Claude Code, or Cursor CLI is available and can install it. The provider row has an **Update** button that runs the provider's own updater, or Homebrew's for a Homebrew install, without leaving MeldShell. The **Version** row names the installed and latest versions. A provider installed by a system package manager shows which one to use instead, and its row marks **Update available**. Versions are compared when a provider connects and every four hours after that; **Check for updates** compares them now. After an update, the provider reconnects with the new version when no turns are running.
+
 ### Fixed
 
 - Malformed provider messages and stored approvals now report decoding errors with field paths instead of being treated as empty objects or trusted without validation.

@@ -2,11 +2,14 @@ name: CI
 
 on:
   pull_request:
-    paths-ignore: ['docs/**', '**/*.md']
   push:
     branches: [main]
-    paths-ignore: ['docs/**', '**/*.md']
   workflow_call:
+    inputs:
+      full:
+        description: Run all checks for release certification
+        type: boolean
+        default: true
   workflow_dispatch:
 
 permissions:
@@ -22,8 +25,40 @@ env:
   npm_config_fund: 'false'
 
 jobs:
+  changes:
+    name: Select checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      static: ${{ steps.scope.outputs.static }}
+      desktop: ${{ steps.scope.outputs.desktop }}
+      site: ${{ steps.scope.outputs.site }}
+      test: ${{ steps.scope.outputs.test }}
+      windows: ${{ steps.scope.outputs.windows }}
+      scope: ${{ steps.scope.outputs.scope }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          filter: blob:none
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Select affected checks
+        id: scope
+        env:
+          CI_FULL: ${{ inputs.full == true || github.event_name == 'workflow_dispatch' }}
+        run: node scripts/ci-scope.mjs
+      - name: Test check selection
+        run: node --test tests/ci-scope.test.mjs
+
   static:
     name: Static checks
+    needs: changes
+    if: needs.changes.outputs.static == 'true'
+    env:
+      CI_SCOPE: ${{ needs.changes.outputs.scope }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -43,12 +78,17 @@ jobs:
       - name: Format
         run: npm run format:check
       - name: Codex protocol types
+        if: fromJSON(needs.changes.outputs.scope).protocol
         run: npm run check:protocol --workspace=@meldshell/provider-codex
       - name: Typecheck
-        run: npm run typecheck
+        run: node scripts/ci-scope.mjs typecheck
 
   build-test:
     name: Build and test
+    needs: changes
+    if: needs.changes.outputs.test == 'true' || needs.changes.outputs.desktop == 'true' || needs.changes.outputs.site == 'true'
+    env:
+      CI_SCOPE: ${{ needs.changes.outputs.scope }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -61,14 +101,21 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - name: Test
-        run: npm test
+        if: needs.changes.outputs.test == 'true'
+        run: node scripts/ci-scope.mjs test
       - name: Build desktop
+        if: needs.changes.outputs.desktop == 'true'
         run: npm run build
       - name: Build website
+        if: needs.changes.outputs.site == 'true'
         run: npm run build --workspace=@meldshell/site
 
   test-windows:
     name: Test (Windows)
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    env:
+      CI_SCOPE: ${{ needs.changes.outputs.scope }}
     runs-on: windows-2025
     timeout-minutes: 15
     steps:
@@ -81,4 +128,5 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - name: Test
-        run: npm test
+        if: needs.changes.outputs.test == 'true'
+        run: node scripts/ci-scope.mjs test

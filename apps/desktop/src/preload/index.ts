@@ -15,6 +15,7 @@ const api: MeldShellApi = {
   platform: process.platform,
   ...createInvoker((channel, ...args) => ipcRenderer.invoke(channel, ...args)),
   onProviderStatus: on(IPC.providerStatusChanged),
+  onProviderUpdate: on(IPC.providerUpdateChanged),
   onRuntimeChanged: (listener) =>
     on<[string, boolean?]>(IPC.runtimeChanged)((threadId, snapshotChanged = true) =>
       listener(threadId, snapshotChanged),

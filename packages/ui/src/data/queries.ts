@@ -36,6 +36,13 @@ export function useAppData() {
   )
   useEffect(
     () =>
+      window.meldshell.onProviderUpdate((status) => {
+        client.setQueryData(queryKeys.providerUpdate(status.harness), status)
+      }),
+    [client],
+  )
+  useEffect(
+    () =>
       window.meldshell.onRuntimeChanged((id, snapshotChanged) =>
         invalidateThread(client, id, snapshotChanged),
       ),
