@@ -8,7 +8,7 @@
     "./worker": "./src/worker-runtime.ts"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.3.261",
+    "@anthropic-ai/claude-agent-sdk": "0.3.278",
     "@meldshell/contracts": "*",
     "@meldshell/provider-runtime": "*",
     "which": "7.0.0"

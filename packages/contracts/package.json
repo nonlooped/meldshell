@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@effect/rpc": "0.76.2",
-    "effect": "3.22.1"
+    "effect": "3.22.2"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
