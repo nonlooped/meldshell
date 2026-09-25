@@ -11,11 +11,13 @@ import {
   CursorProvider,
   providerFor,
 } from "./worker-provider"
+import { ProviderUpdates, providerUpdatesLive } from "./provider-updates"
 import { stopAllWorktreeSetups } from "./workspace-scripts"
 
 export const createHostRuntime = (platform: typeof HostPlatform.Service) =>
   ManagedRuntime.make(
-    Layer.mergeAll(codexProviderLive, claudeProviderLive, cursorProviderLive).pipe(
+    providerUpdatesLive.pipe(
+      Layer.provideMerge(Layer.mergeAll(codexProviderLive, claudeProviderLive, cursorProviderLive)),
       Layer.provideMerge(Layer.merge(CoreClient.Default, HostEvents.Default)),
       Layer.provideMerge(Layer.succeed(HostPlatform, platform)),
     ),
@@ -28,6 +30,7 @@ export type HostServices =
   | CodexProvider
   | ClaudeProvider
   | CursorProvider
+  | ProviderUpdates
 export const stopHost = Effect.gen(function* () {
   const core = yield* CoreClient
   yield* stopAllWorktreeSetups.pipe(Effect.catchAll(Effect.logError))

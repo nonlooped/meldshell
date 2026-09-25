@@ -136,6 +136,7 @@ export function remoteApi(
         ? Promise.resolve()
         : api.gitFileAction(input),
     onProviderStatus: (listener) => subscribe(IPC.providerStatusChanged, listener as Listener),
+    onProviderUpdate: (listener) => subscribe(IPC.providerUpdateChanged, listener as Listener),
     onRuntimeChanged: (listener) => subscribe(IPC.runtimeChanged, listener as Listener),
     onOpenAttention: (listener) => subscribe(IPC.attentionRequested, listener as Listener),
     onUpdateStatus: () => () => undefined,

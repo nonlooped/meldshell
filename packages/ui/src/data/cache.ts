@@ -8,6 +8,7 @@ export const queryKeys = {
   schedules: ["schedules"] as const,
   transcript: (threadId: string) => ["transcript", threadId] as const,
   providerStatus: (harness: string) => ["provider-status", harness] as const,
+  providerUpdate: (harness: string) => ["provider-update", harness] as const,
   providerUsage: (harness: string) => ["provider-usage", harness] as const,
 }
 

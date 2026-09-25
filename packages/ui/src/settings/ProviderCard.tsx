@@ -1,14 +1,34 @@
 import { iconButtonClasses } from "../ui/styles"
-import { CollapsiblePanel, Pressable } from "../ui/motion"
-import { providerStatusQuery, refreshProviderStatus } from "../data/providers"
+import { ActivitySpinner, CollapsiblePanel, Pressable } from "../ui/motion"
+import {
+  checkProviderUpdate,
+  installProviderUpdate,
+  providerStatusQuery,
+  providerUpdateQuery,
+  refreshProviderStatus,
+} from "../data/providers"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { modelLabel } from "../data/model-label"
+import { queryKeys } from "../data/cache"
 import { Collapsible } from "@base-ui-components/react/collapsible"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { useState } from "react"
-import type { Provider, ProviderModel, ProviderStatus } from "@meldshell/contracts"
-import { REASONING_EFFORTS } from "@meldshell/contracts"
-import { ChevronDown, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
+import type {
+  Provider,
+  ProviderModel,
+  ProviderStatus,
+  ProviderUpdateStatus,
+} from "@meldshell/contracts"
+import { errorMessage, REASONING_EFFORTS } from "@meldshell/contracts"
+import {
+  ChevronDown,
+  CircleArrowUp,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react"
 import { SettingRow } from "./SettingRow"
 import { effortLabel } from "../data/catalog"
 import { ProviderIcon } from "../ui/ProviderIcon"
@@ -64,6 +84,35 @@ function connectionDescription(harness: string, status: ProviderStatus | undefin
 const versionLabel = (version: string | null): string | null =>
   version === null ? null : /^\d/.test(version) ? `v${version}` : version
 
+const checkedLabel = (checkedAt: string | null): string =>
+  checkedAt === null
+    ? ""
+    : ` Checked ${new Date(checkedAt).toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      })}.`
+
+/** What the Version row says; the host's message already names versions and next steps. */
+function versionDescription(update: ProviderUpdateStatus, installed: string | null): string {
+  const version = versionLabel(installed)
+  switch (update.state) {
+    case "unknown":
+      return version === null ? "No version reported." : `${version} is installed.`
+    case "checking":
+    case "updating":
+      return update.message
+    case "error":
+      return `${update.message}${checkedLabel(update.checkedAt)}`
+    case "current":
+      return `${version ?? "This version"} is the latest.${checkedLabel(update.checkedAt)}`
+    case "available":
+      return `${version === null ? "" : `${version} is installed. `}${update.message}${checkedLabel(update.checkedAt)}`
+  }
+}
+
+const updateButtonLabel = (update: ProviderUpdateStatus): string =>
+  update.state === "checking" ? "Checking…" : "Check for updates"
+
 /** Contiguous effort ranges read as "Low–High"; the tooltip always lists every effort. */
 function effortRange(model: ProviderModel): string {
   const efforts = REASONING_EFFORTS.filter((effort) => model.reasoningEfforts.includes(effort))
@@ -93,6 +142,38 @@ const VISIBILITY_PATCH: Record<Visibility, { enabled: boolean; hidden: boolean }
 /** Long catalogs get a filter; short ones are easier to scan without it. */
 const FILTER_THRESHOLD = 8
 
+type HarnessUpdateAction = (harness: string) => Promise<ProviderUpdateStatus>
+
+function useHarnessUpdate(
+  harness: string,
+  onFailure: (open: true) => void,
+): {
+  readonly actionError: string | null
+  readonly run: (action: HarnessUpdateAction) => void
+} {
+  const client = useQueryClient()
+  const [actionError, setActionError] = useState<string | null>(null)
+  const run = (action: HarnessUpdateAction): void => {
+    setActionError(null)
+    void rememberUpdate(client, harness, action).catch((cause: unknown) => {
+      setActionError(errorMessage(cause, "The update failed."))
+      onFailure(true)
+    })
+  }
+  return { actionError, run }
+}
+
+function rememberUpdate(
+  client: QueryClient,
+  harness: string,
+  action: HarnessUpdateAction,
+): Promise<ProviderUpdateStatus> {
+  return action(harness).then((next) => {
+    client.setQueryData(queryKeys.providerUpdate(harness), next)
+    return next
+  })
+}
+
 export function ProviderCard({
   provider,
   models,
@@ -106,11 +187,13 @@ export function ProviderCard({
 }: ProviderCardProps): React.JSX.Element {
   const status = useQuery(providerStatusQuery(provider.harness))
   const availability = status.data?.availability
+  const update = useQuery(providerUpdateQuery(provider.harness)).data
   // Follows the connection until the person opens or closes the card themselves.
   const [openChoice, setOpenChoice] = useState<boolean | null>(null)
   const open = openChoice ?? needsAttention(availability)
   const [checking, setChecking] = useState(false)
   const [filter, setFilter] = useState("")
+  const { actionError, run } = useHarnessUpdate(provider.harness, setOpenChoice)
 
   // Commit on blur; key the input by the stored name to pick up external renames.
   const commitName = (input: HTMLInputElement): void => {
@@ -163,20 +246,7 @@ export function ProviderCard({
             <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
               {provider.displayName}
             </span>
-            <span className="flex min-w-0 items-center gap-[6px] text-[var(--text-secondary)] text-[12px] leading-[1.6]">
-              <span
-                aria-hidden="true"
-                className="w-[6px] h-[6px] flex-none rounded-[50%]"
-                style={{ background: statusInfo.tone }}
-              />
-              <span className="flex-none">{statusInfo.label}</span>
-              {/* No account email: the settings page is often on screen while streaming or sharing. */}
-              {version !== null && (
-                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)]">
-                  · {version}
-                </span>
-              )}
-            </span>
+            <ProviderStatusLine label={statusInfo.label} tone={statusInfo.tone} update={update} />
           </span>
           <ChevronDown
             className="motion-transform provider-chevron flex-none ml-[2px] text-[var(--text-tertiary)]"
@@ -184,10 +254,13 @@ export function ProviderCard({
             strokeWidth={1.75}
           />
         </Collapsible.Trigger>
-        <Switch
-          checked={provider.enabled}
-          onCheckedChange={onToggleProvider}
-          label={`Use ${provider.displayName}`}
+        <ProviderRowActions
+          displayName={provider.displayName}
+          enabled={provider.enabled}
+          probing={availability === "probing"}
+          update={update}
+          onToggle={onToggleProvider}
+          onAction={run}
         />
       </div>
 
@@ -216,6 +289,15 @@ export function ProviderCard({
             {busy ? "Checking…" : "Check again"}
           </Button>
         </SettingRow>
+        {update !== undefined && (version !== null || update.state !== "unknown") && (
+          <VersionRow
+            update={update}
+            installedVersion={status.data?.version ?? null}
+            probing={availability === "probing"}
+            actionError={actionError}
+            onAction={run}
+          />
+        )}
         <SettingRow
           label="Display name"
           description="The name shown in menus and thread controls."
@@ -296,6 +378,123 @@ export function ProviderCard({
         </div>
       </CollapsiblePanel>
     </Collapsible.Root>
+  )
+}
+
+/**
+ * The installed release against the latest one. The row needs an installed version to compare
+ * and stays while an update runs; the host publishes each step as it happens. Installing happens
+ * from the provider row, so this row only offers a fresh comparison.
+ */
+function ProviderStatusLine({
+  label,
+  tone,
+  update,
+}: {
+  readonly label: string
+  readonly tone: string
+  readonly update: ProviderUpdateStatus | undefined
+}): React.JSX.Element {
+  const manual = update?.state === "available" && !update.canUpdate
+  return (
+    <span className="flex min-w-0 items-center gap-[6px] text-[var(--text-secondary)] text-[12px] leading-[1.6]">
+      <span
+        aria-hidden="true"
+        className="w-[6px] h-[6px] flex-none rounded-[50%]"
+        style={{ background: tone }}
+      />
+      <span className="flex-none">{label}</span>
+      {/* No account email: the settings page is often on screen while streaming or sharing. */}
+      {manual && (
+        <span className="flex flex-none items-center gap-[3px] text-[var(--color-modified)]">
+          <CircleArrowUp size={11} strokeWidth={2} aria-hidden="true" />
+          Update available
+        </span>
+      )}
+    </span>
+  )
+}
+
+function ProviderRowActions({
+  displayName,
+  enabled,
+  probing,
+  update,
+  onToggle,
+  onAction,
+}: {
+  readonly displayName: string
+  readonly enabled: boolean
+  readonly probing: boolean
+  readonly update: ProviderUpdateStatus | undefined
+  readonly onToggle: (enabled: boolean) => void
+  readonly onAction: (action: HarnessUpdateAction) => void
+}): React.JSX.Element {
+  const updating = update?.state === "updating"
+  const installable = update?.state === "available" && update.canUpdate
+  return (
+    <div className="flex flex-none items-center gap-[12px]">
+      {(installable || updating) && (
+        <Button
+          size="sm"
+          variant="primary"
+          icon={<CircleArrowUp size={13} aria-hidden="true" />}
+          disabled={updating || probing}
+          aria-label={`Update ${displayName}`}
+          onClick={() => onAction(installProviderUpdate)}
+        >
+          {updating ? "Updating…" : "Update"}
+        </Button>
+      )}
+      <Switch checked={enabled} onCheckedChange={onToggle} label={`Use ${displayName}`} />
+    </div>
+  )
+}
+
+function VersionRow({
+  update,
+  installedVersion,
+  probing,
+  actionError,
+  onAction,
+}: {
+  readonly update: ProviderUpdateStatus
+  readonly installedVersion: string | null
+  readonly probing: boolean
+  readonly actionError: string | null
+  readonly onAction: (action: HarnessUpdateAction) => void
+}): React.JSX.Element {
+  const updating = update.state === "updating"
+  const installable = update.state === "available" && update.canUpdate
+  const busy = update.state === "checking" || updating
+  const failed = actionError !== null || update.state === "error"
+  const description = (
+    <span className="flex items-baseline gap-[6px]" role={failed ? "alert" : undefined}>
+      {busy && (
+        <span className="flex-none self-center text-[var(--text-tertiary)]">
+          <ActivitySpinner />
+        </span>
+      )}
+      <span style={failed ? { color: "var(--color-deleted)" } : undefined}>
+        {actionError ?? versionDescription(update, installedVersion)}
+      </span>
+    </span>
+  )
+
+  if (installable || updating) {
+    return <SettingRow label="Version" description={description} />
+  }
+
+  return (
+    <SettingRow label="Version" description={description}>
+      <Button
+        icon={<RefreshCw size={13} aria-hidden="true" />}
+        disabled={busy || probing}
+        onClick={() => onAction(checkProviderUpdate)}
+      >
+        {updateButtonLabel(update)}
+      </Button>
+    </SettingRow>
   )
 }
 

@@ -1,8 +1,14 @@
-import { IPC, type ProviderStatus, type RemoteEvent } from "@meldshell/contracts"
+import {
+  IPC,
+  type ProviderStatus,
+  type ProviderUpdateStatus,
+  type RemoteEvent,
+} from "@meldshell/contracts"
 import { Effect, PubSub } from "effect"
 
 export type HostEvent =
   | { readonly _tag: "ProviderStatusChanged"; readonly status: ProviderStatus }
+  | { readonly _tag: "ProviderUpdateChanged"; readonly status: ProviderUpdateStatus }
   | {
       readonly _tag: "RuntimeChanged"
       readonly threadId: string
@@ -32,6 +38,8 @@ export function eventFrames(batch: Iterable<HostEvent>): RemoteEvent[] {
       )
     else if (event._tag === "ProviderStatusChanged")
       frames.push({ type: "event", channel: IPC.providerStatusChanged, args: [event.status] })
+    else if (event._tag === "ProviderUpdateChanged")
+      frames.push({ type: "event", channel: IPC.providerUpdateChanged, args: [event.status] })
     else frames.push({ type: "event", channel: IPC.attentionRequested, args: [event.threadId] })
   }
   for (const [threadId, snapshotChanged] of changed)

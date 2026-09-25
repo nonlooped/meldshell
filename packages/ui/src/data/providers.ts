@@ -6,6 +6,8 @@ import {
   type CodexUsage,
   type Harness,
   type ProviderStatus,
+  type ProviderUpdateStatus,
+  unknownUpdateStatus,
 } from "@meldshell/contracts"
 import { resolveSelection } from "./catalog"
 import { queryKeys } from "./cache"
@@ -47,6 +49,21 @@ export const providerStatusQuery = (harness: string) => ({
 })
 
 export const refreshProviderStatus = (harness: string) => harnessApi(harness).refreshStatus()
+
+/** An older host has no update channel; its failure reads as nothing known, so the row stays hidden. */
+export const providerUpdateQuery = (harness: string) => ({
+  queryKey: queryKeys.providerUpdate(harness),
+  queryFn: (): Promise<ProviderUpdateStatus> =>
+    window.meldshell
+      .getProviderUpdate(knownHarness(harness))
+      .catch(() => unknownUpdateStatus(knownHarness(harness))),
+})
+
+export const checkProviderUpdate = (harness: string) =>
+  window.meldshell.checkProviderUpdate(knownHarness(harness))
+
+export const installProviderUpdate = (harness: string) =>
+  window.meldshell.installProviderUpdate(knownHarness(harness))
 
 export function useSelectedProvider(snapshot: AppSnapshot, threadId: string | null) {
   const harness = knownHarness(resolveSelection(snapshot, threadId ?? "")?.provider.harness)

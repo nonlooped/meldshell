@@ -427,6 +427,43 @@ export const probingStatus = (harness: Harness): ProviderStatus =>
     checkedAt: new Date().toISOString(),
   }) as ProviderStatus
 
+const ProviderUpdateState = Schema.Literal(
+  /** No installed version to compare, or not checked yet. */
+  "unknown",
+  "checking",
+  "current",
+  "available",
+  "updating",
+  "error",
+)
+
+/** Whether a newer release of a harness exists, and how MeldShell would install it. */
+export const ProviderUpdateStatus = Schema.Struct({
+  harness: Harness,
+  state: ProviderUpdateState,
+  installedVersion: Schema.NullOr(Schema.String),
+  latestVersion: Schema.NullOr(Schema.String),
+  /** The command MeldShell runs to update, for display; null while the install is unknown. */
+  command: Schema.NullOr(Schema.String),
+  /** False when the install must be updated by hand, such as a system package. */
+  canUpdate: Schema.Boolean,
+  message: Schema.String,
+  checkedAt: Schema.NullOr(Schema.String),
+})
+
+export type ProviderUpdateStatus = typeof ProviderUpdateStatus.Type
+
+export const unknownUpdateStatus = (harness: Harness): ProviderUpdateStatus => ({
+  harness,
+  state: "unknown",
+  installedVersion: null,
+  latestVersion: null,
+  command: null,
+  canUpdate: false,
+  message: "",
+  checkedAt: null,
+})
+
 export const UsageWindow = Schema.Struct({
   label: Schema.optional(Schema.String),
   usedPercent: Schema.Number.pipe(Schema.finite()),

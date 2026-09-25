@@ -35,6 +35,8 @@ export interface ProviderService {
   readonly usage: Effect.Effect<CodexUsage, Error>
   readonly commands: (workspacePath: string) => Effect.Effect<ReadonlyArray<ComposerCommand>, Error>
   readonly refresh: Effect.Effect<void, Error>
+  /** Replaces the worker with a fresh one, which probes the harness again; fails running turns. */
+  readonly restart: Effect.Effect<void, Error>
   readonly send: (message: ProviderWorkerInput) => Effect.Effect<void, Error>
   readonly shutdown: Effect.Effect<void>
 }
@@ -89,6 +91,8 @@ const providerRuntime = (
     /** Identifies one worker process, so events from a replaced worker are recognised. */
     const generations = new WeakMap<HostProcess, string>()
     let stopping = false
+    /** Set while a deliberate restart stops the worker, so its exit is not treated as a crash. */
+    let restarting = false
 
     const currentChild = (): HostProcess | null => Effect.runSync(Ref.get(processRef))
     const publishStatus = (status: ProviderStatus): Effect.Effect<void> =>
@@ -339,7 +343,7 @@ const providerRuntime = (
 
     /** Settles everything a worker owned once it exits: its processes and its running turns. */
     const workerExited = (child: HostProcess, code: number): void => {
-      if (!stopping)
+      if (!stopping && !restarting)
         console.error(`${label} worker exited.`, {
           code,
           generation: generations.get(child),
@@ -399,10 +403,18 @@ const providerRuntime = (
         ),
       ),
       Effect.andThen(
-        publishStatus({
-          ...probing(),
-          availability: "error",
-          detail: `The ${label} integration stopped. MeldShell is restarting it with backoff.`,
+        Effect.suspend(() => {
+          const planned = restarting
+          restarting = false
+          return publishStatus(
+            planned
+              ? probing()
+              : {
+                  ...probing(),
+                  availability: "error",
+                  detail: `The ${label} integration stopped. MeldShell is restarting it with backoff.`,
+                },
+          )
         }),
       ),
       Effect.catchAll((cause) =>
@@ -503,6 +515,18 @@ const providerRuntime = (
       refresh: Effect.suspend(() =>
         publishStatus(probing()).pipe(Effect.andThen(send("probe-now"))),
       ),
+      restart: Effect.suspend(() => {
+        const child = currentChild()
+        if (child === null || stopping) return Effect.void
+        restarting = true
+        return killWorker(child).pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              restarting = false
+            }),
+          ),
+        )
+      }),
       send,
     }
   })

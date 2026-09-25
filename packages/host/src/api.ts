@@ -6,6 +6,7 @@ import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
 import { submitTurn, interruptTurn, resolveApproval } from "./operations"
 import { providerFor } from "./worker-provider"
+import { ProviderUpdates } from "./provider-updates"
 import type { HostRuntime, HostServices } from "./runtime"
 import {
   getGitSnapshot,
@@ -269,6 +270,16 @@ for (const [harness, status, refresh, usage] of [
     Effect.flatMap(providerFor(harness), (service) => service.usage),
   )
 }
+hostOperations[C.IPC.getProviderUpdate] = operation(C.Harness, true, (harness) =>
+  Effect.flatMap(ProviderUpdates, (updates) => updates.status(harness)),
+)
+hostOperations[C.IPC.checkProviderUpdate] = operation(C.Harness, true, (harness) =>
+  Effect.flatMap(ProviderUpdates, (updates) => updates.check(harness)),
+)
+// Updates change the harness install, not the stored state other clients would need to reload.
+hostOperations[C.IPC.installProviderUpdate] = operation(C.Harness, true, (harness) =>
+  Effect.flatMap(ProviderUpdates, (updates) => updates.install(harness)),
+)
 
 export function createHostApi(runtime: HostRuntime) {
   const call = async (method: string, args: readonly unknown[]) => {
