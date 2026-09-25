@@ -36,7 +36,7 @@ See [Contributing](CONTRIBUTING.md) for development checks and [Release](docs/re
 | --- | --- |
 | Change processes, storage, IPC, or recovery | [Host](packages/host/src/host.ts), [contracts](packages/contracts/src/ipc.ts) |
 | Work on provider behavior | [Provider packages](packages) |
-| Change desktop UI or transcript output | [Renderer styles](apps/desktop/src/renderer/src/app/styles.css), [Markdown renderer](apps/desktop/src/renderer/src/ui/Markdown.tsx) |
+| Change desktop UI or transcript output | [Renderer styles](packages/ui/src/app/styles.css), [Markdown renderer](packages/ui/src/ui/Markdown.tsx) |
 | Build or deploy the site | [Pages configuration](apps/site/wrangler.jsonc), [account worker](apps/control/wrangler.jsonc) |
 | See what changed between versions | [Changelog](CHANGELOG.md) |
 | Work as an agent | [AGENTS.md](AGENTS.md) |
