@@ -48,7 +48,10 @@ export const NativePayload = Schema.Struct({
   explanation: text,
   message: text,
   diff: text,
-  error: Schema.optional(Schema.NullOr(Schema.Struct({ message: text }))),
+  /** Codex MCP startup, login, and sandbox setup notifications report a bare string. */
+  error: Schema.optional(
+    Schema.NullOr(Schema.Union(Schema.String, Schema.Struct({ message: text }))),
+  ),
   plan: Schema.optional(Schema.Union(Schema.String, Schema.Array(PlanStep))),
   toolName: text,
   command: textParts,

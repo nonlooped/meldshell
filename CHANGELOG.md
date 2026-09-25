@@ -17,6 +17,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - When a Cursor model cannot write a commit message or a thread title, the failure shows right away. Before, the commit message button waited 75 seconds before reporting it.
 - Files that Cursor edits show only the lines that changed, and files it creates show their contents. Before, an edit showed the whole file removed and added again, and a new file showed patch markers as if they were its text.
 - Error messages from Git, files, and commit message generation no longer start with "Error:".
+- When an MCP server fails to start in a Codex turn, the transcript no longer shows a "The provider reported an error" card with an "Invalid mcpServer/startupStatus/updated payload" message. Codex messages that report an error as plain text, such as MCP server status, MCP and account sign-in results, and Windows sandbox setup, are now read correctly.
 
 ### Changed
 

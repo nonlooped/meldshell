@@ -75,7 +75,8 @@ export const eventText = (method: string, params: unknown): string | null => {
       [nonEmptyText(record.explanation), planText(record.plan)].filter(Boolean).join("\n\n") || null
     )
   if (method.endsWith("/progress")) return nonEmptyText(record.message)
-  const message = nonEmptyText(record.error?.message)
+  const error = record.error
+  const message = nonEmptyText(typeof error === "string" ? error : error?.message)
   if (message !== null) return message
   const text = nativeItemText(record.item)
   if (text !== undefined) return text

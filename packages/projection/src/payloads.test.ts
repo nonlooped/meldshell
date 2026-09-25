@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { decodeCursorPayload, decodeNativePayload, type CanonicalEvent } from "@meldshell/contracts"
 import { Either } from "effect"
+import { eventText } from "./normalization"
 import { prepareTranscriptEvents } from "./transcript"
 
 const event = (payload: unknown): CanonicalEvent => ({
@@ -31,6 +32,24 @@ test("native decoders retain extensions and report the nested path for malformed
   assert.ok(Either.isLeft(invalid))
   assert.match(invalid.left.message, /content/)
   assert.match(invalid.left.message, /text/)
+})
+
+test("Codex notifications with a string error decode and use it as their text", () => {
+  const native = {
+    threadId: "native-thread",
+    name: "playwright",
+    status: "failed",
+    error: "MCP client for `playwright` failed to start",
+  }
+  assert.ok(Either.isRight(decodeNativePayload(native)))
+  assert.equal(eventText("account/login/completed", native), native.error)
+  assert.equal(eventText("error", { error: { message: "Turn failed" } }), "Turn failed")
+  const startup = (payload: unknown): CanonicalEvent => ({
+    ...event(payload),
+    kind: "tool",
+    method: "mcpServer/startupStatus/updated",
+  })
+  assert.deepEqual(prepareTranscriptEvents([startup(native), startup({ error: 42 })]), [])
 })
 
 test("malformed history is visible with its native payload instead of an empty object", () => {

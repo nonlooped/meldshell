@@ -103,20 +103,16 @@ const fileChangeText = (payload: NativePayload): string | null => {
   return summaries.length > 0 ? summaries.join("\n") : null
 }
 
-const standaloneVisible = (event: CanonicalEvent): boolean => {
-  if (event.method === "mcpServer/startupStatus/updated") return false
-  return (
-    event.kind === "user" ||
-    event.kind === "assistant" ||
-    event.kind === "reasoning" ||
-    event.kind === "plan" ||
-    event.kind === "command" ||
-    event.kind === "file-change" ||
-    event.kind === "tool" ||
-    event.kind === "approval" ||
-    event.kind === "error"
-  )
-}
+const standaloneVisible = (event: CanonicalEvent): boolean =>
+  event.kind === "user" ||
+  event.kind === "assistant" ||
+  event.kind === "reasoning" ||
+  event.kind === "plan" ||
+  event.kind === "command" ||
+  event.kind === "file-change" ||
+  event.kind === "tool" ||
+  event.kind === "approval" ||
+  event.kind === "error"
 
 const finishGroup = (group: EventGroup): CanonicalEvent | null => {
   let text = group.completedText ?? group.chunks.join("")
@@ -227,7 +223,9 @@ export const prepareTranscriptEvents = (
     if (standaloneVisible(event)) standalone.push(event)
   }
 
-  for (const event of prepareCursorEvents(events)) append(event)
+  // MCP startup progress never appears in the transcript, so its payload shape cannot fail a turn.
+  for (const event of prepareCursorEvents(events))
+    if (event.method !== "mcpServer/startupStatus/updated") append(event)
 
   return [
     ...standalone,
