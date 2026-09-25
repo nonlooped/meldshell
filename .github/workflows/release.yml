@@ -2,12 +2,15 @@ name: Release
 run-name: Release (${{ inputs.channel || (github.event.schedule == '17 0 * * *' && 'stable' || 'nightly') }})
 
 # Releases are cut by this workflow from main. Daily, a stable release publishes the
-# CHANGELOG.md Unreleased entries as the next minor version when there are any. Hourly, a nightly
-# prerelease publishes main when app files changed since the last release. Either one is cut only
-# after the full CI suite and packaging pass on that commit, and a commit whose release failed is
-# not retried by the schedule; a new commit or a manual run retries. A manual run can also release
-# now (including a forced nightly), or build installers from any ref as workflow artifacts.
+# CHANGELOG.md Unreleased entries as the next minor version when there are any. A nightly
+# prerelease runs after a main push or on the hourly schedule when app files changed since the
+# last release. Either one is cut only after the full CI suite and packaging pass on that commit.
+# A commit whose release failed is not retried by the schedule; a new commit or a manual run retries.
+# A manual run can also release now (including a forced nightly), or build installers from any ref
+# as workflow artifacts.
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '17 0 * * *' # stable
     - cron: '47 * * * *' # nightly
@@ -74,9 +77,23 @@ jobs:
             echo "::error::Releases are cut only from main"
             exit 1
           fi
-          force_args=()
-          if [ "$FORCE_NIGHTLY" = true ]; then force_args=(--force); fi
-          node scripts/release.mjs plan "$CHANNEL" "${force_args[@]}" > "$RUNNER_TEMP/plan"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            # Let a burst of pushes settle before committing to an installer build.
+            sleep 120
+            latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+            if [ "$latest" != "$GITHUB_SHA" ]; then
+              printf 'release=false\nbuild=false\n' >> "$GITHUB_OUTPUT"
+              echo "Nightly: newer main commit $latest superseded $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          plan_args=()
+          if [ "$FORCE_NIGHTLY" = true ]; then
+            plan_args=(--force)
+          elif [ "$CHANNEL" = nightly ] && [ "$GITHUB_EVENT_NAME" != workflow_dispatch ]; then
+            plan_args=(--automatic)
+          fi
+          node scripts/release.mjs plan "$CHANNEL" "${plan_args[@]}" > "$RUNNER_TEMP/plan"
           cat "$RUNNER_TEMP/plan"
           release=$(sed -n 's/^release=//p' "$RUNNER_TEMP/plan")
           reason=$(sed -n 's/^reason=//p' "$RUNNER_TEMP/plan")

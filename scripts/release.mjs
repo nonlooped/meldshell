@@ -1,5 +1,5 @@
 // Release tooling for the scheduled and manual Release workflow.
-// `plan <stable|nightly> [--force]` decides whether HEAD should be released and prints key=value outputs.
+// `plan <stable|nightly> [--force|--automatic]` decides whether HEAD should be released and prints key=value outputs.
 // `set-version X` writes a version into every version field without committing.
 // `cut X` moves the changelog's Unreleased entries under X, bumps the version, commits, and tags.
 // `notes X [ref]` prints X's changelog entries; `nightly-notes <previous-tag> <ref>` summarizes a
@@ -109,7 +109,7 @@ function previousTag() {
   }
 }
 
-function plan(channel, force = false, now = new Date()) {
+function plan(channel, force = false, automatic = false, now = new Date()) {
   const current = readJson("package.json").version
   const previous = previousTag()
   let version
@@ -123,6 +123,17 @@ function plan(channel, force = false, now = new Date()) {
       ? git("diff", "--name-only", previous, "HEAD").split("\n").filter(Boolean)
       : ["(no earlier release)"]
     if (!force && !changed.some(isAppChange)) reason = `no app changes since ${previous}`
+    if (!reason && automatic && previous) {
+      const releasedAt = Number(
+        git("for-each-ref", "--format=%(creatordate:unix)", `refs/tags/${previous}`),
+      )
+      if (!Number.isFinite(releasedAt) || releasedAt <= 0) {
+        throw new Error(`Cannot read release time for ${previous}`)
+      }
+      if (now.getTime() - releasedAt * 1000 < 30 * 60 * 1000) {
+        reason = `last release ${previous} was less than 30 minutes ago`
+      }
+    }
   } else throw new Error("Plan stable or nightly")
   if (!reason && git("tag", "--list", `v${version}`)) reason = `v${version} already exists`
   return {
@@ -176,10 +187,15 @@ const changelogAt = (ref) =>
 
 function run(command, args) {
   if (command === "plan") {
-    if (args.length > 2 || (args[1] && (args[0] !== "nightly" || args[1] !== "--force"))) {
-      throw new Error("Only nightly plans accept --force")
+    const [channel, ...options] = args
+    if (
+      options.length > 1 ||
+      (options.length === 1 &&
+        (channel !== "nightly" || !["--force", "--automatic"].includes(options[0])))
+    ) {
+      throw new Error("Only nightly plans accept --force or --automatic")
     }
-    const result = plan(args[0], args[1] === "--force")
+    const result = plan(channel, options[0] === "--force", options[0] === "--automatic")
     return Object.entries(result)
       .map(([key, value]) => `${key}=${value}\n`)
       .join("")
@@ -198,7 +214,7 @@ function run(command, args) {
     })
   }
   throw new Error(
-    "Usage: node scripts/release.mjs plan <stable|nightly> [--force for nightly] | set-version X | cut X | notes X [ref] | nightly-notes <previous-tag> <ref>",
+    "Usage: node scripts/release.mjs plan <stable|nightly> [--force|--automatic for nightly] | set-version X | cut X | notes X [ref] | nightly-notes <previous-tag> <ref>",
   )
 }
 
