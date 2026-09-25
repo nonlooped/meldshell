@@ -1,59 +1,75 @@
-import { workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
+import { eventPublisher, workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
 import {
   errorMessage,
   toError,
-  type ComposerCommand,
+  type CodexStatus,
   type TitleRequest,
   type TurnDispatch,
+  type WorkerCommand,
 } from "@meldshell/contracts"
+import { Effect } from "effect"
 import {
   CodexAppServer,
   listCodexModels,
   probeCodex,
-  readCodexUsage,
-  encodeInteractionResponse,
-  type MessageValidation,
+  type AppServerCallbacks,
   type JsonRpcNotification,
   type JsonRpcServerRequest,
-  type AppServerCallbacks,
-} from "./index"
-import { Effect } from "effect"
-
-const text = (value: unknown): string | undefined =>
-  typeof value === "string" && value.trim() !== "" ? value : undefined
-
-/** Codex has no slash-command API; its enabled skills are sent as skill inputs. */
-const codexSkillCommands = (response: unknown): ComposerCommand[] => {
-  const data = (response as { data?: unknown } | null)?.data
-  if (!Array.isArray(data)) return []
-  const commands = new Map<string, ComposerCommand>()
-  for (const entry of data) {
-    const skills = (entry as { skills?: unknown } | null)?.skills
-    if (!Array.isArray(skills)) continue
-    for (const skill of skills as Array<Record<string, unknown>>) {
-      const name = text(skill.name)
-      const path = text(skill.path)
-      if (!name || !path || skill.enabled === false || commands.has(name)) continue
-      const presentation = (skill.interface ?? {}) as Record<string, unknown>
-      commands.set(name, {
-        kind: "skill",
-        name,
-        description:
-          text(presentation.shortDescription) ??
-          text(skill.shortDescription) ??
-          text(skill.description) ??
-          "",
-        path,
-      })
-    }
-  }
-  return [...commands.values()]
-}
+  type MessageValidation,
+} from "./client"
+import { encodeInteractionResponse } from "./interactions"
+import { nativeThreadIdOf, nativeTurnIdOf } from "./messages"
+import { codexSkillCommands } from "./skills"
+import { TitleTurns } from "./title-turns"
+import { inputItems, sandboxPolicy, threadSettings } from "./turn-input"
+import { readCodexUsage } from "./usage"
 
 type CodexConnection = Pick<
   CodexAppServer,
   "start" | "stop" | "request" | "respond" | "rejectRequest"
 >
+
+/** The interactions Codex may ask of the user; anything else is rejected at once. */
+const INTERACTION_METHODS = new Set([
+  "item/commandExecution/requestApproval",
+  "item/fileChange/requestApproval",
+  "item/tool/requestUserInput",
+  "item/permissions/requestApproval",
+])
+
+/** Account notifications that change what `probe` would report. */
+const AUTH_METHODS = new Set(["account/updated", "account/login/completed"])
+
+/** Commands acknowledged when their work settles, not on receipt. */
+const ACKNOWLEDGED_ON_COMPLETION = new Set<WorkerCommand["type"]>([
+  "resolve-approval",
+  "shutdown",
+  "interrupt-turn",
+])
+
+/** Messages held for a turn Codex has not yet accepted; more than this stops the server. */
+const BUFFER_LIMIT = 256
+
+interface BufferedMessage {
+  readonly message: JsonRpcNotification | JsonRpcServerRequest
+  readonly known: MessageValidation
+}
+
+/** A MeldShell turn running on a native Codex thread. */
+interface LocalTurn {
+  readonly threadId: string
+  readonly turnId: string
+  /** Set once Codex accepts the turn; messages before then are buffered. */
+  nativeTurnId?: string
+  buffered?: BufferedMessage[]
+}
+
+interface PendingInteraction {
+  readonly id: string | number
+  readonly method: string
+  readonly params: unknown
+  readonly turnId: string
+}
 
 export const runCodexWorker = (
   parentPort: WorkerPort,
@@ -67,223 +83,92 @@ export const runCodexWorker = (
   let appServerReady: Promise<CodexConnection> | null = null
   let executablePath: string | null = null
   let stopping = false
-  const localByNativeThread = new Map<
-    string,
-    {
-      threadId: string
-      turnId: string
-      nativeTurnId?: string
-      buffered?: Array<{ message: JsonRpcNotification; known: MessageValidation }>
-    }
-  >()
+  const turnsByNativeThread = new Map<string, LocalTurn>()
   const usageRequests = new Map<string, AbortController>()
-  const serverRequestIds = new Map<
-    string,
-    { id: string | number; method: string; params: unknown; turnId: string }
-  >()
+  const interactions = new Map<string, PendingInteraction>()
+  const publish = eventPublisher(parentPort)
+  const publishStatus = (status: CodexStatus): void => publish({ type: "provider-status", status })
+  const titles = new TitleTurns(publish)
 
-  interface PendingTitle {
-    readonly threadId: string
-    text: string | null
-    readonly timeout: ReturnType<typeof setTimeout>
-  }
+  const reject = (message: JsonRpcServerRequest, code: number, reason: string): void =>
+    appServer?.rejectRequest(message.id, code, reason)
 
-  /**
-   * Title turns run on their own ephemeral Codex thread, keyed separately from conversation threads:
-   * nothing they emit belongs in a transcript, and the user never sees them run.
-   */
-  const titleThreads = new Map<string, PendingTitle>()
-
-  /** Codex answers a title turn long before this; the timer only stops a hung turn leaking an entry. */
-  const TITLE_TIMEOUT_MS = 60_000
-
-  const publish = (message: unknown): void => parentPort.postMessage(message)
-
-  const threadIdFrom = (message: JsonRpcNotification): string | null => {
-    const params = message.params
-    if (typeof params !== "object" || params === null) return null
-    const record = params as Record<string, unknown>
-    if (typeof record.threadId === "string") return record.threadId
-    const thread = record.thread
-    return typeof thread === "object" && thread !== null && "id" in thread
-      ? String((thread as Record<string, unknown>).id)
-      : null
-  }
-
-  const nativeTurnIdFrom = (message: JsonRpcNotification): string | undefined => {
-    const params = message.params
-    if (typeof params !== "object" || params === null) return undefined
-    const direct = (params as Record<string, unknown>).turnId
-    if (typeof direct === "string") return direct
-    const turn = (params as Record<string, unknown>).turn
-    return typeof turn === "object" && turn !== null && "id" in turn
-      ? String((turn as Record<string, unknown>).id)
-      : undefined
-  }
-
-  const agentMessageText = (item: unknown): string | null => {
-    if (typeof item !== "object" || item === null) return null
-    const record = item as Record<string, unknown>
-    return record.type === "agentMessage" && typeof record.text === "string" ? record.text : null
-  }
-
-  /** The completed turn repeats its items, so a dropped `item/completed` still yields a title. */
-  const finalMessageText = (params: unknown): string | null => {
-    if (typeof params !== "object" || params === null) return null
-    const turn = (params as Record<string, unknown>).turn
-    const items =
-      typeof turn === "object" && turn !== null
-        ? (turn as Record<string, unknown>).items
-        : undefined
-    if (!Array.isArray(items)) return null
-    for (const item of [...items].reverse()) {
-      const text = agentMessageText(item)
-      if (text !== null) return text
-    }
-    return null
-  }
-
-  const settleTitle = (nativeThreadId: string, title: string | null, detail?: string): void => {
-    const pending = titleThreads.get(nativeThreadId)
-    if (pending === undefined) return
-    clearTimeout(pending.timeout)
-    titleThreads.delete(nativeThreadId)
-    if (title === null || title.trim() === "") {
-      publish({
-        type: "title-failed",
-        threadId: pending.threadId,
-        message: detail ?? "The title model answered with no text.",
-      })
-      return
-    }
-    publish({ type: "thread-title", threadId: pending.threadId, title })
-  }
-
-  const updateTitle = (
-    nativeThreadId: string,
-    pendingTitle: NonNullable<ReturnType<typeof titleThreads.get>>,
-    message: JsonRpcNotification,
-  ): void => {
-    if (message.method === "item/completed") {
-      const params = message.params
-      const item =
-        typeof params === "object" && params !== null
-          ? (params as Record<string, unknown>).item
-          : undefined
-      pendingTitle.text = agentMessageText(item) ?? pendingTitle.text
-    }
-    if (message.method === "turn/completed") {
-      settleTitle(nativeThreadId, pendingTitle.text ?? finalMessageText(message.params))
-    }
-  }
   const finishLocalTurn = (nativeThreadId: string, turnId: string): void => {
-    localByNativeThread.delete(nativeThreadId)
-    for (const [key, request] of serverRequestIds)
-      if (request.turnId === turnId) serverRequestIds.delete(key)
+    turnsByNativeThread.delete(nativeThreadId)
+    for (const [key, interaction] of interactions)
+      if (interaction.turnId === turnId) interactions.delete(key)
   }
-  const bufferNotification = (
-    local: NonNullable<ReturnType<typeof localByNativeThread.get>>,
-    message: JsonRpcNotification,
-    known: MessageValidation,
-  ): void => {
+
+  const buffer = (local: LocalTurn, entry: BufferedMessage): void => {
     const buffered = (local.buffered ??= [])
-    if (buffered.length >= 256) {
+    if (buffered.length >= BUFFER_LIMIT) {
       void appServer?.stop()
       return
     }
-    buffered.push({ message, known })
+    buffered.push(entry)
   }
+
   const routeNotification = (message: JsonRpcNotification, known: MessageValidation): void => {
     if (known === "malformed") {
       publish({ type: "protocol-error", message: "Malformed known notification", raw: message })
       return
     }
-    const nativeThreadId = threadIdFrom(message)
-    if (nativeThreadId === null) return
-    const pendingTitle = titleThreads.get(nativeThreadId)
-    if (pendingTitle !== undefined) {
-      updateTitle(nativeThreadId, pendingTitle, message)
-      return
-    }
-    const local = localByNativeThread.get(nativeThreadId)
+    const nativeThreadId = nativeThreadIdOf(message)
+    if (nativeThreadId === null || titles.observe(nativeThreadId, message)) return
+    const local = turnsByNativeThread.get(nativeThreadId)
     if (local === undefined) return
-    const nativeTurnId = nativeTurnIdFrom(message)
-    if (
-      nativeTurnId !== undefined &&
-      local.nativeTurnId !== undefined &&
-      nativeTurnId !== local.nativeTurnId
-    )
-      return
+    const nativeTurnId = nativeTurnIdOf(message)
     if (local.nativeTurnId === undefined) {
-      bufferNotification(local, message, known)
+      buffer(local, { message, known })
       return
     }
+    if (nativeTurnId !== undefined && nativeTurnId !== local.nativeTurnId) return
     if (message.method === "turn/completed" && nativeTurnId === undefined) return
     publish({
       type: "runtime-event",
-      known,
       input: {
         threadId: local.threadId,
         turnId: local.turnId,
         validated: known === "validated",
         method: message.method,
         params: message.params ?? {},
-        nativeTurnId: nativeTurnIdFrom(message),
+        nativeTurnId,
       },
     })
-    if (known === "validated" && message.method === "turn/completed") {
+    if (known === "validated" && message.method === "turn/completed")
       finishLocalTurn(nativeThreadId, local.turnId)
-    }
   }
 
   const routeRequest = (message: JsonRpcServerRequest, known: MessageValidation): void => {
-    if (
-      known !== "validated" ||
-      ![
-        "item/commandExecution/requestApproval",
-        "item/fileChange/requestApproval",
-        "item/tool/requestUserInput",
-        "item/permissions/requestApproval",
-      ].includes(message.method)
-    ) {
-      appServer?.rejectRequest(
-        message.id,
+    if (known !== "validated" || !INTERACTION_METHODS.has(message.method)) {
+      reject(
+        message,
         known === "malformed" ? -32602 : -32601,
         "Unsupported or invalid interaction request.",
       )
       return
     }
-    const nativeThreadId = threadIdFrom(message)
-    if (nativeThreadId === null) {
-      appServer?.rejectRequest(message.id, -32600, "No active turn owns this request.")
-      return
-    }
+    const nativeThreadId = nativeThreadIdOf(message)
     // A title turn is read-only and never approved by hand; asking the user to unblock a thread name
     // would be worse than losing the name.
-    if (titleThreads.has(nativeThreadId)) {
-      appServer?.rejectRequest(message.id, -32600, "Title turns cannot request interactions.")
+    if (nativeThreadId !== null && titles.owns(nativeThreadId)) {
+      reject(message, -32600, "Title turns cannot request interactions.")
       return
     }
-    const local = localByNativeThread.get(nativeThreadId)
+    const local = nativeThreadId === null ? undefined : turnsByNativeThread.get(nativeThreadId)
     if (local === undefined) {
-      appServer?.rejectRequest(message.id, -32600, "No active turn owns this request.")
+      reject(message, -32600, "No active turn owns this request.")
       return
     }
-    const nativeTurnId = nativeTurnIdFrom(message)
     if (local.nativeTurnId === undefined) {
-      const buffered = (local.buffered ??= [])
-      if (buffered.length >= 256) {
-        void appServer?.stop()
-        return
-      }
-      buffered.push({ message, known })
+      buffer(local, { message, known })
       return
     }
-    if (nativeTurnId !== local.nativeTurnId) {
-      appServer?.rejectRequest(message.id, -32600, "Request does not belong to an accepted turn.")
+    if (nativeTurnIdOf(message) !== local.nativeTurnId) {
+      reject(message, -32600, "Request does not belong to an accepted turn.")
       return
     }
-    serverRequestIds.set(String(message.id), {
+    interactions.set(String(message.id), {
       id: message.id,
       method: message.method,
       params: message.params,
@@ -291,16 +176,41 @@ export const runCodexWorker = (
     })
     publish({
       type: "runtime-event",
-      known,
       input: {
         threadId: local.threadId,
         turnId: local.turnId,
-        validated: known === "validated",
+        validated: true,
         method: message.method,
         params: message.params ?? {},
         requestId: message.id,
       },
     })
+  }
+
+  const flushBuffered = (local: LocalTurn): void => {
+    const buffered = local.buffered ?? []
+    local.buffered = []
+    for (const { message, known } of buffered) {
+      if ("id" in message) routeRequest(message, known)
+      else routeNotification(message, known)
+    }
+  }
+
+  const serverExited = (code: number | null): void => {
+    interactions.clear()
+    appServer = null
+    appServerReady = null
+    if (stopping) return
+    const reason = `Codex app-server exited unexpectedly${code === null ? "." : ` with code ${code}.`}`
+    for (const local of turnsByNativeThread.values())
+      publish({
+        type: "turn-start-failed",
+        threadId: local.threadId,
+        turnId: local.turnId,
+        message: reason,
+      })
+    turnsByNativeThread.clear()
+    titles.failAll("The Codex app-server exited before naming the thread.")
   }
 
   const ensureAppServer = async (): Promise<CodexConnection> => {
@@ -310,57 +220,32 @@ export const runCodexWorker = (
     if (executablePath === null) throw new Error("Codex is not ready.")
 
     const epoch = ++serverEpoch
+    const current = (): boolean => epoch === serverEpoch
     let serverPid: number | undefined
     const Server = dependencies.Server ?? CodexAppServer
     const server = new Server(executablePath, {
       onSpawn: (pid) => {
         serverPid = pid
-        publish({ type: "app-server-started", pid })
+        publish({ type: "process-started", pid })
       },
       onNotification: (message, known) => {
-        if (epoch !== serverEpoch) return
-        if (
-          known === "validated" &&
-          ["account/updated", "account/login/completed"].includes(message.method)
-        )
-          void probe(true)
+        if (!current()) return
+        if (known === "validated" && AUTH_METHODS.has(message.method)) void probe(true)
         routeNotification(message, known)
       },
       onRequest: (message, known) => {
-        if (epoch === serverEpoch) routeRequest(message, known)
+        if (current()) routeRequest(message, known)
       },
       onProtocolError: (message, raw) => publish({ type: "protocol-error", message, raw }),
       onExit: (code) => {
-        publish({ type: "app-server-stopped", pid: serverPid })
-        if (epoch !== serverEpoch) return
-        serverRequestIds.clear()
-        appServer = null
-        appServerReady = null
-        if (!stopping) {
-          for (const local of localByNativeThread.values()) {
-            publish({
-              type: "turn-start-failed",
-              threadId: local.threadId,
-              turnId: local.turnId,
-              message: `Codex app-server exited unexpectedly${code === null ? "." : ` with code ${code}.`}`,
-            })
-          }
-          localByNativeThread.clear()
-          for (const nativeThreadId of [...titleThreads.keys()]) {
-            settleTitle(
-              nativeThreadId,
-              null,
-              "The Codex app-server exited before naming the thread.",
-            )
-          }
-          publish({ type: "app-server-exit", code })
-        }
+        if (serverPid !== undefined) publish({ type: "process-stopped", pid: serverPid })
+        if (current()) serverExited(code)
       },
       onStderr: (line) => process.stderr.write(`${line}\n`),
     })
     appServerReady = server.start().then(
       () => {
-        if (stopping || epoch !== serverEpoch) {
+        if (stopping || !current()) {
           void server.stop()
           throw new Error("Codex is shutting down or was replaced.")
         }
@@ -369,94 +254,44 @@ export const runCodexWorker = (
       },
       async (cause: unknown) => {
         await server.stop()
-        if (epoch === serverEpoch) appServerReady = null
+        if (current()) appServerReady = null
         throw cause
       },
     )
     return appServerReady
   }
 
-  const inputItems = (dispatch: TurnDispatch): ReadonlyArray<Record<string, unknown>> => [
-    ...(dispatch.text === "" ? [] : [{ type: "text", text: dispatch.text }]),
-    ...dispatch.attachments.map((attachment) => {
-      switch (attachment.type) {
-        case "image":
-          return { type: "image", url: attachment.value }
-        case "localImage":
-          return { type: "localImage", path: attachment.value }
-        case "mention":
-          return {
-            type: "mention",
-            name: attachment.name ?? attachment.value,
-            path: attachment.value,
-          }
-        case "skill":
-          return {
-            type: "skill",
-            name: attachment.name ?? attachment.value,
-            path: attachment.value,
-          }
-      }
-    }),
-  ]
-
-  const sandboxPolicy = (dispatch: TurnDispatch): Record<string, unknown> => {
-    switch (dispatch.sandbox) {
-      case "read-only":
-        return { type: "readOnly" }
-      case "workspace-write":
-        return { type: "workspaceWrite" }
-      case "danger-full-access":
-        return { type: "dangerFullAccess" }
-    }
-  }
-
-  const resumeThread = async (
-    server: Awaited<ReturnType<typeof ensureAppServer>>,
+  /** Starts or resumes the native thread for a turn and returns its identifier. */
+  const nativeThreadFor = async (
+    server: CodexConnection,
     dispatch: TurnDispatch,
   ): Promise<string> => {
-    let nativeThreadId = dispatch.nativeThreadId
-    if (nativeThreadId === null) {
-      const result = (await server.request("thread/start", {
-        cwd: dispatch.workspacePath,
-        model: dispatch.model,
-        approvalPolicy: dispatch.approvalPolicy,
-        sandbox: dispatch.sandbox,
-        serviceTier: dispatch.serviceTier,
-      })) as { readonly thread?: { readonly id?: unknown } }
-      if (typeof result.thread?.id !== "string") {
-        throw new Error("Codex started a thread without returning its identifier.")
-      }
-      nativeThreadId = result.thread.id
-      publish({ type: "provider-session", threadId: dispatch.threadId, nativeThreadId })
-    } else {
+    if (dispatch.nativeThreadId !== null) {
       await server.request("thread/resume", {
-        threadId: nativeThreadId,
-        cwd: dispatch.workspacePath,
-        model: dispatch.model,
-        approvalPolicy: dispatch.approvalPolicy,
-        sandbox: dispatch.sandbox,
-        serviceTier: dispatch.serviceTier,
+        threadId: dispatch.nativeThreadId,
+        ...threadSettings(dispatch),
       })
+      return dispatch.nativeThreadId
     }
+    const result = (await server.request("thread/start", threadSettings(dispatch))) as {
+      readonly thread?: { readonly id?: unknown }
+    }
+    if (typeof result.thread?.id !== "string")
+      throw new Error("Codex started a thread without returning its identifier.")
+    publish({
+      type: "provider-session",
+      threadId: dispatch.threadId,
+      nativeThreadId: result.thread.id,
+    })
+    return result.thread.id
+  }
 
-    return nativeThreadId
-  }
-  const flushBuffered = (local: NonNullable<ReturnType<typeof localByNativeThread.get>>): void => {
-    const buffered = local.buffered ?? []
-    local.buffered = []
-    for (const event of buffered) {
-      if ("id" in event.message) routeRequest(event.message as JsonRpcServerRequest, event.known)
-      else routeNotification(event.message, event.known)
-    }
-  }
   const startTurn = async (dispatch: TurnDispatch): Promise<void> => {
     try {
       if (dispatch.mode !== "default") throw new Error("Plan mode is not supported.")
       const server = await serverForRequest()
-      const nativeThreadId = await resumeThread(server, dispatch)
-
-      localByNativeThread.set(nativeThreadId, {
+      const nativeThreadId = await nativeThreadFor(server, dispatch)
+      turnsByNativeThread.set(nativeThreadId, {
         threadId: dispatch.threadId,
         turnId: dispatch.turnId,
       })
@@ -471,25 +306,24 @@ export const runCodexWorker = (
         serviceTierForTurn: dispatch.serviceTier,
       })) as { readonly turn?: { readonly id?: unknown } }
       if (typeof result.turn?.id !== "string") throw new Error("Codex did not accept the turn.")
-      const local = localByNativeThread.get(nativeThreadId)
-      if (local?.turnId === dispatch.turnId) local.nativeTurnId = result.turn.id
-      if (local?.turnId === dispatch.turnId) {
-        publish({
-          type: "runtime-event",
-          known: true,
-          input: {
-            threadId: dispatch.threadId,
-            turnId: dispatch.turnId,
-            method: "turn/accepted",
-            params: result,
-            nativeTurnId: result.turn.id,
-          },
-        })
-        flushBuffered(local)
-      }
+      const local = turnsByNativeThread.get(nativeThreadId)
+      if (local?.turnId !== dispatch.turnId) return
+      local.nativeTurnId = result.turn.id
+      publish({
+        type: "runtime-event",
+        input: {
+          threadId: dispatch.threadId,
+          turnId: dispatch.turnId,
+          validated: true,
+          method: "turn/accepted",
+          params: result,
+          nativeTurnId: result.turn.id,
+        },
+      })
+      flushBuffered(local)
     } catch (cause) {
-      for (const [nativeId, local] of localByNativeThread)
-        if (local.turnId === dispatch.turnId) localByNativeThread.delete(nativeId)
+      for (const [nativeId, local] of turnsByNativeThread)
+        if (local.turnId === dispatch.turnId) turnsByNativeThread.delete(nativeId)
       publish({
         type: "turn-start-failed",
         threadId: dispatch.threadId,
@@ -514,20 +348,10 @@ export const runCodexWorker = (
         sandbox: "read-only",
         ephemeral: true,
       })) as { readonly thread?: { readonly id?: unknown } }
-      if (typeof started.thread?.id !== "string") {
+      if (typeof started.thread?.id !== "string")
         throw new Error("Codex started a title thread without returning its identifier.")
-      }
       nativeThreadId = started.thread.id
-      const timedOutThreadId = nativeThreadId
-      const timeout = setTimeout(
-        () => settleTitle(timedOutThreadId, null, "The title model did not answer in time."),
-        TITLE_TIMEOUT_MS,
-      )
-      titleThreads.set(nativeThreadId, {
-        threadId: request.threadId,
-        text: null,
-        timeout,
-      })
+      titles.track(nativeThreadId, request.threadId)
       await server.request("turn/start", {
         threadId: nativeThreadId,
         input: [{ type: "text", text: request.prompt }],
@@ -539,10 +363,9 @@ export const runCodexWorker = (
         serviceTierForTurn: "default",
       })
     } catch (cause) {
-      const message = errorMessage(cause)
       if (nativeThreadId === null)
-        publish({ type: "title-failed", threadId: request.threadId, message })
-      else settleTitle(nativeThreadId, null, message)
+        publish({ type: "title-failed", threadId: request.threadId, message: errorMessage(cause) })
+      else titles.settle(nativeThreadId, null, errorMessage(cause))
     }
   }
 
@@ -552,20 +375,19 @@ export const runCodexWorker = (
     if (stopping) return
     executablePath = status.availability === "ready" ? status.executablePath : null
     if (status.availability !== "ready") {
-      publish(status)
+      publishStatus(status)
       return
     }
     yield* Effect.tryPromise({
       try: async () => {
-        const server = await ensureAppServer()
-        const models = await listCodexModels(server)
+        const models = await listCodexModels(await ensureAppServer())
         if (!stopping) publish({ type: "provider-ready", status, providerKey: "openai", models })
       },
       catch: toError,
     }).pipe(
       Effect.catchAll((cause) =>
         Effect.sync(() =>
-          publish({
+          publishStatus({
             ...status,
             availability: "error",
             detail: `Codex model discovery failed: ${cause.message}`,
@@ -603,49 +425,65 @@ export const runCodexWorker = (
   }
   void probe()
 
-  const resolveApproval = (
-    input: Extract<
-      NonNullable<ReturnType<typeof workerCommand>["input"]>,
-      { type: "resolve-approval" }
-    >,
+  const resolveInteraction = (
+    input: Extract<WorkerCommand, { type: "resolve-approval" }>,
     acknowledge: (error?: string) => void,
   ): void => {
-    const requestId = serverRequestIds.get(String(input.requestId))
-    if (requestId !== undefined) {
-      try {
-        if (appServer === null) throw new Error("Codex disconnected.")
-        appServer.respond(
-          requestId.id,
-          encodeInteractionResponse(
-            requestId.method,
-            requestId.params,
-            input.decision,
-            input.answers,
-          ),
-        )
-        serverRequestIds.delete(String(input.requestId))
-        acknowledge()
-      } catch (cause) {
-        acknowledge(String(cause))
-      }
-    } else acknowledge("This interaction is no longer pending.")
-  }
-  parentPort.on("message", (event: { readonly data: unknown }) => {
-    const message = event.data as Record<string, unknown> | string
-    if (
-      typeof message === "object" &&
-      message !== null &&
-      message.type === "cancel-usage" &&
-      typeof message.requestId === "string"
-    ) {
-      usageRequests.get(message.requestId)?.abort()
+    const interaction = interactions.get(String(input.requestId))
+    if (interaction === undefined) {
+      acknowledge("This interaction is no longer pending.")
       return
     }
-    if (message === "probe-now") {
+    try {
+      if (appServer === null) throw new Error("Codex disconnected.")
+      appServer.respond(
+        interaction.id,
+        encodeInteractionResponse(
+          interaction.method,
+          interaction.params,
+          input.decision,
+          input.answers,
+        ),
+      )
+      interactions.delete(String(input.requestId))
+      acknowledge()
+    } catch (cause) {
+      acknowledge(String(cause))
+    }
+  }
+
+  const readUsage = (requestId: string): void => {
+    const controller = new AbortController()
+    usageRequests.set(requestId, controller)
+    void serverForRequest()
+      .then((server) => readCodexUsage(server, controller.signal))
+      .then(
+        (usage) => publish({ type: "usage-result", requestId, usage }),
+        (cause: unknown) =>
+          publish({ type: "usage-result", requestId, error: errorMessage(cause) }),
+      )
+      .finally(() => usageRequests.delete(requestId))
+  }
+
+  const listCommands = (requestId: string, workspacePath: string): void => {
+    void serverForRequest()
+      .then((server) =>
+        server.request("skills/list", { cwds: [workspacePath] }, { timeoutMs: 15_000 }),
+      )
+      .then(
+        (response) =>
+          publish({ type: "commands-result", requestId, commands: codexSkillCommands(response) }),
+        (cause: unknown) =>
+          publish({ type: "commands-result", requestId, error: errorMessage(cause) }),
+      )
+  }
+
+  parentPort.on("message", ({ data }) => {
+    if (data === "probe-now") {
       void probe()
       return
     }
-    const { input, acknowledge } = workerCommand(parentPort, message)
+    const { input, acknowledge } = workerCommand(parentPort, data)
     if (input === null) {
       publish({
         type: "protocol-error",
@@ -653,16 +491,15 @@ export const runCodexWorker = (
       })
       return
     }
+    if (input.type === "cancel-usage") {
+      usageRequests.get(input.requestId)?.abort()
+      return
+    }
     if (stopping && input.type !== "shutdown") {
       acknowledge("Codex is shutting down.")
       return
     }
-    if (
-      input.type !== "resolve-approval" &&
-      input.type !== "shutdown" &&
-      input.type !== "interrupt-turn"
-    )
-      acknowledge()
+    if (!ACKNOWLEDGED_ON_COMPLETION.has(input.type)) acknowledge()
     switch (input.type) {
       case "shutdown":
         void shutdown().then(
@@ -670,42 +507,11 @@ export const runCodexWorker = (
           (cause: unknown) => acknowledge(String(cause)),
         )
         break
-      case "get-usage": {
-        const controller = new AbortController()
-        usageRequests.set(input.requestId, controller)
-        void serverForRequest()
-          .then((server) => readCodexUsage(server, controller.signal))
-          .then(
-            (usage) => publish({ type: "usage-result", requestId: input.requestId, usage }),
-            (cause: unknown) =>
-              publish({
-                type: "usage-result",
-                requestId: input.requestId,
-                error: errorMessage(cause),
-              }),
-          )
-          .finally(() => usageRequests.delete(input.requestId))
+      case "get-usage":
+        readUsage(input.requestId)
         break
-      }
       case "list-commands":
-        void serverForRequest()
-          .then((server) =>
-            server.request("skills/list", { cwds: [input.workspacePath] }, { timeoutMs: 15_000 }),
-          )
-          .then(
-            (response) =>
-              publish({
-                type: "commands-result",
-                requestId: input.requestId,
-                commands: codexSkillCommands(response),
-              }),
-            (cause: unknown) =>
-              publish({
-                type: "commands-result",
-                requestId: input.requestId,
-                error: errorMessage(cause),
-              }),
-          )
+        listCommands(input.requestId, input.workspacePath)
         break
       case "start-turn":
         void startTurn(input.dispatch)
@@ -726,10 +532,9 @@ export const runCodexWorker = (
             (cause: unknown) => acknowledge(errorMessage(cause)),
           )
         break
-      case "resolve-approval": {
-        resolveApproval(input, acknowledge)
+      case "resolve-approval":
+        resolveInteraction(input, acknowledge)
         break
-      }
     }
   })
 
@@ -738,12 +543,11 @@ export const runCodexWorker = (
     for (const request of usageRequests.values()) request.abort()
     probeAbort.abort()
     await probing
-    for (const pending of titleThreads.values()) clearTimeout(pending.timeout)
-    titleThreads.clear()
+    titles.clear()
     const server = appServer ?? (await appServerReady?.catch(() => null))
     await server?.stop()
-    localByNativeThread.clear()
-    serverRequestIds.clear()
+    turnsByNativeThread.clear()
+    interactions.clear()
   }
   return { shutdown }
 }

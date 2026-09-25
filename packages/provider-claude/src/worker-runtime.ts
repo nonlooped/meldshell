@@ -1,4 +1,4 @@
-import { workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
+import { eventPublisher, workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
 import {
   query,
   type Options,
@@ -93,7 +93,9 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
       planApproved?: { mode: PermissionMode; emit: (method: string, params: unknown) => void }
     }
   >()
-  const publish = (value: unknown): void => port.postMessage(value)
+  const publish = eventPublisher(port)
+  const publishStatus = (value: ClaudeStatus): void =>
+    publish({ type: "provider-status", status: value })
   const status = (
     availability: ClaudeStatus["availability"],
     detail: string,
@@ -149,9 +151,9 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
         }
         // Drain stderr without logging prompts, credentials, or tool output to the host console.
         child.stderr.resume()
-        if (child.pid) publish({ type: "app-server-started", pid: child.pid })
+        if (child.pid) publish({ type: "process-started", pid: child.pid })
         child.once("exit", () => {
-          if (child.pid) publish({ type: "app-server-stopped", pid: child.pid })
+          if (child.pid) publish({ type: "process-stopped", pid: child.pid })
         })
         return child
       },
@@ -192,7 +194,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
     if (probing !== null) return probing
     if (stopping) return Promise.resolve()
     probing = (async () => {
-      publish(status("probing", "Connecting to Claude Code..."))
+      publishStatus(status("probing", "Connecting to Claude Code..."))
       const controller = new AbortController()
       controllers.add(controller)
       const timeout = setTimeout(() => controller.abort(), 20_000)
@@ -235,7 +237,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
       } catch (cause) {
         if (/not installed|override could not be resolved/i.test(errorMessage(cause)))
           discovered = null
-        if (!stopping) publish(discoveryStatus(cause))
+        if (!stopping) publishStatus(discoveryStatus(cause))
       } finally {
         clearTimeout(timeout)
         controller.abort()
@@ -262,7 +264,6 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
     const emit = (method: string, params: unknown, validated = true, requestId?: string): void =>
       publish({
         type: "runtime-event",
-        known: validated,
         input: {
           threadId: dispatch.threadId,
           turnId: dispatch.turnId,

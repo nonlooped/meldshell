@@ -7,7 +7,12 @@ import { execFileSync } from "node:child_process"
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { AppSnapshot, SubmitTurnResult, TranscriptPage } from "@meldshell/contracts"
+import type {
+  AppSnapshot,
+  SubmitTurnResult,
+  TranscriptPage,
+  TurnDispatch,
+} from "@meldshell/contracts"
 import { IPC } from "@meldshell/contracts"
 import type { GitSnapshot, WorktreeStatus } from "@meldshell/contracts/ipc"
 import type { HostProcess } from "./platform"
@@ -54,10 +59,12 @@ const fakeProviders = (
     off: (event: "message" | "exit", listener: (...args: unknown[]) => void) =>
       events.off(event, listener),
     postMessage: (raw) => {
-      const command = raw as { commandId: string }
-      queueMicrotask(() =>
-        events.emit("message", { type: "command-ack", commandId: command.commandId }),
-      )
+      const command = raw as { commandId: string; type?: string; dispatch?: TurnDispatch }
+      queueMicrotask(() => {
+        events.emit("message", { type: "command-ack", commandId: command.commandId })
+        if (command.type === "start-turn" && command.dispatch !== undefined)
+          for (const event of turnEvents(command.dispatch)) events.emit("message", event)
+      })
     },
     kill: () => {
       if (!killed) {
@@ -68,6 +75,9 @@ const fakeProviders = (
     },
   } as HostProcess
 }
+
+/** What the fake workers report for each turn they start; empty unless a test sets it. */
+let turnEvents: (dispatch: TurnDispatch) => readonly unknown[] = () => []
 
 test("host state survives restart and remote commands run through the shared API", {
   timeout: 30_000,
@@ -426,6 +436,68 @@ test("the workspace setup script prepares new worktrees and holds turns until it
     await host.call(IPC.removeWorktree, [{ threadId: thread.id, deleteBranch: true }])
     await assert.rejects(stat(`${worktree.path}.setup.log`))
   } finally {
+    await host?.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test("typed worker events reach the transcript and settle the turn", {
+  timeout: 30_000,
+}, async () => {
+  const directory = await mkdtemp(join(tmpdir(), "meldshell-events-"))
+  const platform = {
+    databasePath: join(directory, "meldshell.sqlite"),
+    notify: () => undefined,
+    fork: fakeProviders,
+  }
+  const event = (dispatch: TurnDispatch, method: string, params: unknown) => ({
+    type: "runtime-event",
+    input: {
+      threadId: dispatch.threadId,
+      turnId: dispatch.turnId,
+      validated: true,
+      method,
+      params,
+    },
+  })
+  turnEvents = (dispatch) => [
+    event(dispatch, "item/agentMessage/delta", { itemId: "answer", delta: "Hel" }),
+    event(dispatch, "item/agentMessage/delta", { itemId: "answer", delta: "lo" }),
+    // A malformed event is refused as a whole; the worker's later events still arrive.
+    { type: "runtime-event", input: { threadId: dispatch.threadId } },
+    event(dispatch, "turn/completed", { turn: { status: "completed" } }),
+  ]
+  let host: Host | undefined
+  try {
+    host = await startHost(directory, platform)
+    const workspace = await host.addWorkspace(directory)
+    const created = (await host.call(IPC.createThread, [
+      { workspaceId: workspace.workspaces[0]!.id, title: "Events" },
+    ])) as AppSnapshot
+    const provider = created.providers.find((entry) => entry.harness === "codex")!
+    const catalog = (await host.call(IPC.upsertModel, [
+      { providerId: provider.id, slug: "test-model", displayName: "Test model" },
+    ])) as AppSnapshot
+    const threadId = created.threads[0]!.id
+    await host.call(IPC.setThreadSettings, [{ threadId, modelId: catalog.models[0]!.id }])
+    await host.call(IPC.submitTurn, [{ threadId, text: "Say hello" }])
+    let snapshot: AppSnapshot | undefined
+    for (let attempt = 0; attempt < 100; attempt++) {
+      snapshot = (await host.call(IPC.getSnapshot, [])) as AppSnapshot
+      if (snapshot.threads[0]?.activity === "completed") break
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    assert.equal(snapshot?.threads[0]?.activity, "completed")
+    const transcript = (await host.call(IPC.getTranscript, [{ threadId }])) as TranscriptPage
+    assert.equal(
+      transcript.events
+        .filter((entry) => entry.kind === "assistant")
+        .map((entry) => entry.text)
+        .join(""),
+      "Hello",
+    )
+  } finally {
+    turnEvents = () => []
     await host?.close()
     await rm(directory, { recursive: true, force: true })
   }

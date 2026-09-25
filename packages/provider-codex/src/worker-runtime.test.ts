@@ -137,7 +137,13 @@ test("validated auth notifications refresh discovery while malformed notificatio
     { method: "account/updated", params: { authMode: null, planType: null } },
     "validated",
   )
-  await until(() => mock.output.some((message) => message.availability === "unauthenticated"))
+  await until(() =>
+    mock.output.some(
+      (message) =>
+        message.type === "provider-status" &&
+        (message.status as CodexStatus).availability === "unauthenticated",
+    ),
+  )
   await setImmediate()
   assert.equal(server.requests.length, 1)
   mock.availability("ready")

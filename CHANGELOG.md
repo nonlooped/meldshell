@@ -14,6 +14,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 ### Fixed
 
 - Cursor threads now run in the mode the thread is set to. Before, every Cursor turn ran in Agent mode.
+- When a Cursor model cannot write a commit message or a thread title, the failure shows right away. Before, the commit message button waited 75 seconds before reporting it.
 
 ### Changed
 
