@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": ["packages/provider-codex/src/generated/**"],
   "ignoreBinaries": ["install-electron"],
   "includeEntryExports": true,
   // The compiler loads its plugin by name. SQLite and semver stay direct desktop dependencies
@@ -29,38 +30,11 @@
     },
     "apps/site": {
       // Pages runs the /api function, which forwards to the account worker.
-      "entry": ["functions/**/*.ts"],
-      // The remote workspace page bundles the desktop renderer, whose imports resolve against
-      // the site's install on Pages. Its tsconfig extends the Electron toolkit preset.
-      "ignoreDependencies": [
-        "@base-ui-components/react",
-        "@electron-toolkit/tsconfig",
-        "@dnd-kit/dom",
-        "@dnd-kit/react",
-        "@iconify-icons/material-icon-theme",
-        "@iconify/react",
-        "@meldshell/projection",
-        "@tanstack/react-query",
-        "@tanstack/react-virtual",
-        "@xterm/addon-fit",
-        "@xterm/addon-unicode11",
-        "@xterm/addon-web-links",
-        "@xterm/xterm",
-        "date-fns",
-        "diff",
-        "katex",
-        "lucide-react",
-        "mermaid",
-        "react-diff-view",
-        "react-error-boundary",
-        "react-markdown",
-        "react-resizable-panels",
-        "refractor",
-        "rehype-katex",
-        "remark-gfm",
-        "remark-math",
-        "zustand"
-      ]
+      "entry": ["functions/**/*.ts"]
+    },
+    "packages/ui": {
+      "entry": ["src/**/*.test.mjs"],
+      "project": ["src/**/*.{ts,tsx,mjs,css}"]
     },
     "packages/*": {
       "project": ["src/**/*.ts"]

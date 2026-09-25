@@ -4,6 +4,20 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+
+- Malformed provider messages and stored approvals now report decoding errors with field paths instead of being treated as empty objects or trusted without validation.
+- The remote workspace identifies its runtime as Web in Settings › About.
+- When a Cursor model cannot write a commit message or a thread title, the failure shows right away. Before, the commit message button waited 75 seconds before reporting it.
+- Files that Cursor edits show only the lines that changed, and files it creates show their contents. Before, an edit showed the whole file removed and added again, and a new file showed patch markers as if they were its text.
+- Error messages from Git, files, and commit message generation no longer start with "Error:".
+
+### Changed
+
+- Updated dependencies across the desktop app, remote site, account worker, and providers. Mermaid 12 also adds support for its new diagram types while keeping existing diagrams' layout and appearance.
+- Collapsing the inbox now leaves a narrow strip of its icons instead of hiding it. New thread, search, the workspace picker, Settings, and each thread's provider icon stay where they were, and threads that need attention keep their colored marker. The New thread button's label is now left-aligned so its icon stays put.
+- On macOS and Linux, stopping or restarting Codex, Claude Code, or Cursor also stops the processes they started, such as running commands, as it already did on Windows.
+
 ## [0.10.0] - 2026-09-25
 
 ### Added
@@ -14,15 +28,11 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 ### Fixed
 
 - Cursor threads now run in the mode the thread is set to. Before, every Cursor turn ran in Agent mode.
-- When a Cursor model cannot write a commit message or a thread title, the failure shows right away. Before, the commit message button waited 75 seconds before reporting it.
-- Files that Cursor edits show only the lines that changed, and files it creates show their contents. Before, an edit showed the whole file removed and added again, and a new file showed patch markers as if they were its text.
-- Error messages from Git, files, and commit message generation no longer start with "Error:".
 
 ### Changed
 
 - Stable releases are published automatically once a day when there are new changes, and each one is a new minor version.
 - The message composer is translucent and blurs the conversation scrolling behind it. With reduced transparency turned on, it keeps a solid background.
-- On macOS and Linux, stopping or restarting Codex, Claude Code, or Cursor also stops the processes they started, such as running commands, as it already did on Windows.
 
 ## [0.9.0] - 2026-09-24
 

@@ -13,6 +13,8 @@ Choose commands from the affected behavior, using exact paths:
 | Markdown documentation | `git diff --check` and review changed links; no build or test |
 | Supported source files | `npx --no-install biome check path/to/file.ts path/to/file.tsx` |
 | One behavior | `node --import tsx --test path/to/affected.test.ts` (also accepts `.test.mjs` and multiple paths) |
+| Core database behavior | `npm run test --workspace=@meldshell/core -- src/affected.spec.ts` |
+| Shared renderer types | `npm run typecheck --workspace=@meldshell/ui` |
 | Desktop renderer types | `npm run typecheck:web --workspace=@meldshell/desktop` |
 | Desktop main/preload types | `npm run typecheck:node --workspace=@meldshell/desktop` |
 | Package or service types | `npm run typecheck --workspace=@meldshell/<workspace>` when that workspace defines it |
@@ -28,11 +30,19 @@ Biome handles supported source formatting and linting, including a cognitive-com
 
 Authenticated provider checks can consume account quota. UI and manual verification follow the repository policy; report unverified behavior explicitly.
 
+Core tests use `@effect/vitest` and `.spec.ts` filenames. Provide the shared `TestDatabase` layer per test to keep SQLite state isolated. Use `TestClock` for Effect clock behavior; other packages continue to use Node’s test runner. The root `npm test` runs both runners.
+
+`@effect/vitest` currently requires Vitest 3. Its browser mocker has an [upstream advisory](https://github.com/vitest-dev/vitest/security/advisories/GHSA-82fw-gwwq-j7x9) whose fix is only available in newer majors. Core tests explicitly use Node with the API and browser modes disabled. Revisit the pin when Effect supports a patched Vitest major.
+
+`electron-vite` 5 requires Vite 7, so the desktop and shared UI use Vite 7 and `@vitejs/plugin-react` 5 until Electron Vite supports Vite 8. `@astrojs/check` currently supports TypeScript through 6, so the workspace uses TypeScript 6. The Node type definitions follow the supported Node 24 runtime.
+
+The shared renderer lives in `packages/ui`. Desktop and the remote site import `@meldshell/ui`; its package owns renderer dependencies. Each app passes its version information to `mount`.
+
 ## Provider changes
 
 Preserve native payloads when mapping canonical events. Review process, session, and recovery behavior in the [host](packages/host/src/host.ts) and [contracts](packages/contracts/src/ipc.ts); provider implementations live under [packages](packages).
 
-Regenerate changed Codex app-server schemas with the supported CLI and commit them under `packages/provider-codex/schema`. Consult the CLI's schema-generation help before changing generated files.
+Regenerate changed Codex app-server schemas with the supported CLI and commit them under `packages/provider-codex/schema`. Consult the CLI's schema-generation help before changing generated files. After updating the JSON schemas, run `npm run generate:protocol --workspace=@meldshell/provider-codex` to regenerate their TypeScript types. `npm run check:protocol --workspace=@meldshell/provider-codex` detects drift without changing files.
 
 ## Versions and changelog
 
