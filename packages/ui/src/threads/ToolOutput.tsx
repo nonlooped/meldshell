@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react"
-import { Check, Copy } from "lucide-react"
-import { Swap } from "../ui/motion"
+import { useMemo, useState } from "react"
+import { CopyIconButton, copyStatusText, useCopy } from "../ui/CopyButton"
 import { Toggle } from "@base-ui-components/react/toggle"
-import { IconButton, SelectField } from "../ui/controls"
+import { SelectField } from "../ui/controls"
 import { SourceCode } from "../ui/SourceCode"
 import { toolLanguage } from "./tool-language"
 
@@ -18,16 +17,10 @@ export function ToolOutput({
   readonly command?: boolean
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState(false)
-  const [copyState, setCopyState] = useState("idle")
+  const [copyState, copy] = useCopy()
   const [language, setLanguage] = useState("auto")
   const detectedLanguage = useMemo(() => toolLanguage(text, command), [text, command])
   const long = text.length > 1200 || text.split("\n").length > 12
-
-  useEffect(() => {
-    if (copyState === "idle") return
-    const timer = window.setTimeout(() => setCopyState("idle"), 2000)
-    return () => window.clearTimeout(timer)
-  }, [copyState])
 
   return (
     <section className={toolOutputClasses} aria-label={label} data-error={error || undefined}>
@@ -64,33 +57,18 @@ export function ToolOutput({
           ]}
         />
         <span className="text-[11px]" role="status">
-          {copyState === "failed"
-            ? "Copy failed. Try again."
-            : copyState === "copied"
-              ? "Copied"
-              : ""}
+          {copyStatusText(copyState)}
         </span>
         {long && (
           <Toggle pressed={expanded} onPressedChange={setExpanded} aria-label="Expand output">
             {expanded ? "Collapse" : "Expand"}
           </Toggle>
         )}
-        <IconButton
-          unstyled
+        <CopyIconButton
           label={`Copy ${label.toLowerCase()}`}
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(text)
-              setCopyState("copied")
-            } catch {
-              setCopyState("failed")
-            }
-          }}
-        >
-          <Swap id={copyState === "copied" ? "copied" : "copy"}>
-            {copyState === "copied" ? <Check size={13} /> : <Copy size={13} />}
-          </Swap>
-        </IconButton>
+          state={copyState}
+          onClick={() => void copy(text)}
+        />
       </div>
       <pre
         className={

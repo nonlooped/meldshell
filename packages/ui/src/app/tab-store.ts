@@ -46,9 +46,7 @@ interface TabStore {
   readonly selectedThreadId: string | null
   readonly openThread: (threadId: string) => void
   readonly closeThread: (threadId: string) => void
-  readonly selectThread: (threadId: string) => void
   readonly cycle: (direction: 1 | -1) => void
-  readonly removeThread: (threadId: string) => void
 }
 
 function newThreadTab(threadId: string): ThreadTab {
@@ -159,7 +157,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
       const state = get()
       const tab = state.threadTabs.find((candidate) => candidate.id === id)
       if (tab) set({ ...tabState(state.threadTabs, id), selectedFileId: null })
-      else state.selectThread(id)
+      else state.openThread(id)
     }
   },
   closeTab: (id) => {
@@ -211,7 +209,6 @@ export const useTabStore = create<TabStore>((set, get) => ({
         : (tabs[Math.min(index, tabs.length - 1)]?.id ?? null)
       return tabState(tabs, selected)
     }),
-  selectThread: (threadId) => get().openThread(threadId),
   cycle: (direction) => {
     const state = get()
     const ids = [...state.threadTabs.map((tab) => tab.id), ...state.files.map((file) => file.id)]
@@ -219,5 +216,4 @@ export const useTabStore = create<TabStore>((set, get) => ({
     const index = Math.max(0, ids.indexOf(state.selectedFileId ?? state.selectedThreadTabId ?? ""))
     state.selectTab(ids[(index + direction + ids.length) % ids.length]!)
   },
-  removeThread: (threadId) => get().closeThread(threadId),
 }))

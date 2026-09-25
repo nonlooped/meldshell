@@ -14,6 +14,7 @@ import { ChangeDiff } from "./ChangeDiff"
 import { FileIcon } from "./FileIcon"
 import { tableDelimited } from "./markdown-model"
 import { copyableText } from "./MarkdownTools"
+import { cx, markdownInlineClasses, markdownProseClasses } from "./styles"
 
 export const MarkdownStreaming = createContext(false)
 export const MarkdownSearch = createContext("")
@@ -72,6 +73,8 @@ function loadMermaid() {
       securityLevel: "strict",
       suppressErrorRendering: true,
       theme: "neutral",
+      look: "classic",
+      layout: "dagre",
       fontFamily: "Segoe UI",
       flowchart: { htmlLabels: false },
     })
@@ -395,49 +398,8 @@ const markdownCodeClasses = [
   "[&_>_header_>_span]:[overflow-wrap:anywhere]",
 ].join(" ")
 
-const eventMarkdownClasses = [
-  "markdown-table-expanded [&_.markdown-table]:max-h-[70vh] event-markdown whitespace-normal",
-  "[&_>_:first-child]:mt-[0] [&_>_:last-child]:mb-[0] [&_p]:[margin:0_0_0.7em]",
-  "[&_a]:text-[var(--color-info)]",
-  "[&_a]:[text-decoration-color:color-mix(in_srgb,_var(--color-info)_50%,_transparent)]",
-  "[&_a]:[text-underline-offset:3px] [&_code:not(pre_code)]:[padding:1px_5px]",
-  "[&_code:not(pre_code)]:rounded-[var(--radius-sm)] [&_code:not(pre_code)]:text-[var(--text-primary)]",
-  "[&_code:not(pre_code)]:[background:color-mix(in_srgb,_var(--text-primary)_7%,_transparent)]",
-  "[&_code:not(pre_code)]:[box-decoration-break:clone] [&_code:not(pre_code)]:[-webkit-box-decoration-break:clone]",
-  "[&_code:not(pre_code)]:[font-family:var(--font-mono)] [&_code:not(pre_code)]:text-[0.86em]",
-  "[&_strong]:font-semibold [&_strong]:text-[var(--text-primary)]",
-  "[&_.markdown-table]:max-w-full [&_.markdown-table]:overflow-x-auto [&_.markdown-table]:[margin:1em_0]",
-  "[&_.markdown-table]:border-[1px] [&_.markdown-table]:border-[color:var(--line)] [&_.markdown-table]:rounded-[var(--radius)]",
-  "[&_.markdown-table]:max-h-[400px] [&_.markdown-table]:overflow-auto [&_.markdown-table]:mt-[0]",
-  "[&_.markdown-table:focus-visible]:[outline:1px_solid_var(--focus-ring)]",
-  "[&_.markdown-table:focus-visible]:[outline-offset:2px] [&_table]:w-full",
-  "[&_table]:[border-collapse:collapse] [&_table]:[overflow-wrap:normal] [&_th]:min-w-[10rem]",
-  "[&_th]:[padding:9px_12px] [&_th]:border-b-[1px] [&_th]:border-b-[color:var(--line)] [&_th]:[vertical-align:top]",
-  "[&_th]:bg-[var(--surface-hover)] [&_th]:text-left [&_th]:font-semibold [&_td]:min-w-[10rem]",
-  "[&_td]:[padding:9px_12px] [&_td]:border-b-[1px] [&_td]:border-b-[color:var(--line)] [&_td]:[vertical-align:top]",
-  "[&_th:first-child]:min-w-auto [&_td:first-child]:min-w-auto [&_tr:last-child_td]:border-b-0",
-  "[&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:p-[12px] [&_pre]:border-[1px] [&_pre]:border-[color:var(--line)]",
-  "[&_pre]:rounded-[var(--radius)] [&_pre]:bg-[var(--surface-hover)] [&_pre]:whitespace-pre",
-  "[&_pre]:[overflow-wrap:normal] [&_pre_code]:[font-family:var(--font-mono)] [&_pre_code]:text-[0.9em]",
-  "[&_blockquote]:[margin:1em_0] [&_blockquote]:pl-[12px]",
-  "[&_blockquote]:border-l-[2px] [&_blockquote]:border-l-[color:var(--line-strong)] [&_blockquote]:text-[var(--text-secondary)]",
-  "[&_img]:max-w-full [&_img]:h-auto [&_.contains-task-list]:[list-style:none]",
-  "[&_.contains-task-list]:pl-[1.5em] [&_hr]:border-0 [&_hr]:border-t-[1px] [&_hr]:border-t-[color:var(--line)]",
-  "[&_hr]:[margin:1.5em_0] [&_.markdown-code-scroll_pre]:flex-1",
-  "[&_.markdown-code-scroll_pre]:overflow-visible [&_.markdown-code-scroll_pre]:border-0",
-  "[&_.markdown-code-scroll_pre]:rounded-[0] [&_.markdown-code-scroll_pre]:m-0",
-  "[&_.markdown-code-scroll_pre]:bg-transparent [&_.markdown-code-scroll_pre]:leading-[1.65]",
-  "[&_.markdown-code-scroll_pre]:text-[0.9em] [&_.markdown-code-scroll_pre_code]:text-[inherit]",
-  "[&_.markdown-code-scroll_.markdown-line-numbers]:sticky",
-  "[&_.markdown-code-scroll_.markdown-line-numbers]:left-[0]",
-  "[&_.markdown-code-scroll_.markdown-line-numbers]:flex-none",
-  "[&_.markdown-code-scroll_.markdown-line-numbers]:text-[var(--text-tertiary)]",
-  "[&_.markdown-code-scroll_.markdown-line-numbers]:text-right",
-  "[&_.markdown-code-scroll_.markdown-line-numbers]:bg-[var(--surface-menu)]",
-  "[&_.markdown-code-scroll_.markdown-line-numbers]:select-none [&_.markdown-table_th]:sticky",
-  "[&_.markdown-table_th]:top-[0] [&_.markdown-table_th]:z-[1]",
-  "[&_.markdown-table_th]:bg-[var(--surface-menu)] [&_mark]:text-[var(--text-primary)]",
-  "[&_mark]:[background:color-mix(in_srgb,_var(--color-modified)_35%,_transparent)]",
-  "[&_mark[data-current]]:[outline:2px_solid_var(--color-modified)] [&_.katex-display]:overflow-x-auto",
-  "[&_.katex-display]:overflow-y-hidden",
-].join(" ")
+const eventMarkdownClasses = cx(
+  "markdown-table-expanded [&_.markdown-table]:max-h-[70vh]",
+  markdownInlineClasses,
+  markdownProseClasses,
+)

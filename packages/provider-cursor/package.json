@@ -8,10 +8,10 @@
     "./worker": "./src/worker-runtime.ts"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "1.4.0",
+    "@agentclientprotocol/sdk": "1.5.0",
     "@meldshell/contracts": "*",
     "@meldshell/provider-runtime": "*",
-    "effect": "3.22.1",
+    "effect": "3.22.2",
     "mime": "4.1.0",
     "which": "7.0.0"
   },

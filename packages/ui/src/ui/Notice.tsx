@@ -66,6 +66,15 @@ export function Notice({
   )
 }
 
+/** A floating panel at the bottom of the window. */
+const toastClasses = [
+  "fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] flex w-max",
+  "bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] text-[var(--text-primary)]",
+  "border-[1px] border-[color:var(--line)] rounded-[var(--radius-lg)] text-[12px] leading-[1.5]",
+  "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
+  "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
+].join(" ")
+
 /** A floating failure from an action that has no control of its own to sit beside. */
 export function ErrorToast({
   message,
@@ -77,7 +86,7 @@ export function ErrorToast({
   return (
     <FadeDiv
       duration={0.2}
-      className="fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] flex items-start gap-[10px] [padding:10px_10px_10px_14px] w-max max-w-[min(560px,_80vw)] bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] text-[var(--text-primary)] border-[1px] border-[color:var(--line)] rounded-[var(--radius-lg)] text-[12px] leading-[1.5] [box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)] [@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]"
+      className={`${toastClasses} items-start gap-[10px] [padding:10px_10px_10px_14px] max-w-[min(560px,_80vw)]`}
       role="alert"
     >
       <CircleAlert size={15} className="flex-none mt-[4px] text-[var(--color-deleted)]" />
@@ -116,7 +125,7 @@ export function ActionToast({
   return (
     <FadeDiv
       duration={0.2}
-      className="fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] flex items-center gap-[8px] [padding:6px_6px_6px_14px] w-max max-w-[min(480px,_80vw)] bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] text-[var(--text-primary)] border-[1px] border-[color:var(--line)] rounded-[var(--radius-lg)] text-[12px] leading-[1.5] [box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)] [@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]"
+      className={`${toastClasses} items-center gap-[8px] [padding:6px_6px_6px_14px] max-w-[min(480px,_80vw)]`}
       role="status"
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}

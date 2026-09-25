@@ -1,7 +1,8 @@
 import { GradientSpinner, PopPresence, TextSwap } from "../ui/motion"
 import { Button as BaseButton } from "@base-ui-components/react/button"
-import { useRef, useState } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import type { Provider, Thread, Workspace } from "@meldshell/contracts"
+import { iconButtonClasses, railControlClasses, railLabelClasses } from "../ui/styles"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   AlarmClock,
@@ -13,7 +14,6 @@ import {
   Folder,
   FolderPlus,
   GitBranch,
-  Inbox as InboxIcon,
   CircleAlert,
   MoreHorizontal,
   Rows2,
@@ -51,6 +51,8 @@ type InboxRow =
   | { readonly type: "notice"; readonly id: string; readonly message: string }
 
 interface InboxProps {
+  /** The sidebar is collapsed to its icon rail; labels fade and controls keep their places. */
+  readonly rail: boolean
   readonly showSettled: boolean
   readonly onSearch: () => void
   readonly onManageWorkspaces: () => void
@@ -127,7 +129,7 @@ function InboxThread({
       <BaseButton
         ref={draggable.ref}
         type="button"
-        className="thread-open relative flex min-w-0 flex-1 flex-col justify-start gap-[5px] [padding:8px_10px] border-0 bg-transparent text-inherit cursor-default text-left [&:focus-visible]:[outline-offset:-2px]"
+        className="thread-open relative flex min-w-0 flex-1 flex-col overflow-hidden justify-start gap-[5px] [padding:8px_10px] border-0 bg-transparent text-inherit cursor-default text-left [&:focus-visible]:[outline-offset:-2px]"
         data-dragging={draggable.isDragging ? "" : undefined}
         aria-current={selected ? "true" : undefined}
         title={`${thread.title}\nDrag onto a pane to open it there`}
@@ -135,77 +137,65 @@ function InboxThread({
       >
         {thread.status === "active" ? (
           <>
-            <span className="thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium">
+            <span
+              className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
+            >
               <TextSwap text={thread.title} />
             </span>
             <span className={threadContextClasses}>
               <ProviderIcon provider={providersByThreadId.get(thread.id)} size={13} />
-              {thread.worktree !== undefined && (
-                <span
-                  className="inline-flex shrink-0"
-                  role="img"
-                  aria-label={`Own branch ${thread.worktree.branch}`}
-                  title={`Works on its own branch: ${thread.worktree.branch}`}
-                >
-                  <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
-                </span>
-              )}
-              {scheduled && (
-                <span
-                  className="inline-flex shrink-0"
-                  role="img"
-                  aria-label="Has scheduled prompts"
-                  title="Has scheduled prompts"
-                >
-                  <AlarmClock size={12} strokeWidth={1.75} aria-hidden="true" />
-                </span>
-              )}
-              {workspaceId === "all" && (
-                <span className="thread-workspace">
-                  {workspaceNames.get(thread.workspaceId) ?? "Unknown workspace"}
-                </span>
-              )}
-              <PopPresence className="inline-flex shrink-0" show={thread.activity === "running"}>
-                <span
-                  className="thread-activity [&[data-attention]]:text-[var(--color-modified)] [&[data-activity='failed']]:text-[var(--color-deleted)] [&[data-activity='running']]:text-[var(--color-info)]"
-                  data-activity="running"
-                  role="img"
-                  aria-label="Running"
-                  title="Running"
-                >
+              {/* The provider icon stays in the rail; the rest of the line fades beside it. */}
+              <span
+                className={`flex min-w-0 flex-1 items-center gap-[6px] overflow-visible! ${railLabelClasses}`}
+              >
+                {thread.worktree !== undefined && (
+                  <span
+                    className="inline-flex shrink-0"
+                    role="img"
+                    aria-label={`Own branch ${thread.worktree.branch}`}
+                    title={`Works on its own branch: ${thread.worktree.branch}`}
+                  >
+                    <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
+                  </span>
+                )}
+                {scheduled && (
+                  <span
+                    className="inline-flex shrink-0"
+                    role="img"
+                    aria-label="Has scheduled prompts"
+                    title="Has scheduled prompts"
+                  >
+                    <AlarmClock size={12} strokeWidth={1.75} aria-hidden="true" />
+                  </span>
+                )}
+                {workspaceId === "all" && (
+                  <span className="thread-workspace">
+                    {workspaceNames.get(thread.workspaceId) ?? "Unknown workspace"}
+                  </span>
+                )}
+                <ActivityBadge activity={thread.activity} show="running">
                   <GradientSpinner />
-                </span>
-              </PopPresence>
-              <PopPresence className="inline-flex shrink-0" show={thread.activity === "approval"}>
-                <span
-                  className="thread-activity [&[data-attention]]:text-[var(--color-modified)] [&[data-activity='failed']]:text-[var(--color-deleted)] [&[data-activity='running']]:text-[var(--color-info)]"
-                  data-activity={thread.activity}
-                  data-attention=""
-                >
+                </ActivityBadge>
+                <ActivityBadge activity={thread.activity} show="approval" attention>
                   <CircleAlert size={12} aria-hidden="true" />
                   Needs approval
-                </span>
-              </PopPresence>
-              <PopPresence className="inline-flex shrink-0" show={thread.activity === "queued"}>
-                <span className="thread-activity [&[data-attention]]:text-[var(--color-modified)] [&[data-activity='failed']]:text-[var(--color-deleted)] [&[data-activity='running']]:text-[var(--color-info)]">
+                </ActivityBadge>
+                <ActivityBadge activity={thread.activity} show="queued">
                   Queued
-                </span>
-              </PopPresence>
-              <PopPresence className="inline-flex shrink-0" show={thread.activity === "failed"}>
-                <span
-                  className="thread-activity [&[data-attention]]:text-[var(--color-modified)] [&[data-activity='failed']]:text-[var(--color-deleted)] [&[data-activity='running']]:text-[var(--color-info)]"
-                  data-activity={thread.activity}
-                  data-attention=""
-                >
+                </ActivityBadge>
+                <ActivityBadge activity={thread.activity} show="failed" attention>
                   Failed
-                </span>
-              </PopPresence>
-              <PopPresence className="inline-flex shrink-0" show={finishedUnseen}>
-                <UnseenMark />
-              </PopPresence>
-              <time dateTime={thread.updatedAt} title={new Date(thread.updatedAt).toLocaleString()}>
-                {relativeAge(thread.updatedAt)}
-              </time>
+                </ActivityBadge>
+                <PopPresence className="inline-flex shrink-0" show={finishedUnseen}>
+                  <UnseenMark />
+                </PopPresence>
+                <time
+                  dateTime={thread.updatedAt}
+                  title={new Date(thread.updatedAt).toLocaleString()}
+                >
+                  {relativeAge(thread.updatedAt)}
+                </time>
+              </span>
             </span>
           </>
         ) : (
@@ -213,10 +203,16 @@ function InboxThread({
             <span className="flex-[0_0_14px] text-[var(--text-tertiary)]">
               <ProviderIcon provider={providersByThreadId.get(thread.id)} size={14} />
             </span>
-            <span className="thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium">
+            <span
+              className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
+            >
               <TextSwap text={thread.title} />
             </span>
-            <time dateTime={thread.updatedAt} title={new Date(thread.updatedAt).toLocaleString()}>
+            <time
+              className={railLabelClasses}
+              dateTime={thread.updatedAt}
+              title={new Date(thread.updatedAt).toLocaleString()}
+            >
               {relativeAge(thread.updatedAt)}
             </time>
           </>
@@ -225,7 +221,7 @@ function InboxThread({
       <div className={rowActionsClasses}>
         <IconButton
           unstyled
-          className={`motion-colors ${rowButtonClasses}`}
+          className={rowButtonClasses}
           label={selected ? withShortcut(archiveLabel, archiveChord) : archiveLabel}
           onClick={() => onSetStatus(thread)}
         >
@@ -240,7 +236,7 @@ function InboxThread({
           trigger={
             <BaseButton
               type="button"
-              className={`motion-colors ${rowButtonClasses}`}
+              className={rowButtonClasses}
               aria-label={`Actions for ${thread.title}`}
             >
               <MoreHorizontal size={15} strokeWidth={1.75} />
@@ -307,6 +303,38 @@ function UnseenMark() {
 
 const threadRow = (thread: Thread): InboxRow => ({ type: "thread", id: thread.id, thread })
 
+/** The inbox's message when nothing waits, centered with the one action that changes that. */
+function InboxNotice({
+  message,
+  showAll,
+  onShowAll,
+  onNewThread,
+}: {
+  message: string
+  showAll: boolean
+  onShowAll: () => void
+  onNewThread: () => void
+}): React.JSX.Element {
+  return (
+    <div className="flex w-full flex-col items-center gap-[10px] [padding:20px_14px] text-center">
+      <p
+        role="status"
+        className="m-0 max-w-[200px] text-[var(--text-secondary)] text-[11.5px] leading-[1.45] [text-wrap:balance]"
+      >
+        {message}
+      </p>
+      <Button
+        size="sm"
+        className="mt-[2px]"
+        icon={showAll ? undefined : <SquarePen size={13} strokeWidth={1.8} />}
+        onClick={showAll ? onShowAll : onNewThread}
+      >
+        {showAll ? "Show all workspaces" : "New thread"}
+      </Button>
+    </div>
+  )
+}
+
 /** What the list says when nothing waits in the inbox, or null while something does. */
 function inboxNotice({
   threads,
@@ -333,19 +361,17 @@ function inboxNotice({
     : "All caught up. Archived threads stay in search."
 }
 
-/** The inbox's sections in order: pinned, the inbox itself, then archived threads when expanded. */
+/** The inbox's sections in order: pinned, then the inbox itself. Archived threads live below. */
 function inboxRows({
   notice,
   pinnedThreads,
   activeThreads,
-  settledThreads,
-  archivedExpanded,
+  hasArchived,
 }: {
   notice: string | null
   pinnedThreads: ReadonlyArray<Thread>
   activeThreads: ReadonlyArray<Thread>
-  settledThreads: ReadonlyArray<Thread>
-  archivedExpanded: boolean
+  hasArchived: boolean
 }): ReadonlyArray<InboxRow> {
   const rows: InboxRow[] = []
   if (notice !== null) rows.push({ type: "notice", id: "notice", message: notice })
@@ -355,18 +381,18 @@ function inboxRows({
       ...pinnedThreads.map(threadRow),
     )
   // A lone inbox needs no label; beside pinned or archived threads it names its section.
-  if (activeThreads.length > 0 && (pinnedThreads.length > 0 || settledThreads.length > 0))
+  if (activeThreads.length > 0 && (pinnedThreads.length > 0 || hasArchived))
     rows.push({ type: "heading", id: "active", label: "Inbox", count: activeThreads.length })
   rows.push(...activeThreads.map(threadRow))
-  if (settledThreads.length > 0)
-    rows.push(
-      { type: "heading", id: "settled", label: "Archived", count: settledThreads.length },
-      ...(archivedExpanded ? settledThreads.map(threadRow) : []),
-    )
   return rows
 }
 
+const ARCHIVED_ROW_HEIGHT = 40
+/** The archived list grows with its threads until this height, then scrolls. */
+const ARCHIVED_MAX_HEIGHT = 220
+
 export function Inbox({
+  rail,
   threads,
   showSettled,
   onSearch,
@@ -418,9 +444,12 @@ export function Inbox({
     }),
     pinnedThreads,
     activeThreads,
-    settledThreads,
-    archivedExpanded,
+    hasArchived: settledThreads.length > 0,
   })
+  // A notice with nothing beneath it is the whole list; it centers in the sidebar instead.
+  const firstRow = rows[0]
+  const emptyNotice = rows.length === 1 && firstRow?.type === "notice" ? firstRow.message : null
+  const showAll = workspaceId !== "all" && visibleThreads.length === 0
   const listRef = useRef<HTMLDivElement>(null)
   // TanStack Virtual deliberately exposes mutable imperative methods. The compiler opt-out is
   // confined to this list so the rest of MeldShell remains React Compiler managed.
@@ -431,11 +460,36 @@ export function Inbox({
       const row = rows[index]
       if (row?.type === "heading") return 34
       if (row?.type === "notice") return 110
-      return row?.thread.status === "active" ? 60 : 40
+      return 60
     },
     getItemKey: (index) => rows[index]?.id ?? index,
     overscan: 12,
   })
+  const archivedRef = useRef<HTMLDivElement>(null)
+  const archivedVirtualizer = useVirtualizer({
+    count: archivedExpanded ? settledThreads.length : 0,
+    getScrollElement: () => archivedRef.current,
+    estimateSize: () => ARCHIVED_ROW_HEIGHT,
+    getItemKey: (index) => settledThreads[index]?.id ?? index,
+    overscan: 6,
+  })
+  const archivedHeight = Math.min(settledThreads.length * ARCHIVED_ROW_HEIGHT, ARCHIVED_MAX_HEIGHT)
+  const renderThread = (thread: Thread): React.JSX.Element => (
+    <InboxThread
+      thread={thread}
+      workspaceId={workspaceId}
+      workspaceNames={workspaceNames}
+      providersByThreadId={providersByThreadId}
+      selectedThreadId={selectedThreadId}
+      unseen={unseenThreadIds.has(thread.id)}
+      scheduled={scheduledThreadIds.has(thread.id)}
+      onOpen={onOpen}
+      onOpenBeside={onOpenBeside}
+      onPin={onPin}
+      onSetStatus={onSetStatus}
+      onDelete={onDelete}
+    />
+  )
 
   const selectedWorkspaceName =
     workspaceId === "all"
@@ -444,27 +498,32 @@ export function Inbox({
 
   return (
     <>
-      <div className="flex flex-col gap-[2px] [padding:0_3px_8px] border-b-[1px] border-b-[color:var(--line-subtle)] mb-[4px]">
+      <div className="flex flex-col gap-[2px] [padding:0_0_8px] border-b-[1px] border-b-[color:var(--line-subtle)] mb-[4px]">
         <Button
           variant="primary"
           block
-          className="mb-[6px]"
+          // Left-aligned so the icon holds its place when the rail narrows the button to a square.
+          className={`mb-[6px] justify-start! overflow-hidden pl-[8px]! ${railControlClasses}`}
           onClick={onNewThread}
+          title={rail ? "New thread" : undefined}
           aria-keyshortcuts={ariaShortcut(bindings.newThread)}
-          icon={<SquarePen size={15} strokeWidth={1.8} />}
+          icon={<SquarePen size={15} strokeWidth={1.8} className="shrink-0" />}
         >
-          New thread
+          <span className={railLabelClasses}>New thread</span>
         </Button>
         <BaseButton
           type="button"
           className={`motion-colors ${inboxSearchClasses}`}
+          title={rail ? "Search" : undefined}
           onClick={onSearch}
           aria-label="Search threads and messages"
           aria-keyshortcuts={ariaShortcut(bindings.threadPalette)}
         >
           <Search size={15} strokeWidth={1.7} aria-hidden="true" />
-          <span>Search</span>
-          {bindings.threadPalette !== "" && <ChordKeys chord={bindings.threadPalette} />}
+          <span className={railLabelClasses}>Search</span>
+          {bindings.threadPalette !== "" && (
+            <ChordKeys chord={bindings.threadPalette} className={railLabelClasses} />
+          )}
         </BaseButton>
         <DropdownMenu
           align="start"
@@ -472,11 +531,12 @@ export function Inbox({
             <BaseButton
               type="button"
               className={`motion-colors ${workspaceSelectorClasses}`}
+              title={rail ? selectedWorkspaceName : undefined}
               aria-label={`Show threads from: ${selectedWorkspaceName}`}
             >
               <Folder size={15} strokeWidth={1.65} />
-              <span>{selectedWorkspaceName}</span>
-              <ChevronsUpDown size={13} strokeWidth={1.7} />
+              <span className={railLabelClasses}>{selectedWorkspaceName}</span>
+              <ChevronsUpDown size={13} strokeWidth={1.7} className={railLabelClasses} />
             </BaseButton>
           }
         >
@@ -505,89 +565,74 @@ export function Inbox({
         className="min-h-0 overflow-y-auto [scrollbar-gutter:stable]"
         aria-label="Thread inbox"
       >
-        <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
-          {virtualizer.getVirtualItems().map((item) => {
-            const row = rows[item.index]
-            if (row === undefined) return null
-            if (row.type === "notice") {
-              const showAll = workspaceId !== "all" && visibleThreads.length === 0
-              // Its wrapped height depends on the sidebar width, so the list measures it.
+        {emptyNotice !== null ? (
+          // Nothing else in the list, so the notice takes the whole sidebar and centers in it.
+          <div
+            className={`flex h-full min-h-[180px] items-center justify-center [padding-bottom:12%] ${railLabelClasses}`}
+          >
+            <InboxNotice
+              message={emptyNotice}
+              showAll={showAll}
+              onShowAll={() => setWorkspaceId("all")}
+              onNewThread={onNewThread}
+            />
+          </div>
+        ) : (
+          <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+            {virtualizer.getVirtualItems().map((item) => {
+              const row = rows[item.index]
+              if (row === undefined) return null
+              if (row.type === "notice") {
+                // Its wrapped height depends on the sidebar width, so the list measures it.
+                return (
+                  <div
+                    key={row.id}
+                    ref={virtualizer.measureElement}
+                    data-index={item.index}
+                    className={`absolute top-[0] left-[0] w-full ${railLabelClasses}`}
+                    style={{ transform: `translateY(${item.start}px)` }}
+                  >
+                    <InboxNotice
+                      message={row.message}
+                      showAll={showAll}
+                      onShowAll={() => setWorkspaceId("all")}
+                      onNewThread={onNewThread}
+                    />
+                  </div>
+                )
+              }
               return (
                 <div
                   key={row.id}
-                  ref={virtualizer.measureElement}
-                  data-index={item.index}
-                  className="absolute top-[0] left-[0] w-full flex flex-col items-start gap-[8px] [padding:18px_10px_14px] text-[var(--text-secondary)] text-[11.5px] leading-[1.45]"
-                  style={{ transform: `translateY(${item.start}px)` }}
+                  className="absolute top-[0] left-[0] w-full"
+                  style={{ transform: `translateY(${item.start}px)`, height: item.size }}
                 >
-                  <InboxIcon
-                    size={18}
-                    strokeWidth={1.6}
-                    aria-hidden="true"
-                    className="text-[var(--text-tertiary)]"
-                  />
-                  <p role="status" className="m-0">
-                    {row.message}
-                  </p>
-                  <Button
-                    size="sm"
-                    className="mt-[2px]"
-                    icon={showAll ? undefined : <SquarePen size={13} strokeWidth={1.8} />}
-                    onClick={showAll ? () => setWorkspaceId("all") : onNewThread}
-                  >
-                    {showAll ? "Show all workspaces" : "New thread"}
-                  </Button>
+                  {row.type === "heading" ? (
+                    <div className="relative flex h-[34px] items-center gap-[7px] [padding:4px_10px_0] text-[var(--text-secondary)] text-[11px] font-medium">
+                      <span className={railLabelClasses}>{row.label}</span>
+                      <span
+                        className={`text-[var(--text-tertiary)] tabular-nums ${railLabelClasses}`}
+                      >
+                        {row.count}
+                      </span>
+                      {/* In the rail a short rule stands in for the section's name. */}
+                      <span
+                        aria-hidden="true"
+                        className="motion-colors motion-duration-220 absolute left-[10px] top-[19px] h-[1px] w-[13px] bg-[var(--line)] opacity-0 group-data-[rail]/inbox:opacity-100"
+                      />
+                    </div>
+                  ) : (
+                    renderThread(row.thread)
+                  )}
                 </div>
               )
-            }
-            return (
-              <div
-                key={row.id}
-                className="absolute top-[0] left-[0] w-full"
-                style={{ transform: `translateY(${item.start}px)`, height: item.size }}
-              >
-                {row.type === "heading" ? (
-                  row.id === "settled" ? (
-                    <BaseButton
-                      type="button"
-                      className="flex h-[34px] items-center gap-[7px] [padding:4px_10px_0] text-[var(--text-secondary)] text-[11px] font-medium w-full border-0 bg-transparent text-left cursor-default motion-colors [&:hover]:text-[var(--text-primary)] [&_svg]:motion-transform [&[aria-expanded='false']_svg]:[transform:rotate(-90deg)]"
-                      aria-expanded={archivedExpanded}
-                      onClick={() => setArchivedExpanded((expanded) => !expanded)}
-                    >
-                      <ChevronDown size={13} aria-hidden="true" />
-                      <span>{row.label}</span>
-                      <span className="text-[var(--text-tertiary)] tabular-nums">{row.count}</span>
-                    </BaseButton>
-                  ) : (
-                    <div className="flex h-[34px] items-center gap-[7px] [padding:4px_10px_0] text-[var(--text-secondary)] text-[11px] font-medium">
-                      <span>{row.label}</span>
-                      <span className="text-[var(--text-tertiary)] tabular-nums">{row.count}</span>
-                    </div>
-                  )
-                ) : (
-                  <InboxThread
-                    thread={row.thread}
-                    workspaceId={workspaceId}
-                    workspaceNames={workspaceNames}
-                    providersByThreadId={providersByThreadId}
-                    selectedThreadId={selectedThreadId}
-                    unseen={unseenThreadIds.has(row.thread.id)}
-                    scheduled={scheduledThreadIds.has(row.thread.id)}
-                    onOpen={onOpen}
-                    onOpenBeside={onOpenBeside}
-                    onPin={onPin}
-                    onSetStatus={onSetStatus}
-                    onDelete={onDelete}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
+            })}
+          </div>
+        )}
         {canLoadMore && (
           <BaseButton
             type="button"
-            className="sticky bottom-[0] w-full p-[7px] border-0 border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[11.5px] bg-[var(--surface-overlay)] cursor-default motion-colors [&:hover:not(:disabled)]:text-[var(--text-primary)] [&:disabled]:text-[var(--text-tertiary)]"
+            className={`${railLabelClasses} sticky bottom-[0] w-full p-[7px] border-0 border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[11.5px] bg-[var(--surface-overlay)] cursor-default motion-colors [&:hover:not(:disabled)]:text-[var(--text-primary)] [&:disabled]:text-[var(--text-tertiary)]`}
             disabled={loadingMore}
             onClick={onLoadMore}
           >
@@ -595,12 +640,59 @@ export function Inbox({
           </BaseButton>
         )}
       </div>
+
+      {settledThreads.length > 0 && (
+        <section
+          className="flex flex-col border-t-[1px] border-t-[color:var(--line-subtle)] mt-[4px] pt-[4px]"
+          aria-label="Archived threads"
+        >
+          <BaseButton
+            type="button"
+            title={rail ? `Archived (${settledThreads.length})` : undefined}
+            className="flex h-[30px] w-full items-center gap-[7px] [padding:0_10px] overflow-hidden border-0 bg-transparent text-left text-[var(--text-secondary)] text-[11px] font-medium cursor-default motion-colors [&:hover]:text-[var(--text-primary)] [&_svg]:motion-transform [&[aria-expanded='false']_svg]:[transform:rotate(-90deg)]"
+            aria-expanded={archivedExpanded}
+            onClick={() => setArchivedExpanded((expanded) => !expanded)}
+          >
+            <ChevronDown size={13} aria-hidden="true" className="shrink-0" />
+            <span className={railLabelClasses}>Archived</span>
+            <span className={`text-[var(--text-tertiary)] tabular-nums ${railLabelClasses}`}>
+              {settledThreads.length}
+            </span>
+          </BaseButton>
+          {archivedExpanded && (
+            <div
+              ref={archivedRef}
+              className="overflow-y-auto [scrollbar-gutter:stable]"
+              style={{ height: archivedHeight }}
+            >
+              <div
+                className="relative w-full"
+                style={{ height: archivedVirtualizer.getTotalSize() }}
+              >
+                {archivedVirtualizer.getVirtualItems().map((item) => {
+                  const thread = settledThreads[item.index]
+                  if (thread === undefined) return null
+                  return (
+                    <div
+                      key={thread.id}
+                      className="absolute top-[0] left-[0] w-full"
+                      style={{ transform: `translateY(${item.start}px)`, height: item.size }}
+                    >
+                      {renderThread(thread)}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
     </>
   )
 }
 
 const threadRowClasses = [
-  "relative flex h-[calc(100%_-_4px)] [margin:2px_0] items-stretch rounded-[var(--radius)]",
+  `relative flex w-full ${railControlClasses} h-[calc(100%_-_4px)] [margin:2px_0] items-stretch rounded-[var(--radius)]`,
   "text-[var(--text-secondary)] [&[data-status='active']]:min-h-[56px]",
   "[&[data-status='settled']]:min-h-[36px] [&[data-status='settled']]:text-[var(--text-secondary)]",
   "[&:hover]:bg-[var(--surface-hover)] [&[data-status='settled']:hover]:text-[var(--text-secondary)]",
@@ -643,20 +735,44 @@ const threadContextClasses = [
 ].join(" ")
 
 const rowActionsClasses = [
-  "row-actions absolute z-[1] top-[6px] right-[4px] flex gap-[2px] opacity-[0]",
+  "row-actions absolute z-[1] top-[6px] right-[4px] flex gap-[2px] opacity-[0] group-data-[rail]/inbox:hidden",
   "[&:has([data-popup-open])]:opacity-[1] [@media(hover:_none)]:opacity-[1]",
 ].join(" ")
 
-const rowButtonClasses = [
-  "row-button [display:inline-grid] w-[28px] h-[28px] flex-[0_0_28px] border-[1px] border-[color:transparent]",
-  "rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default",
-  "place-items-center [&:hover:not(:disabled)]:bg-[var(--surface-hover)]",
-  "[&:hover:not(:disabled)]:text-[var(--text-primary)] [&[data-popup-open]]:bg-[var(--surface-hover)]",
-  "[&[data-popup-open]]:text-[var(--text-primary)] [&:disabled]:text-[var(--text-disabled)]",
-].join(" ")
+/** The row's icon buttons rest at tertiary contrast until the row is hovered or selected. */
+const rowButtonClasses = `motion-colors row-button ${iconButtonClasses} text-[var(--text-tertiary)]`
+
+/** One activity label at a time; the running one shows a spinner in place of text. */
+function ActivityBadge({
+  activity,
+  show,
+  attention = false,
+  children,
+}: {
+  activity: Thread["activity"]
+  show: Thread["activity"]
+  attention?: boolean
+  children: ReactNode
+}) {
+  const running = show === "running"
+  return (
+    <PopPresence className="inline-flex shrink-0" show={activity === show}>
+      <span
+        className="thread-activity [&[data-attention]]:text-[var(--color-modified)] [&[data-activity='failed']]:text-[var(--color-deleted)] [&[data-activity='running']]:text-[var(--color-info)]"
+        data-activity={show}
+        data-attention={attention ? "" : undefined}
+        role={running ? "img" : undefined}
+        aria-label={running ? "Running" : undefined}
+        title={running ? "Running" : undefined}
+      >
+        {children}
+      </span>
+    </PopPresence>
+  )
+}
 
 const inboxSearchClasses = [
-  "flex h-[32px] min-w-0 w-full items-center gap-[9px] [padding:0_10px] border-0 rounded-[var(--radius)]",
+  `flex h-[32px] min-w-0 w-full ${railControlClasses} items-center gap-[9px] [padding:0_9px] overflow-hidden border-0 rounded-[var(--radius)]`,
   "bg-transparent text-[var(--text-secondary)] text-left cursor-default [font:inherit]",
   "[&_svg]:flex-none [&_svg]:text-[var(--text-tertiary)] [&_span]:flex-1 [&_span]:text-[12.5px]",
   "[&_kbd]:text-[10px] [&_kbd]:shrink-0 [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]",
@@ -664,7 +780,7 @@ const inboxSearchClasses = [
 ].join(" ")
 
 const workspaceSelectorClasses = [
-  "flex h-[32px] min-w-0 w-full items-center gap-[9px] [padding:0_8px_0_10px] mt-[4px] border-[1px]",
+  `flex h-[32px] min-w-0 w-full ${railControlClasses} items-center gap-[9px] [padding:0_8px] mt-[4px] overflow-hidden border-[1px]`,
   "border-[color:var(--line)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.12)]",
   "text-[var(--text-secondary)] cursor-default text-left [&_svg]:flex-none",
   "[&_svg]:text-[var(--text-tertiary)] [&_span]:min-w-0 [&_span]:flex-[1_1_auto] [&_span]:text-[12.5px]",

@@ -1,5 +1,5 @@
 ---
-import "../../../desktop/src/renderer/src/app/styles.css"
+import "@meldshell/ui/styles.css"
 ---
 
 <!doctype html>
@@ -29,6 +29,7 @@ import "../../../desktop/src/renderer/src/app/styles.css"
     </div>
     <div id="root"></div>
     <script>
+      import appPackage from "../../../../package.json"
       import { describe, listDevices, requireSession } from "../remote/accounts"
       import { remoteApi, type RemoteState } from "../remote/transport"
 
@@ -77,7 +78,8 @@ import "../../../desktop/src/renderer/src/app/styles.css"
           if (state === "connected") ready()
         })
         await connected
-        await import("../../../desktop/src/renderer/src/main")
+        const { mount } = await import("@meldshell/ui")
+        mount({ version: appPackage.version })
         mounted = true
         $("#remote-gate").hidden = true
       })().catch(cause => show("ended", describe(cause)))

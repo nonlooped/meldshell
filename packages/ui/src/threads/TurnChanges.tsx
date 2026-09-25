@@ -6,6 +6,7 @@ import { turnChangePatches } from "./file-change-diffs"
 import { diffLineCounts, parseFileDiffs } from "../ui/diff-model"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { FileIcon } from "../ui/FileIcon"
+import { disclosureChevronClasses } from "../ui/styles"
 
 function Counts({ insertions, deletions }: { insertions: number; deletions: number }) {
   return (
@@ -28,11 +29,7 @@ function FileChangeRow({ path, patch }: { path: string; patch: string }) {
   return (
     <Collapsible.Root className="turn-change-file">
       <Collapsible.Trigger className={turnChangeTriggerClasses}>
-        <ChevronRight
-          size={13}
-          className={`motion-transform motion-duration-200 ${"disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"}`}
-          aria-hidden="true"
-        />
+        <ChevronRight size={13} className={disclosureChevronClasses} aria-hidden="true" />
         <FileIcon path={path} />
         <span
           className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"

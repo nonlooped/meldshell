@@ -24,7 +24,16 @@ import {
   Check,
   Upload,
 } from "lucide-react"
-import { Button, IconButton, DropdownMenu, MenuAction, TextField } from "../ui/controls"
+import {
+  Button,
+  IconButton,
+  DropdownMenu,
+  MenuAction,
+  PanelNote,
+  QueryError,
+  TextField,
+} from "../ui/controls"
+import { disclosureChevronClasses } from "../ui/styles"
 import { FileIcon } from "../ui/FileIcon"
 import { useTabStore } from "../app/tab-store"
 import { ChangeDiff } from "../ui/ChangeDiff"
@@ -220,28 +229,14 @@ export function GitSidebar({
       aria-label="Source control"
     >
       {!workspace || !scope ? (
-        <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
-          Select a thread to view its workspace changes and history.
-        </p>
+        <PanelNote>Select a thread to view its workspace changes and history.</PanelNote>
       ) : query.isPending ? (
-        <p
-          className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
-          role="status"
-        >
-          Reading repository…
-        </p>
+        <PanelNote role="status">Reading repository…</PanelNote>
       ) : query.isError ? (
-        <p
-          className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
-          role="alert"
-        >
-          {query.error.message}
+        <QueryError query={query} action="Refresh">
           <br />
           Check the workspace folder and refresh to try again.
-          <Button size="sm" onClick={() => void query.refetch()}>
-            Refresh
-          </Button>
-        </p>
+        </QueryError>
       ) : (
         <>
           <CommitSection
@@ -252,14 +247,7 @@ export function GitSidebar({
             onBusy={setCommitBusy}
             onRefresh={refresh}
           />
-          {action.isError && (
-            <p
-              className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
-              role="alert"
-            >
-              {action.error.message}
-            </p>
-          )}
+          {action.isError && <PanelNote role="alert">{action.error.message}</PanelNote>}
           <Group className="min-h-0 flex-1" orientation="vertical">
             <Panel
               id="changes"
@@ -502,10 +490,7 @@ function ChangesSection({
     >
       <div className="flex items-center shrink-0 pr-[6px] [&_.git-section-heading]:flex-1 [&_.git-section-heading]:min-w-0">
         <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-medium [&:hover]:bg-[var(--surface-hover)]">
-          <ChevronRight
-            size={13}
-            className={`motion-transform motion-duration-200 ${"disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"}`}
-          />
+          <ChevronRight size={13} className={disclosureChevronClasses} />
           <span>Changes</span>
           <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
             {changes.length}
@@ -587,10 +572,7 @@ function GraphSection({
       onOpenChange={onOpenChange}
     >
       <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-medium [&:hover]:bg-[var(--surface-hover)]">
-        <ChevronRight
-          size={13}
-          className={`motion-transform motion-duration-200 ${"disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"}`}
-        />
+        <ChevronRight size={13} className={disclosureChevronClasses} />
         <span>Graph</span>
         <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
           All branches
@@ -602,11 +584,7 @@ function GraphSection({
         role="region"
         aria-label="Commit graph"
       >
-        {rows.length === 0 && (
-          <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
-            No commits yet.
-          </p>
-        )}
+        {rows.length === 0 && <PanelNote>No commits yet.</PanelNote>}
         <ol className="[list-style:none] p-0 m-0">
           {rows.map((row) => (
             <CommitRow key={row.commit.hash} scope={scope} row={row} graphWidth={graphWidth} />
@@ -623,9 +601,7 @@ function GraphSection({
               Load older commits
             </Button>
           ) : (
-            <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
-              Showing the latest 2,000 commits.
-            </p>
+            <PanelNote>Showing the latest 2,000 commits.</PanelNote>
           ))}
       </Collapsible.Panel>
     </Collapsible.Root>
@@ -639,27 +615,8 @@ function CommitDiff({ scope, hash }: { scope: WorkspaceScope; hash: string }): R
     staleTime: Infinity,
     retry: false,
   })
-  if (query.isPending)
-    return (
-      <p
-        className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
-        role="status"
-      >
-        Loading commit changes…
-      </p>
-    )
-  if (query.isError)
-    return (
-      <div
-        className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
-        role="alert"
-      >
-        {query.error.message}
-        <Button size="sm" onClick={() => void query.refetch()}>
-          Retry
-        </Button>
-      </div>
-    )
+  if (query.isPending) return <PanelNote role="status">Loading commit changes…</PanelNote>
+  if (query.isError) return <QueryError query={query} />
   return <ChangeDiff path={hash.slice(0, 7)} patch={query.data} />
 }
 
@@ -732,7 +689,7 @@ function CommitRow({
           aria-label={`Changes in ${commit.hash.slice(0, 7)}`}
           tabIndex={0}
         >
-          <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
+          <PanelNote>
             {commit.subject}
             <br />
             {commit.author} · {commit.date.slice(0, 10)}
@@ -742,7 +699,7 @@ function CommitRow({
                 Compared with first parent
               </>
             )}
-          </p>
+          </PanelNote>
           <CommitDiff scope={scope} hash={commit.hash} />
         </div>
       </CollapsiblePanel>

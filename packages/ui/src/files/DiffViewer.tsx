@@ -9,6 +9,7 @@ import { ChangeDiff } from "../ui/ChangeDiff"
 import type { DiffViewType } from "../ui/ChangeDiffContent"
 import { diffLineCounts, parseFileDiffs } from "../ui/diff-model"
 import { FileIcon } from "../ui/FileIcon"
+import { PanelNote } from "../ui/controls"
 
 export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide }) {
   const [viewType, setViewType] = useState<DiffViewType>("unified")
@@ -86,22 +87,8 @@ export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide })
           <WrapText size={15} strokeWidth={1.75} aria-hidden="true" />
         </Toggle>
       </header>
-      {query.isPending && (
-        <p
-          className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
-          role="status"
-        >
-          Loading diff…
-        </p>
-      )}
-      {query.isError && (
-        <p
-          className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
-          role="alert"
-        >
-          {query.error.message}
-        </p>
-      )}
+      {query.isPending && <PanelNote role="status">Loading diff…</PanelNote>}
+      {query.isError && <PanelNote role="alert">{query.error.message}</PanelNote>}
       {query.data !== undefined && (
         <div
           className={`flex-1 min-h-0 min-w-0 overflow-auto p-[16px] [&_.event-diff]:overflow-visible [&_.event-diff]:w-full [&_.event-diff]:max-w-full [&_.event-diff-header_>_span]:min-w-0 overflow-y-auto [scrollbar-gutter:stable] ${wrap ? wrapClasses : ""}`}
@@ -117,9 +104,7 @@ export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide })
               viewType={viewType}
             />
           ) : (
-            <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
-              No {side} changes remain for this file.
-            </p>
+            <PanelNote>No {side} changes remain for this file.</PanelNote>
           )}
         </div>
       )}

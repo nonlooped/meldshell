@@ -354,7 +354,7 @@ export function TitleBar({
               </Tabs.Tab>
               <IconButton
                 unstyled
-                className="motion-colors tab-close grid w-[18px] h-[18px] flex-[0_0_18px] p-0 border-0 rounded-[4px] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center opacity-[0] [&:focus-visible]:opacity-[1] [&:hover]:bg-[var(--surface-active)] [&:hover]:text-[var(--text-primary)]"
+                className={tabCloseClasses}
                 label={`Close ${label}`}
                 onClick={(event) => closeTab(event.currentTarget, tab.id)}
               >
@@ -383,7 +383,7 @@ export function TitleBar({
             </Tabs.Tab>
             <IconButton
               unstyled
-              className="motion-colors tab-close grid w-[18px] h-[18px] flex-[0_0_18px] p-0 border-0 rounded-[4px] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center opacity-[0] [&:focus-visible]:opacity-[1] [&:hover]:bg-[var(--surface-active)] [&:hover]:text-[var(--text-primary)]"
+              className={tabCloseClasses}
               label={`Close ${file.path}`}
               onClick={(event) => closeTab(event.currentTarget, file.id)}
             >
@@ -458,6 +458,12 @@ export function TitleBar({
 const pressedClasses = [
   "[&[aria-pressed='true']]:text-[var(--text-primary)] [&[aria-pressed='true']]:bg-[var(--surface-selected)]",
   "[&[aria-pressed='true']]:[border-color:var(--line-subtle)]",
+].join(" ")
+
+const tabCloseClasses = [
+  "motion-colors tab-close grid w-[18px] h-[18px] flex-[0_0_18px] p-0 border-0 rounded-[4px]",
+  "bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center opacity-[0]",
+  "[&:focus-visible]:opacity-[1] [&:hover]:bg-[var(--surface-active)] [&:hover]:text-[var(--text-primary)]",
 ].join(" ")
 
 const tabClasses = [
