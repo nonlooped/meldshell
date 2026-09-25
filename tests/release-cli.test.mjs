@@ -37,8 +37,8 @@ function fixture(t, entries = "- A fix.\n\n") {
   git("commit", "-m", "Initial")
   git("tag", "v0.1.0")
   const run = (...args) => spawnSync(process.execPath, [script, ...args], { cwd, encoding: "utf8" })
-  const plan = (channel) => {
-    const result = run("plan", channel)
+  const plan = (channel, ...args) => {
+    const result = run("plan", channel, ...args)
     assert.equal(result.status, 0, result.stderr)
     return Object.fromEntries(
       result.stdout
@@ -77,6 +77,18 @@ test("a nightly is planned only when app files changed since the last release", 
   assert.match(nightly.version, /^0\.2\.0-nightly\.\d{12}$/)
   assert.equal(nightly.previous, "v0.1.0")
   assert.equal(nightly.prerelease, "true")
+})
+
+test("a manual nightly can be forced without app changes", (t) => {
+  const { plan, git, run } = fixture(t)
+  assert.equal(plan("nightly").release, "false")
+  const forced = plan("nightly", "--force")
+  assert.equal(forced.release, "true")
+  assert.equal(forced.previous, "v0.1.0")
+  assert.match(forced.version, /^0\.2\.0-nightly\.\d{12}$/)
+  git("tag", forced.tag)
+  assert.equal(plan("nightly", "--force").release, "false")
+  assert.match(run("plan", "stable", "--force").stderr, /Only nightly plans accept --force/)
 })
 
 test("set-version writes every version field without committing", (t) => {

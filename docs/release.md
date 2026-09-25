@@ -4,7 +4,7 @@ Use this checklist for an installer candidate. Routine edits follow [AGENTS.md](
 
 ## Automatic releases
 
-Nobody cuts releases by hand. The [Release](../.github/workflows/release.yml) workflow runs on a schedule from `main`:
+The [Release](../.github/workflows/release.yml) workflow runs on a schedule from `main`:
 
 - **Stable**, daily at 00:17 UTC: if [CHANGELOG.md](../CHANGELOG.md) has `## [Unreleased]` entries, it releases them as the next minor version (`0.9.0` → `0.10.0`). It moves the entries under the new version and date, bumps every version field, pushes `chore(release): vX.Y.0` to `main` with an annotated tag, and publishes the GitHub Release as the latest release. Days without Unreleased entries release nothing.
 - **Nightly**, hourly at minute 47: if files outside `docs/`, `.github/`, and Markdown changed since the nearest release tag, stable or nightly, it publishes a prerelease `vX.Y.0-nightly.YYYYMMDDHHMM` of the upcoming minor version. The version is set only in the build; nothing is committed, and the tag points at the `main` commit. Its notes list the Unreleased entries and the commits since the previous release. Nightlies are never marked latest and are kept.
@@ -13,7 +13,7 @@ Each release runs the full [CI](../.github/workflows/ci.yml) suite and packages 
 
 The stable job pushes its release commit only as a fast-forward of the commit it tested. If `main` moved during the run, the push fails, nothing is published, and the next day's run releases the newer commit. A rerun after a failed upload reuses the tag it already pushed and refuses to change a published release.
 
-To release now, run the workflow from the Actions tab with `stable` or `nightly`. `build-only` packages installers from any ref as seven-day workflow artifacts without releasing. GitHub disables scheduled workflows in a public repository after 60 days without repository activity; re-enable Release from the Actions tab if that happens.
+To release now, open **Actions → Release → Run workflow**, select the `main` branch and `nightly`, then run it. Check **Cut a nightly even when no app files changed** to force a fresh nightly from the current `main` commit, including when the last nightly already used that commit. Leave it unchecked to use the scheduled change rule. Manual `stable` runs use the Unreleased entry rule. The force option cannot reuse a tag created in the same UTC minute; wait until the next minute and run it again. `build-only` packages installers from any ref as seven-day workflow artifacts without releasing. GitHub disables scheduled workflows in a public repository after 60 days without repository activity; re-enable Release from the Actions tab if that happens.
 
 If account API or relay behavior changed, complete the [remote service cutover](#remote-service-cutover) before the next scheduled stable release. Routine releases do not need local builds or suites. Use the candidate path below when installer or runtime changes need manual evidence. Keep the manual matrix as the coverage reference and record skipped cases; a routine release does not imply that every manual case was certified.
 
