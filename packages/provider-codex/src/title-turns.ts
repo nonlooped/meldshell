@@ -1,4 +1,5 @@
-import { asRecord, type WorkerEvent } from "@meldshell/contracts"
+import { Either } from "effect"
+import { decodeNativePayload, type WorkerEvent } from "@meldshell/contracts"
 import type { JsonRpcNotification } from "./client"
 import { agentMessageText, finalMessageText } from "./messages"
 
@@ -37,8 +38,14 @@ export class TitleTurns {
   observe(nativeThreadId: string, message: JsonRpcNotification): boolean {
     const pending = this.#pending.get(nativeThreadId)
     if (pending === undefined) return false
+    if (message.method !== "item/completed" && message.method !== "turn/completed") return true
+    const decoded = decodeNativePayload(message.params)
+    if (Either.isLeft(decoded)) {
+      this.settle(nativeThreadId, null, decoded.left.message)
+      return true
+    }
     if (message.method === "item/completed")
-      pending.text = agentMessageText(asRecord(message.params).item) ?? pending.text
+      pending.text = agentMessageText(decoded.right.item) ?? pending.text
     if (message.method === "turn/completed")
       this.settle(nativeThreadId, pending.text ?? finalMessageText(message.params))
     return true

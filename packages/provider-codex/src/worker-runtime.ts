@@ -11,6 +11,7 @@ import { Effect } from "effect"
 import {
   CodexAppServer,
   listCodexModels,
+  requestCodex,
   probeCodex,
   type AppServerCallbacks,
   type JsonRpcNotification,
@@ -267,15 +268,13 @@ export const runCodexWorker = (
     dispatch: TurnDispatch,
   ): Promise<string> => {
     if (dispatch.nativeThreadId !== null) {
-      await server.request("thread/resume", {
+      await requestCodex(server, "thread/resume", {
         threadId: dispatch.nativeThreadId,
         ...threadSettings(dispatch),
       })
       return dispatch.nativeThreadId
     }
-    const result = (await server.request("thread/start", threadSettings(dispatch))) as {
-      readonly thread?: { readonly id?: unknown }
-    }
+    const result = await requestCodex(server, "thread/start", threadSettings(dispatch))
     if (typeof result.thread?.id !== "string")
       throw new Error("Codex started a thread without returning its identifier.")
     publish({
@@ -295,7 +294,7 @@ export const runCodexWorker = (
         threadId: dispatch.threadId,
         turnId: dispatch.turnId,
       })
-      const result = (await server.request("turn/start", {
+      const result = await requestCodex(server, "turn/start", {
         threadId: nativeThreadId,
         input: inputItems(dispatch),
         cwd: dispatch.workspacePath,
@@ -304,7 +303,7 @@ export const runCodexWorker = (
         approvalPolicy: dispatch.approvalPolicy,
         sandboxPolicy: sandboxPolicy(dispatch),
         serviceTierForTurn: dispatch.serviceTier,
-      })) as { readonly turn?: { readonly id?: unknown } }
+      })
       if (typeof result.turn?.id !== "string") throw new Error("Codex did not accept the turn.")
       const local = turnsByNativeThread.get(nativeThreadId)
       if (local?.turnId !== dispatch.turnId) return
@@ -341,18 +340,18 @@ export const runCodexWorker = (
     let nativeThreadId: string | null = null
     try {
       const server = await serverForRequest()
-      const started = (await server.request("thread/start", {
+      const started = await requestCodex(server, "thread/start", {
         cwd: request.workspacePath,
         model: request.model,
         approvalPolicy: "never",
         sandbox: "read-only",
         ephemeral: true,
-      })) as { readonly thread?: { readonly id?: unknown } }
+      })
       if (typeof started.thread?.id !== "string")
         throw new Error("Codex started a title thread without returning its identifier.")
       nativeThreadId = started.thread.id
       titles.track(nativeThreadId, request.threadId)
-      await server.request("turn/start", {
+      await requestCodex(server, "turn/start", {
         threadId: nativeThreadId,
         input: [{ type: "text", text: request.prompt }],
         cwd: request.workspacePath,

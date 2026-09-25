@@ -1,8 +1,8 @@
-import { access, readFile } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import which from "which"
-import { runCommand } from "@meldshell/provider-runtime/command"
+import { pathExists, runCommand } from "@meldshell/provider-runtime/command"
 import { asRecord } from "@meldshell/contracts"
 
 export interface ClaudeCommand {
@@ -15,12 +15,6 @@ export interface ClaudeCommand {
   /** Display path reported in provider status (the override or PATH hit, when known). */
   readonly executablePath: string
 }
-
-const exists = async (path: string): Promise<boolean> =>
-  access(path).then(
-    () => true,
-    () => false,
-  )
 
 const versionArgs = async (claudePath: string): Promise<{ command: string; args: string[] }> => {
   if (!/\.m?js$/i.test(claudePath)) return { command: claudePath, args: [] }
@@ -49,8 +43,7 @@ const npmEntry = async (shim: string): Promise<string | null> => {
     const bin = typeof binValue === "string" ? binValue : ""
     if (!bin) return null
     const entry = join(root, bin)
-    await access(entry)
-    return entry
+    return (await pathExists(entry)) ? entry : null
   } catch {
     return null
   }
@@ -86,7 +79,7 @@ export const discoverClaude = async (): Promise<ClaudeCommand> => {
 
   if (!claudePath && !override) {
     for (const candidate of nativeCandidates()) {
-      if (await exists(candidate)) {
+      if (await pathExists(candidate)) {
         claudePath = candidate
         break
       }

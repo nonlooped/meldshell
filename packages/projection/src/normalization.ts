@@ -1,4 +1,13 @@
-import { asRecord, nonEmptyText, type CanonicalEventKind } from "@meldshell/contracts"
+import { Either, Schema } from "effect"
+import {
+  decodeNativePayload,
+  decodeCursorPayload,
+  PlanStep,
+  type NativeItem,
+  type CursorPayload,
+  nonEmptyText,
+  type CanonicalEventKind,
+} from "@meldshell/contracts"
 import { cursorEventKind, cursorEventText } from "./cursor"
 
 /** Claude Code asks to leave plan mode with the plan it wrote; approving it starts the work. */
@@ -37,9 +46,9 @@ const nativeEventKind = (method: string, params: unknown): CanonicalEventKind =>
 }
 
 export const planText = (value: unknown): string | null => {
-  if (!Array.isArray(value)) return null
-  const steps = value.flatMap((entry) => {
-    const step = asRecord(entry)
+  const decoded = Schema.decodeUnknownEither(Schema.Array(PlanStep))(value)
+  if (Either.isLeft(decoded)) return null
+  const steps = decoded.right.flatMap((step) => {
     const text = nonEmptyText(step.step) ?? nonEmptyText(step.content)
     if (!text) return []
     const status =
@@ -55,8 +64,9 @@ export const planText = (value: unknown): string | null => {
 
 export const eventText = (method: string, params: unknown): string | null => {
   if (method.startsWith("cursor/")) return cursorEventText(method, params)
-  if (typeof params !== "object" || params === null) return null
-  const record = asRecord(params)
+  const decoded = decodeNativePayload(params)
+  if (Either.isLeft(decoded)) return `Invalid ${method} payload: ${decoded.left.message}`
+  const record = decoded.right
   if (method === CLAUDE_EXIT_PLAN_MODE) return nonEmptyText(record.plan)
   const delta = nonEmptyText(record.delta)
   if (delta !== null) return delta
@@ -65,12 +75,12 @@ export const eventText = (method: string, params: unknown): string | null => {
       [nonEmptyText(record.explanation), planText(record.plan)].filter(Boolean).join("\n\n") || null
     )
   if (method.endsWith("/progress")) return nonEmptyText(record.message)
-  const message = nonEmptyText(asRecord(record.error).message)
+  const message = nonEmptyText(record.error?.message)
   if (message !== null) return message
   const text = nativeItemText(record.item)
   if (text !== undefined) return text
-  const turn = asRecord(record.turn)
-  if (method === "turn/completed" && "status" in turn) return `Turn ${String(turn.status)}.`
+  const turn = record.turn
+  if (method === "turn/completed" && turn?.status) return `Turn ${String(turn.status)}.`
   return null
 }
 
@@ -78,10 +88,16 @@ export const approvalCopy = (
   method: string,
   params: unknown,
 ): { title: string; detail: string } => {
-  const record = asRecord(params)
   if (method.startsWith("cursor/")) {
-    return cursorApprovalCopy(method, record)
+    const decoded = decodeCursorPayload(params)
+    return Either.isRight(decoded)
+      ? cursorApprovalCopy(method, decoded.right)
+      : { title: "Invalid Cursor request", detail: decoded.left.message }
   }
+  const decoded = decodeNativePayload(params)
+  if (Either.isLeft(decoded))
+    return { title: "Invalid provider request", detail: decoded.left.message }
+  const record = decoded.right
   if (method === CLAUDE_EXIT_PLAN_MODE)
     return {
       title: "Approve Claude's plan?",
@@ -106,8 +122,8 @@ export const approvalCopy = (
   return { title: `${provider} needs your input`, detail: nonEmptyText(record.reason) ?? method }
 }
 
-const cursorApprovalCopy = (method: string, record: Record<string, unknown>) => {
-  const tool = asRecord(record.toolCall)
+const cursorApprovalCopy = (method: string, record: CursorPayload) => {
+  const tool = record.toolCall
   return {
     title:
       method === "cursor/create_plan"
@@ -115,18 +131,19 @@ const cursorApprovalCopy = (method: string, record: Record<string, unknown>) => 
         : method === "cursor/ask_question"
           ? String(record.title ?? "Cursor needs your input")
           : "Cursor requests permission",
-    detail: String(record.overview ?? tool.title ?? record.title ?? "Review Cursor's request."),
+    detail: String(record.overview ?? tool?.title ?? record.title ?? "Review Cursor's request."),
   }
 }
 
 const nativeItemType = (params: unknown): string => {
-  const item = asRecord(asRecord(params).item)
-  return "type" in item ? String(item.type) : ""
+  const decoded = decodeNativePayload(params)
+  return Either.isRight(decoded) ? (decoded.right.item?.type ?? "") : ""
 }
 
-const nativeItemText = (item: unknown): string | null | undefined => {
-  const itemRecord = asRecord(item)
-  for (const key of ["text", "message", "summary", "plan", "review", "command"]) {
+const nativeItemText = (item: NativeItem | null | undefined): string | null | undefined => {
+  if (!item) return undefined
+  const itemRecord = item
+  for (const key of ["text", "message", "summary", "plan", "review", "command"] as const) {
     const value = itemRecord[key]
     const text = nonEmptyText(value)
     if (text !== null) return text

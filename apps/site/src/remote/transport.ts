@@ -1,4 +1,3 @@
-import { snapshotRpc } from "./rpc"
 import ReconnectingWebSocket from "partysocket/ws"
 import { selectBrowserImages } from "./attachments"
 import {
@@ -47,7 +46,6 @@ export function remoteApi(
     maxReconnectionDelay: 15_000,
     shouldReconnectOnClose: (event) => event.code !== 4003,
   })
-  const rpc = snapshotRpc((text) => socket.send(text))
   // Browsers cannot see protocol pings, so a silent half-open socket is detected here instead.
   let heard = Date.now()
   const heartbeat = setInterval(() => {
@@ -67,7 +65,6 @@ export function remoteApi(
       emit(IPC.runtimeChanged, ["*", true])
     } else if (frame.type === "event") emit(frame.channel, frame.args)
     else if (frame.type === "result") {
-      if (frame.id.startsWith("rpc_")) return rpc.receive(frame)
       const entry = pending.get(frame.id)
       pending.delete(frame.id)
       if (frame.ok) entry?.resolve(frame.value)
@@ -81,7 +78,6 @@ export function remoteApi(
         new Error("The connection dropped before this was confirmed. Check the conversation."),
       )
     pending.clear()
-    rpc.disconnect()
     if (event.code === 4003)
       status("Access to this computer ended. Return to your devices to reconnect.", "ended")
     else if (event.code === 1012)
@@ -93,7 +89,6 @@ export function remoteApi(
     () => {
       clearInterval(heartbeat)
       socket.close()
-      void rpc.dispose()
     },
     { once: true },
   )
@@ -111,7 +106,6 @@ export function remoteApi(
   const api = createInvoker((channel, ...args) => invoke(channel, args))
   return {
     ...api,
-    getSnapshot: rpc.getSnapshot,
     platform: "web",
     addWorkspace: unsupported,
     selectAttachments: selectBrowserImages,

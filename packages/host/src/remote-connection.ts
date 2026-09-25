@@ -1,5 +1,3 @@
-import { executeRemoteRpc } from "./remote-rpc"
-import { REMOTE_RPC_METHOD } from "@meldshell/contracts"
 import ReconnectingWebSocket from "partysocket/ws"
 import WS from "ws"
 import {
@@ -98,7 +96,7 @@ export function connectRelay(
       type?: unknown
       clientId?: unknown
       count?: unknown
-      command?: { id?: string; method?: string }
+      command?: unknown
     }
     try {
       frame = JSON.parse(String(event.data))
@@ -111,11 +109,7 @@ export function connectRelay(
     }
     const { clientId } = frame
     if (frame.type !== "command" || typeof clientId !== "string") return socket.reconnect(1008)
-    const result =
-      frame.command?.method === REMOTE_RPC_METHOD
-        ? executeRemoteRpc(frame.command, execute)
-        : execute(frame.command)
-    void result.then((result) => send({ ...result, clientId }))
+    void execute(frame.command).then((result) => send({ ...result, clientId }))
   })
   /** Connects, reconnects, or disconnects to match the stored credential. */
   const sync = async () => {

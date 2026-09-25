@@ -1,5 +1,13 @@
+import { access } from "node:fs/promises"
 import { execa } from "execa"
 import { stopProcessTree } from "./process-tree"
+
+/** Whether a file or directory is reachable, without throwing. */
+export const pathExists = (path: string): Promise<boolean> =>
+  access(path).then(
+    () => true,
+    () => false,
+  )
 
 export interface CommandResult {
   readonly exitCode: number | null

@@ -513,14 +513,20 @@ const providerLayer = <Id>(
 ): Layer.Layer<Id, never, CoreClient | HostEvents | HostPlatform> =>
   Layer.scoped(tag, providerRuntime(config))
 
-export const codexProviderLive = () =>
-  providerLayer(CodexProvider, { harness: "codex", worker: "codex-worker.js" })
+export const codexProviderLive = providerLayer(CodexProvider, {
+  harness: "codex",
+  worker: "codex-worker.js",
+})
 
-export const claudeProviderLive = () =>
-  providerLayer(ClaudeProvider, { harness: "claude-code", worker: "claude-worker.js" })
+export const claudeProviderLive = providerLayer(ClaudeProvider, {
+  harness: "claude-code",
+  worker: "claude-worker.js",
+})
 
-export const cursorProviderLive = () =>
-  providerLayer(CursorProvider, { harness: "cursor", worker: "cursor-worker.js" })
+export const cursorProviderLive = providerLayer(CursorProvider, {
+  harness: "cursor",
+  worker: "cursor-worker.js",
+})
 
 const providerTags = {
   codex: CodexProvider,

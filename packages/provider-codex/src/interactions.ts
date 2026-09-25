@@ -1,4 +1,5 @@
 import Ajv from "ajv"
+import { Schema, Either } from "effect"
 import type { ApprovalDecision } from "@meldshell/contracts"
 import commandSchema from "../schema/CommandExecutionRequestApprovalResponse.json"
 import fileSchema from "../schema/FileChangeRequestApprovalResponse.json"
@@ -19,7 +20,7 @@ export const encodeInteractionResponse = (
   decision: ApprovalDecision,
   answers?: Readonly<Record<string, ReadonlyArray<string>>>,
 ): unknown => {
-  const request = params as Record<string, unknown>
+  const request = interactionParams(params)
   let response: unknown
   switch (method) {
     case "item/commandExecution/requestApproval":
@@ -29,14 +30,8 @@ export const encodeInteractionResponse = (
     case "item/tool/requestUserInput": {
       const accepted = decision === "accept"
       const result: Record<string, { answers: ReadonlyArray<string> }> = {}
-      if (accepted) {
-        for (const question of request.questions as Array<{ id: string }>) {
-          const answer = answers?.[question.id]
-          if (answer === undefined || answer.length === 0 || answer.some((text) => !text.trim()))
-            throw new Error("Answer every question before submitting.")
-          result[question.id] = { answers: answer }
-        }
-      } else if (decision === "acceptForSession")
+      if (accepted) Object.assign(result, userAnswers(request.questions, answers))
+      else if (decision === "acceptForSession")
         throw new Error("User input cannot be approved for a session.")
       response = { answers: result }
       break
@@ -55,4 +50,31 @@ export const encodeInteractionResponse = (
   if (!validate(response))
     throw new Error(`Invalid interaction response: ${ajv.errorsText(validate.errors)}`)
   return response
+}
+
+const interactionParams = (params: unknown) => {
+  const decoded = Schema.decodeUnknownEither(
+    Schema.Struct({
+      questions: Schema.optional(Schema.Array(Schema.Struct({ id: Schema.String }))),
+      permissions: Schema.optional(Schema.Unknown),
+    }),
+  )(params)
+  if (Either.isLeft(decoded))
+    throw new Error(`Invalid interaction request: ${decoded.left.message}`)
+  return decoded.right
+}
+
+const userAnswers = (
+  questions: ReadonlyArray<{ readonly id: string }> | undefined,
+  answers: Readonly<Record<string, ReadonlyArray<string>>> | undefined,
+) => {
+  if (!questions) throw new Error("Missing interaction questions.")
+  return Object.fromEntries(
+    questions.map((question) => {
+      const answer = answers?.[question.id]
+      if (answer === undefined || answer.length === 0 || answer.some((text) => !text.trim()))
+        throw new Error("Answer every question before submitting.")
+      return [question.id, { answers: answer }]
+    }),
+  )
 }

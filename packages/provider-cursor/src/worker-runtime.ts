@@ -1,11 +1,12 @@
+import { Either, Schema } from "effect"
+import type { AvailableCommand } from "@agentclientprotocol/sdk"
 import { eventPublisher, workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
-import { RequestError, type RequestPermissionResponse } from "@agentclientprotocol/sdk"
+import { RequestError } from "@agentclientprotocol/sdk"
 import {
-  asRecord,
-  asRecords,
-  asText,
+  decodeCursorPayload,
+  CursorContent,
   errorMessage,
   type CursorStatus,
   type TitleRequest,
@@ -24,8 +25,10 @@ import {
 import {
   automaticPermission,
   cursorPrompt,
-  interactionResponse,
-  knownNotification,
+  permissionResponse,
+  planResponse,
+  questionResponse,
+  decodeNotification,
   nativeMethod,
 } from "./protocol"
 import {
@@ -44,7 +47,7 @@ interface Session extends ConfigurableSession {
   replaying: boolean
   interactive: boolean
   permissions?: Pick<TurnDispatch, "sandbox" | "approvalPolicy">
-  availableCommands?: readonly UnknownRecord[]
+  availableCommands?: readonly AvailableCommand[]
   onCommands?: () => void
 }
 interface RunningTurn {
@@ -151,9 +154,20 @@ export const runCursorWorker = (
     return pending
   }
   const onMessage = (session: Session, message: NativeMessage): void => {
-    const params = asRecord(message.params)
+    const decoded = decodeNotification(message.method, message.params)
+    if (decoded !== undefined && Either.isLeft(decoded)) {
+      publish({
+        type: "protocol-error",
+        message: `Invalid ${message.method}: ${decoded.left.message}`,
+        raw: message.params,
+      })
+      session.emit?.(nativeMethod(message.method), message.params, false)
+      return
+    }
+    const envelope = decodeSessionReference(message.params)
+    const params = Either.isRight(envelope) ? envelope.right : null
     if (
-      typeof params.sessionId === "string" &&
+      typeof params?.sessionId === "string" &&
       session.sessionId &&
       params.sessionId !== session.sessionId
     ) {
@@ -166,7 +180,7 @@ export const runCursorWorker = (
     session.emit?.(
       session.replaying ? "cursor/acp/session/replay" : nativeMethod(message.method),
       message.params,
-      knownNotification(message.method, message.params),
+      decoded !== undefined && Either.isRight(decoded),
     )
   }
   const createSession = async (
@@ -199,7 +213,7 @@ export const runCursorWorker = (
             (!session.sessionId || sessionId === session.sessionId) &&
             update.sessionUpdate === "available_commands_update"
           ) {
-            session.availableCommands = asRecords(update.availableCommands)
+            session.availableCommands = update.availableCommands
             session.onCommands?.()
           }
         },
@@ -209,23 +223,14 @@ export const runCursorWorker = (
             "session/request_permission",
             params,
             signal,
-            (decision, answers, optionId): RequestPermissionResponse =>
-              interactionResponse(
-                "session/request_permission",
-                params,
-                decision,
-                answers,
-                optionId,
-              ),
+            (decision, _answers, optionId) => permissionResponse(params, decision, optionId),
           ),
         askQuestion: ({ params, signal }) =>
-          onRequest(session, "cursor/ask_question", params, signal, (decision, answers, optionId) =>
-            interactionResponse("cursor/ask_question", params, decision, answers, optionId),
+          onRequest(session, "cursor/ask_question", params, signal, (decision, answers) =>
+            questionResponse(params, decision, answers),
           ),
         createPlan: ({ params, signal }) =>
-          onRequest(session, "cursor/create_plan", params, signal, (decision) =>
-            interactionResponse("cursor/create_plan", params, decision),
-          ),
+          onRequest(session, "cursor/create_plan", params, signal, planResponse),
         spawned: (pid) => publish({ type: "process-started", pid }),
         stopped: (pid) => publish({ type: "process-stopped", pid }),
       }),
@@ -235,14 +240,14 @@ export const runCursorWorker = (
     try {
       session.init = await session.client.initialize()
       if (options.catalogOnly) return session
-      if (nativeId && asRecord(session.init.agentCapabilities).loadSession !== true)
+      if (nativeId && !canResume(session.init))
         throw new Error("This Cursor release cannot resume the saved conversation.")
       session.configuration = await session.client.run((agent) =>
         nativeId
           ? agent.request("session/load", { cwd, mcpServers: [], sessionId: nativeId })
           : agent.request("session/new", { cwd, mcpServers: [] }),
       )
-      session.sessionId = nativeId ?? asText(session.configuration.sessionId)
+      session.sessionId = nativeId ?? sessionIdOf(session.configuration)
       if (!session.sessionId) throw new Error("Cursor returned no session ID.")
       session.replaying = false
       return session
@@ -348,10 +353,7 @@ export const runCursorWorker = (
           method,
           params,
           validated,
-          ...(method === "turn/completed" &&
-          asRecord(asRecord(params).cursor).stopReason !== "end_turn"
-            ? { promoteQueue: false }
-            : {}),
+          ...(method === "turn/completed" && !endedTurn(params) ? { promoteQueue: false } : {}),
           ...(requestId ? { requestId } : {}),
         },
       })
@@ -379,7 +381,7 @@ export const runCursorWorker = (
       emit("cursor/acp/session/prompt/result", result)
       if (
         !["end_turn", "cancelled", "max_tokens", "max_turn_requests", "refusal"].includes(
-          asText(result.stopReason),
+          String(result.stopReason ?? ""),
         )
       )
         throw new Error("Cursor returned an unknown stop reason.")
@@ -431,12 +433,14 @@ export const runCursorWorker = (
     let title = ""
     try {
       session = await createSession(request.workspacePath, null, (method, params) => {
-        const update = asRecord(asRecord(params).update)
+        const decoded = decodeCursorPayload(params)
+        if (Either.isLeft(decoded)) return
+        const update = decoded.right.update
         if (
           method === "cursor/acp/session/update" &&
-          update.sessionUpdate === "agent_message_chunk"
+          update?.sessionUpdate === "agent_message_chunk"
         )
-          title += asText(asRecord(update.content).text)
+          title += Schema.is(CursorContent)(update.content) ? (update.content.text ?? "") : ""
       })
       await configureModel(session, request.model, "ask")
       const activeSession = session
@@ -495,13 +499,13 @@ export const runCursorWorker = (
       const skills = await discoverCursorSkills(workspacePath)
       if (stopping) return
       const advertised = (current.availableCommands ?? []).flatMap((command) => {
-        const name = asText(command.name)
+        const name = command.name
         if (!name) return []
-        const argumentHint = asText(asRecord(command.input).hint)
+        const argumentHint = command.input?.hint ?? ""
         return [
           {
             name,
-            description: asText(command.description),
+            description: command.description,
             ...(argumentHint ? { argumentHint } : {}),
           },
         ]
@@ -601,3 +605,30 @@ export const runCursorWorker = (
   void probe()
   return { shutdown }
 }
+
+const Initialization = Schema.Struct({
+  agentCapabilities: Schema.optional(
+    Schema.Struct({ loadSession: Schema.optional(Schema.Boolean) }),
+  ),
+})
+const canResume = (value: unknown): boolean => {
+  const decoded = Schema.decodeUnknownEither(Initialization)(value)
+  if (Either.isLeft(decoded))
+    throw new Error(`Invalid Cursor initialization: ${decoded.left.message}`)
+  return decoded.right.agentCapabilities?.loadSession === true
+}
+const sessionIdOf = (value: unknown): string => {
+  const decoded = Schema.decodeUnknownEither(Schema.Struct({ sessionId: Schema.String }))(value)
+  if (Either.isLeft(decoded)) throw new Error(`Invalid Cursor session: ${decoded.left.message}`)
+  return decoded.right.sessionId
+}
+const endedTurn = (value: unknown): boolean => {
+  const decoded = Schema.decodeUnknownEither(
+    Schema.Struct({ cursor: Schema.Struct({ stopReason: Schema.String }) }),
+  )(value)
+  return Either.isRight(decoded) && decoded.right.cursor.stopReason === "end_turn"
+}
+
+const decodeSessionReference = Schema.decodeUnknownEither(
+  Schema.Struct({ sessionId: Schema.optional(Schema.String) }),
+)

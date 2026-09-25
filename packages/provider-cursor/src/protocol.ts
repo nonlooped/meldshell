@@ -1,5 +1,8 @@
+import { Either, Schema, type ParseResult } from "effect"
 import {
   asRecord,
+  CursorPayload,
+  CursorSessionNotification,
   asRecords,
   asText,
   type ProviderModelCatalogEntry,
@@ -8,7 +11,7 @@ import {
 } from "@meldshell/contracts"
 import type { ContentBlock, RequestPermissionResponse } from "@agentclientprotocol/sdk"
 import { readFile } from "node:fs/promises"
-import { isAbsolute } from "node:path"
+import { referenceText } from "@meldshell/provider-runtime"
 import mime from "mime/lite"
 
 export const cursorModels = (
@@ -37,12 +40,6 @@ export const cursorModels = (
       modelSpecialty: null,
       multiAgentVersion: null,
     }))
-}
-
-const referenceText = ({ type, value }: TurnDispatch["attachments"][number]): string => {
-  if (type === "mention") return `Referenced file: ${value}`
-  // Skills Cursor advertises without a SKILL.md on disk arrive by name.
-  return isAbsolute(value) ? `Read and follow this skill: ${value}` : `Use the ${value} skill.`
 }
 
 /** The image formats Cursor accepts in a prompt. */
@@ -81,40 +78,29 @@ export const cursorPrompt = async (
   return prompt
 }
 
-export function interactionResponse(
-  method: "session/request_permission",
+/** Cursor's reply to a permission request; cancelling declines without choosing an option. */
+export function permissionResponse(
+  params: UnknownRecord,
+  decision: string,
+  optionId?: string,
+): RequestPermissionResponse {
+  if (decision === "cancel") return { outcome: { outcome: "cancelled" } }
+  const option = asRecords(params.options).find((entry) => entry.optionId === optionId)
+  if (!option) throw new Error("Choose one of Cursor's advertised permission options.")
+  return { outcome: { outcome: "selected", optionId: asText(option.optionId) } }
+}
+
+export const planResponse = (decision: string): UnknownRecord => ({
+  outcome: {
+    outcome: decision === "accept" ? "accepted" : decision === "cancel" ? "cancelled" : "rejected",
+  },
+})
+
+export function questionResponse(
   params: UnknownRecord,
   decision: string,
   answers?: Readonly<Record<string, ReadonlyArray<string>>>,
-  optionId?: string,
-): RequestPermissionResponse
-export function interactionResponse(
-  method: string,
-  params: UnknownRecord,
-  decision: string,
-  answers?: Readonly<Record<string, ReadonlyArray<string>>>,
-  optionId?: string,
-): UnknownRecord
-export function interactionResponse(
-  method: string,
-  params: UnknownRecord,
-  decision: string,
-  answers?: Readonly<Record<string, ReadonlyArray<string>>>,
-  optionId?: string,
 ): UnknownRecord {
-  if (method === "session/request_permission") {
-    if (decision === "cancel") return { outcome: { outcome: "cancelled" } }
-    const option = asRecords(params.options).find((entry) => entry.optionId === optionId)
-    if (!option) throw new Error("Choose one of Cursor's advertised permission options.")
-    return { outcome: { outcome: "selected", optionId: option.optionId } }
-  }
-  if (method === "cursor/create_plan")
-    return {
-      outcome: {
-        outcome:
-          decision === "accept" ? "accepted" : decision === "cancel" ? "cancelled" : "rejected",
-      },
-    }
   if (decision !== "accept")
     return { outcome: { outcome: decision === "cancel" ? "cancelled" : "skipped" } }
   const selected = asRecords(params.questions).map((question) => {
@@ -148,36 +134,51 @@ export const automaticPermission = (
 export const nativeMethod = (method: string): string =>
   method.startsWith("cursor/") ? method : `cursor/acp/${method}`
 
-export const knownNotification = (method: string, params: unknown): boolean => {
-  const p = asRecord(params)
-  if (method.startsWith("cursor/"))
-    return (
-      ["cursor/update_todos", "cursor/task", "cursor/generate_image"].includes(method) &&
-      typeof p.toolCallId === "string"
+const decodeUpdateKind = Schema.decodeUnknownEither(
+  Schema.Struct({ update: Schema.Struct({ sessionUpdate: Schema.String }) }),
+)
+
+const SESSION_UPDATES = new Set([
+  "agent_message_chunk",
+  "agent_thought_chunk",
+  "user_message_chunk",
+  "tool_call",
+  "tool_call_update",
+  "plan",
+  "available_commands_update",
+  "config_option_update",
+  "current_mode_update",
+  "usage_update",
+  "session_info_update",
+])
+
+const decodeSessionNotification = Schema.decodeUnknownEither(CursorSessionNotification, {
+  onExcessProperty: "preserve",
+})
+const decodeExtensionNotification = Schema.decodeUnknownEither(
+  Schema.Struct({
+    ...CursorPayload.fields,
+    toolCallId: Schema.String,
+  }),
+  { onExcessProperty: "preserve" },
+)
+
+/** Undefined means an unknown extension; Left means a malformed known notification. */
+export const decodeNotification = (
+  method: string,
+  params: unknown,
+): Either.Either<CursorPayload, ParseResult.ParseError> | undefined => {
+  if (method === "session/update") {
+    const envelope = decodeUpdateKind(params)
+    if (
+      Either.isRight(envelope) &&
+      envelope.right.update &&
+      !SESSION_UPDATES.has(envelope.right.update.sessionUpdate)
     )
-  if (method !== "session/update" || typeof p.sessionId !== "string") return false
-  const update = asRecord(p.update)
-  switch (update.sessionUpdate) {
-    case "agent_message_chunk":
-    case "agent_thought_chunk":
-    case "user_message_chunk":
-      return typeof asRecord(update.content).type === "string"
-    case "tool_call":
-    case "tool_call_update":
-      return typeof update.toolCallId === "string"
-    case "plan":
-      return Array.isArray(update.entries)
-    case "available_commands_update":
-      return Array.isArray(update.availableCommands)
-    case "current_mode_update":
-      return typeof update.currentModeId === "string"
-    case "config_option_update":
-      return Array.isArray(update.configOptions)
-    case "session_info_update":
-      return true
-    case "usage_update":
-      return typeof update.used === "number" && typeof update.size === "number"
-    default:
-      return false
+      return undefined
+    return decodeSessionNotification(params)
   }
+  if (["cursor/update_todos", "cursor/task", "cursor/generate_image"].includes(method))
+    return decodeExtensionNotification(params)
+  return undefined
 }
