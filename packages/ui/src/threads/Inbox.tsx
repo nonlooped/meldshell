@@ -15,6 +15,8 @@ import {
   FolderPlus,
   GitBranch,
   CircleAlert,
+  CircleX,
+  Hourglass,
   MoreHorizontal,
   Rows2,
   Search,
@@ -39,6 +41,7 @@ import {
 } from "../ui/controls"
 import { relativeAge } from "../ui/relative-age"
 import { useScheduledThreadIds } from "../schedules/schedule-queries"
+import { glanceLabel, isFinished, threadGlance, type ThreadGlance } from "./thread-state"
 
 type InboxRow =
   | {
@@ -109,8 +112,11 @@ function InboxThread({
   const archiveChord = useKeybindings((state) => state.bindings.archiveThread)
   const selected = selectedThreadId === thread.id
   const archiveLabel = thread.status === "active" ? "Archive" : "Restore to inbox"
-  const finishedUnseen = unseen && finishedActivities.has(thread.activity)
+  const finishedUnseen = unseen && isFinished(thread.activity)
   const attention = attentionColor(thread, finishedUnseen)
+  // Archived rows never show the unseen mark, so the rail does not either.
+  const glance = threadGlance(thread.activity, thread.status === "active" && finishedUnseen)
+  const provider = providersByThreadId.get(thread.id)
   return (
     <div
       className={`motion-colors ${threadRowClasses}`}
@@ -132,7 +138,9 @@ function InboxThread({
         className="thread-open relative flex min-w-0 flex-1 flex-col overflow-hidden justify-start gap-[5px] [padding:8px_10px] border-0 bg-transparent text-inherit cursor-default text-left [&:focus-visible]:[outline-offset:-2px]"
         data-dragging={draggable.isDragging ? "" : undefined}
         aria-current={selected ? "true" : undefined}
-        title={`${thread.title}\nDrag onto a pane to open it there`}
+        title={[thread.title, glanceLabel(glance), "Drag onto a pane to open it there"]
+          .filter((line) => line !== null)
+          .join("\n")}
         onClick={() => onOpen(thread.id)}
       >
         {thread.status === "active" ? (
@@ -143,8 +151,8 @@ function InboxThread({
               <TextSwap text={thread.title} />
             </span>
             <span className={threadContextClasses}>
-              <ProviderIcon provider={providersByThreadId.get(thread.id)} size={13} />
-              {/* The provider icon stays in the rail; the rest of the line fades beside it. */}
+              <ThreadMark provider={provider} glance={glance} size={13} />
+              {/* The mark stays in the rail; the rest of the line fades beside it. */}
               <span
                 className={`flex min-w-0 flex-1 items-center gap-[6px] overflow-visible! ${railLabelClasses}`}
               >
@@ -201,7 +209,7 @@ function InboxThread({
         ) : (
           <>
             <span className="flex-[0_0_14px] text-[var(--text-tertiary)]">
-              <ProviderIcon provider={providersByThreadId.get(thread.id)} size={14} />
+              <ThreadMark provider={provider} glance={glance} size={14} />
             </span>
             <span
               className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
@@ -279,7 +287,50 @@ function InboxThread({
   )
 }
 
-const finishedActivities = new Set<Thread["activity"]>(["completed", "idle", "interrupted"])
+/** The thread's provider, which the collapsed rail swaps for what the thread is doing. */
+function ThreadMark({
+  provider,
+  glance,
+  size,
+}: {
+  provider: Provider | undefined
+  glance: ThreadGlance
+  size: number
+}) {
+  return (
+    <span
+      className="relative inline-flex shrink-0 items-center justify-center"
+      style={{ width: size, height: size }}
+    >
+      <span className={`inline-flex ${railLabelClasses}`}>
+        <ProviderIcon provider={provider} size={size} />
+      </span>
+      <span
+        aria-hidden="true"
+        className="motion-colors motion-duration-220 absolute inset-[0] inline-flex items-center justify-center opacity-0 group-data-[rail]/inbox:opacity-100"
+      >
+        <GlanceMark glance={glance} size={size} />
+      </span>
+    </span>
+  )
+}
+
+function GlanceMark({ glance, size }: { glance: ThreadGlance; size: number }) {
+  switch (glance) {
+    case "running":
+      return <GradientSpinner size={size - 1} />
+    case "approval":
+      return <CircleAlert size={size} strokeWidth={1.9} className="text-[var(--color-modified)]" />
+    case "failed":
+      return <CircleX size={size} strokeWidth={1.9} className="text-[var(--color-deleted)]" />
+    case "queued":
+      return <Hourglass size={size - 1} strokeWidth={1.75} />
+    case "done":
+      return <span className="block w-[7px] h-[7px] rounded-full bg-[var(--color-info)]" />
+    case "idle":
+      return <span className="block w-[4px] h-[4px] rounded-full bg-current opacity-70" />
+  }
+}
 
 /** The colour that marks an inbox thread the operator should look at next, like an unread message. */
 function attentionColor(thread: Thread, finishedUnseen: boolean): string | null {
