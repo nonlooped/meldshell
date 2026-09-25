@@ -12,7 +12,6 @@ import {
   type TurnDispatch,
   type UnknownRecord,
 } from "@meldshell/contracts"
-import { effortOption, modelSelection, parameterizedModels } from "./model-config"
 import { readCursorUsage } from "./usage"
 import { cursorCommands, discoverCursorSkills } from "./skills"
 import {
@@ -23,19 +22,24 @@ import {
   type NativeMessage,
 } from "./client"
 import {
-  cursorModels,
+  automaticPermission,
   cursorPrompt,
   interactionResponse,
   knownNotification,
   nativeMethod,
 } from "./protocol"
+import {
+  acceptsImages,
+  configureModel,
+  cursorMode,
+  discoverModels,
+  type ConfigurableSession,
+} from "./session-config"
 
 type Emit = (method: string, params: unknown, validated?: boolean, requestId?: string) => void
-interface Session {
-  client: CursorClient
+interface Session extends ConfigurableSession {
   sessionId: string
   init: UnknownRecord
-  configuration: UnknownRecord
   emit: Emit | null
   replaying: boolean
   interactive: boolean
@@ -57,20 +61,6 @@ interface PendingInteraction {
     optionId?: string,
   ) => void
 }
-
-const automaticPermission = (
-  session: Session,
-  params: UnknownRecord,
-): { decision: string; optionId?: string } | null => {
-  if (session.permissions?.approvalPolicy !== "never") return null
-  const kind = session.permissions.sandbox === "danger-full-access" ? "allow_once" : "reject_once"
-  const option = asRecords(params.options).find((entry) => entry.kind === kind)
-  if (option) return { decision: "accept", optionId: asText(option.optionId) }
-  return kind === "reject_once" ? { decision: "cancel" } : null
-}
-
-/** Cursor names MeldShell's default mode `agent`; plan and ask share their names. */
-const cursorMode = (mode: TurnDispatch["mode"]): string => (mode === "default" ? "agent" : mode)
 
 export const runCursorWorker = (
   port: WorkerPort,
@@ -130,7 +120,9 @@ export const runCursorWorker = (
       throw new RequestError(-32601, "Inactive Cursor client request.")
     }
     const automatic =
-      method === "session/request_permission" ? automaticPermission(session, params) : null
+      method === "session/request_permission"
+        ? automaticPermission(session.permissions, params)
+        : null
     if (automatic) {
       const result = response(automatic.decision, undefined, automatic.optionId)
       session.emit("cursor/acp/permission/automatic", { request: params, response: result }, true)
@@ -186,49 +178,58 @@ export const runCursorWorker = (
   ): Promise<Session> => {
     command ??= await dependencies.discover()
     if (stopping) throw new Error("Cursor is shutting down.")
+    // The client's callbacks run only once it is connected, after `session` exists.
     const session: Session = {
-      client: undefined as unknown as CursorClient,
       sessionId: nativeId ?? "",
       init: {},
       configuration: {},
       emit,
       replaying: nativeId !== null,
       interactive: onCreated !== undefined,
+      client: new dependencies.Client(command, cwd, {
+        message: (message) => onMessage(session, message),
+        sessionUpdate: ({ sessionId, update }) => {
+          if (sessionId === session.sessionId && update.sessionUpdate === "config_option_update")
+            session.configuration = {
+              ...session.configuration,
+              configOptions: update.configOptions,
+            }
+          // Each client owns one session, and the list can arrive before session/new returns its ID.
+          if (
+            (!session.sessionId || sessionId === session.sessionId) &&
+            update.sessionUpdate === "available_commands_update"
+          ) {
+            session.availableCommands = asRecords(update.availableCommands)
+            session.onCommands?.()
+          }
+        },
+        requestPermission: ({ params, signal }) =>
+          onRequest(
+            session,
+            "session/request_permission",
+            params,
+            signal,
+            (decision, answers, optionId): RequestPermissionResponse =>
+              interactionResponse(
+                "session/request_permission",
+                params,
+                decision,
+                answers,
+                optionId,
+              ),
+          ),
+        askQuestion: ({ params, signal }) =>
+          onRequest(session, "cursor/ask_question", params, signal, (decision, answers, optionId) =>
+            interactionResponse("cursor/ask_question", params, decision, answers, optionId),
+          ),
+        createPlan: ({ params, signal }) =>
+          onRequest(session, "cursor/create_plan", params, signal, (decision) =>
+            interactionResponse("cursor/create_plan", params, decision),
+          ),
+        spawned: (pid) => publish({ type: "process-started", pid }),
+        stopped: (pid) => publish({ type: "process-stopped", pid }),
+      }),
     }
-    session.client = new dependencies.Client(command, cwd, {
-      message: (message) => onMessage(session, message),
-      sessionUpdate: ({ sessionId, update }) => {
-        if (sessionId === session.sessionId && update.sessionUpdate === "config_option_update")
-          session.configuration = { ...session.configuration, configOptions: update.configOptions }
-        // Each client owns one session, and the list can arrive before session/new returns its ID.
-        if (
-          (!session.sessionId || sessionId === session.sessionId) &&
-          update.sessionUpdate === "available_commands_update"
-        ) {
-          session.availableCommands = asRecords(update.availableCommands)
-          session.onCommands?.()
-        }
-      },
-      requestPermission: ({ params, signal }) =>
-        onRequest(
-          session,
-          "session/request_permission",
-          params,
-          signal,
-          (decision, answers, optionId): RequestPermissionResponse =>
-            interactionResponse("session/request_permission", params, decision, answers, optionId),
-        ),
-      askQuestion: ({ params, signal }) =>
-        onRequest(session, "cursor/ask_question", params, signal, (decision, answers, optionId) =>
-          interactionResponse("cursor/ask_question", params, decision, answers, optionId),
-        ),
-      createPlan: ({ params, signal }) =>
-        onRequest(session, "cursor/create_plan", params, signal, (decision) =>
-          interactionResponse("cursor/create_plan", params, decision),
-        ),
-      spawned: (pid) => publish({ type: "process-started", pid }),
-      stopped: (pid) => publish({ type: "process-stopped", pid }),
-    })
     clients.add(session.client)
     onCreated?.(session)
     try {
@@ -256,92 +257,6 @@ export const runCursorWorker = (
     for (const [id, approval] of approvals) if (approval.session === session) approvals.delete(id)
     await session.client.close()
     clients.delete(session.client)
-  }
-  const configure = async (session: Session, model: string, mode: string): Promise<void> => {
-    for (const [category, value, fallback] of [
-      ["model", model, "session/set_model"],
-      ["mode", mode, "session/set_mode"],
-    ] as const) {
-      const option = asRecords(session.configuration.configOptions).find(
-        (entry) => entry.category === category || entry.id === category,
-      )
-      if (option) {
-        const result = await session.client.run((agent) =>
-          agent.request("session/set_config_option", {
-            sessionId: session.sessionId,
-            configId: asText(option.id),
-            value,
-          }),
-        )
-        session.configuration = { ...session.configuration, ...result }
-      } else
-        await session.client.run((agent) =>
-          agent.request(fallback, {
-            sessionId: session.sessionId,
-            [category === "model" ? "modelId" : "modeId"]: value,
-          }),
-        )
-    }
-  }
-  const configureModel = async (
-    session: Session,
-    model: string,
-    mode: string,
-    effort: string | null = null,
-    speed?: "standard" | "fast",
-  ): Promise<void> => {
-    const selection = modelSelection(model)
-    const modelOption = asRecords(session.configuration.configOptions).find(
-      (option) => option.category === "model" || option.id === "model",
-    )
-    const parameterized = asRecords(modelOption?.options).some(
-      (option) => option.value === selection.model,
-    )
-    await configure(session, parameterized ? selection.model : model, mode)
-    if (!parameterized) return
-    const options = asRecords(session.configuration.configOptions)
-    const reasoning = effortOption(options)
-    if (reasoning && effort !== null) selection.parameters.set(asText(reasoning.id), effort)
-    if (speed && options.some((option) => option.id === "fast"))
-      selection.parameters.set("fast", String(speed === "fast"))
-    for (const [id, value] of selection.parameters) {
-      const option = asRecords(session.configuration.configOptions).find((entry) => entry.id === id)
-      if (!option || !asRecords(option.options).some((entry) => entry.value === value))
-        throw new Error(
-          `Cursor no longer supports ${id}=${value} for ${selection.model}. Refresh the model catalog.`,
-        )
-      const result = await session.client.run((agent) =>
-        agent.request("session/set_config_option", {
-          sessionId: session.sessionId,
-          configId: id,
-          value,
-        }),
-      )
-      session.configuration = { ...session.configuration, ...result }
-    }
-  }
-  const discoverModels = async (session: Session) => {
-    const image =
-      asRecord(asRecord(session.init.agentCapabilities).promptCapabilities).image === true
-    let models
-    try {
-      const catalog = await session.client.run((agent) =>
-        agent.request<UnknownRecord>("cursor/list_available_models", {}),
-      )
-      models = parameterizedModels(catalog, session.configuration, image)
-    } catch (cause) {
-      if (!(cause instanceof RequestError) || cause.code !== -32601) throw cause
-      // Older releases only expose their model catalog through a new session.
-      session.configuration = await session.client.run((agent) =>
-        agent.request("session/new", {
-          cwd: homedir(),
-          mcpServers: [],
-        }),
-      )
-      models = cursorModels(session.configuration, image)
-    }
-
-    return models
   }
   const probeFailed = (cause: unknown): void => {
     if (!stopping)
@@ -455,10 +370,7 @@ export const runCursorWorker = (
         dispatch.speed,
       )
       emit("cursor/acp/session/configuration", session.configuration)
-      const prompt = await cursorPrompt(
-        dispatch,
-        asRecord(asRecord(session.init.agentCapabilities).promptCapabilities).image === true,
-      )
+      const prompt = await cursorPrompt(dispatch, acceptsImages(session))
       if (turn.interrupted) throw new Error("Cursor turn interrupted.")
       const result = await session.client.run(
         (agent) => agent.request("session/prompt", { sessionId: session.sessionId, prompt }),
