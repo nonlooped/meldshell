@@ -4,10 +4,10 @@ Use this checklist for an installer candidate. Routine edits follow [AGENTS.md](
 
 ## Automatic releases
 
-The [Release](../.github/workflows/release.yml) workflow runs on a schedule from `main`:
+The [Release](../.github/workflows/release.yml) workflow runs from `main`:
 
 - **Stable**, daily at 00:17 UTC: if [CHANGELOG.md](../CHANGELOG.md) has `## [Unreleased]` entries, it releases them as the next minor version (`0.9.0` → `0.10.0`). It moves the entries under the new version and date, bumps every version field, pushes `chore(release): vX.Y.0` to `main` with an annotated tag, and publishes the GitHub Release as the latest release. Days without Unreleased entries release nothing.
-- **Nightly**, hourly at minute 47: if files outside `docs/`, `.github/`, and Markdown changed since the nearest release tag, stable or nightly, it publishes a prerelease `vX.Y.0-nightly.YYYYMMDDHHMM` of the upcoming minor version. The version is set only in the build; nothing is committed, and the tag points at the `main` commit. Its notes list the Unreleased entries and the commits since the previous release. Nightlies are never marked latest and are kept.
+- **Nightly**, after pushes to `main` and hourly at minute 47: if files outside `docs/`, `.github/`, and Markdown changed since the nearest release tag, stable or nightly, an automatic run publishes a prerelease only when that release is at least 30 minutes old. Push runs wait two minutes and skip if a newer commit arrived, combining rapid pushes into one build. The 30-minute limit prevents another automatic nightly immediately afterward, while the push trigger covers scheduled events that GitHub delays or drops. Manual nightly runs use the change rule without the delay or 30-minute limit. The version is `vX.Y.0-nightly.YYYYMMDDHHMM` for the upcoming minor version, set only in the build; nothing is committed, and the tag points at the triggering `main` commit. Its notes list the Unreleased entries and the commits since the previous release. Nightlies are never marked latest and are kept.
 
 Each release runs the full [CI](../.github/workflows/ci.yml) suite and packages both platforms from the same commit. It is tagged and published only if everything passes, so a failure leaves no tag, commit, or release. The schedule does not retry a commit whose release failed. A new commit on `main`, a rerun, or a manual run with the same channel does.
 

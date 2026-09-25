@@ -91,6 +91,24 @@ test("a manual nightly can be forced without app changes", (t) => {
   assert.match(run("plan", "stable", "--force").stderr, /Only nightly plans accept --force/)
 })
 
+test("automatic nightlies wait 30 minutes after the previous release", (t) => {
+  const { cwd, git, plan, commit } = fixture(t)
+  commit("main.ts", "feat: first update")
+  assert.equal(plan("nightly", "--automatic").release, "false")
+  assert.match(plan("nightly", "--automatic").reason, /less than 30 minutes ago/)
+  assert.equal(plan("nightly").release, "true")
+
+  git("tag", "-d", "v0.1.0")
+  execFileSync("git", ["tag", "-a", "-m", "Older release", "v0.1.0", "HEAD~1"], {
+    cwd,
+    env: {
+      ...process.env,
+      GIT_COMMITTER_DATE: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+    },
+  })
+  assert.equal(plan("nightly", "--automatic").release, "true")
+})
+
 test("set-version writes every version field without committing", (t) => {
   const { cwd, git, run } = fixture(t)
   const result = run("set-version", "0.2.0-nightly.202609250507")
