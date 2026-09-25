@@ -55,6 +55,6 @@
     "electron": "44.4.5",
     "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
-    "vite": "7.3.6"
+    "vite": "8.3.0"
   }
 }
