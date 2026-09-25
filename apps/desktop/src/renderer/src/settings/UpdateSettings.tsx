@@ -1,4 +1,4 @@
-import type { AppUpdateStatus } from "@meldshell/contracts"
+import { errorMessage, type AppUpdateStatus } from "@meldshell/contracts"
 import { useEffect, useState } from "react"
 import { Button, Switch } from "../ui/controls"
 
@@ -30,7 +30,7 @@ export function UpdateSettings(): React.JSX.Element {
       })
       .catch((cause: unknown) => {
         if (active) {
-          setActionError(cause instanceof Error ? cause.message : "Could not read update status.")
+          setActionError(errorMessage(cause, "Could not read update status."))
         }
       })
     return () => {
@@ -51,7 +51,7 @@ export function UpdateSettings(): React.JSX.Element {
         setStatus(await window.meldshell.checkForUpdates())
       }
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "The update action failed.")
+      setActionError(errorMessage(cause, "The update action failed."))
     }
   }
 
@@ -60,9 +60,7 @@ export function UpdateSettings(): React.JSX.Element {
     try {
       setStatus(await window.meldshell.setUpdateChannel(nightly ? "nightly" : "stable"))
     } catch (cause) {
-      setActionError(
-        cause instanceof Error ? cause.message : "Could not change the update channel.",
-      )
+      setActionError(errorMessage(cause, "Could not change the update channel."))
     }
   }
 

@@ -1,5 +1,11 @@
 import { workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
-import { type ComposerCommand, type TitleRequest, type TurnDispatch } from "@meldshell/contracts"
+import {
+  errorMessage,
+  toError,
+  type ComposerCommand,
+  type TitleRequest,
+  type TurnDispatch,
+} from "@meldshell/contracts"
 import {
   CodexAppServer,
   listCodexModels,
@@ -488,7 +494,7 @@ export const runCodexWorker = (
         type: "turn-start-failed",
         threadId: dispatch.threadId,
         turnId: dispatch.turnId,
-        message: cause instanceof Error ? cause.message : String(cause),
+        message: errorMessage(cause),
       })
     }
   }
@@ -533,7 +539,7 @@ export const runCodexWorker = (
         serviceTierForTurn: "default",
       })
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause)
+      const message = errorMessage(cause)
       if (nativeThreadId === null)
         publish({ type: "title-failed", threadId: request.threadId, message })
       else settleTitle(nativeThreadId, null, message)
@@ -555,7 +561,7 @@ export const runCodexWorker = (
         const models = await listCodexModels(server)
         if (!stopping) publish({ type: "provider-ready", status, providerKey: "openai", models })
       },
-      catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+      catch: toError,
     }).pipe(
       Effect.catchAll((cause) =>
         Effect.sync(() =>
@@ -675,7 +681,7 @@ export const runCodexWorker = (
               publish({
                 type: "usage-result",
                 requestId: input.requestId,
-                error: cause instanceof Error ? cause.message : String(cause),
+                error: errorMessage(cause),
               }),
           )
           .finally(() => usageRequests.delete(input.requestId))
@@ -697,7 +703,7 @@ export const runCodexWorker = (
               publish({
                 type: "commands-result",
                 requestId: input.requestId,
-                error: cause instanceof Error ? cause.message : String(cause),
+                error: errorMessage(cause),
               }),
           )
         break
@@ -717,7 +723,7 @@ export const runCodexWorker = (
           )
           .then(
             () => acknowledge(),
-            (cause: unknown) => acknowledge(cause instanceof Error ? cause.message : String(cause)),
+            (cause: unknown) => acknowledge(errorMessage(cause)),
           )
         break
       case "resolve-approval": {

@@ -1,7 +1,12 @@
 import { stopProcessTree } from "../../provider-runtime/src/process-tree"
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { createInterface } from "node:readline"
-import type { CodexStatus, ProviderModelCatalogEntry } from "@meldshell/contracts"
+import {
+  isRecord,
+  toError,
+  type CodexStatus,
+  type ProviderModelCatalogEntry,
+} from "@meldshell/contracts"
 import Ajv, { type ValidateFunction } from "ajv"
 import { Effect } from "effect"
 import semver from "semver"
@@ -56,7 +61,7 @@ const run = (executablePath: string, args: ReadonlyArray<string>) =>
       })
       return Effect.sync(() => child.kill())
     } catch (cause) {
-      resume(Effect.fail(cause instanceof Error ? cause : new Error(String(cause))))
+      resume(Effect.fail(toError(cause)))
       return undefined
     }
   }).pipe(
@@ -205,11 +210,6 @@ const classifyMessage = (message: JsonRpcNotification, request = false): Message
       ? "validated"
       : "malformed"
 const validateModelListResponse: ValidateFunction = ajv.compile(modelListResponseSchema)
-
-const messageRecord = (value: unknown): Record<string, unknown> | null =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
 
 const rpcError = (error: JsonRpcResponse["error"]): Error => {
   const suffix = error?.code === undefined ? "" : ` (${error.code})`
@@ -396,7 +396,7 @@ export class CodexAppServer {
       try {
         this.send({ id, method, params })
       } catch (cause) {
-        finish(cause instanceof Error ? cause : new Error(String(cause)))
+        finish(toError(cause))
       }
     })
   }
@@ -444,11 +444,11 @@ export class CodexAppServer {
       this.callbacks.onProtocolError("Codex app-server wrote malformed JSON.", line)
       return
     }
-    const record = messageRecord(parsed)
-    if (record === null) {
+    if (!isRecord(parsed)) {
       this.callbacks.onProtocolError("Codex app-server wrote a non-object message.", parsed)
       return
     }
+    const record = parsed
 
     if ((typeof record.id === "string" || typeof record.id === "number") && !("method" in record)) {
       const waiter = this.pending.get(record.id)

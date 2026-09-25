@@ -3,6 +3,7 @@ import { SqliteClient } from "@effect/sql-sqlite-node"
 import { RpcServer } from "@effect/rpc"
 import type { FromClientEncoded, FromServerEncoded } from "@effect/rpc/RpcMessage"
 import {
+  errorMessage,
   CoreDatabaseError,
   CoreProtocolError,
   CoreRpcs,
@@ -72,9 +73,6 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
     prepareCacheSize: 1_024,
     prepareCacheTTL: "24 hours",
   })
-
-  const errorMessage = (value: unknown): string =>
-    value instanceof Error ? value.message : String(value)
 
   const coreErrorFromCause = (cause: Cause.Cause<unknown>): CoreError => {
     const failure = Option.getOrUndefined(Cause.failureOption(cause))

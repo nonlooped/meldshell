@@ -1,18 +1,27 @@
-import type { ProviderModelCatalogEntry, TurnDispatch } from "@meldshell/contracts"
+import {
+  asRecord,
+  asRecords,
+  asText,
+  type ProviderModelCatalogEntry,
+  type TurnDispatch,
+  type UnknownRecord,
+} from "@meldshell/contracts"
 import type { ContentBlock, RequestPermissionResponse } from "@agentclientprotocol/sdk"
 import { readFile } from "node:fs/promises"
 import { extname, isAbsolute } from "node:path"
-import { record, records, text, type RecordValue } from "./client"
 
-export const cursorModels = (session: RecordValue, image: boolean): ProviderModelCatalogEntry[] => {
-  const models = record(session.models)
-  return records(models.availableModels)
-    .filter((model) => text(model.modelId))
+export const cursorModels = (
+  session: UnknownRecord,
+  image: boolean,
+): ProviderModelCatalogEntry[] => {
+  const models = asRecord(session.models)
+  return asRecords(models.availableModels)
+    .filter((model) => asText(model.modelId))
     .map((model) => ({
-      catalogId: text(model.modelId),
-      slug: text(model.modelId),
-      displayName: text(model.name) || text(model.modelId),
-      description: text(model.description),
+      catalogId: asText(model.modelId),
+      slug: asText(model.modelId),
+      displayName: asText(model.name) || asText(model.modelId),
+      description: asText(model.description),
       reasoningEfforts: [],
       defaultReasoningEffort: null,
       serviceTiers: [],
@@ -78,28 +87,28 @@ export const cursorPrompt = async (
 
 export function interactionResponse(
   method: "session/request_permission",
-  params: RecordValue,
+  params: UnknownRecord,
   decision: string,
   answers?: Readonly<Record<string, ReadonlyArray<string>>>,
   optionId?: string,
 ): RequestPermissionResponse
 export function interactionResponse(
   method: string,
-  params: RecordValue,
+  params: UnknownRecord,
   decision: string,
   answers?: Readonly<Record<string, ReadonlyArray<string>>>,
   optionId?: string,
-): RecordValue
+): UnknownRecord
 export function interactionResponse(
   method: string,
-  params: RecordValue,
+  params: UnknownRecord,
   decision: string,
   answers?: Readonly<Record<string, ReadonlyArray<string>>>,
   optionId?: string,
-): RecordValue {
+): UnknownRecord {
   if (method === "session/request_permission") {
     if (decision === "cancel") return { outcome: { outcome: "cancelled" } }
-    const option = records(params.options).find((entry) => entry.optionId === optionId)
+    const option = asRecords(params.options).find((entry) => entry.optionId === optionId)
     if (!option) throw new Error("Choose one of Cursor's advertised permission options.")
     return { outcome: { outcome: "selected", optionId: option.optionId } }
   }
@@ -112,12 +121,12 @@ export function interactionResponse(
     }
   if (decision !== "accept")
     return { outcome: { outcome: decision === "cancel" ? "cancelled" : "skipped" } }
-  const selected = records(params.questions).map((question) => {
-    const values = [...new Set(answers?.[text(question.id)] ?? [])]
+  const selected = asRecords(params.questions).map((question) => {
+    const values = [...new Set(answers?.[asText(question.id)] ?? [])]
     if (
       !values.length ||
       (!question.allowMultiple && values.length !== 1) ||
-      values.some((value) => !records(question.options).some((option) => option.id === value))
+      values.some((value) => !asRecords(question.options).some((option) => option.id === value))
     )
       throw new Error("Choose valid answers for each Cursor question.")
     return { questionId: question.id, selectedOptionIds: values }
@@ -129,19 +138,19 @@ export const nativeMethod = (method: string): string =>
   method.startsWith("cursor/") ? method : `cursor/acp/${method}`
 
 export const knownNotification = (method: string, params: unknown): boolean => {
-  const p = record(params)
+  const p = asRecord(params)
   if (method.startsWith("cursor/"))
     return (
       ["cursor/update_todos", "cursor/task", "cursor/generate_image"].includes(method) &&
       typeof p.toolCallId === "string"
     )
   if (method !== "session/update" || typeof p.sessionId !== "string") return false
-  const update = record(p.update)
+  const update = asRecord(p.update)
   switch (update.sessionUpdate) {
     case "agent_message_chunk":
     case "agent_thought_chunk":
     case "user_message_chunk":
-      return typeof record(update.content).type === "string"
+      return typeof asRecord(update.content).type === "string"
     case "tool_call":
     case "tool_call_update":
       return typeof update.toolCallId === "string"

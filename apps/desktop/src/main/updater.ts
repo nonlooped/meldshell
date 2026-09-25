@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import type { AppUpdateStatus, UpdateChannel } from "@meldshell/contracts"
+import { errorMessage, type AppUpdateStatus, type UpdateChannel } from "@meldshell/contracts"
 import { app } from "electron"
 import electronUpdater, {
   type AppUpdater,
@@ -119,7 +119,7 @@ export class UpdateService {
       await this.#updater.checkForUpdates()
     } catch (cause) {
       this.#setStatus("error", {
-        message: cause instanceof Error ? cause.message : "MeldShell could not check for updates.",
+        message: errorMessage(cause, "MeldShell could not check for updates."),
       })
     }
     return this.#status

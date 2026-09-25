@@ -1,7 +1,4 @@
-import type { CanonicalEvent } from "@meldshell/contracts"
-
-const record = (value: unknown): Record<string, unknown> =>
-  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
+import { asRecord, type CanonicalEvent } from "@meldshell/contracts"
 
 function toolStatus(
   event: CanonicalEvent,
@@ -39,8 +36,8 @@ export function toolDetails(event: CanonicalEvent): {
   outputFile: string | null
   parent: string | null
 } {
-  const payload = record(event.payload)
-  const item = record(payload.item)
+  const payload = asRecord(event.payload)
+  const item = asRecord(payload.item)
   const images: string[] = []
   const imageSource = (value: unknown): void => {
     if (
@@ -55,9 +52,9 @@ export function toolDetails(event: CanonicalEvent): {
     return JSON.stringify(
       value,
       (_key, entry: unknown) => {
-        const block = record(entry)
+        const block = asRecord(entry)
         if (block.type === "image" || block.type === "input_image" || block.type === "inputImage") {
-          const source = record(block.source)
+          const source = asRecord(block.source)
           if (typeof block.data === "string" && typeof block.mimeType === "string")
             imageSource(`data:${block.mimeType};base64,${block.data}`)
           if (source.type === "base64")

@@ -9,7 +9,12 @@ import {
   type SDKUserMessage,
   type SDKMessage,
 } from "@anthropic-ai/claude-agent-sdk"
-import { type TitleRequest, type TurnDispatch, type ClaudeStatus } from "@meldshell/contracts"
+import {
+  errorMessage,
+  type TitleRequest,
+  type TurnDispatch,
+  type ClaudeStatus,
+} from "@meldshell/contracts"
 import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
@@ -21,8 +26,6 @@ import { loadModelHistory } from "./model-history"
 import { discoverClaude, type ClaudeCommand } from "./discovery"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 
-const errorText = (cause: unknown): string =>
-  cause instanceof Error ? cause.message : String(cause)
 const idleInput = (signal: AbortSignal): AsyncIterable<SDKUserMessage> => ({
   async *[Symbol.asyncIterator]() {
     if (!signal.aborted)
@@ -168,7 +171,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
     if (session) queries.delete(session)
   }
   const discoveryStatus = (cause: unknown): ClaudeStatus => {
-    const message = errorText(cause)
+    const message = errorMessage(cause)
     if (/not installed|not available on PATH/i.test(message)) return status("missing", message)
     if (/override could not be resolved/i.test(message)) return status("error", message)
     return status("error", `Could not connect to Claude Code: ${message}`)
@@ -230,7 +233,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
           status: accountStatus(account),
         })
       } catch (cause) {
-        if (/not installed|override could not be resolved/i.test(errorText(cause)))
+        if (/not installed|override could not be resolved/i.test(errorMessage(cause)))
           discovered = null
         if (!stopping) publish(discoveryStatus(cause))
       } finally {
@@ -390,7 +393,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
         queries.add(session)
         await consume(session)
       } catch (cause) {
-        finish(interrupted() ? "interrupted" : "failed", errorText(cause))
+        finish(interrupted() ? "interrupted" : "failed", errorMessage(cause))
       } finally {
         controller.abort()
         closeQuery(session)
@@ -428,7 +431,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
         publish({ type: "thread-title", threadId: request.threadId, title: message.result })
       }
     } catch (cause) {
-      publish({ type: "title-failed", threadId: request.threadId, message: errorText(cause) })
+      publish({ type: "title-failed", threadId: request.threadId, message: errorMessage(cause) })
     } finally {
       clearTimeout(timeout)
       controller.abort()
@@ -462,7 +465,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
       })
       publish({ type: "usage-result", requestId, usage: claudeUsage(response) })
     } catch (cause) {
-      publish({ type: "usage-result", requestId, error: errorText(cause) })
+      publish({ type: "usage-result", requestId, error: errorMessage(cause) })
     } finally {
       clearTimeout(timeout)
       controller.abort()
@@ -510,7 +513,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
         })),
       })
     } catch (cause) {
-      publish({ type: "commands-result", requestId, error: errorText(cause) })
+      publish({ type: "commands-result", requestId, error: errorMessage(cause) })
     } finally {
       clearTimeout(timeout)
       controller.abort()
@@ -637,7 +640,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
           } else {
             void turn.session.interrupt().then(
               () => ack(),
-              (cause) => ack(errorText(cause)),
+              (cause) => ack(errorMessage(cause)),
             )
           }
           break
@@ -649,12 +652,12 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
         case "shutdown":
           void shutdown().then(
             () => ack(),
-            (cause) => ack(errorText(cause)),
+            (cause) => ack(errorMessage(cause)),
           )
           break
       }
     } catch (cause) {
-      ack(errorText(cause))
+      ack(errorMessage(cause))
     }
   })
   void probe()

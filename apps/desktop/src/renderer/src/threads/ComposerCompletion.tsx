@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "motion/react"
 import { Folder, Sparkles, SquareSlash } from "lucide-react"
-import type { ComposerCommand } from "@meldshell/contracts"
+import { errorMessage, type ComposerCommand } from "@meldshell/contracts"
 import type { WorkspacePathMatch, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { FileIcon } from "../ui/FileIcon"
 import { useMotionPreference } from "../ui/motion"
@@ -50,8 +50,7 @@ function completionStatus(
   commands: readonly ComposerCommand[] | undefined,
 ): string {
   const copy = STATUS[trigger?.kind ?? "path"]
-  if (source.isError)
-    return source.error instanceof Error ? source.error.message : "Could not load suggestions."
+  if (source.isError) return errorMessage(source.error, "Could not load suggestions.")
   if (source.isPending) return copy.loading
   // Codex's app server exposes skills but no slash commands.
   if (trigger?.kind === "command" && !commands?.some((command) => command.kind === "command"))

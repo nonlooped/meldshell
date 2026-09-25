@@ -1,7 +1,4 @@
-import type { CanonicalEvent } from "@meldshell/contracts"
-
-const record = (value: unknown): Record<string, unknown> =>
-  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
+import { asRecord, type CanonicalEvent } from "@meldshell/contracts"
 
 function wholeFilePatch(diff: string, name: string, destination: string, added: boolean): string {
   if (diff === "") return ""
@@ -19,13 +16,13 @@ export function fileChangePatches(event: CanonicalEvent): Array<{ path: string; 
   if (event.method === "turn/diff/updated") {
     return [{ path: "Turn changes", patch: event.text ?? "" }]
   }
-  const changes = record(record(event.payload).item).changes
+  const changes = asRecord(asRecord(event.payload).item).changes
   if (!Array.isArray(changes)) return []
   return changes.map((value) => {
-    const change = record(value)
+    const change = asRecord(value)
     const path = typeof change.path === "string" ? change.path : "File change"
     const diff = typeof change.diff === "string" ? change.diff : ""
-    const kind = record(change.kind)
+    const kind = asRecord(change.kind)
     const name = path.replaceAll("\\", "/")
     const destination =
       typeof kind.move_path === "string" ? kind.move_path.replaceAll("\\", "/") : name
@@ -44,7 +41,7 @@ export function turnChangePatches(events: ReadonlyArray<CanonicalEvent>) {
   if (combined) return fileChangePatches(combined).filter(({ patch }) => patch.trim() !== "")
   return events
     .filter((event) => {
-      const item = record(record(event.payload).item)
+      const item = asRecord(asRecord(event.payload).item)
       return event.kind === "file-change" && item.status !== "failed" && item.status !== "declined"
     })
     .flatMap(fileChangePatches)

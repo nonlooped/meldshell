@@ -1,4 +1,4 @@
-import { WorkerCommand } from "@meldshell/contracts"
+import { asRecord, WorkerCommand } from "@meldshell/contracts"
 import { Either, Schema } from "effect"
 
 export interface WorkerPort {
@@ -10,8 +10,7 @@ const decode = Schema.decodeUnknownEither(WorkerCommand)
 
 /** Decode the shared envelope; each provider retains ownership of acknowledgment timing. */
 export function workerCommand(port: WorkerPort, data: unknown) {
-  const commandId =
-    typeof data === "object" && data !== null && "commandId" in data ? data.commandId : undefined
+  const { commandId } = asRecord(data)
   const acknowledge = (error?: string): void => {
     if (typeof commandId === "string")
       port.postMessage({

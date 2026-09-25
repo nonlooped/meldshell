@@ -5,6 +5,7 @@ import { test } from "node:test"
 import vm from "node:vm"
 import ts from "typescript"
 import * as effect from "effect"
+import * as contracts from "@meldshell/contracts"
 
 test("opens the window with IPC registered while runtime initialization is pending", async () => {
   const app = new EventEmitter()
@@ -32,6 +33,7 @@ test("opens the window with IPC registered while runtime initialization is pendi
     },
     electron: { app, BrowserWindow: { getAllWindows: () => [] } },
     "electron-context-menu": { default: () => () => undefined },
+    "@meldshell/contracts": contracts,
     effect: {
       ...effect,
       Effect: {

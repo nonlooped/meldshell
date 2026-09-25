@@ -16,6 +16,7 @@ import {
   type AnyMessage,
 } from "@agentclientprotocol/sdk"
 import which from "which"
+import { asRecords, type UnknownRecord } from "@meldshell/contracts"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import {
   parseCursorQuestion,
@@ -23,13 +24,6 @@ import {
   type CursorQuestion,
   type CursorPlan,
 } from "./extensions"
-
-export type RecordValue = Record<string, unknown>
-export const record = (value: unknown): RecordValue =>
-  typeof value === "object" && value !== null && !Array.isArray(value) ? (value as RecordValue) : {}
-export const records = (value: unknown): RecordValue[] =>
-  Array.isArray(value) ? value.map(record) : []
-export const text = (value: unknown): string => (typeof value === "string" ? value : "")
 
 export interface CursorCommand {
   command: string
@@ -128,8 +122,8 @@ export interface ClientCallbacks {
   message: (message: NativeMessage) => void
   sessionUpdate: (params: SessionNotification) => void
   requestPermission: ClientRequestHandler<RequestPermissionRequest, RequestPermissionResponse>
-  askQuestion: ClientRequestHandler<CursorQuestion, RecordValue>
-  createPlan: ClientRequestHandler<CursorPlan, RecordValue>
+  askQuestion: ClientRequestHandler<CursorQuestion, UnknownRecord>
+  createPlan: ClientRequestHandler<CursorPlan, UnknownRecord>
   spawned?: (pid: number) => void
   stopped?: (pid: number) => void
 }
@@ -224,7 +218,7 @@ export class CursorClient {
     }
   }
 
-  async initialize(): Promise<RecordValue> {
+  async initialize(): Promise<UnknownRecord> {
     const init = await this.run((agent) =>
       agent.request("initialize", {
         protocolVersion: PROTOCOL_VERSION,
@@ -238,7 +232,7 @@ export class CursorClient {
     )
     if (init.protocolVersion !== PROTOCOL_VERSION)
       throw new Error("This Cursor ACP protocol version is not supported.")
-    if (!records(init.authMethods).some((method) => method.id === "cursor_login"))
+    if (!asRecords(init.authMethods).some((method) => method.id === "cursor_login"))
       throw new Error("The discovered executable does not identify itself as Cursor ACP.")
     await this.run((agent) => agent.request("authenticate", { methodId: "cursor_login" }))
     return init

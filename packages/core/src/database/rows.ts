@@ -1,4 +1,5 @@
 import {
+  isRecord,
   type ApprovalPolicy,
   type ApprovalRequest,
   type CanonicalEvent,
@@ -262,9 +263,7 @@ const parseReasoningEfforts = (value: string): ReadonlyArray<ReasoningEffort> =>
 
 export const modelMetadata = (row: ProviderModelRow): Partial<ProviderModelCatalogEntry> => {
   const parsed = parseProviderData(row.metadata)
-  return typeof parsed === "object" && parsed !== null
-    ? (parsed as Partial<ProviderModelCatalogEntry>)
-    : {}
+  return isRecord(parsed) ? (parsed as Partial<ProviderModelCatalogEntry>) : {}
 }
 
 export const fromProviderModelRow = (row: ProviderModelRow): ProviderModel => {

@@ -1,3 +1,5 @@
+import { errorMessage } from "@meldshell/contracts"
+
 /** The site serves the account API and relay under /api on its own origin. */
 export const accountURL = window.location.origin
 
@@ -62,8 +64,7 @@ export async function signOut(returnTo?: string) {
   window.location.assign("/sign-in")
 }
 
-export const describe = (cause: unknown) =>
-  cause instanceof Error ? cause.message : String(cause).replace(/^Error: /, "")
+export const describe = (cause: unknown) => errorMessage(cause).replace(/^Error: /, "")
 
 export type Device = { id: string; name: string; online: boolean; lastSeen: number | null }
 export const listDevices = () => accountRequest("/api/remote/v1/devices") as Promise<Device[]>

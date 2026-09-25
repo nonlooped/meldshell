@@ -1,4 +1,5 @@
 import { RequestError } from "@agentclientprotocol/sdk"
+import { isRecord } from "@meldshell/contracts"
 
 export interface CursorQuestion {
   toolCallId: string
@@ -18,25 +19,22 @@ export interface CursorPlan {
   [key: string]: unknown
 }
 
-const object = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 export const parseCursorQuestion = (value: unknown): CursorQuestion => {
   if (
-    !object(value) ||
+    !isRecord(value) ||
     typeof value.toolCallId !== "string" ||
     !Array.isArray(value.questions) ||
     !value.questions.length ||
     !value.questions.every(
       (question: unknown) =>
-        object(question) &&
+        isRecord(question) &&
         typeof question.id === "string" &&
         typeof question.prompt === "string" &&
         (question.allowMultiple === undefined || typeof question.allowMultiple === "boolean") &&
         Array.isArray(question.options) &&
         question.options.every(
           (option: unknown) =>
-            object(option) && typeof option.id === "string" && typeof option.label === "string",
+            isRecord(option) && typeof option.id === "string" && typeof option.label === "string",
         ),
     )
   )
@@ -46,7 +44,7 @@ export const parseCursorQuestion = (value: unknown): CursorQuestion => {
 
 export const parseCursorPlan = (value: unknown): CursorPlan => {
   if (
-    !object(value) ||
+    !isRecord(value) ||
     typeof value.toolCallId !== "string" ||
     typeof value.plan !== "string" ||
     !Array.isArray(value.todos)

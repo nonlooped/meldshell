@@ -1,6 +1,11 @@
 import { threadContentClasses } from "../ui/styles"
 import { FadeDiv } from "../ui/motion"
-import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
+import {
+  errorMessage,
+  type AppSnapshot,
+  type Thread,
+  type TranscriptSearchResult,
+} from "@meldshell/contracts"
 import { useThreadActions } from "../data/mutations"
 import { useSelectedProvider } from "../data/providers"
 import { workspaceScope } from "../data/workspace-scope"
@@ -61,7 +66,7 @@ export function ThreadView({
     } catch (error) {
       update(thread.id, {
         sending: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage(error),
       })
     }
   }

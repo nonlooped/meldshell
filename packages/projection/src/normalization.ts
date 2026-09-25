@@ -1,4 +1,4 @@
-import type { CanonicalEventKind } from "@meldshell/contracts"
+import { asRecord, nonEmptyText, type CanonicalEventKind } from "@meldshell/contracts"
 import { cursorEventKind, cursorEventText } from "./cursor"
 
 /** Claude Code asks to leave plan mode with the plan it wrote; approving it starts the work. */
@@ -36,15 +36,11 @@ const nativeEventKind = (method: string, params: unknown): CanonicalEventKind =>
   return "unknown"
 }
 
-const stringValue = (value: unknown): string | null =>
-  typeof value === "string" && value.length > 0 ? value : null
-
 export const planText = (value: unknown): string | null => {
   if (!Array.isArray(value)) return null
   const steps = value.flatMap((entry) => {
-    if (typeof entry !== "object" || entry === null) return []
-    const step = entry as Record<string, unknown>
-    const text = stringValue(step.step) ?? stringValue(step.content)
+    const step = asRecord(entry)
+    const text = nonEmptyText(step.step) ?? nonEmptyText(step.content)
     if (!text) return []
     const status =
       step.status === "completed"
@@ -60,28 +56,21 @@ export const planText = (value: unknown): string | null => {
 export const eventText = (method: string, params: unknown): string | null => {
   if (method.startsWith("cursor/")) return cursorEventText(method, params)
   if (typeof params !== "object" || params === null) return null
-  const record = params as Record<string, unknown>
-  if (method === CLAUDE_EXIT_PLAN_MODE) return stringValue(record.plan)
-  const delta = stringValue(record.delta)
+  const record = asRecord(params)
+  if (method === CLAUDE_EXIT_PLAN_MODE) return nonEmptyText(record.plan)
+  const delta = nonEmptyText(record.delta)
   if (delta !== null) return delta
   if (method === "turn/plan/updated")
     return (
-      [stringValue(record.explanation), planText(record.plan)].filter(Boolean).join("\n\n") || null
+      [nonEmptyText(record.explanation), planText(record.plan)].filter(Boolean).join("\n\n") || null
     )
-  if (method.endsWith("/progress")) return stringValue(record.message)
-  const error = record.error
-  if (typeof error === "object" && error !== null) {
-    const message = stringValue((error as Record<string, unknown>).message)
-    if (message !== null) return message
-  }
+  if (method.endsWith("/progress")) return nonEmptyText(record.message)
+  const message = nonEmptyText(asRecord(record.error).message)
+  if (message !== null) return message
   const text = nativeItemText(record.item)
   if (text !== undefined) return text
-  if (method === "turn/completed") {
-    const turn = record.turn
-    if (typeof turn === "object" && turn !== null && "status" in turn) {
-      return `Turn ${String(turn.status)}.`
-    }
-  }
+  const turn = asRecord(record.turn)
+  if (method === "turn/completed" && "status" in turn) return `Turn ${String(turn.status)}.`
   return null
 }
 
@@ -89,8 +78,7 @@ export const approvalCopy = (
   method: string,
   params: unknown,
 ): { title: string; detail: string } => {
-  const record =
-    typeof params === "object" && params !== null ? (params as Record<string, unknown>) : {}
+  const record = asRecord(params)
   if (method.startsWith("cursor/")) {
     return cursorApprovalCopy(method, record)
   }
@@ -102,27 +90,24 @@ export const approvalCopy = (
   const provider = typeof record.toolName === "string" ? "Claude Code" : "Codex"
   const command = Array.isArray(record.command)
     ? record.command.map(String).join(" ")
-    : stringValue(record.command)
+    : nonEmptyText(record.command)
   if (method.includes("commandExecution")) {
     return {
       title: "Allow this command?",
-      detail: command ?? stringValue(record.reason) ?? `${provider} wants to run a command.`,
+      detail: command ?? nonEmptyText(record.reason) ?? `${provider} wants to run a command.`,
     }
   }
   if (method.includes("fileChange")) {
     return {
       title: "Allow these file changes?",
-      detail: stringValue(record.reason) ?? `${provider} wants to edit files in this workspace.`,
+      detail: nonEmptyText(record.reason) ?? `${provider} wants to edit files in this workspace.`,
     }
   }
-  return { title: `${provider} needs your input`, detail: stringValue(record.reason) ?? method }
+  return { title: `${provider} needs your input`, detail: nonEmptyText(record.reason) ?? method }
 }
 
 const cursorApprovalCopy = (method: string, record: Record<string, unknown>) => {
-  const tool =
-    typeof record.toolCall === "object" && record.toolCall !== null
-      ? (record.toolCall as Record<string, unknown>)
-      : {}
+  const tool = asRecord(record.toolCall)
   return {
     title:
       method === "cursor/create_plan"
@@ -135,22 +120,18 @@ const cursorApprovalCopy = (method: string, record: Record<string, unknown>) => 
 }
 
 const nativeItemType = (params: unknown): string => {
-  const item =
-    typeof params === "object" && params !== null && "item" in params ? params.item : undefined
-  return typeof item === "object" && item !== null && "type" in item ? String(item.type) : ""
+  const item = asRecord(asRecord(params).item)
+  return "type" in item ? String(item.type) : ""
 }
 
 const nativeItemText = (item: unknown): string | null | undefined => {
-  if (typeof item === "object" && item !== null) {
-    const itemRecord = item as Record<string, unknown>
-    for (const key of ["text", "message", "summary", "plan", "review", "command"]) {
-      const value = itemRecord[key]
-      const text = stringValue(value)
-      if (text !== null) return text
-      if (Array.isArray(value))
-        return value.filter((entry) => typeof entry === "string").join("\n") || null
-    }
+  const itemRecord = asRecord(item)
+  for (const key of ["text", "message", "summary", "plan", "review", "command"]) {
+    const value = itemRecord[key]
+    const text = nonEmptyText(value)
+    if (text !== null) return text
+    if (Array.isArray(value))
+      return value.filter((entry) => typeof entry === "string").join("\n") || null
   }
-
   return undefined
 }

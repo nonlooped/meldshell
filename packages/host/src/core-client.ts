@@ -2,7 +2,7 @@ import { logStartupTiming } from "./startup-timing"
 import { RpcClient } from "@effect/rpc"
 import { RpcClientError } from "@effect/rpc/RpcClientError"
 import type { FromServerEncoded } from "@effect/rpc/RpcMessage"
-import { CoreRpcs } from "@meldshell/contracts"
+import { asRecord, CoreRpcs } from "@meldshell/contracts"
 import { HostPlatform } from "./platform"
 import { Deferred, Effect, Layer, Runtime } from "effect"
 
@@ -42,12 +42,7 @@ const makeHostProtocol = RpcClient.Protocol.make((writeResponse) =>
 
     let didBecomeReady = false
     const onMessage = (message: unknown): void => {
-      if (
-        typeof message === "object" &&
-        message !== null &&
-        "type" in message &&
-        message.type === "ready"
-      ) {
+      if (asRecord(message).type === "ready") {
         if (!didBecomeReady) logStartupTiming("core ready")
         didBecomeReady = true
         runFork(Deferred.succeed(ready, undefined))

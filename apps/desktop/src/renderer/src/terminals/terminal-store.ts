@@ -21,6 +21,7 @@ import {
 import { actionForEvent, useKeybindings } from "../app/keybindings"
 import { usePreviewStore } from "../preview/preview-store"
 import { detectServerUrls } from "../preview/server-urls"
+import { errorMessage } from "@meldshell/contracts"
 
 /*
  * Thread terminals outlive their views. The store keeps each thread's pane tree; the xterm
@@ -415,7 +416,7 @@ function startShell(id: string, scope: Required<WorkspaceScope>, instance: Insta
         instance.exited = true
         // A failed run shell stays to show why; the next Run starts a fresh one.
         forgetRunShell(id)
-        const message = error instanceof Error ? error.message : String(error)
+        const message = errorMessage(error)
         setInfo(id, { state: "failed", message })
         term.write(
           `\x1b[31m${message.replace(/^Error invoking remote method '[^']+': /, "")}\x1b[0m`,

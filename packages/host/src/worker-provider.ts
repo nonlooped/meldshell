@@ -3,6 +3,7 @@ import { logStartupTiming } from "./startup-timing"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import { randomUUID } from "node:crypto"
 import {
+  errorMessage,
   ProviderStatus as ProviderStatusSchema,
   CodexUsage as CodexUsageSchema,
   ComposerCommand as ComposerCommandSchema,
@@ -52,11 +53,6 @@ type ProviderConfig = {
   readonly worker: string
 }
 
-const messageText = (cause: unknown): string =>
-  cause instanceof Error || (typeof cause === "object" && cause !== null && "message" in cause)
-    ? String(cause.message)
-    : String(cause)
-
 const deliverCommand = (
   child: HostProcess,
   message: ProviderWorkerInput,
@@ -88,7 +84,7 @@ const deliverCommand = (
       child.postMessage(typeof message === "string" ? message : { ...message, commandId })
       if (typeof message === "string") finish()
     } catch (cause) {
-      finish(messageText(cause))
+      finish(errorMessage(cause))
     }
     return Effect.sync(cleanup)
   }).pipe(
@@ -142,7 +138,7 @@ const requestWorker = <A, I>(
     try {
       child.postMessage({ ...fields, type: request.type, requestId })
     } catch (cause) {
-      finish(Effect.fail(new Error(messageText(cause))))
+      finish(Effect.fail(new Error(errorMessage(cause))))
     }
     return Effect.sync(() => {
       child.off("message", onMessage)
@@ -239,7 +235,7 @@ const providerRuntime = (
               turnId: dispatch.turnId,
               generation: child === null ? "unavailable" : generations.get(child)!,
             })
-            .pipe(Effect.mapError((cause) => new Error(messageText(cause))))
+            .pipe(Effect.mapError((cause) => new Error(errorMessage(cause))))
         }
       })
 
@@ -424,7 +420,7 @@ const providerRuntime = (
             publishStatus({
               ...decodedStatus.right,
               availability: "error",
-              detail: `Could not store the ${config.label} model catalog: ${messageText(cause)}`,
+              detail: `Could not store the ${config.label} model catalog: ${errorMessage(cause)}`,
             }),
           ),
         ),
@@ -577,7 +573,7 @@ const providerRuntime = (
               child.stderr?.pipe(process.stderr)
               return child
             },
-            catch: (cause) => new Error(messageText(cause)),
+            catch: (cause) => new Error(errorMessage(cause)),
           }),
           (child) =>
             Ref.set(processRef, child).pipe(
@@ -597,7 +593,7 @@ const providerRuntime = (
                         (pid) =>
                           Effect.tryPromise({
                             try: () => stopProcessTree(pid),
-                            catch: (cause) => new Error(messageText(cause)),
+                            catch: (cause) => new Error(errorMessage(cause)),
                           }).pipe(Effect.catchAll(Effect.logError)),
                         { discard: true },
                       ).pipe(
@@ -640,7 +636,7 @@ const providerRuntime = (
         publishStatus({
           ...probingStatus(),
           availability: "error",
-          detail: `The ${config.label} integration could not start: ${messageText(cause)}`,
+          detail: `The ${config.label} integration could not start: ${errorMessage(cause)}`,
         }),
       ),
     )
@@ -664,7 +660,7 @@ const providerRuntime = (
           (pid) =>
             Effect.tryPromise({
               try: () => stopProcessTree(pid),
-              catch: (cause) => new Error(messageText(cause)),
+              catch: (cause) => new Error(errorMessage(cause)),
             }).pipe(Effect.catchAll(Effect.logError)),
           { discard: true },
         )
@@ -679,7 +675,7 @@ const providerRuntime = (
           turnId,
           core
             .InterruptTurn({ threadId })
-            .pipe(Effect.mapError((cause) => new Error(messageText(cause)))),
+            .pipe(Effect.mapError((cause) => new Error(errorMessage(cause)))),
           (turn) =>
             send({
               type: "interrupt-turn",
@@ -693,7 +689,7 @@ const providerRuntime = (
               if (turn.worker_generation === null)
                 yield* core
                   .BindTurnWorker({ turnId: turn.id, generation })
-                  .pipe(Effect.mapError((cause) => new Error(messageText(cause))))
+                  .pipe(Effect.mapError((cause) => new Error(errorMessage(cause))))
               if (child !== null && generations.get(child) === generation) {
                 console.error(
                   `${config.label} did not settle cancellation; stopping its worker and active turns.`,
@@ -703,7 +699,7 @@ const providerRuntime = (
                   (pid) =>
                     Effect.tryPromise({
                       try: () => stopProcessTree(pid),
-                      catch: (cause) => new Error(messageText(cause)),
+                      catch: (cause) => new Error(errorMessage(cause)),
                     }),
                   { discard: true, concurrency: "unbounded" },
                 )
@@ -727,7 +723,7 @@ const providerRuntime = (
               }
               yield* core
                 .ReconcileWorker({ generation })
-                .pipe(Effect.mapError((cause) => new Error(messageText(cause))))
+                .pipe(Effect.mapError((cause) => new Error(errorMessage(cause))))
               yield* hostEvents.publish({ _tag: "RuntimeChanged", threadId })
             }),
         ),

@@ -275,8 +275,6 @@ for (const [harness, status, refresh, usage] of [
   )
 }
 
-const errorMessage = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause))
-
 export function createHostApi(runtime: HostRuntime) {
   const call = async (method: string, args: readonly unknown[]) => {
     const operation = Object.hasOwn(hostOperations, method) ? hostOperations[method] : undefined
@@ -297,7 +295,7 @@ export function createHostApi(runtime: HostRuntime) {
       const command = C.decodeCommand(raw)
       return { type: "result", id, ok: true, value: await call(command.method, command.args) }
     } catch (cause) {
-      return { type: "result", id, ok: false, error: errorMessage(cause) }
+      return { type: "result", id, ok: false, error: C.errorMessage(cause) }
     }
   }
   return { call, execute }

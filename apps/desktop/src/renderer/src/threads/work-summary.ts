@@ -1,7 +1,4 @@
-import type { CanonicalEvent } from "@meldshell/contracts"
-
-const record = (value: unknown): Record<string, unknown> =>
-  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
+import { asRecord, asRecords, type CanonicalEvent } from "@meldshell/contracts"
 
 const plural = (count: number, one: string, many: string): string =>
   `${count} ${count === 1 ? one : many}`
@@ -24,7 +21,7 @@ const phrases: ReadonlyArray<readonly [Work, (count: number) => string]> = [
 
 // Codex describes read-only commands; count those as what they did.
 function commandWork(item: Record<string, unknown>): Work[] {
-  const actions = Array.isArray(item.commandActions) ? item.commandActions.map(record) : []
+  const actions = asRecords(item.commandActions)
   const described =
     actions.length > 0 &&
     actions.every((action) => ["read", "search", "listFiles"].includes(String(action.type)))
@@ -41,7 +38,7 @@ function toolWork(item: Record<string, unknown>): Work {
 
 function editedPaths(event: CanonicalEvent, item: Record<string, unknown>): string[] {
   const changes = Array.isArray(item.changes) ? item.changes : []
-  const paths = changes.map((change) => record(change).path)
+  const paths = changes.map((change) => asRecord(change).path)
   if (paths.length === 0) return [`item:${event.id}`]
   return paths.map((path) => (typeof path === "string" ? path : `item:${event.id}`))
 }
@@ -53,7 +50,7 @@ function workCounts(events: ReadonlyArray<CanonicalEvent>): ReadonlyMap<Work, nu
 
   for (const event of events) {
     if (event.method === "turn/diff/updated") continue
-    const item = record(record(event.payload).item)
+    const item = asRecord(asRecord(event.payload).item)
     if (event.kind === "reasoning") add("thought")
     else if (event.kind === "plan") add("plan")
     else if (event.kind === "command") commandWork(item).forEach(add)
