@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto"
+import type { WorkerEvent } from "@meldshell/contracts"
+
+const PREFIX = "git-message:"
 
 const pending = new Map<
   string,
@@ -9,7 +12,7 @@ const pending = new Map<
 export async function requestGeneratedText(
   send: (requestId: string) => Promise<void>,
 ): Promise<string> {
-  const id = `git-message:${randomUUID()}`
+  const id = `${PREFIX}${randomUUID()}`
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await new Promise<string>((resolve, reject) => {
@@ -26,14 +29,14 @@ export async function requestGeneratedText(
   }
 }
 
-export function handleGeneratedText(record: Record<string, unknown>): boolean {
-  if (typeof record.threadId !== "string" || !record.threadId.startsWith("git-message:"))
-    return false
-  const request = pending.get(record.threadId)
-  if (record.type === "title-failed")
-    request?.reject(new Error(String(record.message ?? "Message generation failed.")))
-  else if (typeof record.title === "string" && record.title.trim())
-    request?.resolve(record.title.trim())
+/** Settles a generation request from its title event; false when the event names a real thread. */
+export function handleGeneratedText(
+  event: Extract<WorkerEvent, { type: "thread-title" | "title-failed" }>,
+): boolean {
+  if (!event.threadId.startsWith(PREFIX)) return false
+  const request = pending.get(event.threadId)
+  if (event.type === "title-failed") request?.reject(new Error(event.message))
+  else if (event.title.trim()) request?.resolve(event.title.trim())
   else request?.reject(new Error("The model returned an empty message."))
   return true
 }

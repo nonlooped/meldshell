@@ -1,4 +1,4 @@
-import { workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
+import { eventPublisher, workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { RequestError, type RequestPermissionResponse } from "@agentclientprotocol/sdk"
@@ -81,7 +81,9 @@ export const runCursorWorker = (
     readAccountEmail?: typeof readCursorAccountEmail
   } = { discover: discoverCursor, Client: CursorClient },
 ): { shutdown: () => Promise<void> } => {
-  const publish = (value: unknown): void => port.postMessage(value)
+  const publish = eventPublisher(port)
+  const publishStatus = (value: CursorStatus): void =>
+    publish({ type: "provider-status", status: value })
   const sessions = new Map<string, Session>()
   const clients = new Set<CursorClient>()
   const turns = new Map<string, RunningTurn>()
@@ -224,8 +226,8 @@ export const runCursorWorker = (
         onRequest(session, "cursor/create_plan", params, signal, (decision) =>
           interactionResponse("cursor/create_plan", params, decision),
         ),
-      spawned: (pid) => publish({ type: "app-server-started", pid }),
-      stopped: (pid) => publish({ type: "app-server-stopped", pid }),
+      spawned: (pid) => publish({ type: "process-started", pid }),
+      stopped: (pid) => publish({ type: "process-stopped", pid }),
     })
     clients.add(session.client)
     onCreated?.(session)
@@ -343,7 +345,7 @@ export const runCursorWorker = (
   }
   const probeFailed = (cause: unknown): void => {
     if (!stopping)
-      publish(
+      publishStatus(
         status(
           command === null
             ? "missing"
@@ -357,7 +359,7 @@ export const runCursorWorker = (
   const probe = (): Promise<void> => {
     if (probing || stopping) return probing ?? Promise.resolve()
     probing = (async () => {
-      publish(status("probing", "Connecting to Cursor CLI…"))
+      publishStatus(status("probing", "Connecting to Cursor CLI…"))
       let session: Session | undefined
       try {
         command = await dependencies.discover()
@@ -424,7 +426,6 @@ export const runCursorWorker = (
     const emit: Emit = (method, params, validated = true, requestId) =>
       publish({
         type: "runtime-event",
-        known: validated,
         input: {
           threadId: dispatch.threadId,
           turnId: dispatch.turnId,
@@ -537,8 +538,16 @@ export const runCursorWorker = (
       )
       if (!stopping && title.trim())
         publish({ type: "thread-title", threadId: request.threadId, title })
-    } catch {
-      /* The core already retained the derived title. */
+      else if (!stopping)
+        publish({
+          type: "title-failed",
+          threadId: request.threadId,
+          message: "The title model answered with no text.",
+        })
+    } catch (cause) {
+      // The core keeps the derived title; the failure only settles the host's request.
+      if (!stopping)
+        publish({ type: "title-failed", threadId: request.threadId, message: errorMessage(cause) })
     } finally {
       if (session) await closeSession(session)
     }

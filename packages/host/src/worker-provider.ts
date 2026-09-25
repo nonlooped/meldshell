@@ -1,34 +1,32 @@
-import { handleGeneratedText } from "./generated-text"
-import { logStartupTiming } from "./startup-timing"
-import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import { randomUUID } from "node:crypto"
 import {
+  asRecord,
   errorMessage,
   HARNESSES,
   isHarness,
   probingStatus,
-  type Harness,
-  ProviderStatus as ProviderStatusSchema,
-  CodexUsage as CodexUsageSchema,
-  ComposerCommand as ComposerCommandSchema,
-  ProviderSessionInput as ProviderSessionInputSchema,
-  RuntimeEventInput as RuntimeEventInputSchema,
-  SetThreadTitleInput as SetThreadTitleInputSchema,
-  SyncProviderCatalogInput as SyncProviderCatalogInputSchema,
+  toError,
+  WorkerEvent,
   type AppSnapshot,
-  type ProviderStatus,
   type CodexUsage,
   type ComposerCommand,
+  type Harness,
+  type ProviderStatus,
+  type ProviderWorkerInput,
   type RuntimeEventInput,
   type TurnDispatch,
-  type ProviderWorkerInput,
 } from "@meldshell/contracts"
-import { HostPlatform, type HostProcess } from "./platform"
+import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import { Context, Effect, Either, Layer, Ref, Runtime, Schedule, Schema, type Scope } from "effect"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
+import { handleGeneratedText } from "./generated-text"
 import { interruptWithRecovery } from "./interrupt-turn"
-import { isRuntimeDelta, mergeRuntimeDelta } from "./runtime-deltas"
+import { HostPlatform, type HostProcess } from "./platform"
+import { isRuntimeDelta } from "./runtime-deltas"
+import { makeEventQueue } from "./runtime-queue"
+import { logStartupTiming } from "./startup-timing"
+import { deliverCommand, requestCommands, requestUsage } from "./worker-channel"
 
 export interface ProviderService {
   readonly interrupt: (threadId: string, turnId: string) => Effect.Effect<void, Error>
@@ -61,137 +59,14 @@ type ProviderConfig = {
   readonly worker: string
 }
 
-const deliverCommand = (
-  child: HostProcess,
-  message: ProviderWorkerInput,
-  label: string,
-): Effect.Effect<void, Error> =>
-  Effect.async<void, Error>((resume) => {
-    const commandId = randomUUID()
-    const cleanup = (): void => {
-      child.off("message", onMessage)
-      child.off("exit", onExit)
-    }
-    const finish = (error?: string): void => {
-      cleanup()
-      resume(error === undefined ? Effect.void : Effect.fail(new Error(error)))
-    }
-    const onMessage = (value: unknown): void => {
-      if (typeof value !== "object" || value === null) return
-      const record = value as Record<string, unknown>
-      if (record.type === "command-ack" && record.commandId === commandId)
-        finish(typeof record.error === "string" ? record.error : undefined)
-    }
-    const onExit = (): void =>
-      finish(
-        `${label} worker exited before acknowledging delivery. Retry explicitly after reconciliation.`,
-      )
-    child.on("message", onMessage)
-    child.once("exit", onExit)
-    try {
-      child.postMessage(typeof message === "string" ? message : { ...message, commandId })
-      if (typeof message === "string") finish()
-    } catch (cause) {
-      finish(errorMessage(cause))
-    }
-    return Effect.sync(cleanup)
-  }).pipe(
-    Effect.timeoutFail({
-      duration: "8 seconds",
-      onTimeout: () => {
-        child.kill()
-        return new Error(
-          `${label} delivery was not acknowledged. The worker was stopped; explicit retry is required.`,
-        )
-      },
-    }),
-  )
+const decodeEvent = Schema.decodeUnknownEither(WorkerEvent)
 
-/** Sends one request to a worker and decodes the reply that carries the same request ID. */
-const requestWorker = <A, I>(
-  child: HostProcess,
-  label: string,
-  request: { readonly type: string; readonly result: string; readonly cancel?: string },
-  fields: Record<string, unknown>,
-  schema: Schema.Schema<A, I, never>,
-  field: string,
-  timeout: { readonly duration: `${number} seconds`; readonly message: string },
-): Effect.Effect<A, Error> =>
-  Effect.async<A, Error>((resume) => {
-    const requestId = randomUUID()
-    const finish = (result: Effect.Effect<A, Error>): void => {
-      child.off("message", onMessage)
-      child.off("exit", onExit)
-      resume(result)
-    }
-    const onMessage = (message: unknown): void => {
-      if (typeof message !== "object" || message === null) return
-      const record = message as Record<string, unknown>
-      if (record.type !== request.result || record.requestId !== requestId) return
-      if (typeof record.error === "string") {
-        finish(Effect.fail(new Error(record.error)))
-        return
-      }
-      const decoded = Schema.decodeUnknownEither(schema)(record[field])
-      finish(
-        Either.isRight(decoded)
-          ? Effect.succeed(decoded.right)
-          : Effect.fail(new Error(`${label} returned an invalid ${field} response.`)),
-      )
-    }
-    const onExit = (): void =>
-      finish(Effect.fail(new Error(`${label} disconnected. Try again shortly.`)))
-    child.on("message", onMessage)
-    child.once("exit", onExit)
-    try {
-      child.postMessage({ ...fields, type: request.type, requestId })
-    } catch (cause) {
-      finish(Effect.fail(new Error(errorMessage(cause))))
-    }
-    return Effect.sync(() => {
-      child.off("message", onMessage)
-      child.off("exit", onExit)
-      if (request.cancel === undefined) return
-      try {
-        child.postMessage({ type: request.cancel, requestId })
-      } catch {
-        /* Worker already exited. */
-      }
-    })
-  }).pipe(
-    Effect.timeoutFail({
-      duration: timeout.duration,
-      onTimeout: () => new Error(timeout.message),
-    }),
-  )
+const stopPid = (pid: number): Effect.Effect<void, Error> =>
+  Effect.tryPromise({ try: () => stopProcessTree(pid), catch: toError })
 
-const requestUsage = (child: HostProcess, label: string): Effect.Effect<CodexUsage, Error> =>
-  requestWorker(
-    child,
-    label,
-    { type: "get-usage", result: "usage-result", cancel: "cancel-usage" },
-    {},
-    CodexUsageSchema,
-    "usage",
-    { duration: "20 seconds", message: `${label} usage took too long to load. Try again.` },
-  )
-
-const ComposerCommands = Schema.Array(ComposerCommandSchema)
-
-const requestCommands = (
-  child: HostProcess,
-  label: string,
-  workspacePath: string,
-): Effect.Effect<ReadonlyArray<ComposerCommand>, Error> =>
-  requestWorker(
-    child,
-    label,
-    { type: "list-commands", result: "commands-result" },
-    { workspacePath },
-    ComposerCommands,
-    "commands",
-    { duration: "30 seconds", message: `${label} commands took too long to load.` },
-  )
+const restartSchedule = Schedule.exponential("1 second").pipe(
+  Schedule.union(Schedule.spaced("30 seconds")),
+)
 
 const providerRuntime = (
   config: ProviderConfig,
@@ -209,15 +84,24 @@ const providerRuntime = (
     }
     const processRef = yield* Ref.make<HostProcess | null>(null)
     const statusRef = yield* Ref.make(probing())
-    type RuntimeTask = { effect: Effect.Effect<void>; input?: RuntimeEventInput | undefined }
+    /** Harness processes each worker started, stopped with it if it dies first. */
     const descendants = new WeakMap<HostProcess, Set<number>>()
+    /** Identifies one worker process, so events from a replaced worker are recognised. */
     const generations = new WeakMap<HostProcess, string>()
     let stopping = false
-    let draining = false
-    const tasks: RuntimeTask[] = []
+
+    const currentChild = (): HostProcess | null => Effect.runSync(Ref.get(processRef))
     const publishStatus = (status: ProviderStatus): Effect.Effect<void> =>
       Ref.set(statusRef, status).pipe(
         Effect.andThen(hostEvents.publish({ _tag: "ProviderStatusChanged", status })),
+      )
+    const publishChange = (threadId: string): Effect.Effect<void> =>
+      hostEvents.publish({ _tag: "RuntimeChanged", threadId })
+    const stopDescendants = (child: HostProcess): Effect.Effect<void> =>
+      Effect.forEach(
+        [...(descendants.get(child) ?? [])],
+        (pid) => stopPid(pid).pipe(Effect.catchAll(Effect.logError)),
+        { discard: true },
       )
 
     const bindDispatch = (
@@ -225,16 +109,15 @@ const providerRuntime = (
       child: HostProcess | null,
     ): Effect.Effect<void, Error> =>
       Effect.gen(function* () {
-        if (dispatch !== null && dispatch.harness !== config.harness)
+        if (dispatch === null) return
+        if (dispatch.harness !== config.harness)
           return yield* Effect.fail(new Error("Turn routed to the wrong provider."))
-        if (dispatch !== null) {
-          yield* core
-            .BindTurnWorker({
-              turnId: dispatch.turnId,
-              generation: child === null ? "unavailable" : generations.get(child)!,
-            })
-            .pipe(Effect.mapError((cause) => new Error(errorMessage(cause))))
-        }
+        yield* core
+          .BindTurnWorker({
+            turnId: dispatch.turnId,
+            generation: child === null ? "unavailable" : generations.get(child)!,
+          })
+          .pipe(Effect.mapError(toError))
       })
 
     const send = (message: ProviderWorkerInput): Effect.Effect<void, Error> =>
@@ -243,33 +126,32 @@ const providerRuntime = (
           typeof message !== "string" && message.type === "start-turn" ? message.dispatch : null
         const child = yield* Ref.get(processRef)
         yield* bindDispatch(dispatch, child)
-        const delivery =
+        const refused =
           child === null ||
           (stopping && (typeof message === "string" || message.type !== "shutdown"))
-            ? Effect.fail(new Error(`${label} is unavailable or shutting down.`))
-            : deliverCommand(child, message, label)
+        const delivery = refused
+          ? Effect.fail(new Error(`${label} is unavailable or shutting down.`))
+          : deliverCommand(child, message, label)
         yield* delivery.pipe(
-          Effect.tapError(() => {
-            if (dispatch === null) return Effect.void
-            return persistRuntimeEvent({
-              threadId: dispatch.threadId,
-              turnId: dispatch.turnId,
-              validated: true,
-              method: "turn/completed",
-              params: {
-                turn: {
-                  status: "failed",
-                  error: "Worker delivery failed or was ambiguous; explicit retry required.",
-                },
-              },
-              promoteQueue: false,
-            })
-          }),
+          Effect.tapError(() =>
+            dispatch === null
+              ? Effect.void
+              : persistRuntimeEvent({
+                  threadId: dispatch.threadId,
+                  turnId: dispatch.turnId,
+                  validated: true,
+                  method: "turn/completed",
+                  params: {
+                    turn: {
+                      status: "failed",
+                      error: "Worker delivery failed or was ambiguous; explicit retry required.",
+                    },
+                  },
+                  promoteQueue: false,
+                }),
+          ),
         )
       })
-
-    const dispatchTurn = (dispatch: TurnDispatch | null): Effect.Effect<void, Error> =>
-      dispatch === null ? Effect.void : send({ type: "start-turn", dispatch })
 
     const notifyForSnapshot = (
       snapshot: AppSnapshot,
@@ -289,36 +171,33 @@ const providerRuntime = (
         })
       })
 
+    /** Tells clients about a stored event, notifies the user when it needs them, and starts queued input. */
+    const announce = (input: RuntimeEventInput, nextDispatch: TurnDispatch | null) =>
+      Effect.gen(function* () {
+        yield* hostEvents.publish({
+          _tag: "RuntimeChanged",
+          threadId: input.threadId,
+          snapshotChanged: !isRuntimeDelta(input),
+        })
+        if (input.method === "turn/completed" || input.requestId !== undefined)
+          yield* core.GetSnapshot().pipe(
+            Effect.flatMap((snapshot) => notifyForSnapshot(snapshot, input.threadId, input.method)),
+            Effect.catchAllCause(Effect.logError),
+          )
+        if (nextDispatch !== null) yield* send({ type: "start-turn", dispatch: nextDispatch })
+      })
+
     const persistRuntimeEvent = (input: RuntimeEventInput): Effect.Effect<void> =>
       core.RecordRuntimeEvent(input).pipe(
         Effect.tapErrorCause(() =>
           Effect.sync(() => {
-            const child = Effect.runSync(Ref.get(processRef))
+            // An event the core cannot store leaves its turn unknowable; restart the worker.
+            const child = currentChild()
             if (child !== null && input.generation === generations.get(child)) child.kill()
           }),
         ),
         Effect.tap((result) =>
-          result.changed
-            ? hostEvents
-                .publish({
-                  _tag: "RuntimeChanged",
-                  threadId: input.threadId,
-                  snapshotChanged: !isRuntimeDelta(input),
-                })
-                .pipe(
-                  Effect.andThen(
-                    input.method === "turn/completed" || input.requestId !== undefined
-                      ? core.GetSnapshot().pipe(
-                          Effect.flatMap((snapshot) =>
-                            notifyForSnapshot(snapshot, input.threadId, input.method),
-                          ),
-                          Effect.catchAllCause(Effect.logError),
-                        )
-                      : Effect.void,
-                  ),
-                  Effect.andThen(dispatchTurn(result.nextDispatch)),
-                )
-            : Effect.void,
+          result.changed ? announce(input, result.nextDispatch) : Effect.void,
         ),
         Effect.asVoid,
         Effect.catchAllCause((cause) =>
@@ -326,299 +205,197 @@ const providerRuntime = (
         ),
       )
 
-    const enqueue = (
-      effect: Effect.Effect<void>,
-      recovery = false,
-      input?: RuntimeEventInput,
-    ): void => {
-      const previous = tasks.at(-1)
-      const merged = input === undefined ? undefined : mergeRuntimeDelta(previous?.input, input)
-      if (previous !== undefined && merged !== undefined) {
-        // Continue batching while persistence is busy, without crossing intervening events.
-        previous.input = merged
-        previous.effect = persistRuntimeEvent(merged)
-        return
-      }
-      if (!recovery && tasks.length >= 1024) {
-        // Stop the producer on overflow. Its exit reconciles all owned turns; never drop a terminal event and continue running.
-        const child = Effect.runSync(Ref.get(processRef))
+    const queue = makeEventQueue({
+      persist: persistRuntimeEvent,
+      runFork,
+      overflow: (pending, input) => {
+        const child = currentChild()
         console.error(`${label} event queue overflow; stopping worker.`, {
           generation: child === null ? undefined : generations.get(child),
-          pending: tasks.length,
+          pending,
           method: input?.method,
         })
         child?.kill()
+      },
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(queue.dispose))
+
+    /** Queues a core write whose failure is only logged. */
+    const store = (write: Effect.Effect<unknown, unknown>, threadId: string, failure: string) =>
+      queue.enqueue(
+        write.pipe(
+          Effect.andThen(publishChange(threadId)),
+          Effect.catchAll((cause) => Effect.sync(() => console.error(failure, cause))),
+        ),
+      )
+
+    const handleProviderReady = (event: Extract<WorkerEvent, { type: "provider-ready" }>) => {
+      const { status } = event
+      if (status.harness !== config.harness || event.providerKey !== provider) {
+        console.error(`${label} returned a model catalog for another provider.`)
         return
       }
-      tasks.push({ effect, input })
-      if (draining) return
-      draining = true
-      runFork(
-        Effect.gen(function* () {
-          while (tasks.length > 0)
-            yield* tasks.shift()!.effect.pipe(Effect.catchAllCause(Effect.logError))
+      logStartupTiming("provider ready", `${config.harness} ${status.availability}`)
+      queue.enqueue(
+        core
+          .SyncProviderCatalog({
+            providerKey: event.providerKey,
+            models: event.models,
+            ...(event.partial === true ? { partial: true } : {}),
+          })
+          .pipe(
+            Effect.tap(() => publishStatus(status)),
+            Effect.tap(() => publishChange("")),
+            Effect.asVoid,
+            Effect.catchAll((cause) =>
+              publishStatus({
+                ...status,
+                availability: "error",
+                detail: `Could not store the ${label} model catalog: ${errorMessage(cause)}`,
+              }),
+            ),
+          ),
+      )
+    }
+
+    const handleTurnStartFailure = (event: Extract<WorkerEvent, { type: "turn-start-failed" }>) => {
+      const failure = { threadId: event.threadId, turnId: event.turnId }
+      queue.enqueue(
+        persistRuntimeEvent({
+          ...failure,
+          method: "error",
+          params: { error: { message: event.message } },
         }).pipe(
-          Effect.ensuring(
-            Effect.sync(() => {
-              draining = false
-            }),
-          ),
-        ),
-      )
-    }
-
-    let delta: RuntimeEventInput | null = null
-    let deltaTimer: ReturnType<typeof setTimeout> | undefined
-    const flushDelta = (): void => {
-      clearTimeout(deltaTimer)
-      deltaTimer = undefined
-      if (delta !== null) enqueue(persistRuntimeEvent(delta), false, delta)
-      delta = null
-    }
-    yield* Effect.addFinalizer(() => Effect.sync(() => clearTimeout(deltaTimer)))
-    const enqueueEvent = (input: RuntimeEventInput): void => {
-      if (isRuntimeDelta(input)) {
-        const merged = mergeRuntimeDelta(delta ?? undefined, input)
-        if (merged !== undefined) {
-          delta = merged
-          return
-        }
-        flushDelta()
-        delta = input
-        deltaTimer = setTimeout(flushDelta, 16)
-        return
-      }
-      flushDelta()
-      enqueue(persistRuntimeEvent(input), false, input)
-    }
-
-    const handleProviderReady = (record: Record<string, unknown>): void => {
-      const decodedStatus = Schema.decodeUnknownEither(ProviderStatusSchema)(record.status)
-      const decodedCatalog = Schema.decodeUnknownEither(SyncProviderCatalogInputSchema)({
-        providerKey: record.providerKey,
-        models: record.models,
-        ...(record.partial === true ? { partial: true } : {}),
-      })
-      if (
-        Either.isLeft(decodedStatus) ||
-        Either.isLeft(decodedCatalog) ||
-        decodedStatus.right.harness !== config.harness ||
-        decodedCatalog.right.providerKey !== provider
-      ) {
-        console.error(`${label} returned an invalid model catalog message.`)
-        return
-      }
-      logStartupTiming("provider ready", `${config.harness} ${decodedStatus.right.availability}`)
-      enqueue(
-        core.SyncProviderCatalog(decodedCatalog.right).pipe(
-          Effect.tap(() => publishStatus(decodedStatus.right)),
-          Effect.tap(() => hostEvents.publish({ _tag: "RuntimeChanged", threadId: "" })),
-          Effect.asVoid,
-          Effect.catchAll((cause) =>
-            publishStatus({
-              ...decodedStatus.right,
-              availability: "error",
-              detail: `Could not store the ${label} model catalog: ${errorMessage(cause)}`,
-            }),
-          ),
-        ),
-      )
-    }
-
-    const handleRuntimeEvent = (record: Record<string, unknown>, owner: HostProcess): void => {
-      const input = Schema.decodeUnknownEither(RuntimeEventInputSchema)(record.input)
-      if (Either.isLeft(input)) {
-        console.error(`${label} returned an invalid runtime event.`)
-        return
-      }
-      enqueueEvent({
-        ...input.right,
-        generation: generations.get(owner),
-        validated: record.known === true || record.known === "validated",
-      })
-    }
-
-    const handleThreadTitle = (record: Record<string, unknown>): void => {
-      if (handleGeneratedText(record)) return
-      const input = Schema.decodeUnknownEither(SetThreadTitleInputSchema)({
-        threadId: record.threadId,
-        title: record.title,
-      })
-      if (Either.isLeft(input)) {
-        console.error(`${label} returned an invalid thread title.`)
-        return
-      }
-      enqueue(
-        core.SetThreadTitle(input.right).pipe(
-          Effect.tap(() =>
-            hostEvents.publish({
-              _tag: "RuntimeChanged",
-              threadId: input.right.threadId,
-            }),
-          ),
-          Effect.asVoid,
-          Effect.catchAll((cause) =>
-            Effect.sync(() => console.error("Could not store a generated thread title.", cause)),
-          ),
-        ),
-      )
-    }
-
-    const handleProviderSession = (record: Record<string, unknown>): void => {
-      const input = Schema.decodeUnknownEither(ProviderSessionInputSchema)({
-        threadId: record.threadId,
-        harness: config.harness,
-        nativeThreadId: record.nativeThreadId,
-      })
-      if (Either.isLeft(input)) {
-        console.error(`${label} returned an invalid provider session.`)
-        return
-      }
-      enqueue(
-        core.SetProviderSession(input.right).pipe(
-          Effect.tap(() =>
-            hostEvents.publish({
-              _tag: "RuntimeChanged",
-              threadId: input.right.threadId,
-            }),
-          ),
-          Effect.asVoid,
-          Effect.catchAll((cause) =>
-            Effect.sync(() => console.error(`Could not store the ${label} thread id.`, cause)),
-          ),
-        ),
-      )
-    }
-
-    const handleTurnStartFailure = (record: Record<string, unknown>): void => {
-      const input = Schema.decodeUnknownEither(RuntimeEventInputSchema)({
-        threadId: record.threadId,
-        turnId: record.turnId,
-        method: "error",
-        params: { error: { message: record.message } },
-      })
-      if (Either.isLeft(input) || typeof record.message !== "string") {
-        console.error(`${label} returned an invalid turn failure.`)
-        return
-      }
-      enqueue(
-        persistRuntimeEvent(input.right).pipe(
           Effect.andThen(
             persistRuntimeEvent({
-              ...input.right,
+              ...failure,
               validated: true,
               method: "turn/completed",
-              params: { turn: { status: "failed", error: record.message } },
+              params: { turn: { status: "failed", error: event.message } },
             }),
           ),
         ),
       )
-    }
-
-    const handleTitleFailure = (record: Record<string, unknown>): void => {
-      if (!handleGeneratedText(record))
-        console.error("Could not generate a thread title.", record.message)
     }
 
     const handleWorkerMessage = (message: unknown, owner: HostProcess): void => {
-      const record =
-        typeof message === "object" && message !== null
-          ? (message as Record<string, unknown>)
-          : null
-      switch (record?.type) {
-        case "app-server-started":
-          if (typeof record.pid === "number" && Number.isSafeInteger(record.pid) && record.pid > 0)
-            descendants.get(owner)?.add(record.pid)
+      const decoded = decodeEvent(message)
+      if (Either.isLeft(decoded)) {
+        console.error(`${label} sent an invalid message.`, asRecord(message).type)
+        return
+      }
+      const event = decoded.right
+      switch (event.type) {
+        case "process-started":
+          descendants.get(owner)?.add(event.pid)
           return
-        case "app-server-stopped":
-          if (typeof record.pid === "number") descendants.get(owner)?.delete(record.pid)
+        case "process-stopped":
+          descendants.get(owner)?.delete(event.pid)
+          return
+        case "provider-status":
+          if (event.status.harness === config.harness) runFork(publishStatus(event.status))
           return
         case "provider-ready":
-          return handleProviderReady(record)
+          return handleProviderReady(event)
         case "runtime-event":
-          return handleRuntimeEvent(record, owner)
+          return queue.event({
+            ...event.input,
+            generation: generations.get(owner),
+            validated: event.input.validated === true,
+          })
         case "thread-title":
-          return handleThreadTitle(record)
-        case "provider-session":
-          return handleProviderSession(record)
-        case "turn-start-failed":
-          return handleTurnStartFailure(record)
+          if (handleGeneratedText(event)) return
+          return store(
+            core.SetThreadTitle({ threadId: event.threadId, title: event.title }),
+            event.threadId,
+            "Could not store a generated thread title.",
+          )
         case "title-failed":
-          handleTitleFailure(record)
+          if (!handleGeneratedText(event))
+            console.error("Could not generate a thread title.", event.message)
           return
+        case "provider-session":
+          return store(
+            core.SetProviderSession({
+              threadId: event.threadId,
+              harness: config.harness,
+              nativeThreadId: event.nativeThreadId,
+            }),
+            event.threadId,
+            `Could not store the ${label} thread id.`,
+          )
+        case "turn-start-failed":
+          return handleTurnStartFailure(event)
         case "protocol-error":
-          console.error(`${label} protocol error:`, record.message, record.raw)
+          console.error(`${label} protocol error:`, event.message, event.raw)
+          return
+        case "command-ack":
+        case "usage-result":
+        case "commands-result":
+          // The exchange that sent the command or request is waiting for these.
           return
       }
-      const decoded = Schema.decodeUnknownEither(ProviderStatusSchema)(message)
-      if (Either.isRight(decoded) && decoded.right.harness === config.harness)
-        runFork(publishStatus(decoded.right))
     }
+
+    /** Settles everything a worker owned once it exits: its processes and its running turns. */
+    const workerExited = (child: HostProcess, code: number): void => {
+      if (!stopping)
+        console.error(`${label} worker exited.`, {
+          code,
+          generation: generations.get(child),
+          pending: queue.pending(),
+        })
+      queue.flush()
+      queue.enqueue(
+        stopDescendants(child).pipe(
+          Effect.andThen(
+            stopping ? Effect.void : core.ReconcileWorker({ generation: generations.get(child)! }),
+          ),
+          Effect.andThen(publishChange("")),
+          Effect.catchAll(Effect.logError),
+        ),
+        true,
+      )
+    }
+
+    const forkWorker = Effect.try({
+      try: () => {
+        const child = platform.fork(config.worker, `MeldShell ${label}`)
+        generations.set(child, randomUUID())
+        descendants.set(child, new Set())
+        child.stdout?.pipe(process.stdout)
+        child.stderr?.pipe(process.stderr)
+        return child
+      },
+      catch: toError,
+    })
+
+    /** Runs until the worker exits, routing its messages meanwhile. */
+    const superviseWorker = (child: HostProcess) =>
+      Ref.set(processRef, child).pipe(
+        Effect.andThen(
+          Effect.async<void>((resume) => {
+            const onExit = (code: number): void => {
+              workerExited(child, code)
+              resume(Effect.void)
+            }
+            const onMessage = (message: unknown): void => handleWorkerMessage(message, child)
+            child.on("message", onMessage)
+            child.once("exit", onExit)
+            return Effect.sync(() => {
+              child.off("message", onMessage)
+              child.off("exit", onExit)
+            })
+          }),
+        ),
+      )
 
     const runWorker = Effect.suspend(() =>
       stopping ? Effect.never : publishStatus(probing()),
     ).pipe(
       Effect.andThen(
-        Effect.acquireUseRelease(
-          Effect.try({
-            try: () => {
-              const child = platform.fork(config.worker, `MeldShell ${label}`)
-              generations.set(child, randomUUID())
-              descendants.set(child, new Set())
-              child.stdout?.pipe(process.stdout)
-              child.stderr?.pipe(process.stderr)
-              return child
-            },
-            catch: (cause) => new Error(errorMessage(cause)),
-          }),
-          (child) =>
-            Ref.set(processRef, child).pipe(
-              Effect.andThen(
-                Effect.async<void>((resume) => {
-                  const onExit = (code: number): void => {
-                    if (!stopping)
-                      console.error(`${label} worker exited.`, {
-                        code,
-                        generation: generations.get(child),
-                        pending: tasks.length,
-                      })
-                    flushDelta()
-                    enqueue(
-                      Effect.forEach(
-                        [...(descendants.get(child) ?? [])],
-                        (pid) =>
-                          Effect.tryPromise({
-                            try: () => stopProcessTree(pid),
-                            catch: (cause) => new Error(errorMessage(cause)),
-                          }).pipe(Effect.catchAll(Effect.logError)),
-                        { discard: true },
-                      ).pipe(
-                        Effect.andThen(
-                          stopping
-                            ? Effect.void
-                            : core.ReconcileWorker({ generation: generations.get(child)! }),
-                        ),
-                        Effect.andThen(
-                          hostEvents.publish({ _tag: "RuntimeChanged", threadId: "" }),
-                        ),
-                        Effect.catchAll(Effect.logError),
-                      ),
-                      true,
-                    )
-                    resume(Effect.void)
-                  }
-                  const onMessage = (message: unknown): void => handleWorkerMessage(message, child)
-                  child.on("message", onMessage)
-                  child.once("exit", onExit)
-                  return Effect.sync(() => {
-                    child.off("message", onMessage)
-                    child.off("exit", onExit)
-                  })
-                }),
-              ),
-            ),
-          (child) =>
-            Ref.set(processRef, null).pipe(Effect.andThen(Effect.sync(() => child.kill()))),
+        Effect.acquireUseRelease(forkWorker, superviseWorker, (child) =>
+          Ref.set(processRef, null).pipe(Effect.andThen(Effect.sync(() => child.kill()))),
         ),
       ),
       Effect.andThen(
@@ -637,9 +414,6 @@ const providerRuntime = (
       ),
     )
 
-    const restartSchedule = Schedule.exponential("1 second").pipe(
-      Schedule.union(Schedule.spaced("30 seconds")),
-    )
     // Provider processes are isolated and catalog writes are serialized by the core worker,
     // so probes can start concurrently without weakening provider or database boundaries.
     yield* runWorker.pipe(Effect.repeat(restartSchedule), Effect.forkScoped)
@@ -647,97 +421,84 @@ const providerRuntime = (
     const shutdown = Effect.gen(function* () {
       if (stopping) return
       stopping = true
-      flushDelta()
+      queue.flush()
       const child = yield* Ref.get(processRef)
-      if (child !== null) {
-        yield* send({ type: "shutdown" }).pipe(Effect.catchAll((cause) => Effect.logError(cause)))
-        yield* Effect.forEach(
-          [...(descendants.get(child) ?? [])],
-          (pid) =>
-            Effect.tryPromise({
-              try: () => stopProcessTree(pid),
-              catch: (cause) => new Error(errorMessage(cause)),
-            }).pipe(Effect.catchAll(Effect.logError)),
-          { discard: true },
-        )
-        child.kill()
-      }
+      if (child === null) return
+      yield* send({ type: "shutdown" }).pipe(Effect.catchAll(Effect.logError))
+      yield* stopDescendants(child)
+      child.kill()
     })
     yield* Effect.addFinalizer(() => shutdown)
+
+    /** Waits for a worker to exit after stopping it; a worker that will not stop fails. */
+    const killWorker = (child: HostProcess): Effect.Effect<void, Error> =>
+      Effect.async<void, Error>((resume) => {
+        if (child.pid === undefined) {
+          resume(Effect.void)
+          return
+        }
+        const onExit = (): void => resume(Effect.void)
+        child.once("exit", onExit)
+        if (!child.kill()) resume(Effect.fail(new Error(`Could not stop the ${label} worker.`)))
+        return Effect.sync(() => child.off("exit", onExit))
+      }).pipe(
+        Effect.timeoutFail({
+          duration: "5 seconds",
+          onTimeout: () => new Error(`${label} worker did not exit after cancellation.`),
+        }),
+      )
+
+    /** The last resort for a turn the harness would not cancel: stop the worker that runs it. */
+    const abandonTurn = (turn: {
+      readonly id: string
+      readonly worker_generation: string | null
+    }) =>
+      Effect.gen(function* () {
+        const child = yield* Ref.get(processRef)
+        const generation = turn.worker_generation ?? randomUUID()
+        if (turn.worker_generation === null)
+          yield* core.BindTurnWorker({ turnId: turn.id, generation }).pipe(Effect.mapError(toError))
+        if (child !== null && generations.get(child) === generation) {
+          console.error(
+            `${label} did not settle cancellation; stopping its worker and active turns.`,
+          )
+          yield* Effect.forEach([...(descendants.get(child) ?? [])], stopPid, {
+            discard: true,
+            concurrency: "unbounded",
+          })
+          yield* killWorker(child)
+        }
+        yield* core.ReconcileWorker({ generation }).pipe(Effect.mapError(toError))
+      })
+
+    const withWorker = <A>(
+      request: (child: HostProcess) => Effect.Effect<A, Error>,
+    ): Effect.Effect<A, Error> =>
+      Ref.get(processRef).pipe(
+        Effect.flatMap((child) =>
+          child === null
+            ? Effect.fail(new Error(`${label} is restarting. Try again shortly.`))
+            : request(child),
+        ),
+      )
 
     return {
       interrupt: (threadId, turnId) =>
         interruptWithRecovery(
           turnId,
-          core
-            .InterruptTurn({ threadId })
-            .pipe(Effect.mapError((cause) => new Error(errorMessage(cause)))),
+          core.InterruptTurn({ threadId }).pipe(Effect.mapError(toError)),
           (turn) =>
             send({
               type: "interrupt-turn",
               nativeThreadId: turn.native_thread_id!,
               nativeTurnId: turn.native_turn_id!,
             }),
-          (turn) =>
-            Effect.gen(function* () {
-              const child = yield* Ref.get(processRef)
-              const generation = turn.worker_generation ?? randomUUID()
-              if (turn.worker_generation === null)
-                yield* core
-                  .BindTurnWorker({ turnId: turn.id, generation })
-                  .pipe(Effect.mapError((cause) => new Error(errorMessage(cause))))
-              if (child !== null && generations.get(child) === generation) {
-                console.error(
-                  `${label} did not settle cancellation; stopping its worker and active turns.`,
-                )
-                yield* Effect.forEach(
-                  [...(descendants.get(child) ?? [])],
-                  (pid) =>
-                    Effect.tryPromise({
-                      try: () => stopProcessTree(pid),
-                      catch: (cause) => new Error(errorMessage(cause)),
-                    }),
-                  { discard: true, concurrency: "unbounded" },
-                )
-                yield* Effect.async<void, Error>((resume) => {
-                  if (child.pid === undefined) {
-                    resume(Effect.void)
-                    return
-                  }
-                  const onExit = (): void => resume(Effect.void)
-                  child.once("exit", onExit)
-                  if (!child.kill())
-                    resume(Effect.fail(new Error(`Could not stop the ${label} worker.`)))
-                  return Effect.sync(() => child.off("exit", onExit))
-                }).pipe(
-                  Effect.timeoutFail({
-                    duration: "5 seconds",
-                    onTimeout: () => new Error(`${label} worker did not exit after cancellation.`),
-                  }),
-                )
-              }
-              yield* core
-                .ReconcileWorker({ generation })
-                .pipe(Effect.mapError((cause) => new Error(errorMessage(cause))))
-              yield* hostEvents.publish({ _tag: "RuntimeChanged", threadId })
-            }),
+          (turn) => abandonTurn(turn).pipe(Effect.andThen(publishChange(threadId))),
         ),
       shutdown,
-      usage: Ref.get(processRef).pipe(
-        Effect.flatMap((child) => {
-          if (child === null)
-            return Effect.fail(new Error(`${label} is restarting. Try again shortly.`))
-          return requestUsage(child, label)
-        }),
-      ),
+      usage: withWorker((child) => requestUsage(child, label)),
       commands: (workspacePath) =>
-        Ref.get(processRef).pipe(
-          Effect.flatMap((child) =>
-            child === null
-              ? Effect.fail(new Error(`${label} is restarting. Try again shortly.`))
-              : requestCommands(child, label, workspacePath),
-          ),
-        ),
+        withWorker((child) => requestCommands(child, label, workspacePath)),
       status: Ref.get(statusRef),
       refresh: Effect.suspend(() =>
         publishStatus(probing()).pipe(Effect.andThen(send("probe-now"))),
