@@ -1,4 +1,15 @@
-import { buttonClasses, textInputClasses, iconButtonClasses, kbdClasses } from "./styles"
+import {
+  buttonClasses,
+  cx,
+  iconButtonClasses,
+  kbdClasses,
+  menuGutterClasses,
+  menuItemClasses,
+  menuPopupClasses,
+  panelNoteClasses,
+  textInputClasses,
+  tooltipPopupClasses,
+} from "./styles"
 import { Pressable, MotionSurface } from "./motion"
 import type { ReactElement, ReactNode } from "react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
@@ -43,7 +54,7 @@ export function Button({
     <BaseButton
       render={<Pressable />}
       type={type}
-      className={`motion-colors ${className === undefined ? buttonClasses : `${buttonClasses} ${className}`}`}
+      className={cx("motion-colors", buttonClasses, className)}
       data-variant={variant}
       data-size={size}
       data-block={block}
@@ -77,13 +88,7 @@ export function IconButton({
             render={<Pressable />}
             type={type}
             aria-label={label}
-            className={`motion-colors ${
-              unstyled
-                ? className
-                : className === undefined
-                  ? iconButtonClasses
-                  : `${iconButtonClasses} ${className}`
-            }`}
+            className={cx("motion-colors", !unstyled && iconButtonClasses, className)}
             {...rest}
           >
             {children}
@@ -92,10 +97,7 @@ export function IconButton({
       />
       <Tooltip.Portal>
         <Tooltip.Positioner className="z-[300]" side="bottom" sideOffset={6}>
-          <Tooltip.Popup
-            render={<MotionSurface kind="tooltip" />}
-            className="[padding:5px_8px] border-[1px] border-[color:var(--line)] rounded-[var(--radius-sm)] bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] [box-shadow:var(--shadow-popup)] text-[var(--text-primary)] text-[11.5px] [@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]"
-          >
+          <Tooltip.Popup render={<MotionSurface kind="tooltip" />} className={tooltipPopupClasses}>
             {label}
           </Tooltip.Popup>
         </Tooltip.Positioner>
@@ -126,7 +128,7 @@ export function ContentTooltip({
         <Tooltip.Positioner className="z-[300]" side={side} sideOffset={8}>
           <Tooltip.Popup
             render={<MotionSurface kind="tooltip" />}
-            className={`[padding:5px_8px] border-[1px] border-[color:var(--line)] rounded-[var(--radius-sm)] bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] [box-shadow:var(--shadow-popup)] text-[var(--text-primary)] text-[11.5px] [@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none] ${className}`}
+            className={cx(tooltipPopupClasses, className)}
           >
             {children}
           </Tooltip.Popup>
@@ -204,7 +206,7 @@ export function TextField({
       type="text"
       spellCheck={false}
       autoComplete="off"
-      className={`motion-colors motion-duration-200 ${className === undefined ? textInputClasses : `${textInputClasses} ${className}`}`}
+      className={cx("motion-colors motion-duration-200", textInputClasses, className)}
       data-mono={mono}
       onValueChange={onValueChange}
       {...rest}
@@ -272,9 +274,9 @@ export function SelectField<Value extends string>({
                 <Select.Item
                   key={option.value}
                   value={option.value}
-                  className="motion-colors menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)] text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none [&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)] [&[data-disabled]]:text-[var(--text-disabled)]"
+                  className={`motion-colors ${menuItemClasses}`}
                 >
-                  <span className="grid w-[14px] flex-[0_0_14px] place-items-center text-[var(--text-primary)]">
+                  <span className={menuGutterClasses}>
                     <Select.ItemIndicator>
                       <Check size={13} strokeWidth={2} />
                     </Select.ItemIndicator>
@@ -319,6 +321,42 @@ export function ChordKeys({
   )
 }
 
+/** Muted copy in a panel: an empty state, progress (`status`), or a failure (`alert`). */
+export function PanelNote({
+  role,
+  children,
+}: {
+  readonly role?: "status" | "alert"
+  readonly children: ReactNode
+}): React.JSX.Element {
+  return (
+    <p className={panelNoteClasses} role={role}>
+      {children}
+    </p>
+  )
+}
+
+/** A failed query's message followed by a control that runs it again. */
+export function QueryError({
+  query,
+  action = "Retry",
+  children,
+}: {
+  readonly query: { readonly error: Error; readonly refetch: () => unknown }
+  readonly action?: string
+  readonly children?: ReactNode
+}): React.JSX.Element {
+  return (
+    <PanelNote role="alert">
+      {query.error.message}
+      {children}
+      <Button size="sm" onClick={() => void query.refetch()}>
+        {action}
+      </Button>
+    </PanelNote>
+  )
+}
+
 interface MenuRootProps {
   /** Base UI merges its trigger props into this element, so it must be a single element. */
   readonly trigger: ReactElement<Record<string, unknown>>
@@ -348,9 +386,7 @@ export function DropdownMenu({
         >
           <Menu.Popup
             render={<MotionSurface kind="popup" />}
-            className={
-              className === undefined ? menuPopupClasses : `${menuPopupClasses} ${className}`
-            }
+            className={cx(menuPopupClasses, className)}
           >
             {children}
           </Menu.Popup>
@@ -374,16 +410,8 @@ export function MenuAction({
   disabled = false,
 }: MenuActionProps): React.JSX.Element {
   return (
-    <Menu.Item
-      className="motion-colors menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)] text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none [&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)] [&[data-disabled]]:text-[var(--text-disabled)]"
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {icon !== undefined && (
-        <span className="grid w-[14px] flex-[0_0_14px] place-items-center text-[var(--text-primary)]">
-          {icon}
-        </span>
-      )}
+    <Menu.Item className={`motion-colors ${menuItemClasses}`} disabled={disabled} onClick={onClick}>
+      {icon !== undefined && <span className={menuGutterClasses}>{icon}</span>}
       {children}
     </Menu.Item>
   )
@@ -413,16 +441,12 @@ export function MenuChoice({
 }: MenuChoiceProps): React.JSX.Element {
   return (
     <Menu.RadioItem
-      className={`motion-colors ${
-        className === undefined
-          ? "menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)] text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none [&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)] [&[data-disabled]]:text-[var(--text-disabled)]"
-          : `menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)] text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none [&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)] [&[data-disabled]]:text-[var(--text-disabled)] ${className}`
-      }`}
+      className={cx("motion-colors", menuItemClasses, className)}
       value={value}
       disabled={disabled}
       closeOnClick
     >
-      <span className="grid w-[14px] flex-[0_0_14px] place-items-center text-[var(--text-primary)]">
+      <span className={menuGutterClasses}>
         <Menu.RadioItemIndicator>
           <Check size={13} strokeWidth={2.5} />
         </Menu.RadioItemIndicator>
@@ -526,27 +550,11 @@ const switchClasses = [
   "[&[data-checked]_.switch-thumb]:[transform:translateX(17px)]",
 ].join(" ")
 
-const selectPopupClasses = [
-  "popup min-w-[190px] max-h-[var(--available-height,_420px)] overflow-y-auto p-[5px]",
-  "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-lg)] bg-[var(--surface-menu)]",
-  "[backdrop-filter:blur(32px)]",
-  "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
-  "text-[var(--text-primary)] outline-none [transform-origin:var(--transform-origin)]",
-  "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
-  "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-overlay)]",
+const selectPopupClasses = cx(
+  menuPopupClasses,
   "min-w-[var(--anchor-width)] max-w-[min(420px,_var(--available-width))] [&_.menu-item]:h-auto",
   "[&_.menu-item]:min-h-[30px] [&_.menu-item]:py-[6px] [&_.menu-item]:[overflow-wrap:anywhere]",
-].join(" ")
-
-const menuPopupClasses = [
-  "popup min-w-[190px] max-h-[var(--available-height,_420px)] overflow-y-auto p-[5px]",
-  "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-lg)] bg-[var(--surface-menu)]",
-  "[backdrop-filter:blur(32px)]",
-  "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
-  "text-[var(--text-primary)] outline-none [transform-origin:var(--transform-origin)]",
-  "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
-  "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-overlay)]",
-].join(" ")
+)
 
 const dialogClasses = [
   "fixed z-[101] top-[50%] left-[50%] w-[440px] max-w-[calc(100vw_-_48px)] max-h-[calc(100vh_-_64px)]",

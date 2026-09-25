@@ -5,6 +5,7 @@ import { diffLineCounts, foldDiff, parseFileDiffs, type FileDiff } from "./diff-
 import { diffTokens, visibleDiffHunks } from "./diff-highlighting"
 import { FileIcon } from "./FileIcon"
 import { Button } from "./controls"
+import { PlainPatch } from "./ChangeDiff"
 
 const pageSize = 400
 
@@ -114,13 +115,7 @@ export function ChangeDiff({
   readonly viewType?: DiffViewType
 }): React.JSX.Element {
   const files = useMemo(() => parseFileDiffs(patch), [patch])
-  const fallback = (
-    <pre className="work-item-output max-h-[220px] m-0 overflow-auto text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[10.75px] leading-[1.55] whitespace-pre-wrap">
-      {path}
-      {"\n\n"}
-      {patch || "No diff was provided for this file."}
-    </pre>
-  )
+  const fallback = <PlainPatch path={path} patch={patch} />
   return (
     <ErrorBoundary fallback={fallback} resetKeys={[patch]}>
       {files.length === 0

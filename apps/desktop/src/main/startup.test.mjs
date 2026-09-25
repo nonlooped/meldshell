@@ -32,7 +32,7 @@ test("opens the window with IPC registered while runtime initialization is pendi
       optimizer: {},
     },
     electron: { app, BrowserWindow: { getAllWindows: () => [] } },
-    "electron-context-menu": { default: () => () => undefined },
+    "electron-context-menu": () => () => undefined,
     "@meldshell/contracts": contracts,
     effect: {
       ...effect,

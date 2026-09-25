@@ -1,4 +1,9 @@
-import { centeredStateClasses, threadContentClasses } from "../ui/styles"
+import {
+  centeredStateClasses,
+  railControlClasses,
+  railLabelClasses,
+  threadContentClasses,
+} from "../ui/styles"
 import { FadeDiv, MotionPreferences } from "../ui/motion"
 import { useAppData } from "../data/queries"
 import {
@@ -178,7 +183,14 @@ function remoteLayout(phone: boolean, inboxWidth: number, filesWidth: number) {
   }
 }
 
-function useSidebar(initialWidth: number, initiallyCollapsed = false) {
+/** The collapsed inbox keeps an icon rail: two 8px gutters around the 33px square controls. */
+const INBOX_RAIL_WIDTH = "49px"
+
+function useSidebar(
+  initialWidth: number,
+  initiallyCollapsed = false,
+  collapsedSize: string | 0 = 0,
+) {
   const panelRef = usePanelRef()
   const elementRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(initialWidth)
@@ -195,7 +207,7 @@ function useSidebar(initialWidth: number, initiallyCollapsed = false) {
     elementRef,
     width,
     collapsed,
-    defaultSize: collapsed ? 0 : `${width}px`,
+    defaultSize: collapsed ? collapsedSize : `${width}px`,
     onResize,
     onTransitionEnd: (event: React.TransitionEvent<HTMLDivElement>) => {
       if (event.target === event.currentTarget && event.propertyName === "flex-grow") {
@@ -208,6 +220,41 @@ function useSidebar(initialWidth: number, initiallyCollapsed = false) {
       else panelRef.current?.collapse()
     },
   }
+}
+
+/** On a desktop layout the collapsed inbox narrows to its icon rail; on a phone it hides. */
+function useInboxSidebar(phone: boolean) {
+  const collapsedSize = phone ? 0 : INBOX_RAIL_WIDTH
+  const sidebar = useSidebar(304, phone, collapsedSize)
+  const rail = sidebar.collapsed && !phone
+  const hidden = sidebar.collapsed && phone
+  return {
+    ...sidebar,
+    collapsedSize,
+    rail,
+    asideProps: {
+      className: `motion-colors motion-duration-220 group/inbox grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto_auto] [padding:10px_8px_8px] ${hidden ? "opacity-0" : ""}`,
+      inert: hidden,
+      "data-rail": rail ? "" : undefined,
+    },
+  }
+}
+
+function InboxFooter({ rail, onOpenSettings }: { rail: boolean; onOpenSettings: () => void }) {
+  return (
+    <div className="flex [padding:8px_0_0] mt-[4px] border-t-[1px] border-t-[color:var(--line-subtle)] [&_.button]:h-[42px] [&_.button]:pr-[12px] [&_.button]:pl-[8px]">
+      <Button
+        variant="ghost"
+        block
+        icon={<Settings size={15} strokeWidth={1.75} className="shrink-0" />}
+        className={`justify-start! overflow-hidden ${railControlClasses}`}
+        title={rail ? "Settings" : undefined}
+        onClick={onOpenSettings}
+      >
+        <span className={railLabelClasses}>Settings</span>
+      </Button>
+    </div>
+  )
 }
 
 function SidebarPanel({ defaultSize, ...props }: React.ComponentProps<typeof Panel>) {
@@ -345,7 +392,7 @@ export function App(): React.JSX.Element {
   const { selectedFile, selectedTabId } = useSelectedTab()
   const selectThread = useTabStore((state) => state.selectTab)
   const cycleTabs = useTabStore((state) => state.cycle)
-  const removeThread = useTabStore((state) => state.removeThread)
+  const removeThread = useTabStore((state) => state.closeThread)
 
   const settingsOpen = useViewStore((state) => state.settingsOpen)
   const openSettings = useViewStore((state) => state.openSettings)
@@ -358,7 +405,7 @@ export function App(): React.JSX.Element {
   const [deleteTarget, setDeleteTarget] = useState<Thread | null>(null)
   const [filePaletteOpen, setFilePaletteOpen] = useState(false)
   const remotePhone = useRemotePhone()
-  const inbox = useSidebar(304, remotePhone)
+  const inbox = useInboxSidebar(remotePhone)
   // Source control opens on request: the thread pane owns the window until the operator asks.
   const sourceControl = useSidebar(300, true)
   const panelMotion = usePanelMotion()
@@ -623,19 +670,18 @@ export function App(): React.JSX.Element {
               elementRef={inbox.elementRef}
               onTransitionEnd={inbox.onTransitionEnd}
               collapsible
-              collapsedSize={0}
+              collapsedSize={inbox.collapsedSize}
+              // The rail's controls size against the panel's live width, so they track its edge.
+              className="@container"
               defaultSize={inbox.defaultSize}
               minSize={layout.inboxMin}
               maxSize={layout.inboxMax}
               groupResizeBehavior="preserve-pixel-size"
               onResize={inbox.onResize}
             >
-              <aside
-                className={`motion-colors motion-duration-220 grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto] [padding:10px_8px_8px] ${inbox.collapsed ? "opacity-0" : ""}`}
-                inert={inbox.collapsed}
-                style={{ width: layout.inboxWidth }}
-              >
+              <aside {...inbox.asideProps} style={{ width: layout.inboxWidth }}>
                 <Inbox
+                  rail={inbox.rail}
                   showSettled={snapshot.settings.showSettled ?? true}
                   onSearch={() => setThreadPaletteOpen(true)}
                   onManageWorkspaces={() => setWorkspacesOpen(true)}
@@ -663,17 +709,7 @@ export function App(): React.JSX.Element {
                   onLoadMore={() => void threadPagesQuery.fetchNextPage()}
                 />
 
-                <div className="flex [padding:8px_3px_0] mt-[4px] border-t-[1px] border-t-[color:var(--line-subtle)] [&_.button]:h-[42px] [&_.button]:pr-[12px] [&_.button]:pl-[12px]">
-                  <Button
-                    variant="ghost"
-                    block
-                    icon={<Settings size={15} strokeWidth={1.75} />}
-                    className="justify-start!"
-                    onClick={() => openSettings()}
-                  >
-                    Settings
-                  </Button>
-                </div>
+                <InboxFooter rail={inbox.rail} onOpenSettings={() => openSettings()} />
               </aside>
             </SidebarPanel>
 

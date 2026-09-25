@@ -22,7 +22,7 @@ test("diff tabs keep file, stage, workspace, and worktree identities separate an
   assert.equal(useTabStore.getState().selectedFileId, diffId)
   store.closeTab(diffId!)
   assert.ok(!useTabStore.getState().files.some((file) => file.id === diffId))
-  store.selectThread("conversation")
+  store.openThread("conversation")
   assert.equal(useTabStore.getState().selectedFileId, null)
   assert.equal(useTabStore.getState().selectedThreadId, "conversation")
 })

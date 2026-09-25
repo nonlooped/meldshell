@@ -21,7 +21,8 @@ import {
   MessagesSquare,
   Monitor,
 } from "lucide-react"
-import desktopPackage from "../../../../package.json"
+import { useContext } from "react"
+import { AppInfoContext } from "../app/app-info"
 import { modelsForProvider } from "../data/catalog"
 import { useViewStore, type SettingsSection } from "../app/view-store"
 import { AppDialog, Button, IconButton } from "../ui/controls"
@@ -143,6 +144,7 @@ export function SettingsView({
   onResetCatalog,
   onChangeAppSettings,
 }: SettingsViewProps): React.JSX.Element {
+  const appInfo = useContext(AppInfoContext)
   const section = useViewStore((state) => state.settingsSection)
   const selectSection = useViewStore((state) => state.selectSettingsSection)
   const closeSettings = useViewStore((state) => state.closeSettings)
@@ -268,7 +270,7 @@ export function SettingsView({
                       App version
                     </span>
                     <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
-                      {desktopPackage.version}
+                      {appInfo.version}
                     </span>
                   </div>
                   <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
@@ -284,7 +286,7 @@ export function SettingsView({
                       Runtime
                     </span>
                     <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
-                      Electron {desktopPackage.devDependencies.electron}
+                      {appInfo.electronVersion ? `Electron ${appInfo.electronVersion}` : "Web"}
                     </span>
                   </div>
                   <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">

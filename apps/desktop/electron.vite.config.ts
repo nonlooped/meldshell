@@ -46,11 +46,6 @@ export default defineConfig({
       // The renderer CSP permits bundled fonts, not data: font URLs.
       assetsInlineLimit: (path) => (/\.(?:woff2?|ttf)$/i.test(path) ? false : undefined),
     },
-    resolve: {
-      alias: {
-        "@renderer": resolve("src/renderer/src"),
-      },
-    },
     plugins: [
       tailwindcss(),
       react({

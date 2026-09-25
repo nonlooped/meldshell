@@ -4,7 +4,6 @@ import {
   GradientSpinner,
   PopPresence,
   Shimmer,
-  Swap,
   useMotionPreference,
 } from "../ui/motion"
 import { motion } from "motion/react"
@@ -13,7 +12,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { Collapsible } from "@base-ui-components/react/collapsible"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { Button as BaseButton } from "@base-ui-components/react/button"
-import { Button, IconButton } from "../ui/controls"
+import { Button } from "../ui/controls"
+import { disclosureChevronClasses } from "../ui/styles"
 import type { CanonicalEvent } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { ChangeDiff } from "../ui/ChangeDiff"
@@ -31,8 +31,6 @@ import { refreshTranscript, type TranscriptWindow } from "../data/transcript"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   ArrowDown,
-  Check,
-  Copy,
   Brain,
   ChevronRight,
   CircleAlert,
@@ -46,6 +44,7 @@ import {
   Wrench,
 } from "lucide-react"
 import { Markdown } from "../ui/Markdown"
+import { CopyIconButton, copyStatusText, useCopy } from "../ui/CopyButton"
 import { MarkdownWorkspace, MarkdownSources, ReferenceChip } from "../ui/MarkdownReference"
 import { MarkdownStreaming, ToolImageGallery } from "../ui/MarkdownBlocks"
 import { fileReference, sourceTitles } from "../ui/markdown-model"
@@ -69,19 +68,13 @@ function Message({
   /** Changes each time the reader jumps to this message, briefly marking where they landed. */
   readonly flash?: number
 }): React.JSX.Element {
-  const [copyState, setCopyState] = useState("idle")
+  const [copyState, copy] = useCopy()
   const [showTime, setShowTime] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const reduced = useMotionPreference()
   const text = fallbackText(event)
   const date = new Date(event.createdAt)
   const fullTime = date.toLocaleString()
-
-  useEffect(() => {
-    if (copyState === "idle") return
-    const timer = window.setTimeout(() => setCopyState("idle"), 2000)
-    return () => window.clearTimeout(timer)
-  }, [copyState])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: The prompt flies only when the message first mounts.
   useLayoutEffect(() => {
@@ -110,22 +103,11 @@ function Message({
       {event.kind === "user" && <MessageAttachments payload={event.payload} />}
       {children}
       <div className={`motion-colors ${workingSectionClasses}`}>
-        <IconButton
-          unstyled
+        <CopyIconButton
           label={copyState === "copied" ? "Copied" : "Copy message"}
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(text)
-              setCopyState("copied")
-            } catch {
-              setCopyState("failed")
-            }
-          }}
-        >
-          <Swap id={copyState === "copied" ? "copied" : "copy"}>
-            {copyState === "copied" ? <Check size={13} /> : <Copy size={13} />}
-          </Swap>
-        </IconButton>
+          state={copyState}
+          onClick={() => void copy(text)}
+        />
         <Toggle
           className="message-time"
           title={fullTime}
@@ -140,11 +122,7 @@ function Message({
           </time>
         </Toggle>
         <span className="text-[var(--text-secondary)] text-[11px]" role="status">
-          {copyState === "failed"
-            ? "Copy failed. Try again."
-            : copyState === "copied"
-              ? "Copied"
-              : ""}
+          {copyStatusText(copyState)}
         </span>
       </div>
     </div>
@@ -296,10 +274,7 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
           <span title={tool.progress}>{tool.progress}</span>
         )}
         {tool.parent && <span title={tool.parent}>Subagent</span>}
-        <ChevronRight
-          className={`motion-transform motion-duration-200 ${"disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"}`}
-          size={13}
-        />
+        <ChevronRight className={disclosureChevronClasses} size={13} />
       </Collapsible.Trigger>
       <CollapsiblePanel className="grid gap-[10px] min-w-0 [margin:6px_6px_16px_26px]">
         <ToolBody
@@ -388,10 +363,7 @@ function WorkingSection({
   return (
     <Collapsible.Root className="text-[var(--text-tertiary)]" open={open} onOpenChange={setOpen}>
       <Collapsible.Trigger className="motion-colors [list-style:none] flex min-h-[28px] items-center gap-[6px] [padding:3px_6px_3px_2px] rounded-[var(--radius-sm)] cursor-pointer text-[11px] font-medium w-full border-0 bg-transparent text-inherit [font:inherit] text-left [&::-webkit-details-marker]:hidden [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)]">
-        <ChevronRight
-          className={`motion-transform motion-duration-200 ${"disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"}`}
-          size={14}
-        />
+        <ChevronRight className={disclosureChevronClasses} size={14} />
         {turn.complete ? (
           <>
             <WorkIcon work={primaryWork(turn.workingEvents)} />

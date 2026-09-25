@@ -1,4 +1,106 @@
 // Shared Tailwind compositions for controls used by more than one feature.
+
+/** Joins a base composition with a caller's optional additions. */
+export const cx = (...classes: ReadonlyArray<string | false | undefined>): string =>
+  classes.filter(Boolean).join(" ")
+
+/** Muted copy in a panel: an empty state, progress, or a failure shown in the deleted colour. */
+export const panelNoteClasses =
+  "[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
+
+/** A chevron that turns to point down while its Collapsible panel is open. */
+export const disclosureChevronClasses =
+  "motion-transform motion-duration-200 disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
+
+/** An inbox control whose right edge follows the sidebar panel's live width. Collapsed to the
+ * rail it becomes a square around its icon; its left edge and icon never move. */
+export const railControlClasses = "max-w-[calc(100cqw_-_16px)]"
+
+/** Inbox copy beside an icon, faded out while the sidebar is collapsed to its rail. */
+export const railLabelClasses =
+  "motion-colors motion-duration-220 group-data-[rail]/inbox:opacity-0 group-data-[rail]/inbox:pointer-events-none"
+
+/** One row in a menu or select list, highlighted by Base UI's roving focus. */
+export const menuItemClasses = [
+  "menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)]",
+  "text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none",
+  "[&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)]",
+  "[&[data-disabled]]:text-[var(--text-disabled)]",
+].join(" ")
+
+/** The gutter before a menu row's label, holding its icon or selection tick. */
+export const menuGutterClasses =
+  "grid w-[14px] flex-[0_0_14px] place-items-center text-[var(--text-primary)]"
+
+export const tooltipPopupClasses = [
+  "[padding:5px_8px] border-[1px] border-[color:var(--line)] rounded-[var(--radius-sm)]",
+  "bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] [box-shadow:var(--shadow-popup)]",
+  "text-[var(--text-primary)] text-[11.5px]",
+  "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
+].join(" ")
+
+export const menuPopupClasses = [
+  "popup min-w-[190px] max-h-[var(--available-height,_420px)] overflow-y-auto p-[5px]",
+  "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-lg)] bg-[var(--surface-menu)]",
+  "[backdrop-filter:blur(32px)]",
+  "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
+  "text-[var(--text-primary)] outline-none [transform-origin:var(--transform-origin)]",
+  "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
+  "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-overlay)]",
+].join(" ")
+
+/** Inline code and emphasis inside transcript Markdown. */
+export const markdownInlineClasses = [
+  "[&_code:not(pre_code)]:[padding:1px_5px]",
+  "[&_code:not(pre_code)]:rounded-[var(--radius-sm)] [&_code:not(pre_code)]:text-[var(--text-primary)]",
+  "[&_code:not(pre_code)]:[background:color-mix(in_srgb,_var(--text-primary)_7%,_transparent)]",
+  "[&_code:not(pre_code)]:[box-decoration-break:clone] [&_code:not(pre_code)]:[-webkit-box-decoration-break:clone]",
+  "[&_code:not(pre_code)]:[font-family:var(--font-mono)] [&_code:not(pre_code)]:text-[0.86em]",
+  "[&_strong]:font-semibold [&_strong]:text-[var(--text-primary)]",
+].join(" ")
+
+/** Rendered Markdown descendants shared by the transcript, expanded tables, and file previews. */
+export const markdownProseClasses = [
+  "event-markdown whitespace-normal [&_>_:first-child]:mt-[0] [&_>_:last-child]:mb-[0]",
+  "[&_p]:[margin:0_0_0.7em] [&_a]:text-[var(--color-info)]",
+  "[&_a]:[text-decoration-color:color-mix(in_srgb,_var(--color-info)_50%,_transparent)]",
+  "[&_a]:[text-underline-offset:3px]",
+  "[&_.markdown-table]:max-w-full [&_.markdown-table]:overflow-x-auto [&_.markdown-table]:[margin:1em_0]",
+  "[&_.markdown-table]:border-[1px] [&_.markdown-table]:border-[color:var(--line)] [&_.markdown-table]:rounded-[var(--radius)]",
+  "[&_.markdown-table]:max-h-[400px] [&_.markdown-table]:overflow-auto [&_.markdown-table]:mt-[0]",
+  "[&_.markdown-table:focus-visible]:[outline:1px_solid_var(--focus-ring)]",
+  "[&_.markdown-table:focus-visible]:[outline-offset:2px] [&_table]:w-full",
+  "[&_table]:[border-collapse:collapse] [&_table]:[overflow-wrap:normal] [&_th]:min-w-[10rem]",
+  "[&_th]:[padding:9px_12px] [&_th]:border-b-[1px] [&_th]:border-b-[color:var(--line)] [&_th]:[vertical-align:top]",
+  "[&_th]:bg-[var(--surface-hover)] [&_th]:text-left [&_th]:font-semibold [&_td]:min-w-[10rem]",
+  "[&_td]:[padding:9px_12px] [&_td]:border-b-[1px] [&_td]:border-b-[color:var(--line)] [&_td]:[vertical-align:top]",
+  "[&_th:first-child]:min-w-auto [&_td:first-child]:min-w-auto [&_tr:last-child_td]:border-b-0",
+  "[&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:p-[12px] [&_pre]:border-[1px] [&_pre]:border-[color:var(--line)]",
+  "[&_pre]:rounded-[var(--radius)] [&_pre]:bg-[var(--surface-hover)] [&_pre]:whitespace-pre",
+  "[&_pre]:[overflow-wrap:normal] [&_pre_code]:[font-family:var(--font-mono)] [&_pre_code]:text-[0.9em]",
+  "[&_blockquote]:[margin:1em_0] [&_blockquote]:pl-[12px]",
+  "[&_blockquote]:border-l-[2px] [&_blockquote]:border-l-[color:var(--line-strong)] [&_blockquote]:text-[var(--text-secondary)]",
+  "[&_img]:max-w-full [&_img]:h-auto [&_.contains-task-list]:[list-style:none]",
+  "[&_.contains-task-list]:pl-[1.5em] [&_hr]:border-0 [&_hr]:border-t-[1px] [&_hr]:border-t-[color:var(--line)]",
+  "[&_hr]:[margin:1.5em_0] [&_.markdown-code-scroll_pre]:flex-1",
+  "[&_.markdown-code-scroll_pre]:overflow-visible [&_.markdown-code-scroll_pre]:border-0",
+  "[&_.markdown-code-scroll_pre]:rounded-[0] [&_.markdown-code-scroll_pre]:m-0",
+  "[&_.markdown-code-scroll_pre]:bg-transparent [&_.markdown-code-scroll_pre]:leading-[1.65]",
+  "[&_.markdown-code-scroll_pre]:text-[0.9em] [&_.markdown-code-scroll_pre_code]:text-[inherit]",
+  "[&_.markdown-code-scroll_.markdown-line-numbers]:sticky",
+  "[&_.markdown-code-scroll_.markdown-line-numbers]:left-[0]",
+  "[&_.markdown-code-scroll_.markdown-line-numbers]:flex-none",
+  "[&_.markdown-code-scroll_.markdown-line-numbers]:text-[var(--text-tertiary)]",
+  "[&_.markdown-code-scroll_.markdown-line-numbers]:text-right",
+  "[&_.markdown-code-scroll_.markdown-line-numbers]:bg-[var(--surface-menu)]",
+  "[&_.markdown-code-scroll_.markdown-line-numbers]:select-none [&_.markdown-table_th]:sticky",
+  "[&_.markdown-table_th]:top-[0] [&_.markdown-table_th]:z-[1]",
+  "[&_.markdown-table_th]:bg-[var(--surface-menu)] [&_mark]:text-[var(--text-primary)]",
+  "[&_mark]:[background:color-mix(in_srgb,_var(--color-modified)_35%,_transparent)]",
+  "[&_mark[data-current]]:[outline:2px_solid_var(--color-modified)] [&_.katex-display]:overflow-x-auto",
+  "[&_.katex-display]:overflow-y-hidden",
+].join(" ")
+
 export const centeredStateClasses = [
   "flex h-full flex-col items-center justify-center p-[40px] [grid-row:1_/_-1] text-center",
   "[&_.brand-mark]:w-[34px] [&_.brand-mark]:h-[34px] [&_.brand-mark]:flex-[0_0_34px]",

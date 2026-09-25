@@ -208,7 +208,7 @@ function ThreadTile({
   const focused = useTabStore((state) => state.selectedThreadId === thread.id)
   const droppable = useThreadDroppable(thread.id)
   const focus = (): void => {
-    if (!focused) useTabStore.getState().selectThread(thread.id)
+    if (!focused) useTabStore.getState().openThread(thread.id)
   }
   return (
     <section

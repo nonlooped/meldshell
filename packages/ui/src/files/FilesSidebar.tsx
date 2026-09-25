@@ -11,9 +11,9 @@ import { GitSidebar } from "./GitSidebar"
 import { WorktreeBar } from "./WorktreeBar"
 import { scopeKey } from "../data/workspace-scope"
 import { FileIcon } from "../ui/FileIcon"
-import { Button, IconButton } from "../ui/controls"
+import { Button, IconButton, PanelNote, QueryError } from "../ui/controls"
 import { useTabStore } from "../app/tab-store"
-import { panelTabsClasses } from "../ui/styles"
+import { panelNoteClasses, panelTabsClasses } from "../ui/styles"
 
 function statusKind(status: string): string {
   if (status === "!!") return "ignored"
@@ -187,27 +187,8 @@ function Directory({
     staleTime: 5000,
     retry: false,
   })
-  if (query.isPending)
-    return (
-      <p
-        className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
-        role="status"
-      >
-        Loading files…
-      </p>
-    )
-  if (query.isError)
-    return (
-      <div
-        className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
-        role="alert"
-      >
-        {query.error.message}
-        <Button size="sm" onClick={() => void query.refetch()}>
-          Retry
-        </Button>
-      </div>
-    )
+  if (query.isPending) return <PanelNote role="status">Loading files…</PanelNote>
+  if (query.isError) return <QueryError query={query} />
   return (
     <ul
       className="[list-style:none] p-0 m-0"
@@ -227,10 +208,7 @@ function Directory({
         />
       ))}
       {query.data.length === 0 && (
-        <li
-          role="none"
-          className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]"
-        >
+        <li role="none" className={panelNoteClasses}>
           Empty folder
         </li>
       )}
@@ -288,9 +266,7 @@ export function FilesSidebar({
           {workspace && scope ? (
             <Directory key={workspace.id} scope={scope} path="" />
           ) : (
-            <p className="[margin:12px_14px] leading-[1.6] [overflow-wrap:anywhere] [&[role='alert']]:text-[var(--color-deleted)]">
-              Choose a thread to browse its workspace.
-            </p>
+            <PanelNote>Choose a thread to browse its workspace.</PanelNote>
           )}
         </div>
       </Tabs.Panel>

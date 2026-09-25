@@ -10,14 +10,14 @@
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "@better-auth/api-key": "1.7.5",
+    "@better-auth/api-key": "1.7.6",
     "@meldshell/contracts": "*",
-    "better-auth": "1.7.5"
+    "better-auth": "1.7.6"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260923.1",
+    "@cloudflare/workers-types": "5.20260925.1",
     "@types/ws": "^8.18.1",
-    "wrangler": "4.136.3",
+    "wrangler": "4.140.0",
     "ws": "^8.21.3"
   }
 }

@@ -6,7 +6,6 @@
     "strict": true,
     "plugins": [{ "name": "@effect/language-service" }],
     "types": ["electron-vite/node"],
-    "baseUrl": ".",
     "paths": {
       "@meldshell/contracts": ["../../packages/contracts/src/index.ts"],
       "@meldshell/core": ["../../packages/core/src/index.ts"],
