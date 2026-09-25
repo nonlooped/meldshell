@@ -193,8 +193,6 @@ type Providers = CodexProvider | ClaudeProvider | CursorProvider
 /** What an updater run left behind, reported by the version check that follows it. */
 interface InstallOutcome {
   readonly output: string
-  /** Whether the harness was reloaded, or only probed because turns were running. */
-  readonly restarted: boolean
 }
 
 export const makeProviderUpdates = (
@@ -217,6 +215,7 @@ export const makeProviderUpdates = (
     const statuses = new Map<Harness, ProviderUpdateStatus>()
     const latest = new Map<Harness, { readonly version: string; readonly at: number }>()
     const outcomes = new Map<Harness, InstallOutcome>()
+    const installing = new Set<Harness>()
 
     const current = (harness: Harness): ProviderUpdateStatus =>
       statuses.get(harness) ?? unknownUpdateStatus(harness)
@@ -270,9 +269,7 @@ export const makeProviderUpdates = (
       outcomes.delete(harness)
       if (order !== "behind") {
         if (outcome === undefined) return `${label} is up to date.`
-        return outcome.restarted
-          ? `${label} ${version} is installed.`
-          : `${label} ${version} is installed. Turns that were running keep the previous version.`
+        return `${label} ${version} is installed.`
       }
       if (outcome !== undefined)
         return `${label} is still ${version} after the update; its updater said: ${outcome.output}`
@@ -288,6 +285,7 @@ export const makeProviderUpdates = (
     ): Effect.Effect<ProviderUpdateStatus> =>
       Effect.gen(function* () {
         const newest = yield* Effect.either(latestVersion(harness))
+        if (current(harness).state === "updating") return current(harness)
         if (Either.isLeft(newest))
           return yield* publish({
             ...current(harness),
@@ -315,6 +313,7 @@ export const makeProviderUpdates = (
           return yield* publish(unknownUpdateStatus(harness))
         }
         const resolution = yield* resolve(harness, status.executablePath)
+        if (current(harness).state === "updating") return current(harness)
         yield* publish({
           ...known,
           harness,
@@ -325,6 +324,22 @@ export const makeProviderUpdates = (
           message: "Checking for updates…",
         })
         return yield* compare(harness, status.version, resolution)
+      })
+
+    const waitForIdle = (harness: Harness) =>
+      Effect.gen(function* () {
+        // Keep the update pending until restarting cannot interrupt existing turns.
+        const activeTurns = core.GetActiveTurnCount().pipe(Effect.orElseSucceed(() => 1))
+        if ((yield* activeTurns) > 0) {
+          yield* publish({
+            ...current(harness),
+            state: "updating",
+            message: "Update installed. Waiting for running turns to finish before reconnecting…",
+          })
+          do {
+            yield* Effect.sleep("1 second")
+          } while ((yield* activeTurns) > 0)
+        }
       })
 
     /** Runs the updater, then reloads the harness so its probe reports the version now installed. */
@@ -339,21 +354,15 @@ export const makeProviderUpdates = (
           return yield* Effect.fail(
             new Error(`${plan.display} failed${output === "" ? "." : `: ${output}`}`),
           )
-        // A restart fails running turns, so a busy host only probes the harness again.
-        const active = yield* core.GetActiveTurnCount().pipe(Effect.orElseSucceed(() => 1))
-        outcomes.set(harness, {
-          output: output === "" ? "nothing" : output,
-          restarted: active === 0,
-        })
+        yield* waitForIdle(harness)
+        outcomes.set(harness, { output: output === "" ? "nothing" : output })
         yield* publish({
           ...current(harness),
           state: "checking",
           message: "Update finished. Checking the installed version…",
         })
         const service = yield* providerFor(harness)
-        yield* (active === 0 ? service.restart : service.refresh).pipe(
-          Effect.catchAll(Effect.logError),
-        )
+        yield* service.restart
       }).pipe(
         Effect.catchAll((cause) =>
           publish({
@@ -363,28 +372,40 @@ export const makeProviderUpdates = (
             checkedAt: timestamp(),
           }),
         ),
+        Effect.ensuring(Effect.sync(() => installing.delete(harness))),
       )
 
     const install = (harness: Harness): Effect.Effect<ProviderUpdateStatus, Error, Providers> =>
-      Effect.gen(function* () {
+      Effect.suspend(() => {
         const known = current(harness)
-        if (known.state === "updating") return known
-        const status = yield* providerStatus(harness)
-        if (status.executablePath === null)
-          return yield* Effect.fail(new Error(`${HARNESSES[harness].label} is not installed.`))
-        const resolution = yield* resolve(harness, status.executablePath)
-        if ("manual" in resolution) return yield* Effect.fail(new Error(resolution.manual))
-        const started = yield* publish({
-          ...known,
-          harness,
-          state: "updating",
-          installedVersion: status.version,
-          command: resolution.plan.display,
-          canUpdate: true,
-          message: `Running ${resolution.plan.display}…`,
-        })
-        runFork(runInstall(harness, resolution.plan))
-        return started
+        if (installing.has(harness)) return Effect.succeed(known)
+        installing.add(harness)
+        let handedOff = false
+        return Effect.gen(function* () {
+          const status = yield* providerStatus(harness)
+          if (status.executablePath === null)
+            return yield* Effect.fail(new Error(`${HARNESSES[harness].label} is not installed.`))
+          const resolution = yield* resolve(harness, status.executablePath)
+          if ("manual" in resolution) return yield* Effect.fail(new Error(resolution.manual))
+          const started = yield* publish({
+            ...known,
+            harness,
+            state: "updating",
+            installedVersion: status.version,
+            command: resolution.plan.display,
+            canUpdate: true,
+            message: `Running ${resolution.plan.display}…`,
+          })
+          runFork(runInstall(harness, resolution.plan))
+          handedOff = true
+          return started
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              if (!handedOff) installing.delete(harness)
+            }),
+          ),
+        )
       })
 
     /** Whether a settled probe calls for a comparison: a new version, or the one after an update. */

@@ -10,6 +10,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Fixed
 
+- Provider updates prevent overlapping installers and reconnect automatically after running turns finish.
+
 - Malformed provider messages and stored approvals now report decoding errors with field paths instead of being treated as empty objects or trusted without validation.
 - The remote workspace identifies its runtime as Web in Settings › About.
 - When a Cursor model cannot write a commit message or a thread title, the failure shows right away. Before, the commit message button waited 75 seconds before reporting it.

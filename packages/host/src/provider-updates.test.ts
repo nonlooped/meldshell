@@ -118,6 +118,7 @@ const harness = async (world: {
   readonly afterUpdate?: string
   readonly activeTurns?: number
 }) => {
+  let activeTurns = world.activeTurns ?? 0
   const version = await Effect.runPromise(Ref.make<string | null>("0.156.1"))
   const published: ProviderUpdateStatus[] = []
   const reloads: string[] = []
@@ -136,7 +137,7 @@ const harness = async (world: {
     refresh: reload("refresh"),
   } as unknown as ProviderService
   const core = {
-    GetActiveTurnCount: () => Effect.succeed(world.activeTurns ?? 0),
+    GetActiveTurnCount: () => Effect.sync(() => activeTurns),
   } as unknown as CoreClient
   const base = Layer.mergeAll(
     Layer.succeed(CodexProvider, provider),
@@ -181,7 +182,17 @@ const harness = async (world: {
     await Effect.runPromise(Fiber.interrupt(listener))
     await runtime.dispose()
   }
-  return { service, published, reloads, ran, runtime, dispose }
+  return {
+    service,
+    published,
+    reloads,
+    ran,
+    runtime,
+    dispose,
+    setActiveTurns: (count: number) => {
+      activeTurns = count
+    },
+  }
 }
 
 const waitFor = async (
@@ -251,17 +262,22 @@ test("a failed updater reports its last line and leaves the harness alone", asyn
   }
 })
 
-test("running turns keep the harness alive and the outcome says so", async () => {
-  const { service, published, reloads, runtime, dispose } = await harness({
+test("a busy update restarts once turns finish without another install", async () => {
+  const { service, published, reloads, ran, runtime, dispose, setActiveTurns } = await harness({
     latest: "0.157.0",
     afterUpdate: "0.157.0",
     activeTurns: 2,
   })
   try {
     await runtime.runPromise(service.install("codex"))
+    await waitFor(published, (status) => /Waiting for running turns/.test(status.message))
+    assert.deepEqual(reloads, [])
+    await runtime.runPromise(service.install("codex"))
+    assert.equal(ran.length, 1)
+    setActiveTurns(0)
     const final = await waitFor(published, (status) => status.state === "current")
-    assert.deepEqual(reloads, ["refresh"])
-    assert.match(final.message, /Turns that were running keep the previous version/)
+    assert.deepEqual(reloads, ["restart"])
+    assert.equal(final.installedVersion, "0.157.0")
   } finally {
     await dispose()
   }
@@ -281,6 +297,43 @@ test("an updater that changes nothing reports what it said", async () => {
       /still 0\.156\.1 after the update; its updater said: Claude is up to date!/,
     )
   } finally {
+    await dispose()
+  }
+})
+
+test("overlapping installs run only one updater and release the lock after failure", async () => {
+  let markStarted!: () => void
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve
+  })
+  let finish!: (result: CommandResult) => void
+  const finished = new Promise<CommandResult>((resolve) => {
+    finish = resolve
+  })
+  let calls = 0
+  const { service, published, runtime, dispose } = await harness({
+    latest: "0.157.0",
+    run: async () => {
+      calls++
+      markStarted()
+      return finished
+    },
+  })
+  try {
+    await Promise.all([
+      runtime.runPromise(service.install("codex")),
+      runtime.runPromise(service.install("codex")),
+    ])
+    await started
+    assert.equal(calls, 1)
+    await runtime.runPromise(service.check("codex"))
+    assert.equal((await runtime.runPromise(service.status("codex"))).state, "updating")
+    finish({ exitCode: 1, stdout: "", stderr: "failed" })
+    await waitFor(published, (status) => status.state === "error")
+    await runtime.runPromise(service.install("codex"))
+    assert.equal(calls, 2)
+  } finally {
+    finish({ exitCode: 1, stdout: "", stderr: "failed" })
     await dispose()
   }
 })
