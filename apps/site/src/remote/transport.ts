@@ -142,10 +142,6 @@ export function remoteApi(
         ? Promise.resolve()
         : api.gitFileAction(input),
     onProviderStatus: (listener) => subscribe(IPC.providerStatusChanged, listener as Listener),
-    onCodexStatus: (listener) =>
-      subscribe(IPC.providerStatusChanged, ((value: { harness: string }) => {
-        if (value.harness === "codex") listener(value as Parameters<typeof listener>[0])
-      }) as Listener),
     onRuntimeChanged: (listener) => subscribe(IPC.runtimeChanged, listener as Listener),
     onOpenAttention: (listener) => subscribe(IPC.attentionRequested, listener as Listener),
     onUpdateStatus: () => () => undefined,

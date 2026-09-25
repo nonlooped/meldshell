@@ -5,13 +5,15 @@ import { AnimatePresence, motion } from "motion/react"
 import { Notice } from "../ui/Notice"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { ComposerAttachment } from "@meldshell/contracts/ipc"
-import type {
-  AppSnapshot,
-  CollaborationMode,
-  ReasoningEffort,
-  SandboxMode,
-  SetThreadSettingsInput,
+import {
+  HARNESSES,
+  type AppSnapshot,
+  type CollaborationMode,
+  type ReasoningEffort,
+  type SandboxMode,
+  type SetThreadSettingsInput,
 } from "@meldshell/contracts"
+import { knownHarness } from "../data/providers"
 import {
   AlarmClock,
   ChevronDown,
@@ -331,16 +333,10 @@ const MODES: Readonly<Record<CollaborationMode, { label: string; icon: typeof Ha
   ask: { label: "Ask", icon: MessageCircleQuestion },
 }
 
-/** The modes each harness offers natively. Codex takes no collaboration mode from MeldShell. */
+/** The modes a harness offers; one with only the default mode offers no choice. */
 const harnessModes = (harness: string): readonly CollaborationMode[] => {
-  switch (harness) {
-    case "claude-code":
-      return ["default", "plan"]
-    case "cursor":
-      return ["default", "plan", "ask"]
-    default:
-      return []
-  }
+  const { modes } = HARNESSES[knownHarness(harness)]
+  return modes.length > 1 ? modes : []
 }
 
 function ComposerSettings({

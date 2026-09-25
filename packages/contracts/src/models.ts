@@ -214,6 +214,47 @@ export const ApprovalPolicy = Schema.Literal("untrusted", "on-request", "never")
 
 export type ApprovalPolicy = typeof ApprovalPolicy.Type
 
+/** The coding agents MeldShell supervises, each in its own worker process. */
+export const Harness = Schema.Literal("codex", "claude-code", "cursor")
+
+export type Harness = typeof Harness.Type
+
+export const isHarness = Schema.is(Harness)
+
+interface HarnessInfo {
+  /** The `Provider.key` of the vendor that ships the harness. */
+  readonly provider: "openai" | "anthropic" | "cursor"
+  /** The name a seeded provider starts with; the user can rename it. */
+  readonly vendor: string
+  /** The harness's own name, as statuses and notifications show it. */
+  readonly label: string
+  /** The collaboration modes the harness takes from MeldShell. Codex takes none but the default. */
+  readonly modes: ReadonlyArray<CollaborationMode>
+}
+
+export const HARNESSES: { readonly [Key in Harness]: HarnessInfo } = {
+  codex: { provider: "openai", vendor: "OpenAI", label: "Codex", modes: ["default"] },
+  "claude-code": {
+    provider: "anthropic",
+    vendor: "Claude",
+    label: "Claude Code",
+    modes: ["default", "plan"],
+  },
+  cursor: {
+    provider: "cursor",
+    vendor: "Cursor",
+    label: "Cursor",
+    modes: ["default", "plan", "ask"],
+  },
+}
+
+/** Whether a harness takes a mode; the default mode works everywhere. */
+export const supportsMode = (harness: string | undefined, mode: CollaborationMode): boolean =>
+  mode === "default" || (isHarness(harness) && HARNESSES[harness].modes.includes(mode))
+
+/** Older dispatch payloads predate the other harnesses and name none. */
+const DispatchHarness = Schema.optionalWith(Harness, { default: () => "codex" as const })
+
 export const Provider = Schema.Struct({
   id: Schema.String,
   /** Stable vendor key. Never edited by the user; `displayName` is the editable label. */
@@ -258,25 +299,11 @@ export const ProviderModelCatalogEntry = Schema.Struct({
 export type ProviderModelCatalogEntry = typeof ProviderModelCatalogEntry.Type
 
 export const ProviderModel = Schema.Struct({
+  ...ProviderModelCatalogEntry.fields,
   id: Schema.String,
   providerId: Schema.String,
   /** The identifier sent to the harness, for example `gpt-5.1-codex`. */
   slug: Schema.String,
-  catalogId: Schema.String,
-  displayName: Schema.String,
-  description: Schema.String,
-  reasoningEfforts: Schema.Array(ReasoningEffort),
-  defaultReasoningEffort: Schema.NullOr(ReasoningEffort),
-  serviceTiers: Schema.Array(ModelServiceTier),
-  defaultServiceTier: Schema.NullOr(Schema.String),
-  additionalSpeedTiers: Schema.Array(Schema.String),
-  fastServiceTier: Schema.NullOr(Schema.String),
-  inputModalities: Schema.Array(Schema.String),
-  supportsPersonality: Schema.Boolean,
-  isDefault: Schema.Boolean,
-  upgrade: Schema.NullOr(Schema.String),
-  modelSpecialty: Schema.NullOr(Schema.String),
-  multiAgentVersion: Schema.NullOr(Schema.String),
   supportsFast: Schema.Boolean,
   /** Disabled models cannot be selected for a turn. */
   enabled: Schema.Boolean,
@@ -309,11 +336,15 @@ export const CURRENT_TITLE_MODEL = "current"
 
 export const AppOpacity = Schema.Number.pipe(Schema.int(), Schema.between(20, 100))
 
+const Theme = Schema.Literal("dark", "light", "system")
+
+const TranscriptSize = Schema.Literal("small", "medium", "large")
+
 export const AppSettings = Schema.Struct({
   opacity: Schema.optional(AppOpacity),
   showSettled: Schema.optional(Schema.Boolean),
-  theme: Schema.optional(Schema.Literal("dark", "light", "system")),
-  transcriptSize: Schema.optional(Schema.Literal("small", "medium", "large")),
+  theme: Schema.optional(Theme),
+  transcriptSize: Schema.optional(TranscriptSize),
   reduceMotion: Schema.optional(Schema.Boolean),
   /** Chimes when a thread finishes or needs attention out of view. */
   sounds: Schema.optional(Schema.Boolean),
@@ -382,6 +413,19 @@ export type CursorStatus = typeof CursorStatus.Type
 export const ProviderStatus = Schema.Union(CodexStatus, ClaudeStatus, CursorStatus)
 
 export type ProviderStatus = typeof ProviderStatus.Type
+
+/** What a harness shows before its worker has reported a status of its own. */
+export const probingStatus = (harness: Harness): ProviderStatus =>
+  // Each registry entry names its own vendor, so the pair matches one member of the union.
+  ({
+    provider: HARNESSES[harness].provider,
+    harness,
+    availability: "probing",
+    executablePath: null,
+    version: null,
+    detail: `Connecting to ${HARNESSES[harness].label}…`,
+    checkedAt: new Date().toISOString(),
+  }) as ProviderStatus
 
 export const UsageWindow = Schema.Struct({
   label: Schema.optional(Schema.String),
@@ -523,8 +567,8 @@ export type SetThreadSettingsInput = typeof SetThreadSettingsInput.Type
 export const SetAppSettingsInput = Schema.Struct({
   opacity: Schema.optional(AppOpacity),
   showSettled: Schema.optional(Schema.Boolean),
-  theme: Schema.optional(Schema.Literal("dark", "light", "system")),
-  transcriptSize: Schema.optional(Schema.Literal("small", "medium", "large")),
+  theme: Schema.optional(Theme),
+  transcriptSize: Schema.optional(TranscriptSize),
   reduceMotion: Schema.optional(Schema.Boolean),
   sounds: Schema.optional(Schema.Boolean),
   editor: Schema.optional(Schema.String.pipe(Schema.maxLength(64))),
@@ -616,9 +660,7 @@ export const ResolveApprovalInput = Schema.Struct({
 export type ResolveApprovalInput = typeof ResolveApprovalInput.Type
 
 export const TurnDispatch = Schema.Struct({
-  harness: Schema.optionalWith(Schema.Literal("codex", "claude-code", "cursor"), {
-    default: () => "codex" as const,
-  }),
+  harness: DispatchHarness,
   threadId: Schema.String,
   turnId: Schema.String,
   nativeThreadId: Schema.NullOr(Schema.String),
@@ -642,9 +684,7 @@ export type TurnDispatch = typeof TurnDispatch.Type
  * so it carries no thread settings beyond the model the title is allowed to cost.
  */
 export const TitleRequest = Schema.Struct({
-  harness: Schema.optionalWith(Schema.Literal("codex", "claude-code", "cursor"), {
-    default: () => "codex" as const,
-  }),
+  harness: DispatchHarness,
   threadId: Schema.String,
   workspacePath: Schema.String,
   model: Schema.String,
@@ -685,9 +725,7 @@ export const RuntimeEventResult = Schema.Struct({
 export type RuntimeEventResult = typeof RuntimeEventResult.Type
 
 export const ProviderSessionInput = Schema.Struct({
-  harness: Schema.optionalWith(Schema.Literal("codex", "claude-code", "cursor"), {
-    default: () => "codex" as const,
-  }),
+  harness: DispatchHarness,
   threadId: Schema.String,
   nativeThreadId: Schema.String,
 })

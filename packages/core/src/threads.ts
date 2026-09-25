@@ -10,6 +10,8 @@ import {
   type ThreadWorktree,
   CoreProtocolError,
   defaultReasoningEffort,
+  HARNESSES,
+  type Harness,
 } from "@meldshell/contracts"
 import { Effect } from "effect"
 import { transaction } from "./database/persistence"
@@ -155,13 +157,20 @@ export const deleteThread = (threadId: string) =>
     return yield* getSnapshot
   }).pipe(transaction)
 
-export const setProviderSession = (threadId: string, nativeThreadId: string, harness = "codex") =>
+export const setProviderSession = (
+  threadId: string,
+  nativeThreadId: string,
+  harness: Harness = "codex",
+) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
       INSERT INTO provider_sessions (
         thread_id, provider, harness, native_thread_id, created_at
-      ) VALUES (${threadId}, ${harness === "cursor" ? "cursor" : harness === "claude-code" ? "anthropic" : "openai"}, ${harness}, ${nativeThreadId}, ${new Date().toISOString()})
+      ) VALUES (
+        ${threadId}, ${HARNESSES[harness].provider}, ${harness}, ${nativeThreadId},
+        ${new Date().toISOString()}
+      )
       ON CONFLICT(thread_id, harness) DO UPDATE SET native_thread_id = excluded.native_thread_id
     `
     return yield* getSnapshot

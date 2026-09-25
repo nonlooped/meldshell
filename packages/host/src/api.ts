@@ -152,7 +152,7 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.listComposerCommands]: operation(
     Schema.Struct({
       ...scopeFields,
-      harness: Schema.Literal("codex", "claude-code", "cursor"),
+      harness: C.Harness,
     }),
     true,
     (input) =>
@@ -231,13 +231,14 @@ hostOperations[C.IPC.generateCommitMessage] = operation(
         available.find((entry) => entry.id === snapshot.settings.titleModelId) ??
         available.find((entry) => entry.id === selected)
       const provider = snapshot.providers.find((entry) => entry.id === model?.providerId)
-      if (!model || !provider || !["codex", "claude-code", "cursor"].includes(provider.harness))
+      const harness = provider?.harness
+      if (!model || !C.isHarness(harness))
         return yield* Effect.fail(
           new Error("Choose an available Title model or a model for this thread."),
         )
       const workspacePath = yield* scopePath(input)
       const prompt = yield* withWorkspace(input, commitMessagePrompt)
-      const service = yield* providerFor(provider.harness)
+      const service = yield* providerFor(harness)
       return yield* Effect.tryPromise({
         try: () =>
           requestGeneratedText((threadId) =>
@@ -248,7 +249,7 @@ hostOperations[C.IPC.generateCommitMessage] = operation(
                   threadId,
                   workspacePath,
                   model: model.slug,
-                  harness: provider.harness as "codex" | "claude-code" | "cursor",
+                  harness,
                   reasoningEffort: model.defaultReasoningEffort,
                   prompt,
                 },

@@ -1,4 +1,3 @@
-import { unsupportedMode } from "./catalog"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
@@ -12,7 +11,9 @@ import {
   type RuntimeEventResult,
   type TurnDispatch,
   CoreProtocolError,
+  isHarness,
   ProviderConfigurationError,
+  supportsMode,
   TurnSubmissionError,
 } from "@meldshell/contracts"
 import { Effect } from "effect"
@@ -78,14 +79,14 @@ const createDispatch = (
         }),
       )
     }
-    if (unsupportedMode(row.mode, row.harness))
+    if (!isHarness(row.harness))
+      return yield* Effect.fail(new CoreProtocolError({ message: "Unsupported provider harness." }))
+    if (!supportsMode(row.harness, row.mode))
       return yield* Effect.fail(
         new CoreProtocolError({
           message: "This mode is not supported by this provider integration.",
         }),
       )
-    if (row.harness !== "codex" && row.harness !== "claude-code" && row.harness !== "cursor")
-      return yield* Effect.fail(new CoreProtocolError({ message: "Unsupported provider harness." }))
     const metadata = parseProviderData(row.model_metadata)
     const fastServiceTier = asRecord(metadata).fastServiceTier
     const serviceTier =

@@ -6,6 +6,7 @@ import {
   type TitleRequest,
   CURRENT_TITLE_MODEL,
   defaultReasoningEffort,
+  isHarness,
 } from "@meldshell/contracts"
 import { Effect } from "effect"
 import { enabledModel } from "./catalog"
@@ -104,7 +105,7 @@ export const buildTitleRequest = (threadId: string, text: string) =>
       harness: string
     }>`SELECT harness FROM providers WHERE id = ${model.providerId}`
     const harness = providers[0]?.harness
-    if (harness !== "codex" && harness !== "claude-code" && harness !== "cursor") return null
+    if (!isHarness(harness)) return null
     return {
       harness,
       threadId,

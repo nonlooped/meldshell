@@ -4,7 +4,14 @@ import { queryKeys } from "../data/cache"
 import { useEffect, useState } from "react"
 import { Meter } from "@base-ui-components/react/meter"
 import { useQueries } from "@tanstack/react-query"
-import type { CodexUsage, Provider, UsageLimit } from "@meldshell/contracts"
+import {
+  isHarness,
+  type CodexUsage,
+  type Harness,
+  type Provider,
+  type UsageLimit,
+} from "@meldshell/contracts"
+import { harnessApi, knownHarness } from "../data/providers"
 import { RefreshCw, TriangleAlert } from "lucide-react"
 import { ProviderIcon } from "../ui/ProviderIcon"
 import { Button } from "../ui/controls"
@@ -22,44 +29,38 @@ import {
   windowLabel,
 } from "./usage-format"
 
-const SUBSCRIPTION_HARNESSES = ["codex", "claude-code", "cursor"]
+export const hasSubscriptionUsage = (provider: Provider): boolean => isHarness(provider.harness)
 
-export const hasSubscriptionUsage = (provider: Provider): boolean =>
-  SUBSCRIPTION_HARNESSES.includes(provider.harness)
-
-function subscriptionProvider(harness: string) {
-  if (harness === "cursor")
-    return {
-      key: "cursor",
-      name: "Cursor",
-      account: "Cursor account in Cursor CLI",
-      getStatus: () => window.meldshell.getCursorStatus(),
-      refreshStatus: () => window.meldshell.refreshCursorStatus(),
-      getUsage: () => window.meldshell.getCursorUsage(),
-      usageHint:
-        "Sign in with Cursor CLI, then refresh. If you are already signed in, Cursor's usage service may be temporarily unavailable.",
-    }
-  if (harness === "claude-code")
-    return {
-      key: "claude",
-      name: "Claude",
-      account: "Claude account in Claude Code",
-      getStatus: () => window.meldshell.getClaudeStatus(),
-      refreshStatus: () => window.meldshell.refreshClaudeStatus(),
-      getUsage: () => window.meldshell.getClaudeUsage(),
-      usageHint:
-        "Check that Claude is signed in with a subscription account, then try again. Subscription usage may be unavailable for API key accounts.",
-    }
-  return {
-    key: "codex",
+const SUBSCRIPTIONS: {
+  readonly [Key in Harness]: {
+    readonly name: string
+    readonly account: string
+    readonly usageHint: string
+  }
+} = {
+  codex: {
     name: "Codex",
     account: "ChatGPT account in Codex",
-    getStatus: () => window.meldshell.getCodexStatus(),
-    refreshStatus: () => window.meldshell.refreshCodexStatus(),
-    getUsage: () => window.meldshell.getCodexUsage(),
     usageHint:
       "Check that Codex is signed in with a subscription account, then try again. Subscription usage may be unavailable for API key accounts.",
-  }
+  },
+  "claude-code": {
+    name: "Claude",
+    account: "Claude account in Claude Code",
+    usageHint:
+      "Check that Claude is signed in with a subscription account, then try again. Subscription usage may be unavailable for API key accounts.",
+  },
+  cursor: {
+    name: "Cursor",
+    account: "Cursor account in Cursor CLI",
+    usageHint:
+      "Sign in with Cursor CLI, then refresh. If you are already signed in, Cursor's usage service may be temporarily unavailable.",
+  },
+}
+
+function subscriptionProvider(provider: string) {
+  const harness = knownHarness(provider)
+  return { harness, ...SUBSCRIPTIONS[harness], ...harnessApi(harness) }
 }
 
 /**
@@ -76,8 +77,8 @@ function useSubscriptionUsage(providers: ReadonlyArray<Provider>) {
   })
   const usages = useQueries({
     queries: metas.map((meta, index) => ({
-      queryKey: [`${meta.key}-usage`],
-      queryFn: meta.getUsage as () => Promise<CodexUsage>,
+      queryKey: queryKeys.providerUsage(meta.harness),
+      queryFn: meta.getUsage,
       enabled: statuses[index]?.data?.availability === "ready",
       refetchInterval: 60_000,
       staleTime: 0,
