@@ -7,7 +7,7 @@ import {
   type TranscriptSearchResult,
 } from "@meldshell/contracts"
 import { useThreadActions } from "../data/mutations"
-import { useSelectedProvider } from "../data/providers"
+import { refreshProviderStatus, useSelectedProvider } from "../data/providers"
 import { workspaceScope } from "../data/workspace-scope"
 import { emptyDraft, useThreadDrafts } from "../app/thread-drafts"
 import { ErrorToast } from "../ui/Notice"
@@ -31,10 +31,7 @@ export function ThreadView({
   const draft = useThreadDrafts((state) => state.drafts[thread.id] ?? emptyDraft)
   const [scheduling, setScheduling] = useState(false)
   const update = useThreadDrafts((state) => state.update)
-  const { isClaude, isCursor, providerStatus, providerReady } = useSelectedProvider(
-    snapshot,
-    thread.id,
-  )
+  const { harness, providerStatus, providerReady } = useSelectedProvider(snapshot, thread.id)
   const { threadSettingsMutation, submitTurnMutation, interruptMutation } = useThreadActions(
     snapshot,
     {
@@ -95,13 +92,7 @@ export function ThreadView({
           onTokensChange={(tokens) => update(thread.id, { tokens })}
           providerReady={providerReady}
           providerDetail={providerStatus.detail}
-          onRecheckProvider={() =>
-            void (isCursor
-              ? window.meldshell.refreshCursorStatus()
-              : isClaude
-                ? window.meldshell.refreshClaudeStatus()
-                : window.meldshell.refreshCodexStatus())
-          }
+          onRecheckProvider={() => void refreshProviderStatus(harness)}
           onChangeSettings={(input) => threadSettingsMutation.mutate(input)}
           running={["running", "queued", "approval"].includes(thread.activity)}
           queuedCount={thread.queuedCount}

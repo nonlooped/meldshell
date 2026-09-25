@@ -7,14 +7,8 @@ export const queryKeys = {
   search: ["transcript-search"] as const,
   schedules: ["schedules"] as const,
   transcript: (threadId: string) => ["transcript", threadId] as const,
-  providerStatus: (harness: string) =>
-    [
-      harness === "cursor"
-        ? "cursor-status"
-        : harness === "claude-code"
-          ? "claude-status"
-          : "codex-status",
-    ] as const,
+  providerStatus: (harness: string) => ["provider-status", harness] as const,
+  providerUsage: (harness: string) => ["provider-usage", harness] as const,
 }
 
 export function replaceSnapshot(client: QueryClient, snapshot: AppSnapshot): void {

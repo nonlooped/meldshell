@@ -374,7 +374,6 @@ export const IPC = {
 export type MeldShellApi = InvokeApi & {
   readonly platform: string
   readonly onProviderStatus: (listener: (status: ProviderStatus) => void) => () => void
-  readonly onCodexStatus: (listener: (status: CodexStatus) => void) => () => void
   readonly onRuntimeChanged: (
     listener: (threadId: string, snapshotChanged?: boolean) => void,
   ) => () => void

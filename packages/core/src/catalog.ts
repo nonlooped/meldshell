@@ -2,6 +2,9 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
   defaultReasoningEffort,
+  HARNESSES,
+  Harness,
+  supportsMode,
   type ProviderModel,
   type SetThreadSettingsInput,
   type SyncProviderCatalogInput,
@@ -20,27 +23,11 @@ import {
 } from "./database/rows"
 import { getSnapshot } from "./snapshots"
 
-interface SeedProvider {
-  readonly key: string
-  readonly harness: string
-  readonly displayName: string
-}
-
 /**
  * Only the provider identity is seeded. Models come from each provider and remain stored so an
  * unavailable provider never blocks access to existing threads.
  */
 const CATALOG_SEED_VERSION = "5"
-
-const SEED_PROVIDERS: ReadonlyArray<SeedProvider> = [
-  {
-    key: "openai",
-    harness: "codex",
-    displayName: "OpenAI",
-  },
-  { key: "anthropic", harness: "claude-code", displayName: "Claude" },
-  { key: "cursor", harness: "cursor", displayName: "Cursor" },
-]
 
 export const seedCatalog = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -50,14 +37,12 @@ export const seedCatalog = Effect.gen(function* () {
       // Retire catalog entries for integrations that are no longer shipped. Foreign-key
       // cascades clear their models and selections while retaining conversation history.
       yield* sql`DELETE FROM providers WHERE built_in = 1
-        AND harness NOT IN ('codex', 'claude-code', 'cursor')`
-      for (const [providerIndex, provider] of SEED_PROVIDERS.entries()) {
+        AND harness NOT IN ${sql.in(Harness.literals)}`
+      for (const [providerIndex, harness] of Harness.literals.entries()) {
+        const { provider, vendor } = HARNESSES[harness]
         yield* sql`
             INSERT INTO providers (id, key, harness, display_name, enabled, sort_order, built_in)
-            VALUES (
-              ${randomUUID()}, ${provider.key}, ${provider.harness},
-              ${provider.displayName}, 1, ${providerIndex}, 1
-            )
+            VALUES (${randomUUID()}, ${provider}, ${harness}, ${vendor}, 1, ${providerIndex}, 1)
             ON CONFLICT(key) DO NOTHING
           `
       }
@@ -346,7 +331,7 @@ export const setThreadSettings = (input: SetThreadSettingsInput) =>
       input.mode ??
       (current?.provider_id === model.providerId ? current.mode : "default") ??
       "default"
-    if (unsupportedMode(mode, harness))
+    if (!supportsMode(harness, mode))
       return yield* Effect.fail(
         new CoreProtocolError({
           message: "This mode is not supported by this provider integration.",
@@ -446,7 +431,3 @@ function catalogDefault(discoveredRows: readonly ProviderModelRow[]) {
     discoveredRows[0]
   )
 }
-
-export const unsupportedMode = (mode: string, harness: string | undefined): boolean =>
-  (mode === "plan" && harness !== "claude-code" && harness !== "cursor") ||
-  (mode === "ask" && harness !== "cursor")

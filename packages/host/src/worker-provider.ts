@@ -4,6 +4,10 @@ import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import { randomUUID } from "node:crypto"
 import {
   errorMessage,
+  HARNESSES,
+  isHarness,
+  probingStatus,
+  type Harness,
   ProviderStatus as ProviderStatusSchema,
   CodexUsage as CodexUsageSchema,
   ComposerCommand as ComposerCommandSchema,
@@ -46,10 +50,14 @@ export class ClaudeProvider extends Context.Tag("MeldShell/ClaudeProvider")<
   ProviderService
 >() {}
 
+export class CursorProvider extends Context.Tag("MeldShell/CursorProvider")<
+  CursorProvider,
+  ProviderService
+>() {}
+
 type ProviderConfig = {
-  readonly provider: "openai" | "anthropic" | "cursor"
-  readonly harness: "codex" | "claude-code" | "cursor"
-  readonly label: string
+  readonly harness: Harness
+  /** The worker bundle the platform forks for this harness. */
   readonly worker: string
 }
 
@@ -189,18 +197,8 @@ const providerRuntime = (
   config: ProviderConfig,
 ): Effect.Effect<ProviderService, never, CoreClient | HostEvents | HostPlatform | Scope.Scope> =>
   Effect.gen(function* () {
-    const probingStatus = (): ProviderStatus => ({
-      ...(config.harness === "cursor"
-        ? { provider: "cursor" as const, harness: "cursor" as const }
-        : config.harness === "codex"
-          ? { provider: "openai" as const, harness: "codex" as const }
-          : { provider: "anthropic" as const, harness: "claude-code" as const }),
-      availability: "probing",
-      executablePath: null,
-      version: null,
-      detail: `Connecting to ${config.label}...`,
-      checkedAt: new Date().toISOString(),
-    })
+    const { provider, label } = HARNESSES[config.harness]
+    const probing = (): ProviderStatus => probingStatus(config.harness)
     const platform = yield* HostPlatform
     const core = yield* CoreClient
     const hostEvents = yield* HostEvents
@@ -210,7 +208,7 @@ const providerRuntime = (
       Runtime.runFork(runtime)(effect.pipe(Effect.forkIn(scope)))
     }
     const processRef = yield* Ref.make<HostProcess | null>(null)
-    const statusRef = yield* Ref.make(probingStatus())
+    const statusRef = yield* Ref.make(probing())
     type RuntimeTask = { effect: Effect.Effect<void>; input?: RuntimeEventInput | undefined }
     const descendants = new WeakMap<HostProcess, Set<number>>()
     const generations = new WeakMap<HostProcess, string>()
@@ -248,8 +246,8 @@ const providerRuntime = (
         const delivery =
           child === null ||
           (stopping && (typeof message === "string" || message.type !== "shutdown"))
-            ? Effect.fail(new Error(`${config.label} is unavailable or shutting down.`))
-            : deliverCommand(child, message, config.label)
+            ? Effect.fail(new Error(`${label} is unavailable or shutting down.`))
+            : deliverCommand(child, message, label)
         yield* delivery.pipe(
           Effect.tapError(() => {
             if (dispatch === null) return Effect.void
@@ -284,7 +282,7 @@ const providerRuntime = (
         const approval = snapshot.approvals.some((candidate) => candidate.threadId === threadId)
         if (!approval && method !== "turn/completed") return
         platform.notify({
-          title: approval ? `${config.label} needs approval` : `${config.label} turn finished`,
+          title: approval ? `${label} needs approval` : `${label} turn finished`,
           body: thread.title,
           threadId,
           onClick: () => runFork(hostEvents.publish({ _tag: "AttentionRequested", threadId })),
@@ -324,7 +322,7 @@ const providerRuntime = (
         ),
         Effect.asVoid,
         Effect.catchAllCause((cause) =>
-          Effect.sync(() => console.error(`Could not persist a ${config.label} event.`, cause)),
+          Effect.sync(() => console.error(`Could not persist a ${label} event.`, cause)),
         ),
       )
 
@@ -344,7 +342,7 @@ const providerRuntime = (
       if (!recovery && tasks.length >= 1024) {
         // Stop the producer on overflow. Its exit reconciles all owned turns; never drop a terminal event and continue running.
         const child = Effect.runSync(Ref.get(processRef))
-        console.error(`${config.label} event queue overflow; stopping worker.`, {
+        console.error(`${label} event queue overflow; stopping worker.`, {
           generation: child === null ? undefined : generations.get(child),
           pending: tasks.length,
           method: input?.method,
@@ -405,9 +403,9 @@ const providerRuntime = (
         Either.isLeft(decodedStatus) ||
         Either.isLeft(decodedCatalog) ||
         decodedStatus.right.harness !== config.harness ||
-        decodedCatalog.right.providerKey !== config.provider
+        decodedCatalog.right.providerKey !== provider
       ) {
-        console.error(`${config.label} returned an invalid model catalog message.`)
+        console.error(`${label} returned an invalid model catalog message.`)
         return
       }
       logStartupTiming("provider ready", `${config.harness} ${decodedStatus.right.availability}`)
@@ -420,7 +418,7 @@ const providerRuntime = (
             publishStatus({
               ...decodedStatus.right,
               availability: "error",
-              detail: `Could not store the ${config.label} model catalog: ${errorMessage(cause)}`,
+              detail: `Could not store the ${label} model catalog: ${errorMessage(cause)}`,
             }),
           ),
         ),
@@ -430,7 +428,7 @@ const providerRuntime = (
     const handleRuntimeEvent = (record: Record<string, unknown>, owner: HostProcess): void => {
       const input = Schema.decodeUnknownEither(RuntimeEventInputSchema)(record.input)
       if (Either.isLeft(input)) {
-        console.error(`${config.label} returned an invalid runtime event.`)
+        console.error(`${label} returned an invalid runtime event.`)
         return
       }
       enqueueEvent({
@@ -447,7 +445,7 @@ const providerRuntime = (
         title: record.title,
       })
       if (Either.isLeft(input)) {
-        console.error(`${config.label} returned an invalid thread title.`)
+        console.error(`${label} returned an invalid thread title.`)
         return
       }
       enqueue(
@@ -473,7 +471,7 @@ const providerRuntime = (
         nativeThreadId: record.nativeThreadId,
       })
       if (Either.isLeft(input)) {
-        console.error(`${config.label} returned an invalid provider session.`)
+        console.error(`${label} returned an invalid provider session.`)
         return
       }
       enqueue(
@@ -486,9 +484,7 @@ const providerRuntime = (
           ),
           Effect.asVoid,
           Effect.catchAll((cause) =>
-            Effect.sync(() =>
-              console.error(`Could not store the ${config.label} thread id.`, cause),
-            ),
+            Effect.sync(() => console.error(`Could not store the ${label} thread id.`, cause)),
           ),
         ),
       )
@@ -502,7 +498,7 @@ const providerRuntime = (
         params: { error: { message: record.message } },
       })
       if (Either.isLeft(input) || typeof record.message !== "string") {
-        console.error(`${config.label} returned an invalid turn failure.`)
+        console.error(`${label} returned an invalid turn failure.`)
         return
       }
       enqueue(
@@ -551,7 +547,7 @@ const providerRuntime = (
           handleTitleFailure(record)
           return
         case "protocol-error":
-          console.error(`${config.label} protocol error:`, record.message, record.raw)
+          console.error(`${label} protocol error:`, record.message, record.raw)
           return
       }
       const decoded = Schema.decodeUnknownEither(ProviderStatusSchema)(message)
@@ -560,13 +556,13 @@ const providerRuntime = (
     }
 
     const runWorker = Effect.suspend(() =>
-      stopping ? Effect.never : publishStatus(probingStatus()),
+      stopping ? Effect.never : publishStatus(probing()),
     ).pipe(
       Effect.andThen(
         Effect.acquireUseRelease(
           Effect.try({
             try: () => {
-              const child = platform.fork(config.worker, `MeldShell ${config.label}`)
+              const child = platform.fork(config.worker, `MeldShell ${label}`)
               generations.set(child, randomUUID())
               descendants.set(child, new Set())
               child.stdout?.pipe(process.stdout)
@@ -581,7 +577,7 @@ const providerRuntime = (
                 Effect.async<void>((resume) => {
                   const onExit = (code: number): void => {
                     if (!stopping)
-                      console.error(`${config.label} worker exited.`, {
+                      console.error(`${label} worker exited.`, {
                         code,
                         generation: generations.get(child),
                         pending: tasks.length,
@@ -627,16 +623,16 @@ const providerRuntime = (
       ),
       Effect.andThen(
         publishStatus({
-          ...probingStatus(),
+          ...probing(),
           availability: "error",
-          detail: `The ${config.label} integration stopped. MeldShell is restarting it with backoff.`,
+          detail: `The ${label} integration stopped. MeldShell is restarting it with backoff.`,
         }),
       ),
       Effect.catchAll((cause) =>
         publishStatus({
-          ...probingStatus(),
+          ...probing(),
           availability: "error",
-          detail: `The ${config.label} integration could not start: ${errorMessage(cause)}`,
+          detail: `The ${label} integration could not start: ${errorMessage(cause)}`,
         }),
       ),
     )
@@ -692,7 +688,7 @@ const providerRuntime = (
                   .pipe(Effect.mapError((cause) => new Error(errorMessage(cause))))
               if (child !== null && generations.get(child) === generation) {
                 console.error(
-                  `${config.label} did not settle cancellation; stopping its worker and active turns.`,
+                  `${label} did not settle cancellation; stopping its worker and active turns.`,
                 )
                 yield* Effect.forEach(
                   [...(descendants.get(child) ?? [])],
@@ -711,13 +707,12 @@ const providerRuntime = (
                   const onExit = (): void => resume(Effect.void)
                   child.once("exit", onExit)
                   if (!child.kill())
-                    resume(Effect.fail(new Error(`Could not stop the ${config.label} worker.`)))
+                    resume(Effect.fail(new Error(`Could not stop the ${label} worker.`)))
                   return Effect.sync(() => child.off("exit", onExit))
                 }).pipe(
                   Effect.timeoutFail({
                     duration: "5 seconds",
-                    onTimeout: () =>
-                      new Error(`${config.label} worker did not exit after cancellation.`),
+                    onTimeout: () => new Error(`${label} worker did not exit after cancellation.`),
                   }),
                 )
               }
@@ -731,77 +726,49 @@ const providerRuntime = (
       usage: Ref.get(processRef).pipe(
         Effect.flatMap((child) => {
           if (child === null)
-            return Effect.fail(new Error(`${config.label} is restarting. Try again shortly.`))
-          return requestUsage(child, config.label)
+            return Effect.fail(new Error(`${label} is restarting. Try again shortly.`))
+          return requestUsage(child, label)
         }),
       ),
       commands: (workspacePath) =>
         Ref.get(processRef).pipe(
           Effect.flatMap((child) =>
             child === null
-              ? Effect.fail(new Error(`${config.label} is restarting. Try again shortly.`))
-              : requestCommands(child, config.label, workspacePath),
+              ? Effect.fail(new Error(`${label} is restarting. Try again shortly.`))
+              : requestCommands(child, label, workspacePath),
           ),
         ),
       status: Ref.get(statusRef),
       refresh: Effect.suspend(() =>
-        publishStatus(probingStatus()).pipe(Effect.andThen(send("probe-now"))),
+        publishStatus(probing()).pipe(Effect.andThen(send("probe-now"))),
       ),
       send,
     }
   })
 
-export const codexProviderLive = (): Layer.Layer<
-  CodexProvider,
-  never,
-  CoreClient | HostEvents | HostPlatform
-> =>
-  Layer.scoped(
-    CodexProvider,
-    providerRuntime({
-      provider: "openai",
-      harness: "codex",
-      label: "Codex",
-      worker: "codex-worker.js",
-    }),
-  )
+const providerLayer = <Id>(
+  tag: Context.Tag<Id, ProviderService>,
+  config: ProviderConfig,
+): Layer.Layer<Id, never, CoreClient | HostEvents | HostPlatform> =>
+  Layer.scoped(tag, providerRuntime(config))
 
-export const claudeProviderLive = (): Layer.Layer<
-  ClaudeProvider,
-  never,
-  CoreClient | HostEvents | HostPlatform
-> =>
-  Layer.scoped(
-    ClaudeProvider,
-    providerRuntime({
-      provider: "anthropic",
-      harness: "claude-code",
-      label: "Claude Code",
-      worker: "claude-worker.js",
-    }),
-  )
+export const codexProviderLive = () =>
+  providerLayer(CodexProvider, { harness: "codex", worker: "codex-worker.js" })
 
-export class CursorProvider extends Context.Tag("MeldShell/CursorProvider")<
-  CursorProvider,
-  ProviderService
->() {}
+export const claudeProviderLive = () =>
+  providerLayer(ClaudeProvider, { harness: "claude-code", worker: "claude-worker.js" })
 
-export const cursorProviderLive = (): Layer.Layer<
-  CursorProvider,
-  never,
-  CoreClient | HostEvents | HostPlatform
-> =>
-  Layer.scoped(
-    CursorProvider,
-    providerRuntime({
-      provider: "cursor",
-      harness: "cursor",
-      label: "Cursor",
-      worker: "cursor-worker.js",
-    }),
-  )
+export const cursorProviderLive = () =>
+  providerLayer(CursorProvider, { harness: "cursor", worker: "cursor-worker.js" })
 
+const providerTags = {
+  codex: CodexProvider,
+  "claude-code": ClaudeProvider,
+  cursor: CursorProvider,
+} as const
+
+/** The provider service for a harness; an unknown harness is routed to Codex, as it predates the others. */
 export const providerFor = (
   harness: string,
 ): Effect.Effect<ProviderService, never, CodexProvider | ClaudeProvider | CursorProvider> =>
-  harness === "cursor" ? CursorProvider : harness === "claude-code" ? ClaudeProvider : CodexProvider
+  providerTags[isHarness(harness) ? harness : "codex"]

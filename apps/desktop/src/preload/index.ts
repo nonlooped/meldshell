@@ -13,16 +13,6 @@ const api: MeldShellApi = {
     ipcRenderer.on(IPC.providerStatusChanged, handleStatus)
     return () => ipcRenderer.removeListener(IPC.providerStatusChanged, handleStatus)
   },
-  onCodexStatus: (listener) => {
-    const handleStatus = (
-      _event: Electron.IpcRendererEvent,
-      status: Parameters<typeof listener>[0],
-    ): void => {
-      if (status.harness === "codex") listener(status)
-    }
-    ipcRenderer.on(IPC.providerStatusChanged, handleStatus)
-    return () => ipcRenderer.removeListener(IPC.providerStatusChanged, handleStatus)
-  },
   onRuntimeChanged: (listener) => {
     const handleChange = (
       _event: Electron.IpcRendererEvent,
