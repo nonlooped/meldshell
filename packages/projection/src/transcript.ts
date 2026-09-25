@@ -1,7 +1,8 @@
-import { Either } from "effect"
+import { Either, Schema } from "effect"
 import { eventKind, eventText, planText } from "./normalization"
 import { prepareCursorEvents } from "./cursor"
 import {
+  asRecord,
   decodeNativePayload,
   type NativeItem,
   type NativePayload,
@@ -32,12 +33,20 @@ interface EventGroup {
   readonly output: string[]
 }
 
+/** A question Codex asked in a message, answered by the user's next message. */
+export interface AsyncQuestion {
+  readonly title: string
+  readonly options: ReadonlyArray<string>
+}
+
 export interface TranscriptTurn {
   readonly id: string
   readonly sequence: number
   readonly userMessages: ReadonlyArray<CanonicalEvent>
   readonly workingEvents: ReadonlyArray<CanonicalEvent>
   readonly finalResponse: CanonicalEvent | null
+  /** Questions the turn left for the user, shown in place of the messages that carried them. */
+  readonly questions: ReadonlyArray<AsyncQuestion>
   readonly durationMs: number
   readonly complete: boolean
 }
@@ -238,6 +247,31 @@ export const prepareTranscriptEvents = (
 const assistantPhase = (event: CanonicalEvent): string | null =>
   nonEmptyText(payloadItem(event.payload)?.phase)
 
+const decodeAsyncQuestions = Schema.decodeUnknownEither(
+  Schema.Array(
+    Schema.Struct({
+      title: Schema.String,
+      options: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
+    }),
+  ),
+)
+
+/**
+ * Codex asks without blocking the turn: the question arrives as an agent message delivered
+ * asynchronously, and the user's next message answers it.
+ */
+const asyncQuestions = (event: CanonicalEvent): AsyncQuestion[] => {
+  const item = asRecord(payloadItem(event.payload))
+  if (item.delivery !== "async") return []
+  const decoded = decodeAsyncQuestions(item.questions)
+  if (Either.isLeft(decoded)) return []
+  return decoded.right.flatMap((question) =>
+    question.title.trim()
+      ? [{ title: question.title, options: (question.options ?? []).filter((o) => o.trim()) }]
+      : [],
+  )
+}
+
 const eventTime = (event: CanonicalEvent): number => {
   const time = Date.parse(event.createdAt)
   return Number.isNaN(time) ? 0 : time
@@ -275,6 +309,7 @@ export const prepareTranscriptTurns = (
       userMessages: CanonicalEvent[]
       workingEvents: CanonicalEvent[]
       finalResponse: CanonicalEvent | null
+      questions: AsyncQuestion[]
     }
   >()
 
@@ -285,11 +320,17 @@ export const prepareTranscriptTurns = (
       userMessages: [],
       workingEvents: [],
       finalResponse: null,
+      questions: [],
     }
     turn.sequence = Math.min(turn.sequence, entry.sequence)
+    const questions = entry.kind === "assistant" ? asyncQuestions(entry) : []
     if (entry.kind === "user") {
       turn.userMessages.push(entry)
+    } else if (questions.length > 0) {
+      turn.questions.push(...questions)
     } else if (entry.kind === "assistant" && assistantPhase(entry) === "final_answer") {
+      // Only the last final answer closes the turn; earlier ones stay in the working log in order.
+      turn.workingEvents.push(entry)
       turn.finalResponse = entry
     } else {
       turn.workingEvents.push(entry)
@@ -299,7 +340,9 @@ export const prepareTranscriptTurns = (
 
   return [...turns.entries()]
     .map(([id, turn]) => {
-      if (turn.finalResponse === null) {
+      if (turn.finalResponse !== null)
+        turn.workingEvents.splice(turn.workingEvents.lastIndexOf(turn.finalResponse), 1)
+      else {
         const finalIndex = turn.workingEvents.findLastIndex(
           (entry) => entry.kind === "assistant" && !payloadItem(entry.payload)?.parentToolUseId,
         )
@@ -316,6 +359,7 @@ export const prepareTranscriptTurns = (
         userMessages: turn.userMessages,
         workingEvents: turn.workingEvents,
         finalResponse: turn.finalResponse,
+        questions: turn.questions,
         durationMs: Math.max(0, end - start),
         complete: clock?.completed != null,
       }

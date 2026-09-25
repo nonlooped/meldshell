@@ -480,6 +480,7 @@ const persistApproval = (input: RuntimeEventInput) =>
         "item/permissions/requestApproval",
         "cursor/acp/session/request_permission",
         "cursor/ask_question",
+        "cursor/ask_user_question",
         "cursor/create_plan",
         CLAUDE_EXIT_PLAN_MODE,
       ].includes(input.method)

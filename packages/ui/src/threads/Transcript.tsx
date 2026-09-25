@@ -24,6 +24,7 @@ import { toolDetails } from "./tool-details"
 import { commandLabel } from "./command-summary"
 import { primaryWork, workSummary, type Work } from "./work-summary"
 import { MessageRail } from "./MessageRail"
+import { AsyncQuestions } from "./AsyncQuestions"
 import { landFlight } from "../ui/flight"
 import { Notice } from "../ui/Notice"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -427,10 +428,13 @@ function TurnRow({
   entering = false,
   live = false,
   flash,
+  onAnswer,
 }: {
   readonly threadId: string
   readonly turn: TranscriptTurn
   readonly flash?: number
+  /** Answers the turn's open questions with a new message; absent once they cannot be answered. */
+  readonly onAnswer?: (text: string) => void
   /** The thread's latest turn while the provider is still working on it. */
   readonly live?: boolean
   /** A turn appended while the thread is open rises into place once. */
@@ -481,6 +485,9 @@ function TurnRow({
           ) : (
             turn.complete && <TurnChanges events={turn.workingEvents} />
           )}
+          {turn.questions.length > 0 && (
+            <AsyncQuestions questions={turn.questions} onAnswer={onAnswer} />
+          )}
         </motion.article>
       </MarkdownStreaming>
     </MarkdownSources>
@@ -510,8 +517,11 @@ export function Transcript({
   scope,
   origin,
   running = false,
+  onAnswer,
 }: {
   readonly running?: boolean
+  /** Sends a reply to the latest turn's questions; absent while the thread cannot take one. */
+  readonly onAnswer?: (text: string) => void
   readonly targetTurnId?: string
   readonly threadId: string
   /** Where file references resolve; a worktree thread reads its own checkout. */
@@ -627,6 +637,7 @@ export function Transcript({
                     entering={turn.id === enteringTurn}
                     flash={jump?.turnId === turn.id ? jump.at : undefined}
                     live={running && item.index === turns.length - 1}
+                    onAnswer={item.index === turns.length - 1 ? onAnswer : undefined}
                   />
                 </div>
               )

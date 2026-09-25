@@ -309,6 +309,7 @@ const fromApprovalRow = (row: ApprovalRow) =>
           })),
         }
       case "item/tool/requestUserInput":
+      case "cursor/ask_user_question":
         return {
           ...fields,
           kind: "user-input",

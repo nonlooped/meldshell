@@ -5,94 +5,138 @@ import { Field } from "@base-ui-components/react/field"
 import { Fieldset } from "@base-ui-components/react/fieldset"
 import type { ApprovalRequest, ResolveApprovalInput } from "@meldshell/contracts"
 import { AppDialog, Button, Checkbox, Radio, TextField } from "../ui/controls"
+import { questionHeaderClasses, questionOptionClasses, questionTextClasses } from "../ui/styles"
 import { Markdown } from "../ui/Markdown"
+
+type Question = Extract<ApprovalRequest, { kind: "user-input" }>["questions"][number]
+
+/** The option that stands for an answer in the user's own words. */
+const OTHER = "\u0000other"
+
+interface Draft {
+  /** Chosen option values, with `OTHER` when the user writes their own answer. */
+  readonly selected: ReadonlyArray<string>
+  readonly other: string
+}
+
+const emptyDraft: Draft = { selected: [], other: "" }
+
+/** What a question's draft answers: chosen options, then the user's own words when chosen. */
+const draftAnswers = (question: Question, draft: Draft): string[] => {
+  const typed = draft.other.trim()
+  if (!question.options?.length) return typed ? [draft.other] : []
+  return [
+    ...draft.selected.filter((value) => value !== OTHER),
+    ...(draft.selected.includes(OTHER) && typed ? [draft.other] : []),
+  ]
+}
+
+const initialDraft = (question: Question): Draft => {
+  const value = question.defaultValue
+  if (value === undefined) return emptyDraft
+  const option = question.options?.find((choice) => (choice.value ?? choice.label) === value)
+  if (option) return { selected: [value], other: "" }
+  return question.options?.length
+    ? { selected: [OTHER], other: value }
+    : { selected: [], other: value }
+}
 
 function QuestionInput({
   question,
-  name,
-  value,
+  draft,
   disabled,
-  allowFreeText,
-  onValueChange,
+  allowOther,
+  onDraftChange,
 }: {
-  question: Extract<ApprovalRequest, { kind: "user-input" }>["questions"][number]
-  name: string
-  value: string[]
+  question: Question
+  draft: Draft
   disabled: boolean
-  allowFreeText: boolean
-  onValueChange: (value: string[]) => void
+  allowOther: boolean
+  onDraftChange: (draft: Draft) => void
 }): React.JSX.Element {
-  const choices = question.options?.map((option) => (
-    <Field.Item
-      key={option.value ?? option.label}
-      className="question-option [&_+_.question-option]:mt-[10px] [&[data-disabled]]:opacity-[0.5]"
-    >
-      <Field.Label className="flex items-center gap-[8px] text-[var(--text-primary)] text-[12px] leading-[1.5]">
-        {question.multiSelect ? (
-          <Checkbox value={option.value ?? option.label} />
-        ) : (
-          <Radio value={option.value ?? option.label} />
-        )}
-        <span>{option.label}</span>
+  const options = question.options ?? []
+  const choices = [
+    ...options.map((option) => ({
+      value: option.value ?? option.label,
+      label: option.label,
+      description: option.description,
+    })),
+    ...(allowOther && options.length > 0
+      ? [{ value: OTHER, label: "Other", description: "" }]
+      : []),
+  ]
+  const writing = options.length === 0 || draft.selected.includes(OTHER)
+  const rows = choices.map((choice) => (
+    <Field.Item key={choice.value}>
+      <Field.Label className={questionOptionClasses}>
+        <span className="flex pt-[2px]">
+          {question.multiSelect ? (
+            <Checkbox value={choice.value} />
+          ) : (
+            <Radio value={choice.value} />
+          )}
+        </span>
+        <span className="flex min-w-0 flex-col gap-[2px]">
+          <span>{choice.label}</span>
+          {choice.description && (
+            <span className="text-[var(--text-secondary)] text-[12px]">{choice.description}</span>
+          )}
+        </span>
       </Field.Label>
-      {option.description && (
-        <Field.Description className="[margin:3px_0_0_23px] text-[var(--text-secondary)] text-[12px] leading-[1.5]">
-          {option.description}
-        </Field.Description>
-      )}
     </Field.Item>
   ))
+  const hasHeader = question.header.trim() && question.header.trim() !== question.question.trim()
   return (
-    <Fieldset.Root
-      className={
-        "min-w-0 [margin:16px_0] p-0 border-0 [&_>_legend]:mb-[8px] [&_>_.field]:mt-[12px]"
-      }
-      disabled={disabled}
-    >
-      <Fieldset.Legend className="block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium">
-        {question.question}
+    <Fieldset.Root className="m-0 min-w-0 p-0 border-0" disabled={disabled}>
+      <Fieldset.Legend className="mb-[10px] p-0">
+        {hasHeader && <span className={questionHeaderClasses}>{question.header}</span>}
+        <span className={questionTextClasses}>{question.question}</span>
       </Fieldset.Legend>
-      {choices && choices.length > 0 && (
-        <Field.Root name={name} disabled={disabled}>
+      {rows.length > 0 && (
+        <Field.Root disabled={disabled}>
           {question.multiSelect ? (
             <CheckboxGroup
-              value={value}
-              onValueChange={onValueChange}
+              className="flex flex-col gap-[6px]"
+              value={[...draft.selected]}
+              onValueChange={(selected) => onDraftChange({ ...draft, selected })}
               aria-label={question.question}
             >
-              {choices}
+              {rows}
             </CheckboxGroup>
           ) : (
             <RadioGroup
-              value={value[0] ?? null}
-              onValueChange={(next) => onValueChange([String(next)])}
+              className="flex flex-col gap-[6px]"
+              value={draft.selected[0] ?? null}
+              onValueChange={(next) => onDraftChange({ ...draft, selected: [String(next)] })}
               aria-label={question.question}
             >
-              {choices}
+              {rows}
             </RadioGroup>
           )}
         </Field.Root>
       )}
-      {allowFreeText && question.multiline ? (
-        <textarea
-          className="w-full [box-sizing:border-box] [resize:vertical] p-[10px] text-[var(--text-primary)] bg-[var(--surface-raised)] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] [font:inherit]"
-          aria-label={question.header}
-          disabled={disabled}
-          value={value[0] ?? ""}
-          onChange={(event) => onValueChange([event.target.value])}
-          rows={8}
-        />
-      ) : (
-        allowFreeText && (
+      {writing &&
+        (question.multiline ? (
+          <textarea
+            className="mt-[8px] w-full [box-sizing:border-box] [resize:vertical] p-[10px] text-[var(--text-primary)] text-[12.5px] bg-[var(--surface-raised)] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] [font-family:inherit] outline-none [&:focus]:[border-color:var(--line-strong)]"
+            aria-label={question.question}
+            disabled={disabled}
+            value={draft.other}
+            onChange={(event) => onDraftChange({ ...draft, other: event.target.value })}
+            rows={6}
+          />
+        ) : (
           <TextField
-            label={question.options?.length ? "Your answer" : question.header}
+            className="mt-[8px]"
+            aria-label={options.length ? `Your answer to: ${question.question}` : question.question}
+            placeholder={options.length ? "Type your answer" : "Your answer"}
             type={question.isSecret ? "password" : "text"}
             disabled={disabled}
-            value={value.join(", ")}
-            onValueChange={(next) => onValueChange([next])}
+            autoFocus={options.length > 0}
+            value={draft.other}
+            onValueChange={(other) => onDraftChange({ ...draft, other })}
           />
-        )
-      )}
+        ))}
     </Fieldset.Root>
   )
 }
@@ -113,14 +157,15 @@ export function InteractionDialog({
   readonly error: string | null
   readonly onResolve: (input: ResolveApprovalInput) => void
 }): React.JSX.Element {
-  const [answers, setAnswers] = useState<Record<string, string[]>>(() =>
-    request.kind === "user-input"
-      ? Object.fromEntries(
-          request.questions
-            .filter((question) => question.defaultValue !== undefined)
-            .map((question) => [question.id, [question.defaultValue!]]),
-        )
-      : {},
+  const questions = request.kind === "user-input" ? request.questions : []
+  const [drafts, setDrafts] = useState<Record<string, Draft>>(() =>
+    Object.fromEntries(questions.map((question) => [question.id, initialDraft(question)])),
+  )
+  const answers = Object.fromEntries(
+    questions.map((question) => [
+      question.id,
+      draftAnswers(question, drafts[question.id] ?? emptyDraft),
+    ]),
   )
   const userInput = request.kind === "user-input"
   const resolve = (decision: ResolveApprovalInput["decision"]): void =>
@@ -129,9 +174,9 @@ export function InteractionDialog({
       decision,
       ...(userInput ? { answers } : {}),
     })
-  const incomplete =
-    userInput &&
-    request.questions.some((question) => !answers[question.id]?.some((answer) => answer.trim()))
+  const incomplete = questions.some(
+    (question) => !answers[question.id]?.some((answer) => answer.trim()),
+  )
   return (
     <AppDialog
       alert={!userInput}
@@ -176,7 +221,9 @@ export function InteractionDialog({
                 onClick={() => resolve("accept")}
               >
                 {userInput
-                  ? "Submit answers"
+                  ? questions.length > 1
+                    ? "Submit answers"
+                    : "Submit answer"
                   : request.kind === "plan"
                     ? "Approve plan"
                     : "Allow once"}
@@ -186,9 +233,11 @@ export function InteractionDialog({
         </>
       }
     >
-      <p className="max-h-[220px] overflow-auto [padding:9px_10px] [margin:12px_20px_0] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.198)] text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[11.5px] leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere]">
-        {request.detail}
-      </p>
+      {!userInput && (
+        <p className="max-h-[220px] overflow-auto [padding:9px_10px] [margin:12px_20px_0] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.198)] text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[11.5px] leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere]">
+          {request.detail}
+        </p>
+      )}
       {request.kind === "plan" && <Markdown className="plan-review" text={request.plan} />}
       {request.kind === "cursor-permission" && (
         <pre className="max-h-[220px] overflow-auto [padding:9px_10px] [margin:12px_20px_0] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.198)] text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[11.5px] leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere]">
@@ -200,20 +249,22 @@ export function InteractionDialog({
           {JSON.stringify(request.permissions, null, 2)}
         </pre>
       )}
-      {request.kind === "user-input" &&
-        request.questions.map((question) => (
-          <QuestionInput
-            key={question.id}
-            question={question}
-            name={`${request.id}-${question.id}`}
-            disabled={pending}
-            value={answers[question.id] ?? []}
-            allowFreeText={request.method !== "cursor/ask_question"}
-            onValueChange={(value) =>
-              setAnswers((current) => ({ ...current, [question.id]: value }))
-            }
-          />
-        ))}
+      {userInput && (
+        <div className="flex flex-col [padding:14px_20px_0] [&_>_*_+_*]:mt-[16px] [&_>_*_+_*]:pt-[16px] [&_>_*_+_*]:border-t-[1px] [&_>_*_+_*]:border-t-[color:var(--line-subtle)]">
+          {questions.map((question) => (
+            <QuestionInput
+              key={question.id}
+              question={question}
+              draft={drafts[question.id] ?? emptyDraft}
+              disabled={pending}
+              allowOther={question.isOther !== false}
+              onDraftChange={(draft) =>
+                setDrafts((current) => ({ ...current, [question.id]: draft }))
+              }
+            />
+          ))}
+        </div>
+      )}
       {error && <p role="alert">{error}</p>}
     </AppDialog>
   )

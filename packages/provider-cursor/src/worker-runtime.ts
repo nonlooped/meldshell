@@ -38,6 +38,13 @@ import {
   discoverModels,
   type ConfigurableSession,
 } from "./session-config"
+import {
+  QuestionServer,
+  answeredResult,
+  skippedResult,
+  type ToolQuestion,
+  type ToolResult,
+} from "./question-server"
 
 type Emit = (method: string, params: unknown, validated?: boolean, requestId?: string) => void
 interface Session extends ConfigurableSession {
@@ -49,6 +56,8 @@ interface Session extends ConfigurableSession {
   permissions?: Pick<TurnDispatch, "sandbox" | "approvalPolicy">
   availableCommands?: readonly AvailableCommand[]
   onCommands?: () => void
+  /** Withdraws the session's MeldShell question tool. */
+  releaseQuestions?: () => void
 }
 interface RunningTurn {
   dispatch: TurnDispatch
@@ -82,6 +91,7 @@ export const runCursorWorker = (
   const turns = new Map<string, RunningTurn>()
   const approvals = new Map<string, PendingInteraction>()
   const usageRequests = new Map<string, AbortController>()
+  const questionServer = new QuestionServer()
   let stopping = false
   let command: CursorCommand | null = null
   let probing: Promise<void> | null = null
@@ -153,6 +163,21 @@ export const runCursorWorker = (
     session.emit(nativeMethod(method), params, true, id)
     return pending
   }
+  /** MeldShell's question tool, answered through the shared user-input interaction. */
+  const askQuestions = (
+    session: Session,
+    questions: ReadonlyArray<ToolQuestion>,
+    signal: AbortSignal,
+  ): Promise<ToolResult> =>
+    onRequest(session, "cursor/ask_user_question", { questions }, signal, (decision, answers) => {
+      if (decision === "accept") return answeredResult(questions, answers)
+      if (decision === "cancel")
+        return {
+          content: [{ type: "text" as const, text: "The user dismissed these questions." }],
+          isError: true,
+        }
+      return skippedResult
+    })
   const onMessage = (session: Session, message: NativeMessage): void => {
     const decoded = decodeNotification(message.method, message.params)
     if (decoded !== undefined && Either.isLeft(decoded)) {
@@ -240,18 +265,24 @@ export const runCursorWorker = (
     try {
       session.init = await session.client.initialize()
       if (options.catalogOnly) return session
+      const questions = session.interactive
+        ? await questionServer.register((asked, signal) => askQuestions(session, asked, signal))
+        : null
+      if (questions) session.releaseQuestions = questions.release
+      const mcpServers = questions ? [questions.entry] : []
       if (nativeId && !canResume(session.init))
         throw new Error("This Cursor release cannot resume the saved conversation.")
       session.configuration = await session.client.run((agent) =>
         nativeId
-          ? agent.request("session/load", { cwd, mcpServers: [], sessionId: nativeId })
-          : agent.request("session/new", { cwd, mcpServers: [] }),
+          ? agent.request("session/load", { cwd, mcpServers, sessionId: nativeId })
+          : agent.request("session/new", { cwd, mcpServers }),
       )
       session.sessionId = nativeId ?? sessionIdOf(session.configuration)
       if (!session.sessionId) throw new Error("Cursor returned no session ID.")
       session.replaying = false
       return session
     } catch (cause) {
+      session.releaseQuestions?.()
       await session.client.close()
       clients.delete(session.client)
       throw cause
@@ -259,6 +290,7 @@ export const runCursorWorker = (
   }
   const closeSession = async (session: Session): Promise<void> => {
     session.emit = null
+    session.releaseQuestions?.()
     for (const [id, approval] of approvals) if (approval.session === session) approvals.delete(id)
     await session.client.close()
     clients.delete(session.client)
@@ -524,6 +556,7 @@ export const runCursorWorker = (
     for (const turn of turns.values()) turn.interrupted = true
     await Promise.all([...clients].map((client) => client.close()))
     await Promise.all([...turns.values()].map((turn) => turn.task))
+    await questionServer.close()
     sessions.clear()
     approvals.clear()
   }

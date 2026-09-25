@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { asRecord, type CanonicalEvent } from "@meldshell/contracts"
 import { prepareCursorEvents } from "./cursor"
+import { eventKind, eventText } from "./normalization"
+import { prepareTranscriptTurns } from "./transcript"
 
 const toolUpdate = (content: unknown[]): CanonicalEvent => ({
   id: "event",
@@ -20,6 +22,37 @@ const toolUpdate = (content: unknown[]): CanonicalEvent => ({
 
 const changesOf = (event: CanonicalEvent | undefined) =>
   asRecord(asRecord(event?.payload).item).changes
+
+test("MeldShell's Cursor questions stay approvals throughout transcript projection", () => {
+  const method = "cursor/ask_user_question"
+  const payload = {
+    questions: [
+      {
+        id: "0",
+        header: "Topic",
+        question: "Which topic?",
+        multiSelect: false,
+        isOther: true,
+        options: [
+          { label: "Science", description: "Explore science" },
+          { label: "History", description: "Explore history" },
+        ],
+      },
+    ],
+  }
+  const event: CanonicalEvent = {
+    ...toolUpdate([]),
+    method,
+    payload,
+    kind: eventKind(method, payload),
+    text: eventText(method, payload),
+  }
+  assert.equal(event.kind, "approval")
+  assert.equal(event.text, null)
+  const [turn] = prepareTranscriptTurns([event])
+  assert.deepEqual(turn?.workingEvents, [event])
+  assert.equal(turn?.workingEvents[0]?.payload, payload)
+})
 
 test("a new Cursor file carries its content and an edit carries only the changed lines", () => {
   const [event] = prepareCursorEvents([

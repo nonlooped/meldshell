@@ -155,7 +155,12 @@ export const ApprovalRequest = Schema.Union(
   Schema.Struct({
     ...InteractionFields,
     kind: Schema.Literal("user-input"),
-    method: Schema.Literal("item/tool/requestUserInput", "cursor/ask_question"),
+    /** Codex's or Claude Code's question tool, Cursor's own, or MeldShell's tool offered to Cursor. */
+    method: Schema.Literal(
+      "item/tool/requestUserInput",
+      "cursor/ask_question",
+      "cursor/ask_user_question",
+    ),
     questions: Schema.Array(UserInputQuestion),
   }),
   Schema.Struct({

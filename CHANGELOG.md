@@ -8,8 +8,14 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Settings › Providers shows when a newer release of Codex, Claude Code, or Cursor CLI is available and can install it. The provider row has an **Update** button that runs the provider's own updater, or Homebrew's for a Homebrew install, without leaving MeldShell. The **Version** row names the installed and latest versions. A provider installed by a system package manager shows which one to use instead, and its row marks **Update available**. Versions are compared when a provider connects and every four hours after that; **Check for updates** compares them now. After an update, the provider reconnects with the new version when no turns are running.
 
+- Cursor can ask you questions. Cursor does not offer its own question tool to apps like MeldShell, so MeldShell gives Cursor turns a question tool of its own. Its questions open the same dialog as Claude Code's, with option descriptions and room for your own answer.
+
 ### Fixed
 
+- Cursor questions from MeldShell's tool no longer produce a false payload error in the transcript.
+- Questions that Codex asks now appear in the transcript. Before, only its closing sentence showed, such as "You can choose an option or type your own answer.", and the question itself was lost. Each option is a button that sends it as your reply; with several questions, choose one option for each, then select **Send answers**. You can also type your own answer in the composer.
+- When a turn ends with more than one final message, the earlier ones stay in the turn's working log instead of disappearing.
+- The question dialog no longer shows the question's raw JSON above the choices. Its title names who is asking, each question shows its short label, every option is a full-width row, and writing your own answer is an **Other** choice that opens a text field. The questions now line up with the dialog's title and buttons.
 - Provider updates prevent overlapping installers and reconnect automatically after running turns finish.
 
 - Malformed provider messages and stored approvals now report decoding errors with field paths instead of being treated as empty objects or trusted without validation.

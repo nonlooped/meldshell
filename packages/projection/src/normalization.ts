@@ -1,5 +1,6 @@
 import { Either, Schema } from "effect"
 import {
+  asRecord,
   decodeNativePayload,
   decodeCursorPayload,
   PlanStep,
@@ -85,10 +86,29 @@ export const eventText = (method: string, params: unknown): string | null => {
   return null
 }
 
+/** Every harness's request for answers to questions, in any of their methods. */
+const QUESTION_METHODS = new Set([
+  "item/tool/requestUserInput",
+  "cursor/ask_question",
+  "cursor/ask_user_question",
+])
+
+/** Names who is asking; the questions themselves carry the detail. */
+const questionCopy = (provider: string, params: unknown): { title: string; detail: string } => {
+  const questions = asRecord(params).questions
+  const count = Array.isArray(questions) ? questions.length : 0
+  return {
+    title: count > 1 ? `${provider} has ${count} questions` : `${provider} has a question`,
+    detail: "",
+  }
+}
+
 export const approvalCopy = (
   method: string,
   params: unknown,
 ): { title: string; detail: string } => {
+  if (method === "cursor/ask_question" || method === "cursor/ask_user_question")
+    return questionCopy("Cursor", params)
   if (method.startsWith("cursor/")) {
     const decoded = decodeCursorPayload(params)
     return Either.isRight(decoded)
@@ -105,6 +125,7 @@ export const approvalCopy = (
       detail: "Claude Code is ready to leave plan mode and start working.",
     }
   const provider = typeof record.toolName === "string" ? "Claude Code" : "Codex"
+  if (QUESTION_METHODS.has(method)) return questionCopy(provider, params)
   const command = Array.isArray(record.command)
     ? record.command.map(String).join(" ")
     : nonEmptyText(record.command)
@@ -127,11 +148,7 @@ const cursorApprovalCopy = (method: string, record: CursorPayload) => {
   const tool = record.toolCall
   return {
     title:
-      method === "cursor/create_plan"
-        ? "Approve Cursor's plan?"
-        : method === "cursor/ask_question"
-          ? String(record.title ?? "Cursor needs your input")
-          : "Cursor requests permission",
+      method === "cursor/create_plan" ? "Approve Cursor's plan?" : "Cursor requests permission",
     detail: String(record.overview ?? tool?.title ?? record.title ?? "Review Cursor's request."),
   }
 }

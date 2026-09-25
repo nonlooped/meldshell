@@ -25,9 +25,12 @@ const contentText = (block: CursorContent | undefined): string => {
 export const cursorEventKind = (method: string, params: unknown): CanonicalEventKind => {
   if (method === "cursor/acp/error") return "error"
   if (
-    ["cursor/acp/session/request_permission", "cursor/ask_question", "cursor/create_plan"].includes(
-      method,
-    )
+    [
+      "cursor/acp/session/request_permission",
+      "cursor/ask_question",
+      "cursor/ask_user_question",
+      "cursor/create_plan",
+    ].includes(method)
   )
     return "approval"
   if (method === "cursor/update_todos") return "plan"
@@ -62,6 +65,8 @@ export const cursorEventKind = (method: string, params: unknown): CanonicalEvent
 }
 
 export const cursorEventText = (method: string, params: unknown): string | null => {
+  // MeldShell's question tool uses the shared interaction shape, not Cursor's native questions.
+  if (method === "cursor/ask_user_question") return null
   const decoded = decodeCursorPayload(params)
   if (Either.isLeft(decoded)) return `Invalid ${method} payload: ${decoded.left.message}`
   const p = decoded.right
@@ -294,7 +299,10 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
     }
     appendStatus(event, params, update)
   }
-  for (const event of events) append(event)
+  for (const event of events) {
+    if (event.method === "cursor/ask_user_question") result.push(event)
+    else append(event)
+  }
   return result
 }
 

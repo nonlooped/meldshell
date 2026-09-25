@@ -218,3 +218,24 @@ export const paneSeparatorClasses = [
   "[&[aria-orientation='horizontal']]:w-auto [&[aria-orientation='horizontal']]:h-[1px]",
   "[&[aria-orientation='horizontal']::after]:[inset:-3px_0]",
 ].join(" ")
+
+/** A selectable answer to a provider's question: a full-width row that is one click target. */
+export const questionOptionClasses = [
+  "motion-colors flex w-full items-start gap-[10px] [padding:9px_12px] text-left",
+  "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-transparent",
+  "text-[var(--text-primary)] text-[12.5px] leading-[1.45] [font-family:inherit] cursor-pointer",
+  "[&:hover]:bg-[var(--surface-hover)] [&:hover]:[border-color:var(--line)]",
+  "[&:has([data-checked])]:bg-[var(--surface-selected)] [&:has([data-checked])]:[border-color:var(--line-strong)]",
+  "[&[aria-pressed='true']]:bg-[var(--surface-selected)] [&[aria-pressed='true']]:[border-color:var(--line-strong)]",
+  "[&:focus-visible]:outline-[2px] [&:focus-visible]:outline-[color:var(--focus-ring)] [&:focus-visible]:outline-offset-[1px]",
+  "[&[data-disabled]]:opacity-[0.5] [&:disabled]:opacity-[0.55] [&:disabled]:cursor-default",
+  "[&:disabled:hover]:bg-transparent [&:disabled:hover]:[border-color:var(--line-subtle)]",
+].join(" ")
+
+/** The short label a provider puts above a question. */
+export const questionHeaderClasses =
+  "block mb-[4px] text-[var(--text-tertiary)] text-[10.5px] font-semibold uppercase tracking-[0.06em]"
+
+/** The question itself. */
+export const questionTextClasses =
+  "block m-0 text-[var(--text-primary)] text-[13.5px] font-medium leading-[1.45] [overflow-wrap:anywhere]"

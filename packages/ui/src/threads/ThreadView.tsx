@@ -67,6 +67,15 @@ export function ThreadView({
       })
     }
   }
+  const busy = ["running", "queued", "approval"].includes(thread.activity)
+  /** Replies to a question Codex left in the transcript. */
+  const answer = async (text: string) => {
+    try {
+      await submitTurnMutation.mutateAsync({ threadId: thread.id, text, attachments: [] })
+    } catch (error) {
+      update(thread.id, { error: errorMessage(error) })
+    }
+  }
   const error =
     draft.error ?? threadSettingsMutation.error?.message ?? interruptMutation.error?.message
   return (
@@ -75,6 +84,7 @@ export function ThreadView({
         <Transcript
           threadId={thread.id}
           running={thread.activity === "running"}
+          onAnswer={busy || submitTurnMutation.isPending ? undefined : (text) => void answer(text)}
           scope={workspaceScope(thread)}
           origin={<ThreadOrigin thread={thread} workspaces={snapshot.workspaces} />}
           targetTurnId={
@@ -94,7 +104,7 @@ export function ThreadView({
           providerDetail={providerStatus.detail}
           onRecheckProvider={() => void refreshProviderStatus(harness)}
           onChangeSettings={(input) => threadSettingsMutation.mutate(input)}
-          running={["running", "queued", "approval"].includes(thread.activity)}
+          running={busy}
           queuedCount={thread.queuedCount}
           sending={draft.sending}
           attachments={draft.attachments}
