@@ -834,10 +834,10 @@ const attachmentChipClasses = [
 
 const composerClasses = [
   "composer relative [container-type:inline-size] flex w-full max-w-[860px] [margin:0_auto] flex-col",
-  "border-[1px] border-[color:var(--line)] rounded-[var(--radius-xl)] bg-[var(--surface-composer)] [backdrop-filter:blur(24px)]",
-  "[box-shadow:var(--shadow-raised),_inset_0_1px_0_var(--edge-highlight)]",
+  "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-xl)] bg-[var(--surface-composer)] [backdrop-filter:blur(24px)]",
+  "[box-shadow:0_2px_12px_rgba(0,_0,_0,_0.08)]",
   "[&:focus-within]:[border-color:var(--line-strong)]",
-  "[&:focus-within]:[box-shadow:var(--shadow-raised),_inset_0_1px_0_var(--edge-highlight),_0_0_0_3px_var(--surface-hover)]",
+  "[&:focus-within]:[box-shadow:0_2px_12px_rgba(0,_0,_0,_0.08),_0_0_0_2px_var(--surface-hover)]",
   "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-raised)] [@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
   "[@media(prefers-reduced-transparency:_reduce)]:[&:focus-within]:bg-[var(--surface-raised)]",
   "[&_textarea]:min-h-[72px] [&_textarea]:max-h-[210px] [&_textarea]:overflow-y-hidden",
