@@ -336,9 +336,9 @@ export const CURRENT_TITLE_MODEL = "current"
 
 export const AppOpacity = Schema.Number.pipe(Schema.int(), Schema.between(20, 100))
 
-const Theme = Schema.Literal("dark", "light", "system")
+export const Theme = Schema.Literal("dark", "light", "system")
 
-const TranscriptSize = Schema.Literal("small", "medium", "large")
+export const TranscriptSize = Schema.Literal("small", "medium", "large")
 
 export const AppSettings = Schema.Struct({
   opacity: Schema.optional(AppOpacity),
@@ -564,13 +564,9 @@ export const SetThreadSettingsInput = Schema.Struct({
 
 export type SetThreadSettingsInput = typeof SetThreadSettingsInput.Type
 
+/** Every field is optional; free-text fields are bounded because they arrive from clients. */
 export const SetAppSettingsInput = Schema.Struct({
-  opacity: Schema.optional(AppOpacity),
-  showSettled: Schema.optional(Schema.Boolean),
-  theme: Schema.optional(Theme),
-  transcriptSize: Schema.optional(TranscriptSize),
-  reduceMotion: Schema.optional(Schema.Boolean),
-  sounds: Schema.optional(Schema.Boolean),
+  ...AppSettings.fields,
   editor: Schema.optional(Schema.String.pipe(Schema.maxLength(64))),
   /** Replaces every stored override. */
   keybindings: Schema.optional(
@@ -579,7 +575,6 @@ export const SetAppSettingsInput = Schema.Struct({
       value: Schema.String.pipe(Schema.maxLength(64)),
     }),
   ),
-
   titleModelId: Schema.optional(Schema.String),
 })
 

@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
-import { access, readdir } from "node:fs/promises"
+import { readdir } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { stripVTControlCharacters } from "node:util"
@@ -18,7 +18,7 @@ import {
 } from "@agentclientprotocol/sdk"
 import which from "which"
 import { asRecords, type UnknownRecord } from "@meldshell/contracts"
-import { runCommand } from "@meldshell/provider-runtime/command"
+import { pathExists, runCommand } from "@meldshell/provider-runtime/command"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import {
   parseCursorQuestion,
@@ -31,12 +31,6 @@ export interface CursorCommand {
   command: string
   args: string[]
 }
-const exists = async (path: string): Promise<boolean> =>
-  access(path).then(
-    () => true,
-    () => false,
-  )
-
 /** Resolve the official Windows distribution to its bundled Node binary, without a shell. */
 const windowsDistribution = async (root: string): Promise<CursorCommand | null> => {
   const versions = await readdir(join(root, "versions")).catch(() => [])
@@ -45,7 +39,10 @@ const windowsDistribution = async (root: string): Promise<CursorCommand | null> 
     .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
     .map((name) => join(root, "versions", name))
   for (const directory of [root, ...candidates]) {
-    if ((await exists(join(directory, "node.exe"))) && (await exists(join(directory, "index.js"))))
+    if (
+      (await pathExists(join(directory, "node.exe"))) &&
+      (await pathExists(join(directory, "index.js")))
+    )
       return { command: join(directory, "node.exe"), args: [join(directory, "index.js")] }
   }
   return null

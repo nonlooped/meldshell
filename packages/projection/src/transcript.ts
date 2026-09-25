@@ -1,15 +1,16 @@
+import { Either } from "effect"
 import { eventKind, eventText, planText } from "./normalization"
 import { prepareCursorEvents } from "./cursor"
 import {
-  asRecord,
-  isRecord,
+  decodeNativePayload,
+  type NativeItem,
+  type NativePayload,
   nonEmptyText,
   type CanonicalEvent,
   type CanonicalEventKind,
-  type UnknownRecord,
 } from "@meldshell/contracts"
 
-type JsonRecord = Readonly<UnknownRecord>
+type JsonRecord = NativeItem
 
 interface ItemDetails {
   readonly id: string | null
@@ -23,6 +24,7 @@ interface EventGroup {
   kind: CanonicalEventKind
   method: string
   payload: unknown
+  decoded: NativePayload
   completedText: string | null
   command: string | null
   progress: string | null
@@ -41,16 +43,19 @@ export interface TranscriptTurn {
 }
 
 /** The native item a payload carries, as Codex and the other harnesses nest it. */
-const payloadItem = (payload: unknown): JsonRecord => asRecord(asRecord(payload).item)
+const readPayload = (payload: unknown): NativePayload | null => {
+  const decoded = decodeNativePayload(payload)
+  return Either.isRight(decoded) ? decoded.right : null
+}
+const payloadItem = (payload: unknown): JsonRecord | null => readPayload(payload)?.item ?? null
 
 const commandValue = (value: unknown): string | null =>
   nonEmptyText(value)?.replaceAll("\\\\", "\\") ?? null
 
-const itemDetails = (event: CanonicalEvent): ItemDetails => {
-  const payload = asRecord(event.payload)
-  const item = isRecord(payload.item) ? payload.item : null
+const itemDetails = (payload: NativePayload): ItemDetails => {
+  const item = payload?.item ?? null
   return {
-    id: nonEmptyText(payload.itemId) ?? nonEmptyText(item?.id),
+    id: nonEmptyText(payload?.itemId) ?? nonEmptyText(item?.id),
     type: nonEmptyText(item?.type),
     record: item,
   }
@@ -66,12 +71,12 @@ const groupable = (kind: CanonicalEventKind): boolean =>
 
 const completedItemText = (item: JsonRecord | null): string | null => {
   if (item === null) return null
-  for (const key of ["text", "message", "review"]) {
+  for (const key of ["text", "message", "review"] as const) {
     const text = nonEmptyText(item[key])
     if (text !== null) return text
   }
   if (item.type === "reasoning") {
-    for (const key of ["summary", "content"]) {
+    for (const key of ["summary", "content"] as const) {
       const parts = item[key]
       if (Array.isArray(parts)) {
         const text = parts.filter((part) => typeof part === "string").join("\n")
@@ -84,14 +89,14 @@ const completedItemText = (item: JsonRecord | null): string | null => {
 
 const fileName = (path: string): string => path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
 
-const fileChangeText = (payload: unknown): string | null => {
-  const changeList = payloadItem(payload).changes
+const fileChangeText = (payload: NativePayload): string | null => {
+  const changeList = payload.item?.changes
   if (!Array.isArray(changeList)) return null
   const summaries = changeList.flatMap((value) => {
-    const change = asRecord(value)
+    const change = value
     const path = nonEmptyText(change.path)
     if (path === null) return []
-    const changeType = nonEmptyText(asRecord(change.kind).type)
+    const changeType = nonEmptyText(change.kind.type)
     const verb = changeType === "add" ? "Created" : changeType === "delete" ? "Deleted" : "Updated"
     return [`${verb} ${fileName(path)}`]
   })
@@ -117,22 +122,22 @@ const finishGroup = (group: EventGroup): CanonicalEvent | null => {
   let text = group.completedText ?? group.chunks.join("")
   if (group.kind === "command") {
     const output = (
-      nonEmptyText(payloadItem(group.payload).aggregatedOutput) ?? group.output.join("")
+      nonEmptyText(group.decoded.item?.aggregatedOutput) ?? group.output.join("")
     ).trimEnd()
     text = [group.command, output === "" ? null : output].filter(Boolean).join("\n\n")
   } else if (group.kind === "file-change") {
-    text = fileChangeText(group.payload) ?? text
+    text = fileChangeText(group.decoded) ?? text
   } else if (group.kind === "plan") {
-    text = planText(payloadItem(group.payload).plan) ?? text
+    text = planText(group.decoded.item?.plan) ?? text
   }
   if (text === "" && group.kind === "tool") {
-    const item = payloadItem(group.payload)
+    const item = group.decoded.item
     text =
-      item.type === "contextCompaction"
+      item?.type === "contextCompaction"
         ? group.method === "item/completed"
           ? "Context compacted"
           : "Compacting context"
-        : (nonEmptyText(item.tool) ?? nonEmptyText(item.type) ?? "Tool")
+        : (nonEmptyText(item?.tool) ?? nonEmptyText(item?.type) ?? "Tool")
   }
   if (text === "") return null
   return {
@@ -145,14 +150,18 @@ const finishGroup = (group: EventGroup): CanonicalEvent | null => {
       group.progress === null
         ? group.payload
         : {
-            ...asRecord(group.payload),
-            item: { ...payloadItem(group.payload), progress: group.progress },
+            ...group.decoded,
+            item: { ...group.decoded.item, progress: group.progress },
           },
   }
 }
 
-const updateDiff = (diffs: Map<string, CanonicalEvent>, event: CanonicalEvent): void => {
-  const diff = asRecord(event.payload).diff
+const updateDiff = (
+  diffs: Map<string, CanonicalEvent>,
+  event: CanonicalEvent,
+  payload: NativePayload,
+): void => {
+  const diff = payload.diff
   if (typeof diff === "string") {
     const key = event.turnId ?? `sequence:${event.sequence}`
     const first = diffs.get(key)
@@ -183,44 +192,42 @@ export const prepareTranscriptEvents = (
   const plans = new Map<string, CanonicalEvent>()
   const standalone: CanonicalEvent[] = []
 
-  for (const event of prepareCursorEvents(events)) {
+  const append = (event: CanonicalEvent): void => {
+    const decoded = decodeNativePayload(event.payload)
+    if (Either.isLeft(decoded)) {
+      standalone.push({
+        ...event,
+        kind: "error",
+        text: `Invalid ${event.method} payload: ${decoded.left.message}`,
+      })
+      return
+    }
     if (event.method === "turn/plan/updated") {
       updatePlan(plans, event)
-      continue
+      return
     }
     if (event.method === "turn/diff/updated") {
-      updateDiff(diffs, event)
-      continue
+      updateDiff(diffs, event, decoded.right)
+      return
     }
 
-    const item = itemDetails(event)
+    const item = itemDetails(decoded.right)
     const kind = event.kind === "unknown" ? eventKind(event.method, event.payload) : event.kind
-    if (kind === "user" && item.id !== null) continue
+    if (kind === "user" && item.id !== null) return
 
     const groupKey = `${event.turnId ?? event.threadId}:${item.id}`
-    const existing = item.id === null ? undefined : groups.get(groupKey)
+    const existing = groups.get(groupKey)
     if (item.id !== null && (existing !== undefined || groupable(kind))) {
-      const group =
-        existing ??
-        ({
-          id: `item:${item.id}`,
-          first: event,
-          kind,
-          method: event.method,
-          payload: event.payload,
-          completedText: null,
-          command: null,
-          progress: null,
-          chunks: [],
-          output: [],
-        } satisfies EventGroup)
+      const group = existing ?? newGroup(event, decoded.right, item.id, kind)
       groups.set(groupKey, group)
-      updateGroup(group, event, item, kind)
-      continue
+      updateGroup(group, event, decoded.right, item, kind)
+      return
     }
 
     if (standaloneVisible(event)) standalone.push(event)
   }
+
+  for (const event of prepareCursorEvents(events)) append(event)
 
   return [
     ...standalone,
@@ -231,7 +238,7 @@ export const prepareTranscriptEvents = (
 }
 
 const assistantPhase = (event: CanonicalEvent): string | null =>
-  nonEmptyText(payloadItem(event.payload).phase)
+  nonEmptyText(payloadItem(event.payload)?.phase)
 
 const eventTime = (event: CanonicalEvent): number => {
   const time = Date.parse(event.createdAt)
@@ -296,7 +303,7 @@ export const prepareTranscriptTurns = (
     .map(([id, turn]) => {
       if (turn.finalResponse === null) {
         const finalIndex = turn.workingEvents.findLastIndex(
-          (entry) => entry.kind === "assistant" && !payloadItem(entry.payload).parentToolUseId,
+          (entry) => entry.kind === "assistant" && !payloadItem(entry.payload)?.parentToolUseId,
         )
         if (finalIndex >= 0 && timing.get(id)?.completed != null) {
           turn.finalResponse = turn.workingEvents.splice(finalIndex, 1)[0] ?? null
@@ -321,16 +328,18 @@ export const prepareTranscriptTurns = (
 function updateGroup(
   group: EventGroup,
   event: CanonicalEvent,
+  payload: NativePayload,
   item: ReturnType<typeof itemDetails>,
   kind: CanonicalEvent["kind"],
 ): void {
   if (item.type !== null) group.kind = kind
   if (item.record !== null) {
     group.payload = event.payload
+    group.decoded = payload
     group.command = commandValue(item.record.command) ?? group.command
   }
   if (event.method.endsWith("/progress")) {
-    group.progress = nonEmptyText(asRecord(event.payload).message) ?? event.text
+    group.progress = nonEmptyText(payload.message) ?? event.text
   } else if (event.method === "item/completed") {
     group.method = event.method
     group.completedText = completedItemText(item.record) ?? group.completedText
@@ -342,3 +351,22 @@ function updateGroup(
     group.completedText = event.text
   }
 }
+
+const newGroup = (
+  event: CanonicalEvent,
+  decoded: NativePayload,
+  id: string,
+  kind: CanonicalEventKind,
+): EventGroup => ({
+  decoded,
+  id: `item:${id}`,
+  first: event,
+  kind,
+  method: event.method,
+  payload: event.payload,
+  completedText: null,
+  command: null,
+  progress: null,
+  chunks: [],
+  output: [],
+})

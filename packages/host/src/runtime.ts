@@ -15,7 +15,7 @@ import { stopAllWorktreeSetups } from "./workspace-scripts"
 
 export const createHostRuntime = (platform: typeof HostPlatform.Service) =>
   ManagedRuntime.make(
-    Layer.mergeAll(codexProviderLive(), claudeProviderLive(), cursorProviderLive()).pipe(
+    Layer.mergeAll(codexProviderLive, claudeProviderLive, cursorProviderLive).pipe(
       Layer.provideMerge(Layer.merge(CoreClient.Default, HostEvents.Default)),
       Layer.provideMerge(Layer.succeed(HostPlatform, platform)),
     ),

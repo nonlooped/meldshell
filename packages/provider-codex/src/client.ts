@@ -1,3 +1,9 @@
+import type { ServerNotification } from "./generated/ServerNotification"
+import type { ServerRequest } from "./generated/ServerRequest"
+import type { ThreadStartResponse } from "./generated/v2/ThreadStartResponse"
+import type { ThreadResumeResponse } from "./generated/v2/ThreadResumeResponse"
+import type { TurnStartResponse } from "./generated/v2/TurnStartResponse"
+import type { ModelListResponse } from "./generated/v2/ModelListResponse"
 import type { ChildProcessWithoutNullStreams } from "node:child_process"
 import { createInterface } from "node:readline"
 import {
@@ -10,7 +16,7 @@ import { runCommand } from "@meldshell/provider-runtime/command"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import Ajv, { type ValidateFunction } from "ajv"
 import spawn from "cross-spawn"
-import { Effect } from "effect"
+import { Effect, Either, Schema } from "effect"
 import semver from "semver"
 import which from "which"
 import { readCodexAccountEmail } from "./account"
@@ -105,12 +111,6 @@ export interface JsonRpcServerRequest extends JsonRpcNotification {
   readonly id: string | number
 }
 
-interface JsonRpcResponse {
-  readonly id: string | number
-  readonly result?: unknown
-  readonly error?: { readonly code?: number; readonly message?: string; readonly data?: unknown }
-}
-
 export interface AppServerCallbacks {
   readonly onNotification: (message: JsonRpcNotification, known: MessageValidation) => void
   readonly onRequest: (message: JsonRpcServerRequest, known: MessageValidation) => void
@@ -133,24 +133,63 @@ const ajv = new Ajv({
     uint64: true,
   },
 })
-const validateServerNotification: ValidateFunction = ajv.compile(serverNotificationSchema)
-const validateServerRequest: ValidateFunction = ajv.compile(serverRequestSchema)
-const responseValidators: Record<string, ValidateFunction> = {
-  "thread/start": ajv.compile(threadStartResponseSchema),
-  "thread/resume": ajv.compile(threadResumeResponseSchema),
-  "turn/start": ajv.compile(turnStartResponseSchema),
+const validateServerNotification = ajv.compile<ServerNotification>(serverNotificationSchema)
+const validateServerRequest = ajv.compile<ServerRequest>(serverRequestSchema)
+interface Responses {
+  "thread/start": ThreadStartResponse
+  "thread/resume": ThreadResumeResponse
+  "turn/start": TurnStartResponse
+  "model/list": ModelListResponse
+}
+const responseValidators: { [M in keyof Responses]: ValidateFunction<Responses[M]> } = {
+  "thread/start": ajv.compile<ThreadStartResponse>(threadStartResponseSchema),
+  "thread/resume": ajv.compile<ThreadResumeResponse>(threadResumeResponseSchema),
+  "turn/start": ajv.compile<TurnStartResponse>(turnStartResponseSchema),
+  "model/list": ajv.compile<ModelListResponse>(modelListResponseSchema),
+}
+
+/**
+ * The validator and result type are generated from the same checked-in protocol schema. Methods
+ * with a response schema go through here; `request` itself returns the raw reply.
+ */
+export async function requestCodex<M extends keyof Responses>(
+  server: Pick<CodexAppServer, "request">,
+  method: M,
+  params: unknown,
+): Promise<Responses[M]> {
+  const value = await server.request(method, params)
+  const validate = responseValidators[method]
+  if (!validate(value))
+    throw new Error(`Invalid ${method} response: ${ajv.errorsText(validate.errors)}`)
+  return value
 }
 export type MessageValidation = "validated" | "unknown" | "malformed"
+const decodeSchemaMethods = Schema.decodeUnknownEither(
+  Schema.Struct({
+    properties: Schema.optional(
+      Schema.Struct({
+        method: Schema.optional(
+          Schema.Struct({
+            enum: Schema.optional(Schema.Array(Schema.Unknown)),
+            const: Schema.optional(Schema.Unknown),
+          }),
+        ),
+      }),
+    ),
+  }),
+)
+
 const methods = (schema: unknown): Set<string> => {
   const result = new Set<string>()
   const visit = (value: unknown): void => {
     if (typeof value !== "object" || value === null) return
-    const record = value as Record<string, unknown>
-    const properties = record.properties as
-      | Record<string, { enum?: unknown[]; const?: unknown }>
-      | undefined
-    for (const name of properties?.method?.enum ?? [properties?.method?.const])
-      if (typeof name === "string") result.add(name)
+    const decoded = decodeSchemaMethods(value)
+    if (Either.isRight(decoded))
+      for (const name of decoded.right.properties?.method?.enum ?? [
+        decoded.right.properties?.method?.const,
+      ])
+        if (typeof name === "string") result.add(name)
+    const record = value
     for (const child of Object.values(record)) visit(child)
   }
   visit(schema)
@@ -164,46 +203,22 @@ const classifyMessage = (message: JsonRpcNotification, request = false): Message
     : (request ? validateServerRequest : validateServerNotification)(message)
       ? "validated"
       : "malformed"
-const validateModelListResponse: ValidateFunction = ajv.compile(modelListResponseSchema)
 
-const rpcError = (error: JsonRpcResponse["error"]): Error => {
+const RpcError = Schema.Struct({
+  code: Schema.optional(Schema.Number),
+  message: Schema.optional(Schema.String),
+  data: Schema.optional(Schema.Unknown),
+})
+
+const rpcError = (error: typeof RpcError.Type): Error => {
   const suffix = error?.code === undefined ? "" : ` (${error.code})`
   const cause = new Error(`${error?.message ?? "Codex app-server request failed."}${suffix}`)
   if (error?.data !== undefined) cause.cause = error.data
   return cause
 }
 
-interface RawModelListResponse {
-  readonly data: ReadonlyArray<{
-    readonly id: string
-    readonly model: string
-    readonly displayName: string
-    readonly description: string
-    readonly hidden: boolean
-    readonly supportedReasoningEfforts: ReadonlyArray<{
-      readonly reasoningEffort: string
-      readonly description: string
-    }>
-    readonly defaultReasoningEffort: string
-    readonly serviceTiers?: ReadonlyArray<{
-      readonly id: string
-      readonly name: string
-      readonly description: string
-    }>
-    readonly defaultServiceTier?: string | null
-    readonly additionalSpeedTiers?: ReadonlyArray<string>
-    readonly inputModalities?: ReadonlyArray<string>
-    readonly supportsPersonality?: boolean
-    readonly isDefault: boolean
-    readonly upgrade?: string | null
-    readonly modelSpecialty?: string | null
-    readonly multiAgentVersion?: string | null
-  }>
-  readonly nextCursor?: string | null
-}
-
 const normalizeCatalogModel = (
-  model: RawModelListResponse["data"][number],
+  model: ModelListResponse["data"][number],
 ): ProviderModelCatalogEntry => {
   const serviceTiers = model.serviceTiers ?? []
   const additionalSpeedTiers = model.additionalSpeedTiers ?? []
@@ -244,19 +259,13 @@ export const listCodexModels = async (
   let cursor: string | null = null
 
   do {
-    const result = await server.request("model/list", {
+    const page: ModelListResponse = await requestCodex(server, "model/list", {
       limit: 100,
       includeHidden: true,
       ...(cursor === null ? {} : { cursor }),
     })
-    if (!validateModelListResponse(result)) {
-      throw new Error(
-        `Codex returned an invalid model catalog: ${ajv.errorsText(validateModelListResponse.errors)}`,
-      )
-    }
-    const page = result as RawModelListResponse
     models.push(...page.data.map(normalizeCatalogModel))
-    const nextCursor = page.nextCursor ?? null
+    const nextCursor: string | null = page.nextCursor ?? null
     if (nextCursor !== null && cursors.has(nextCursor)) {
       throw new Error("Codex returned a repeated model catalog cursor.")
     }
@@ -322,12 +331,7 @@ export class CodexAppServer {
         options.signal?.removeEventListener("abort", abort)
         this.pending.delete(id)
         if (error !== null) reject(error)
-        else {
-          const validate = responseValidators[method]
-          if (validate !== undefined && !validate(value))
-            reject(new Error(`Invalid ${method} response: ${ajv.errorsText(validate.errors)}`))
-          else resolve(value)
-        }
+        else resolve(value)
       }
       const abort = (): void => finish(new Error(`Codex request "${method}" was cancelled.`))
       const timer = setTimeout(
@@ -404,9 +408,14 @@ export class CodexAppServer {
       const waiter = this.pending.get(record.id)
       if (waiter === undefined) return
       this.pending.delete(record.id)
-      if (record.error !== undefined)
-        waiter.reject(rpcError(record.error as JsonRpcResponse["error"]))
-      else waiter.resolve(record.result)
+      if (record.error !== undefined) {
+        const error = Schema.decodeUnknownEither(RpcError)(record.error)
+        waiter.reject(
+          Either.isRight(error)
+            ? rpcError(error.right)
+            : new Error(`Invalid RPC error: ${error.left.message}`),
+        )
+      } else waiter.resolve(record.result)
       return
     }
 
@@ -417,10 +426,7 @@ export class CodexAppServer {
     if (typeof record.id === "string" || typeof record.id === "number") {
       this.callbacks.onRequest(
         { id: record.id, method: record.method, params: record.params },
-        classifyMessage(
-          { id: record.id, method: record.method, params: record.params } as JsonRpcServerRequest,
-          true,
-        ),
+        classifyMessage({ method: record.method, params: record.params }, true),
       )
       return
     }
