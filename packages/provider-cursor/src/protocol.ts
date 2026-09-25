@@ -130,6 +130,21 @@ export function interactionResponse(
   return { outcome: { outcome: "answered", answers: selected } }
 }
 
+/**
+ * The answer to a permission request that the thread's settings already decide: never asking means
+ * full access allows once and anything else rejects. Null when the user should be asked.
+ */
+export const automaticPermission = (
+  permissions: Pick<TurnDispatch, "sandbox" | "approvalPolicy"> | undefined,
+  params: UnknownRecord,
+): { decision: string; optionId?: string } | null => {
+  if (permissions?.approvalPolicy !== "never") return null
+  const kind = permissions.sandbox === "danger-full-access" ? "allow_once" : "reject_once"
+  const option = asRecords(params.options).find((entry) => entry.kind === kind)
+  if (option) return { decision: "accept", optionId: asText(option.optionId) }
+  return kind === "reject_once" ? { decision: "cancel" } : null
+}
+
 export const nativeMethod = (method: string): string =>
   method.startsWith("cursor/") ? method : `cursor/acp/${method}`
 
