@@ -1,5 +1,5 @@
-// Release tooling for the scheduled Release workflow; nobody cuts releases by hand.
-// `plan <stable|nightly>` decides whether HEAD should be released and prints key=value outputs.
+// Release tooling for the scheduled and manual Release workflow.
+// `plan <stable|nightly> [--force]` decides whether HEAD should be released and prints key=value outputs.
 // `set-version X` writes a version into every version field without committing.
 // `cut X` moves the changelog's Unreleased entries under X, bumps the version, commits, and tags.
 // `notes X [ref]` prints X's changelog entries; `nightly-notes <previous-tag> <ref>` summarizes a
@@ -109,7 +109,7 @@ function previousTag() {
   }
 }
 
-function plan(channel, now = new Date()) {
+function plan(channel, force = false, now = new Date()) {
   const current = readJson("package.json").version
   const previous = previousTag()
   let version
@@ -122,7 +122,7 @@ function plan(channel, now = new Date()) {
     const changed = previous
       ? git("diff", "--name-only", previous, "HEAD").split("\n").filter(Boolean)
       : ["(no earlier release)"]
-    if (!changed.some(isAppChange)) reason = `no app changes since ${previous}`
+    if (!force && !changed.some(isAppChange)) reason = `no app changes since ${previous}`
   } else throw new Error("Plan stable or nightly")
   if (!reason && git("tag", "--list", `v${version}`)) reason = `v${version} already exists`
   return {
@@ -176,7 +176,10 @@ const changelogAt = (ref) =>
 
 function run(command, args) {
   if (command === "plan") {
-    const result = plan(args[0])
+    if (args.length > 2 || (args[1] && (args[0] !== "nightly" || args[1] !== "--force"))) {
+      throw new Error("Only nightly plans accept --force")
+    }
+    const result = plan(args[0], args[1] === "--force")
     return Object.entries(result)
       .map(([key, value]) => `${key}=${value}\n`)
       .join("")
@@ -195,7 +198,7 @@ function run(command, args) {
     })
   }
   throw new Error(
-    "Usage: node scripts/release.mjs plan <stable|nightly> | set-version X | cut X | notes X [ref] | nightly-notes <previous-tag> <ref>",
+    "Usage: node scripts/release.mjs plan <stable|nightly> [--force for nightly] | set-version X | cut X | notes X [ref] | nightly-notes <previous-tag> <ref>",
   )
 }
 
