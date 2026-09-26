@@ -4,10 +4,10 @@ import {
   iconButtonClasses,
   paneSeparatorClasses,
 } from "../ui/styles"
-import { Pressable, FadeDiv } from "../ui/motion"
-import { useState } from "react"
+import { Pressable, FadeDiv, useMotionPreference } from "../ui/motion"
+import { useLayoutEffect, useRef, useState } from "react"
 import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
-import { Group, Panel, Separator } from "react-resizable-panels"
+import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import { Columns2, Globe, Maximize2, MoreHorizontal, Rows2, SquareTerminal, X } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { AppDialog, Button, DropdownMenu, IconButton, MenuAction } from "../ui/controls"
@@ -225,6 +225,46 @@ function ThreadTile({
   )
 }
 
+/**
+ * A panel shown and hidden from a store, which glides open and shut like the sidebars; drags still
+ * apply instantly. The panel stays mounted collapsed, and `shown` keeps its content mounted until it
+ * finishes folding shut.
+ */
+function useDrawer(open: boolean, size: number) {
+  const reduced = useMotionPreference()
+  const groupRef = useRef<HTMLDivElement>(null)
+  const panelRef = usePanelRef()
+  const [closing, setClosing] = useState(false)
+  // Only a toggle reopens to the stored size; resizing an open panel is already on screen.
+  const sizeRef = useRef(size)
+  sizeRef.current = size
+  const toggled = useRef(open)
+  useLayoutEffect(() => {
+    if (toggled.current === open) return
+    toggled.current = open
+    const group = groupRef.current
+    if (group) group.dataset.panelMotion = ""
+    if (open) panelRef.current?.resize(`${sizeRef.current}%`)
+    else panelRef.current?.collapse()
+    setClosing(!open)
+    // Outlasts the transition, which is skipped entirely when motion is reduced.
+    const settle = window.setTimeout(
+      () => {
+        if (group) delete group.dataset.panelMotion
+        setClosing(false)
+      },
+      reduced ? 0 : 400,
+    )
+    return () => window.clearTimeout(settle)
+  }, [open, panelRef, reduced])
+  return {
+    groupRef,
+    panelRef,
+    shown: open || closing,
+    defaultSize: open ? `${size}%` : 0,
+  }
+}
+
 /** The conversation, with the thread's terminal panel below it while that panel is shown. */
 function ConversationAndTerminal({
   snapshot,
@@ -232,32 +272,41 @@ function ConversationAndTerminal({
   searchTarget,
 }: Omit<WorkbenchProps, "threads"> & { thread: Thread }): React.JSX.Element {
   const terminals = useTerminalStore((state) => state.threads[thread.id])
+  const drawer = useDrawer(terminals?.open === true, terminals?.size ?? 0)
   const terminalPanelId = `terminals:${thread.id}`
   // The group stays mounted either way, so showing the terminal never remounts the conversation.
   return (
     <Group
-      className="w-full h-full min-w-0 min-h-0"
+      elementRef={drawer.groupRef}
+      className="motion-panels motion-duration-220 w-full h-full min-w-0 min-h-0"
       orientation="vertical"
       onLayoutChanged={(layout, meta) => {
         const size = layout[terminalPanelId]
-        if (meta.isUserInteraction && size !== undefined)
+        if (meta.isUserInteraction && size !== undefined && terminals?.open)
           useTerminalStore.getState().resizePanel(thread.id, size)
       }}
     >
       <Panel id={`conversation:${thread.id}`} minSize="160px">
         <ThreadView snapshot={snapshot} thread={thread} searchTarget={searchTarget} />
       </Panel>
-      {terminals?.open && (
-        <>
-          <Separator
-            className={`motion-colors ${paneSeparatorClasses}`}
-            aria-label="Resize terminal"
-          />
-          <Panel id={terminalPanelId} defaultSize={`${terminals.size}%`} minSize="96px">
-            <TerminalPanel thread={thread} terminals={terminals} />
-          </Panel>
-        </>
-      )}
+      <Separator
+        className={`motion-colors ${paneSeparatorClasses} ${drawer.shown ? "" : "invisible"}`}
+        aria-label="Resize terminal"
+        disabled={!terminals?.open}
+      />
+      <Panel
+        id={terminalPanelId}
+        panelRef={drawer.panelRef}
+        defaultSize={drawer.defaultSize}
+        minSize="96px"
+        collapsible
+        collapsedSize={0}
+        disabled={!terminals?.open}
+      >
+        {drawer.shown && terminals !== undefined && (
+          <TerminalPanel thread={thread} terminals={terminals} />
+        )}
+      </Panel>
     </Group>
   )
 }
@@ -268,31 +317,40 @@ function ThreadBody(
 ): React.JSX.Element {
   const { thread } = props
   const preview = usePreviewStore((state) => state.threads[thread.id])
+  const drawer = useDrawer(preview?.open === true, preview?.size ?? 0)
   const previewPanelId = `preview:${thread.id}`
   return (
     <Group
-      className="w-full h-full min-w-0 min-h-0"
+      elementRef={drawer.groupRef}
+      className="motion-panels motion-duration-220 w-full h-full min-w-0 min-h-0"
       orientation="horizontal"
       onLayoutChanged={(layout, meta) => {
         const size = layout[previewPanelId]
-        if (meta.isUserInteraction && size !== undefined)
+        if (meta.isUserInteraction && size !== undefined && preview?.open)
           usePreviewStore.getState().resize(thread.id, size)
       }}
     >
       <Panel id={`work:${thread.id}`} minSize="280px">
         <ConversationAndTerminal {...props} />
       </Panel>
-      {preview?.open && (
-        <>
-          <Separator
-            className={`motion-colors ${paneSeparatorClasses}`}
-            aria-label="Resize preview"
-          />
-          <Panel id={previewPanelId} defaultSize={`${preview.size}%`} minSize="240px">
-            <PreviewPanel thread={thread} preview={preview} />
-          </Panel>
-        </>
-      )}
+      <Separator
+        className={`motion-colors ${paneSeparatorClasses} ${drawer.shown ? "" : "invisible"}`}
+        aria-label="Resize preview"
+        disabled={!preview?.open}
+      />
+      <Panel
+        id={previewPanelId}
+        panelRef={drawer.panelRef}
+        defaultSize={drawer.defaultSize}
+        minSize="240px"
+        collapsible
+        collapsedSize={0}
+        disabled={!preview?.open}
+      >
+        {drawer.shown && preview !== undefined && (
+          <PreviewPanel thread={thread} preview={preview} />
+        )}
+      </Panel>
     </Group>
   )
 }
