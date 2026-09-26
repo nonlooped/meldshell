@@ -21,10 +21,11 @@ if [ ! -f "$target/.ready" ]; then
   touch "$stage/.ready"
   if [ -d "$target" ]; then rm -rf "$stage"; else mv "$stage" "$target"; fi
   trap - EXIT
-  for old in "$cache_dir"/* "$cache_dir"/.install-*; do
-    [ -e "$old" ] && [ "$old" != "$target" ] && rm -rf "$old"
-  done
+  # Stable and nightly installs keep separate caches; remove only abandoned ones.
+  rm -rf "$cache_dir"/.install-*
+  find "$cache_dir" -mindepth 1 -maxdepth 1 ! -path "$target" -mtime +14 -exec rm -rf {} +
 fi
+touch "$target"
 cd "$HOME"
 exec node "$target/desktop.js" 1>&3 3>&-
 `
