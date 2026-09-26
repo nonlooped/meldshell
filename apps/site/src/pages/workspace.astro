@@ -73,11 +73,13 @@ import "@meldshell/ui/styles.css"
 
         let ready: () => void
         const connected = new Promise<void>(resolve => { ready = resolve })
-        window.meldshell = remoteApi(id, (message, state) => {
+        const remote = remoteApi(id, (message, state) => {
           show(state, message)
           if (state === "connected") ready()
         })
+        window.meldshell = remote.api
         await connected
+        window.meldshell = remote.forHost(await remote.api.getRemoteStatus().catch(() => null))
         const { mount } = await import("@meldshell/ui")
         mount({ version: appPackage.version })
         mounted = true

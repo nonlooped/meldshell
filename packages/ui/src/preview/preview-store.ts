@@ -33,7 +33,10 @@ const without = <Value>(record: Readonly<Record<string, Value>>, key: string) =>
   return rest
 }
 
-export const previewSupported = window.meldshell.desktop !== undefined
+export const previewSupported =
+  window.meldshell.platform === "web"
+    ? window.meldshell.remotePreview !== undefined
+    : window.meldshell.desktop !== undefined
 
 export const usePreviewStore = create<PreviewStore>((set) => ({
   threads: {},

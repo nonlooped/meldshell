@@ -166,12 +166,10 @@ function LinkedComputer({
 }
 
 export function RemoteAccess() {
-  const web = window.meldshell.platform === "web"
   const status = useQuery({
     queryKey: ["remote-status"],
     queryFn: () => window.meldshell.getRemoteStatus(),
     refetchInterval: 1500,
-    enabled: !web,
   })
   const link = useMutation({
     mutationFn: () => window.meldshell.linkRemote(),
@@ -185,17 +183,6 @@ export function RemoteAccess() {
     },
   })
   const [confirmSignOut, setConfirmSignOut] = useState(false)
-  if (web)
-    return (
-      <section className={groupClasses} aria-label="Account and devices">
-        <SettingRow
-          label="Remote session"
-          description="To add another computer, open MeldShell on it and go to Settings → Account & devices."
-        >
-          <Status tone="online" />
-        </SettingRow>
-      </section>
-    )
   const state = status.data
   const error = link.error ?? unlink.error ?? state?.error ?? status.error
   const signIn = (label: string) => (
@@ -253,6 +240,33 @@ export function RemoteAccess() {
     <>
       <section className={groupClasses} aria-label="Account and devices">
         {rows}
+        {window.meldshell.hostControl && (
+          <SettingRow
+            label="Host process"
+            description="Restart or shut down MeldShell on this computer. Running work will be interrupted."
+          >
+            <Controls>
+              <Button
+                onClick={() => {
+                  void window.meldshell
+                    .hostControl!.restart()
+                    .catch((cause) => window.alert(messageFor(cause)))
+                }}
+              >
+                Restart host
+              </Button>
+              <Button
+                onClick={() => {
+                  void window.meldshell
+                    .hostControl!.shutdown()
+                    .catch((cause) => window.alert(messageFor(cause)))
+                }}
+              >
+                Shut down host
+              </Button>
+            </Controls>
+          </SettingRow>
+        )}
       </section>
       {error && (
         <p

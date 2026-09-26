@@ -13,7 +13,7 @@ Each MeldShell thread keeps a separate native session for each harness. Switchin
 - Per-thread Git worktrees, with setup and run scripts from `meldshell.json`, and per-thread terminals.
 - A per-thread browser preview, Open in editor, scheduled prompts, and customizable keyboard shortcuts.
 - Provider catalogs, account usage where available, and appearance preferences.
-- Remote browser access to a linked desktop or headless host.
+- Remote browser access to a linked desktop or headless host, with host folder browsing, terminals, and run scripts. Linked desktops also support interactive host browser previews, updates, and administration.
 
 Windows 11 x64 NSIS and Linux x64 AppImage are the configured release targets. Windows uses acrylic; Linux uses a solid backdrop. Release targets and implemented features do not imply completed certification. See the [release checklist](docs/release.md).
 

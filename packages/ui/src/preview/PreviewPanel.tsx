@@ -1,3 +1,4 @@
+import { RemotePreview } from "./RemotePreview"
 import { useEffect, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Button as BaseButton } from "@base-ui-components/react/button"
@@ -527,6 +528,8 @@ export function PreviewPanel({
         <PreviewStart thread={thread} suggestions={suggestions} />
       </section>
     )
+  if (window.meldshell.remotePreview)
+    return <RemotePreview key={thread.id} threadId={thread.id} url={preview.url} />
   return (
     <PreviewPage
       key={thread.id}
