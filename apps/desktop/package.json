@@ -50,7 +50,7 @@
     "@meldshell/ui": "*",
     "@tailwindcss/vite": "4.3.3",
     "@types/cross-spawn": "6.0.6",
-    "@vitejs/plugin-react": "5.2.0",
+    "@vitejs/plugin-react": "6.1.1",
     "babel-plugin-react-compiler": "1.0.0",
     "electron": "44.4.5",
     "electron-builder": "26.15.3",
