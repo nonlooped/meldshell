@@ -91,7 +91,7 @@ test("host state survives restart and remote commands run through the shared API
   let host: Host | undefined
   try {
     host = await startHost(directory, platform)
-    const workspace = await host.addWorkspace(directory)
+    const workspace = (await host.call(IPC.addWorkspacePath, [directory])) as AppSnapshot
     const created = (await host.call(IPC.createThread, [
       { workspaceId: workspace.workspaces[0]!.id, title: "Remote thread" },
     ])) as AppSnapshot

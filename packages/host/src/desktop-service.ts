@@ -33,6 +33,7 @@ export function desktopService(
       call: host.call,
       addWorkspace: host.addWorkspace,
       activeTurns: host.activeTurns,
+      administrationResult: host.administrationResult,
       scopePath: host.scopePath,
       terminalContext: host.terminalContext,
       "remote.status": host.remote.status,

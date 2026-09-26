@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect"
+import { browseHostFolders, workspaceFolder } from "./host-folders"
 import * as C from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { attempt } from "./attempt"
@@ -59,6 +60,16 @@ const withWorkspace = <A>(scope: WorkspaceScope, run: (path: string) => Promise<
   Effect.flatMap(scopePath(scope), (path) => attempt(() => run(path)))
 
 export const hostOperations: Record<string, Operation> = {
+  [C.IPC.browseHostFolders]: operation(Schema.String, true, (path) =>
+    attempt(() => browseHostFolders(path)),
+  ),
+  [C.IPC.addWorkspacePath]: operation(Schema.String, false, (path) =>
+    Effect.gen(function* () {
+      const folder = yield* attempt(() => workspaceFolder(path))
+      const core = yield* CoreClient
+      return yield* core.AddWorkspace({ path: folder })
+    }),
+  ),
   [C.IPC.getSnapshot]: coreCall(noInput, true, (core) => core.GetSnapshot()),
   [C.IPC.listThreads]: coreCall(C.ThreadPageQuery, true, (core, input) => core.ListThreads(input)),
   [C.IPC.getTranscript]: coreCall(C.TranscriptQuery, true, (core, input) =>
@@ -295,14 +306,5 @@ export function createHostApi(runtime: HostRuntime) {
       )
     return value ?? null
   }
-  const execute = async (raw: unknown): Promise<C.RemoteResult> => {
-    const id = String((raw as { id?: unknown } | null)?.id ?? "")
-    try {
-      const command = C.decodeCommand(raw)
-      return { type: "result", id, ok: true, value: await call(command.method, command.args) }
-    } catch (cause) {
-      return { type: "result", id, ok: false, error: C.errorMessage(cause) }
-    }
-  }
-  return { call, execute }
+  return { call }
 }

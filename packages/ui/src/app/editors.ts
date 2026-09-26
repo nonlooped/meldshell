@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import type { ExternalEditor, WorkspaceScope } from "@meldshell/contracts/ipc"
 import type { SetAppSettingsInput } from "@meldshell/contracts"
 
-const desktopApi = window.meldshell.desktop
+const desktopApi = window.meldshell.desktop?.listEditors ? window.meldshell.desktop : undefined
 const noEditors: readonly ExternalEditor[] = []
 
 /**
@@ -17,7 +17,7 @@ export function useOpenInEditor(
   // Installing an editor while MeldShell runs is rare, but the menu should notice it eventually.
   const editors = useQuery({
     queryKey: ["external-editors"],
-    queryFn: () => desktopApi!.listEditors(),
+    queryFn: () => desktopApi!.listEditors!(),
     enabled: desktopApi !== undefined,
     staleTime: 60_000,
     refetchOnWindowFocus: "always",
@@ -28,7 +28,7 @@ export function useOpenInEditor(
     ...list.filter((editor) => editor.id !== preferred),
   ]
   const mutation = useMutation({
-    mutationFn: (input: WorkspaceScope & { editorId: string }) => desktopApi!.openInEditor(input),
+    mutationFn: (input: WorkspaceScope & { editorId: string }) => desktopApi!.openInEditor!(input),
   })
   const open = (editorId?: string): void => {
     const chosen = editorId ?? ordered[0]?.id

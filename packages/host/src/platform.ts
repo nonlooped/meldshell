@@ -23,6 +23,7 @@ export interface HostNotification {
 export class HostPlatform extends Context.Tag("MeldShell/HostPlatform")<
   HostPlatform,
   {
+    readonly desktop?: boolean
     readonly onCoreExit?: () => void
     readonly databasePath: string
     readonly fork: (entry: string, label: string, env?: Record<string, string>) => HostProcess

@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./ipc": "./src/ipc.ts"
+    "./ipc": "./src/ipc.ts",
+    "./remote-preview": "./src/remote-preview.ts"
   },
   "dependencies": {
     "@effect/rpc": "0.76.2",

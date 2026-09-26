@@ -18,6 +18,7 @@ export interface DesktopMethods {
   call: Host["call"]
   addWorkspace: Host["addWorkspace"]
   activeTurns: Host["activeTurns"]
+  administrationResult: Host["administrationResult"]
   scopePath: Host["scopePath"]
   terminalContext: Host["terminalContext"]
   "remote.status": Host["remote"]["status"]

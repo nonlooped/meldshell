@@ -10,7 +10,10 @@ import { connectRelay } from "./remote-connection"
 import { beginLink, readCredential, unlinkDevice } from "./identity"
 import { readWorkspaceScripts, scriptEnvironment } from "./workspace-scripts"
 import { scheduleLoop } from "./scheduler"
-import { errorMessage } from "@meldshell/contracts"
+import { errorMessage, decodeCommand, IPC } from "@meldshell/contracts"
+import { remoteTerminals } from "./remote-terminals"
+import { administrationBridge } from "./administration"
+import { threadPort } from "./workspace-scripts"
 
 /** Runs the host in this process: core writer, provider workers, and the relay connection. */
 export async function startHost(
@@ -42,7 +45,81 @@ export async function startHost(
     ),
   )
   const schedulerFiber = runtime.runFork(scheduleLoop)
-  const relay = connectRelay(directory, api.execute)
+  const terminalContext = async (
+    scope: { workspaceId: string; threadId: string },
+    run: string | undefined,
+  ) => {
+    const cwd = await runtime.runPromise(scopePath(scope))
+    const location = await core((client) => client.GetThreadLocation({ threadId: scope.threadId }))
+    const env = await scriptEnvironment(location)
+    if (run === undefined) return { cwd, env, run: null }
+    const script = (await readWorkspaceScripts(location.workspacePath)).run.find(
+      (entry) => entry.name === run,
+    )
+    if (script === undefined)
+      throw new Error(`meldshell.json no longer has a run script named "${run}".`)
+    return { cwd, env, run: script }
+  }
+
+  const administration = administrationBridge(onEvent)
+  const terminals = remoteTerminals({ terminalContext }, (frame) => relay.publish(frame))
+  const relay = connectRelay(
+    directory,
+    async (raw, clientId) => {
+      try {
+        const command = decodeCommand(raw)
+        const value = await remoteCall(command.method, command.args, clientId)
+        return { type: "result", id: command.id, ok: true, value }
+      } catch (cause) {
+        return {
+          type: "result",
+          id: String((raw as { id?: unknown })?.id ?? ""),
+          ok: false,
+          error: errorMessage(cause),
+        }
+      }
+    },
+    terminals.clients,
+  )
+  const desktopCall = (method: string, args: readonly unknown[]) => {
+    if (platform.desktop) return administration.call(method, args)
+    if (method === IPC.getDesktopEnvironment) return null
+    if (method === IPC.getUpdateStatus)
+      return {
+        state: "unavailable",
+        currentVersion: "",
+        channel: "stable",
+        availableVersion: null,
+        progressPercent: null,
+        message: "This standalone host is updated by its installation manager.",
+      }
+    throw new Error(
+      "This host runs without a desktop installation. Manage its process through its service manager.",
+    )
+  }
+  const remoteCall = async (
+    method: string,
+    args: readonly unknown[],
+    clientId: string,
+  ): Promise<unknown> => {
+    if (terminals.handles(method)) return terminals.execute(method, args[0], clientId)
+    if (method === IPC.getRemoteStatus) return remote.status()
+    if (method === IPC.unlinkRemote) {
+      setTimeout(() => {
+        void remote.unlink().catch(console.error)
+      }, 500)
+      return null
+    }
+    if (method === IPC.retryRemote) {
+      setTimeout(() => {
+        void remote.retry().catch(console.error)
+      }, 500)
+      return null
+    }
+    if (method === IPC.threadPort && typeof args[0] === "string") return threadPort(args[0])
+    if (administration.handles(method)) return desktopCall(method, args)
+    return api.call(method, args)
+  }
   // Batch bursts such as streamed deltas into one change per thread every 32 ms.
   const eventFiber = runtime.runFork(
     Effect.scoped(
@@ -70,6 +147,7 @@ export async function startHost(
       const credential = await readCredential(directory)
       return {
         linked: !!credential,
+        desktop: platform.desktop === true,
         account: credential?.account ?? null,
         siteURL: credential?.siteURL ?? null,
         status: relay.status(),
@@ -105,6 +183,8 @@ export async function startHost(
   const close = () =>
     (closing ??= (async () => {
       relay.close()
+      administration.close()
+      await terminals.close()
       await Effect.runPromise(Fiber.interrupt(schedulerFiber))
       await Effect.runPromise(Fiber.interrupt(eventFiber))
       try {
@@ -136,23 +216,8 @@ export async function startHost(
      * Where a thread's terminal starts, the script variables it receives, and, when `run` names
      * one, the workspace run script it should start.
      */
-    terminalContext: async (
-      scope: { workspaceId: string; threadId: string },
-      run: string | undefined,
-    ) => {
-      const cwd = await runtime.runPromise(scopePath(scope))
-      const location = await core((client) =>
-        client.GetThreadLocation({ threadId: scope.threadId }),
-      )
-      const env = await scriptEnvironment(location)
-      if (run === undefined) return { cwd, env, run: null }
-      const script = (await readWorkspaceScripts(location.workspacePath)).run.find(
-        (entry) => entry.name === run,
-      )
-      if (script === undefined)
-        throw new Error(`meldshell.json no longer has a run script named "${run}".`)
-      return { cwd, env, run: script }
-    },
+    terminalContext,
+    administrationResult: administration.result,
     remote,
     close,
   }
