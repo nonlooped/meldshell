@@ -1,6 +1,6 @@
 {
   "name": "meldshell",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "author": "MeldShell contributors",
   "description": "A local desktop environment for concurrent coding-agent threads",
