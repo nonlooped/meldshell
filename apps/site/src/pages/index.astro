@@ -1,7 +1,6 @@
 ---
 import AppWindow from "../components/AppWindow.astro"
 import BrandIcon from "../components/BrandIcon.astro"
-import Download from "../components/Download.astro"
 import Features from "../components/Features.astro"
 import Header from "../components/Header.astro"
 import Lucide from "../components/Lucide.astro"
@@ -28,17 +27,17 @@ const releases = `${repo}/releases`
       </script>
       <div class="mx-auto w-full max-w-[1200px] px-5 sm:px-8 pt-14 sm:pt-20">
         <h1 id="hero-heading" class="display text-[clamp(44px,7.6vw,108px)] leading-[0.94]">
-          <span class="line line-1">Three agents.</span><br />
-          <span class="line line-2">One window.</span>
+          <span class="line line-1">Your coding agents,</span><br />
+          <span class="line line-2">side by side.</span>
         </h1>
         <div class="mt-7 sm:mt-9 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
           <p class="prose-lede max-w-[40ch]">
             Codex, Claude Code and Cursor on one desktop, each in its own native session.
           </p>
           <div class="flex flex-wrap items-center gap-3 shrink-0">
-            <a href="#download" class="btn btn-primary" data-motion-link="download">
+            <a href={`${releases}/latest`} data-download class="btn btn-primary" data-motion-link="download">
               <Lucide name="ArrowDownToLine" size={16} strokeWidth={2} />
-              Download
+              <span data-download-label>View downloads</span>
             </a>
             <a href={repo} class="btn btn-secondary">
               <BrandIcon name="github" size={16} />
@@ -59,9 +58,7 @@ const releases = `${repo}/releases`
       </div>
     </section>
 
-    <Features class="mt-28 sm:mt-36" />
-
-    <Download {releases} class="mt-28 sm:mt-36 mb-24 sm:mb-32" />
+    <Features class="mt-28 sm:mt-36 mb-24 sm:mb-32" />
   </main>
   <script>
     import "../scripts/release"
@@ -69,30 +66,8 @@ const releases = `${repo}/releases`
 </Layout>
 
 <style>
-  /* The headline follows the window: the first line stands alone while the agents are apart,
-     the second lands as they meld. The glow rises with the frame. */
   .line {
     display: inline-block;
-    transition:
-      opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
-      transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
-      color 0.7s;
-  }
-  .line-2 {
-    color: var(--color-ink-3);
-  }
-  [data-meld="hidden"] .line {
-    opacity: 0;
-    transform: translateY(0.3em);
-  }
-  [data-meld="hidden"] .line-2,
-  [data-meld="apart"] .line-2 {
-    opacity: 0;
-    transform: translateY(0.3em);
-  }
-  [data-meld="together"] .line-2 {
-    color: var(--color-ink);
-    transition-delay: 0.25s;
   }
   .glow {
     opacity: 0;
@@ -103,8 +78,5 @@ const releases = `${repo}/releases`
   }
   .hero:not([data-meld]) .glow {
     opacity: 0.18;
-  }
-  .hero:not([data-meld]) .line-2 {
-    color: var(--color-ink);
   }
 </style>

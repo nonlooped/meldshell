@@ -6,6 +6,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Changed
 
+- The website hero now reads “Your coding agents, side by side.” and appears immediately. The main download button selects the Windows or Linux installer for the visitor’s operating system, and the bottom download panel has been removed.
+
 - The website was redesigned. The landing page opens on three separate agent windows that meld into one MeldShell window, rendered from the app's own interface instead of screenshots, with the working indicator, streaming replies, an approval request, and a Codex question live; the frame catches light from the pointer, and product fragments scale to the viewport rather than reflowing. It uses the desktop's Mona Sans and Monaspace Neon faces, the same Lucide icons as the app, and the official OpenAI, Claude, Cursor, GitHub, Windows, and Linux marks. The download section links the Windows and Linux installers directly with their version and size, and the run-from-source card and footer are gone.
 
 ### Fixed
