@@ -23,6 +23,15 @@ const api: MeldShellApi = {
   onOpenAttention: on(IPC.attentionRequested),
   onUpdateStatus: on(IPC.updateStatusChanged),
   desktop: {
+    ...(process.platform === "win32"
+      ? {
+          environment: {
+            get: () => ipcRenderer.invoke(IPC.getDesktopEnvironment),
+            switch: (mode: import("@meldshell/contracts/ipc").DesktopMode) =>
+              ipcRenderer.invoke(IPC.switchDesktopEnvironment, mode),
+          },
+        }
+      : {}),
     listEditors: () => ipcRenderer.invoke(IPC.listEditors),
     openInEditor: (input) => ipcRenderer.invoke(IPC.openInEditor, input),
     threadPort: (threadId) => ipcRenderer.invoke(IPC.threadPort, threadId),

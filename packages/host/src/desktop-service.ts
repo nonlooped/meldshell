@@ -6,7 +6,7 @@ import {
 } from "./desktop-protocol"
 import type { Host } from "./host"
 import { createTerminals } from "./terminals"
-import { listEditors, openEditor } from "./editors"
+import { listEditors, openEditor, type EditorSpawn } from "./editors"
 
 export interface DesktopService {
   readonly methods: DesktopMethods
@@ -17,7 +17,10 @@ export interface DesktopService {
 export function desktopService(
   host: Host,
   send: (channel: string, args: unknown[]) => void,
-  options: { toHostPath?: DesktopMethods["toHostPath"] } = {},
+  options: {
+    toHostPath?: DesktopMethods["toHostPath"]
+    spawnEditor?: EditorSpawn
+  } = {},
 ): DesktopService {
   const terminals = createTerminals(host, send)
   return {
@@ -39,7 +42,8 @@ export function desktopService(
       "terminal.open": terminals.open,
       "terminal.close": terminals.close,
       "editor.list": listEditors,
-      "editor.open": async (scope, id) => openEditor(await host.scopePath(scope), id),
+      "editor.open": async (scope, id) =>
+        openEditor(await host.scopePath(scope), id, options.spawnEditor),
       toHostPath: options.toHostPath ?? (async (path) => path),
       close: async () => {
         await terminals.closeAll()

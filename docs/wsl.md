@@ -1,6 +1,10 @@
 # Windows and WSL
 
-The Windows MeldShell app runs its host in one selected WSL distribution. Codex, Claude Code, Cursor CLI, their tools and MCP servers, Git, worktrees, setup scripts, terminals, and development servers run there. MeldShell does not fall back to Windows tools when WSL is unavailable. The Linux desktop continues to run its host locally.
+The Windows MeldShell app offers **Windows (native)** and **WSL (Linux)** modes in **Settings → General → Execution environment**. Choose a mode, then **Restart and switch**. Restarting closes terminals and interrupts any running agent turns after confirmation. Threads, settings, provider sign-ins, and remote-account identity stay separate in each environment; switching back restores access to that environment’s data. No history is moved or merged.
+
+New installations default to Windows mode, where agents, tools, Git, editors, and terminals run directly on Windows without WSL. Native terminals use PowerShell (with Command Prompt as a fallback). Existing installations with a saved WSL distribution or `MELDSHELL_WSL_DISTRO` retain WSL mode until you choose otherwise. The mode is saved in `environment.json` in the Windows user-data directory; an explicit Windows choice takes precedence over the distribution environment variable.
+
+In WSL mode, MeldShell runs its host in one selected WSL distribution. Codex, Claude Code, Cursor CLI, their tools and MCP servers, Git, worktrees, setup scripts, terminals, and development servers run there. MeldShell does not automatically fall back to Windows tools when WSL is unavailable. The Linux desktop continues to run its host locally.
 
 ## Set up the distribution
 
@@ -12,11 +16,11 @@ Install WSL and your preferred distribution using [Microsoft's installation guid
 
 MeldShell uses the distribution's default Linux user and its Bash startup files. Linux-side CLI overrides and credentials belong in that environment. The desktop does not forward Windows credential or provider environment variables. Mounted Windows PATH entries under `/mnt/<drive>` are removed from the host's PATH to avoid discovering Windows tool installations. MeldShell does not change WSL's system-wide interoperability settings or prevent commands you explicitly configure from invoking Windows programs.
 
-Start the Windows app and choose the distribution. First launch copies the matching host from the installed app into WSL, downloads locked runtime dependencies, and builds the terminal addon. Internet access is needed for this step. Later launches reuse the prepared host; changed host code or Node ABI gets a new installation and removes the previous ones. No account or network listener is needed for the desktop connection.
+Select WSL mode and restart, then choose the distribution if one has not been saved. First launch copies the matching host from the installed app into WSL, downloads locked runtime dependencies, and builds the terminal addon. Internet access is needed for this step. Later launches reuse the prepared host; changed host code or Node ABI gets a new installation and removes the previous ones. No account or network listener is needed for the desktop connection.
 
-If setup fails, the error dialog offers retry, another distribution, or quit. It never launches a Windows agent. To select a different distribution on a later launch, set the Windows environment variable `MELDSHELL_WSL_DISTRO` to its exact name, or remove `wsl.json` from MeldShell's Windows user-data directory while the app is closed to choose again. The override takes precedence over the saved choice. Each distribution has separate threads, settings, and provider sessions.
+If setup fails, the error dialog offers retry, another distribution, **Use Windows**, or quit. **Use Windows** explicitly saves Windows mode and restarts with the native host; there is no automatic fallback. To select a different distribution on a later launch, set the Windows environment variable `MELDSHELL_WSL_DISTRO` to its exact name, or remove `wsl.json` from MeldShell's Windows user-data directory while the app is closed to choose again. In WSL mode, the override takes precedence over the saved distribution choice. Each distribution has separate threads, settings, and provider sessions.
 
-## Projects, files, and tools
+## Projects, files, and tools in WSL
 
 The folder and attachment pickers start in the selected Linux user's home through `\\wsl.localhost\<distribution>`. Both `\\wsl.localhost` and `\\wsl$` paths are accepted. A selection from another distribution is rejected. Local Windows drive paths are translated by that distribution's `wslpath`, so custom mount locations work. Prefer projects under `/home/<user>` for Linux filesystem performance; see [Microsoft's filesystem guidance](https://learn.microsoft.com/windows/wsl/filesystems).
 
@@ -25,6 +29,8 @@ File references and provider payloads use Linux paths. Agent configuration, cred
 Windows browser previews can usually reach Linux development servers through `localhost`. If a preview fails, check the server and your [WSL networking configuration](https://learn.microsoft.com/windows/wsl/networking); MeldShell does not change firewall or WSL networking settings.
 
 ## Data and recovery
+
+Windows mode uses the existing database and remote-account identity in the Windows app user-data directory (or `MELDSHELL_DATA_DIR`, if configured), along with provider credentials in the Windows environment. Switching back to Windows makes pre-WSL Windows history available again.
 
 The database and remote-account identity live under `~/.local/share/meldshell` in WSL. Set `MELDSHELL_WSL_DATA_DIR` in the Linux startup environment to use another absolute Linux directory. The headless host (`npm run host`) defaults to the same directory; do not run both against one database at the same time. Give the headless host its own `--data-dir` inside that distribution. The current host installation is cached under `~/.cache/meldshell/hosts`. Existing Windows databases are left in place and are not automatically migrated or merged with Linux history. Back up the WSL data directory when the app is closed.
 

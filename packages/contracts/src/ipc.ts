@@ -141,13 +141,15 @@ export interface TerminalOpenInput {
 }
 
 export interface TerminalSession {
+  /** Enables ConPTY handling only for a native Windows host. */
+  readonly windowsPty?: boolean
   readonly cwd: string
   readonly shell: string
   /** The run script the shell was started with. */
   readonly run?: RunScript
 }
 
-/** Shells run in the desktop's host environment (WSL on Windows); web clients have no terminals. */
+/** Shells run in the desktop's host environment (native Windows or WSL on Windows); web clients have no terminals. */
 interface TerminalApi {
   readonly open: (input: TerminalOpenInput) => Promise<TerminalSession>
   readonly write: (id: string, data: string) => void
@@ -163,8 +165,19 @@ export interface ExternalEditor {
   readonly name: string
 }
 
+export type DesktopMode = "windows" | "wsl"
+
+export interface DesktopEnvironment {
+  readonly mode: DesktopMode
+  readonly distribution: string | null
+}
+
 /** Workstation-only actions; a remote client leaves `MeldShellApi.desktop` undefined. */
 interface DesktopApi {
+  readonly environment?: {
+    readonly get: () => Promise<DesktopEnvironment>
+    readonly switch: (mode: DesktopMode) => Promise<boolean>
+  }
   /** Editors found on this workstation, in a stable order, followed by the file manager. */
   readonly listEditors: () => Promise<readonly ExternalEditor[]>
   /** Opens the folder a thread works in, or the workspace folder, in the chosen editor. */
@@ -379,6 +392,8 @@ export const IPC = {
   terminalClose: "meldshell:terminal-close",
   terminalData: "meldshell:terminal-data",
   terminalExit: "meldshell:terminal-exit",
+  getDesktopEnvironment: "meldshell:get-desktop-environment",
+  switchDesktopEnvironment: "meldshell:switch-desktop-environment",
   listEditors: "meldshell:list-editors",
   openInEditor: "meldshell:open-in-editor",
   threadPort: "meldshell:thread-port",

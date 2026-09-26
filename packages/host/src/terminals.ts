@@ -1,4 +1,5 @@
 import { basename } from "node:path"
+import which from "which"
 import type { IPty } from "node-pty"
 import { IPC, type TerminalOpenInput, type TerminalSession } from "@meldshell/contracts/ipc"
 import type { Host } from "./host"
@@ -15,7 +16,15 @@ const dimension = (value: number, fallback: number): number =>
   Number.isFinite(value) ? Math.max(1, Math.min(1000, Math.floor(value))) : fallback
 
 function shellCommand(): { file: string; args: string[] } {
-  if (process.platform === "win32") throw new Error("Windows terminals require a Linux WSL host.")
+  if (process.platform === "win32")
+    return {
+      file:
+        which.sync("pwsh.exe", { nothrow: true }) ??
+        which.sync("powershell.exe", { nothrow: true }) ??
+        process.env.COMSPEC ??
+        "cmd.exe",
+      args: [],
+    }
   return {
     file: process.env.SHELL || (process.platform === "darwin" ? "/bin/zsh" : "/bin/bash"),
     args: process.platform === "darwin" ? ["-l"] : [],
@@ -85,6 +94,7 @@ export function createTerminals(
         if (run !== null) pty.write(`${run.command}\r`)
         return {
           cwd,
+          windowsPty: process.platform === "win32",
           shell: basename(file).replace(/\.exe$/i, ""),
           ...(run === null ? {} : { run }),
         }

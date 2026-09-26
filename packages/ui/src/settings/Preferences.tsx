@@ -2,6 +2,7 @@ import type { AppSettings, SetAppSettingsInput } from "@meldshell/contracts"
 import { useEffect, useState } from "react"
 import { Slider } from "@base-ui-components/react/slider"
 import { SelectField, Switch } from "../ui/controls"
+import { Environment } from "./Environment"
 import { SettingRow } from "./SettingRow"
 
 function OpacitySlider({
@@ -83,6 +84,7 @@ export function Preferences({
     >
       {section === "general" ? (
         <>
+          <Environment />
           <SettingRow
             label="Always full permissions"
             description="Use full access without permission prompts for every harness starting with the next turn. Hide permission controls in the composer."

@@ -373,7 +373,6 @@ function createInstance(id: string): Instance {
     macOptionIsMeta: true,
     scrollback: 5000,
     theme: terminalTheme(),
-    // Windows desktops also use Linux PTYs, through their WSL host.
   })
   const fit = new FitAddon()
   term.loadAddon(fit)
@@ -407,7 +406,8 @@ function startShell(id: string, scope: Required<WorkspaceScope>, instance: Insta
   terminalApi
     ?.open({ id, ...scope, cols: term.cols, rows: term.rows, ...(run ? { run } : {}) })
     .then(
-      ({ shell, cwd, run }) => {
+      ({ shell, cwd, run, windowsPty }) => {
+        if (windowsPty) term.options.windowsPty = { backend: "conpty" }
         setInfo(id, { state: "running", shell, cwd, ...(run === undefined ? {} : { run }) })
         // The pane may have been fitted while the shell was starting.
         terminalApi?.resize(id, term.cols, term.rows)

@@ -1,8 +1,10 @@
-import { spawn } from "node:child_process"
+import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process"
 import { stat } from "node:fs/promises"
 import which from "which"
 import type { ExternalEditor } from "@meldshell/contracts/ipc"
 import { childEnvironment } from "./environment"
+
+export type EditorSpawn = (file: string, args: string[], options: SpawnOptions) => ChildProcess
 
 interface EditorCommand {
   readonly id: string
@@ -25,8 +27,12 @@ const EDITORS: readonly EditorCommand[] = [
   { id: "goland", name: "GoLand", commands: ["goland", "goland.sh"] },
   { id: "rider", name: "Rider", commands: ["rider", "rider.sh"] },
   { id: "rustrover", name: "RustRover", commands: ["rustrover", "rustrover.sh"] },
-  // Always last. The host runs on Linux or macOS; Windows desktops reach a Linux host.
-  { id: "file-manager", name: "File manager", commands: ["xdg-open", "open"] },
+  // Always last, in the same environment as the host.
+  {
+    id: "file-manager",
+    name: process.platform === "win32" ? "File Explorer" : "File manager",
+    commands: process.platform === "win32" ? ["explorer.exe"] : ["xdg-open", "open"],
+  },
 ]
 
 const locate = async (editor: EditorCommand): Promise<string | null> => {
@@ -44,11 +50,12 @@ export async function listEditors(): Promise<ExternalEditor[]> {
   return found.flat().map(({ id, name }) => ({ id, name }))
 }
 
-const launch = (file: string, folder: string): Promise<void> =>
+const launch = (file: string, folder: string, spawnEditor: EditorSpawn): Promise<void> =>
   new Promise((resolve, reject) => {
     // The folder is a single argument, including when its name contains spaces or shell syntax.
-    const child = spawn(file, [folder], {
+    const child = spawnEditor(file, [folder], {
       detached: true,
+      windowsHide: true,
       stdio: "ignore",
       env: childEnvironment(),
     })
@@ -59,7 +66,11 @@ const launch = (file: string, folder: string): Promise<void> =>
     })
   })
 
-export async function openEditor(folder: string, editorId: string): Promise<void> {
+export async function openEditor(
+  folder: string,
+  editorId: string,
+  spawnEditor: EditorSpawn = spawn,
+): Promise<void> {
   if (
     !(await stat(folder).then(
       (entry) => entry.isDirectory(),
@@ -71,5 +82,5 @@ export async function openEditor(folder: string, editorId: string): Promise<void
   if (!editor) throw new Error("MeldShell does not know this editor.")
   const file = await locate(editor)
   if (!file) throw new Error(`${editor.name} is not installed in this environment.`)
-  await launch(file, folder)
+  await launch(file, folder, spawnEditor)
 }

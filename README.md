@@ -17,7 +17,7 @@ Each MeldShell thread keeps a separate native session for each harness. Switchin
 
 Windows 11 x64 NSIS and Linux x64 AppImage are the configured release targets. Windows uses acrylic; Linux uses a solid backdrop. Release targets and implemented features do not imply completed certification. See the [release checklist](docs/release.md).
 
-On Windows, agents, Git, terminals, and thread storage run inside a selected WSL distribution. Follow the [Windows and WSL setup guide](docs/wsl.md) before first launch; there is no Windows tool fallback.
+On Windows, choose **Windows (native)** or **WSL (Linux)** in **Settings → General → Execution environment**. Windows mode runs everything locally without WSL; WSL mode keeps the app on Windows and runs agents, Git, terminals, and thread storage in Linux. Switching restarts the app and keeps each environment’s data separate. See the [Windows and WSL setup guide](docs/wsl.md).
 
 ## Run from source
 

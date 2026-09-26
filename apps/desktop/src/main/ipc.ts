@@ -9,6 +9,7 @@ import { confirmAndClose, markInstallingUpdate, prepareToClose } from "./runtime
 import { getMainWindow, applyAppearance } from "./window"
 import { setUpdateChannel, updateService } from "./updater"
 import { getWebPageTitle } from "./web-page-title"
+import { registerEnvironmentIpc } from "./runtime/environment"
 import { registerTerminalIpc } from "./terminals"
 import { registerEditorIpc } from "./editors"
 import { registerPreviewIpc } from "./preview"
@@ -58,6 +59,7 @@ const selectAttachments = Effect.gen(function* () {
 })
 
 export const registerIpc = (): void => {
+  registerEnvironmentIpc()
   for (const channel of Object.keys(hostOperations)) {
     ipcMain.handle(channel, async (_event, ...args: unknown[]) => {
       if (

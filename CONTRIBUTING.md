@@ -2,7 +2,7 @@
 
 Use Node.js 24 or newer. `npm install` downloads Electron and rebuilds SQLite for its ABI; `npm run dev` starts the desktop app. Windows 11 x64 and Linux x64 are the configured packaging targets.
 
-The Windows desktop uses a Linux host in WSL. Windows development and production builds include that host's payload (other platforms build it only with `MELDSHELL_BUILD_WSL_HOST=1`); its first launch installs the locked Linux runtime dependencies inside WSL. See [Windows and WSL](docs/wsl.md) for prerequisites, data locations, and the bundled-host check.
+The Windows desktop can run natively on Windows or use a Linux host in WSL; switch in Settings → General → Execution environment. Windows development and production builds include that host's payload (other platforms build it only with `MELDSHELL_BUILD_WSL_HOST=1`); its first launch installs the locked Linux runtime dependencies inside WSL. See [Windows and WSL](docs/wsl.md) for prerequisites, data locations, and the bundled-host check.
 
 ## Choose checks by impact
 

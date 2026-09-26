@@ -1,3 +1,6 @@
+import spawn from "cross-spawn"
+import { readDesktopMode, writeDesktopMode } from "./environment-settings"
+import type { DesktopMode } from "@meldshell/contracts/ipc"
 import { app, dialog, Notification } from "electron"
 import { Effect } from "effect"
 import { startHost } from "@meldshell/host/host"
@@ -9,6 +12,11 @@ import { desktopPlatform } from "./platform"
 import { createConnectionManager, type Connection } from "./connection"
 import { startWsl, WslCancelled } from "./wsl"
 import { getMainWindow } from "../window"
+
+let selectedMode: Promise<DesktopMode> | undefined
+const mode = () =>
+  (selectedMode ??= readDesktopMode(app.getPath("userData"), process.env.MELDSHELL_WSL_DISTRO))
+let activeDistribution: string | null = null
 
 const listeners = new Set<(channel: string, args: readonly unknown[]) => void>()
 const events = new Set<string>([
@@ -45,7 +53,7 @@ async function connectLocal(): Promise<Connection> {
     desktopPlatform(publish),
     publish,
   )
-  const { methods, notifications } = desktopService(host, publish)
+  const { methods, notifications } = desktopService(host, publish, { spawnEditor: spawn })
   return {
     request: (method, ...args) => Reflect.apply(methods[method], undefined, args),
     notify: (method, ...args) => Reflect.apply(notifications[method], undefined, args),
@@ -54,13 +62,14 @@ async function connectLocal(): Promise<Connection> {
   }
 }
 
-/** Windows never runs a host of its own: setup either reaches WSL or the app quits. */
+/** WSL failures require an explicit choice before changing environments. */
 async function connectWsl(disconnected: () => void): Promise<Connection> {
   let reset = false
   for (;;) {
     if (manager.stopped()) throw new Error("MeldShell is closing.")
     try {
       const { client, distribution, home } = await startWsl(publish, disconnected, reset)
+      activeDistribution = distribution
       return {
         request: client.request.bind(client),
         notify: client.notify.bind(client),
@@ -77,13 +86,19 @@ async function connectWsl(disconnected: () => void): Promise<Connection> {
         type: "error",
         title: "MeldShell could not start in WSL",
         message: "The Linux host is unavailable.",
-        detail: `${cause instanceof Error ? cause.message : String(cause)}\n\nMeldShell will not run agents or development tools on Windows.`,
-        buttons: ["Retry", "Choose distribution", "Quit"],
+        detail: `${cause instanceof Error ? cause.message : String(cause)}\n\nYou can retry WSL or explicitly switch to native Windows tools and separate Windows thread data.`,
+        buttons: ["Retry", "Choose distribution", "Use Windows", "Quit"],
         defaultId: 0,
-        cancelId: 2,
+        cancelId: 3,
         noLink: true,
       })
+      if (choice.response === 3) {
+        app.quit()
+        throw cause
+      }
       if (choice.response === 2) {
+        await writeDesktopMode(app.getPath("userData"), "windows")
+        app.relaunch()
         app.quit()
         throw cause
       }
@@ -93,8 +108,10 @@ async function connectWsl(disconnected: () => void): Promise<Connection> {
 }
 
 const manager = createConnectionManager({
-  connect: (disconnected) =>
-    process.platform === "win32" ? connectWsl(disconnected) : connectLocal(),
+  connect: async (disconnected) =>
+    process.platform === "win32" && (await mode()) === "wsl"
+      ? connectWsl(disconnected)
+      : connectLocal(),
   disconnected: () => {
     publish("host:disconnected", [])
     publish(IPC.runtimeChanged, [""])
@@ -102,6 +119,7 @@ const manager = createConnectionManager({
 })
 
 export const desktopHost = {
+  environment: async () => ({ mode: await mode(), distribution: activeDistribution }),
   start: (): Promise<DesktopConnection> => manager.connection(),
   subscribe: (listener: (channel: string, args: readonly unknown[]) => void) => {
     listeners.add(listener)
