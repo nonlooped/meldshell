@@ -31,3 +31,20 @@ const glanceLabels: Record<ThreadGlance, string | null> = {
 }
 
 export const glanceLabel = (glance: ThreadGlance): string | null => glanceLabels[glance]
+
+const minorWords = new Set(["a", "an", "and", "for", "in", "of", "on", "the", "to", "with"])
+
+/**
+ * Up to two letters that stand for a thread in the collapsed inbox: the initials of the title's
+ * first two significant words, or the first two letters of a one-word title.
+ */
+export function threadMonogram(title: string): string {
+  const words = title.match(/[\p{L}\p{N}]+/gu) ?? []
+  const significant = words.filter((word) => !minorWords.has(word.toLowerCase()))
+  const [first, second] = significant.length > 0 ? significant : words
+  if (first === undefined) return "#"
+  if (second !== undefined)
+    return `${[...first][0] ?? ""}${[...second][0] ?? ""}`.toLocaleUpperCase()
+  const [initial = "", next = ""] = [...first]
+  return `${initial.toLocaleUpperCase()}${next.toLocaleLowerCase()}`
+}

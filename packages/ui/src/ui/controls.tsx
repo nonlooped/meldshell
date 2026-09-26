@@ -106,23 +106,30 @@ export function IconButton({
   )
 }
 
+/** A tooltip with rich content; it follows hover and focus unless the caller controls `open`. */
 export function ContentTooltip({
   trigger,
   children,
   open,
   onOpenChange,
+  disabled = false,
   className = "",
   side = "top",
 }: {
   trigger: ReactElement<Record<string, unknown>>
   children: ReactNode
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  disabled?: boolean
   className?: string
   side?: "top" | "right"
 }) {
   return (
-    <Tooltip.Root open={open} onOpenChange={onOpenChange}>
+    <Tooltip.Root
+      disabled={disabled}
+      {...(open !== undefined ? { open } : {})}
+      {...(onOpenChange !== undefined ? { onOpenChange } : {})}
+    >
       <Tooltip.Trigger render={trigger} />
       <Tooltip.Portal>
         <Tooltip.Positioner className="z-[300]" side={side} sideOffset={8}>

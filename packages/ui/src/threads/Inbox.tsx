@@ -33,6 +33,7 @@ import { ariaShortcut, useKeybindings, withShortcut } from "../app/keybindings"
 import {
   Button,
   ChordKeys,
+  ContentTooltip,
   DropdownMenu,
   IconButton,
   MenuAction,
@@ -41,7 +42,13 @@ import {
 } from "../ui/controls"
 import { relativeAge } from "../ui/relative-age"
 import { useScheduledThreadIds } from "../schedules/schedule-queries"
-import { glanceLabel, isFinished, threadGlance, type ThreadGlance } from "./thread-state"
+import {
+  glanceLabel,
+  isFinished,
+  threadGlance,
+  threadMonogram,
+  type ThreadGlance,
+} from "./thread-state"
 
 type InboxRow =
   | {
@@ -80,6 +87,7 @@ interface InboxProps {
 }
 
 function InboxThread({
+  rail,
   thread,
   workspaceId,
   workspaceNames,
@@ -94,6 +102,7 @@ function InboxThread({
   scheduled,
 }: Pick<
   InboxProps,
+  | "rail"
   | "workspaceNames"
   | "providersByThreadId"
   | "selectedThreadId"
@@ -132,100 +141,119 @@ function InboxThread({
           style={{ background: attention }}
         />
       )}
-      <BaseButton
-        ref={draggable.ref}
-        type="button"
-        className="thread-open relative flex min-w-0 flex-1 flex-col overflow-hidden justify-start gap-[5px] [padding:8px_10px] border-0 bg-transparent text-inherit cursor-default text-left [&:focus-visible]:[outline-offset:-2px]"
-        data-dragging={draggable.isDragging ? "" : undefined}
-        aria-current={selected ? "true" : undefined}
-        title={[thread.title, glanceLabel(glance), "Drag onto a pane to open it there"]
-          .filter((line) => line !== null)
-          .join("\n")}
-        onClick={() => onOpen(thread.id)}
-      >
-        {thread.status === "active" ? (
-          <>
-            <span
-              className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
-            >
-              <TextSwap text={thread.title} />
-            </span>
-            <span className={threadContextClasses}>
-              <ThreadMark provider={provider} glance={glance} size={13} />
-              {/* The mark stays in the rail; the rest of the line fades beside it. */}
-              <span
-                className={`flex min-w-0 flex-1 items-center gap-[6px] overflow-visible! ${railLabelClasses}`}
-              >
-                {thread.worktree !== undefined && (
-                  <span
-                    className="inline-flex shrink-0"
-                    role="img"
-                    aria-label={`Own branch ${thread.worktree.branch}`}
-                    title={`Works on its own branch: ${thread.worktree.branch}`}
-                  >
-                    <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
+      <ContentTooltip
+        side="right"
+        disabled={!rail}
+        className="max-w-[280px]"
+        trigger={
+          <BaseButton
+            ref={draggable.ref}
+            type="button"
+            className="thread-open relative flex min-w-0 flex-1 flex-col overflow-hidden justify-start gap-[5px] [padding:8px_10px] border-0 bg-transparent text-inherit cursor-default text-left [&:focus-visible]:[outline-offset:-2px]"
+            data-dragging={draggable.isDragging ? "" : undefined}
+            aria-current={selected ? "true" : undefined}
+            // The rail names the thread in its own tooltip instead.
+            title={
+              rail
+                ? undefined
+                : [thread.title, glanceLabel(glance), "Drag onto a pane to open it there"]
+                    .filter((line) => line !== null)
+                    .join("\n")
+            }
+            onClick={() => onOpen(thread.id)}
+          >
+            <RailTile title={thread.title} glance={glance} />
+            {thread.status === "active" ? (
+              <>
+                <span
+                  className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
+                >
+                  <TextSwap text={thread.title} />
+                </span>
+                <span className={`${threadContextClasses} ${railLabelClasses}`}>
+                  <ProviderIcon provider={provider} size={13} />
+                  <span className="flex min-w-0 flex-1 items-center gap-[6px] overflow-visible!">
+                    {thread.worktree !== undefined && (
+                      <span
+                        className="inline-flex shrink-0"
+                        role="img"
+                        aria-label={`Own branch ${thread.worktree.branch}`}
+                        title={`Works on its own branch: ${thread.worktree.branch}`}
+                      >
+                        <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
+                      </span>
+                    )}
+                    {scheduled && (
+                      <span
+                        className="inline-flex shrink-0"
+                        role="img"
+                        aria-label="Has scheduled prompts"
+                        title="Has scheduled prompts"
+                      >
+                        <AlarmClock size={12} strokeWidth={1.75} aria-hidden="true" />
+                      </span>
+                    )}
+                    {workspaceId === "all" && (
+                      <span className="thread-workspace">
+                        {workspaceNames.get(thread.workspaceId) ?? "Unknown workspace"}
+                      </span>
+                    )}
+                    <ActivityBadge activity={thread.activity} show="running">
+                      <GradientSpinner />
+                    </ActivityBadge>
+                    <ActivityBadge activity={thread.activity} show="approval" attention>
+                      <CircleAlert size={12} aria-hidden="true" />
+                      Needs approval
+                    </ActivityBadge>
+                    <ActivityBadge activity={thread.activity} show="queued">
+                      Queued
+                    </ActivityBadge>
+                    <ActivityBadge activity={thread.activity} show="failed" attention>
+                      Failed
+                    </ActivityBadge>
+                    <PopPresence className="inline-flex shrink-0" show={finishedUnseen}>
+                      <UnseenMark />
+                    </PopPresence>
+                    <time
+                      dateTime={thread.updatedAt}
+                      title={new Date(thread.updatedAt).toLocaleString()}
+                    >
+                      {relativeAge(thread.updatedAt)}
+                    </time>
                   </span>
-                )}
-                {scheduled && (
-                  <span
-                    className="inline-flex shrink-0"
-                    role="img"
-                    aria-label="Has scheduled prompts"
-                    title="Has scheduled prompts"
-                  >
-                    <AlarmClock size={12} strokeWidth={1.75} aria-hidden="true" />
-                  </span>
-                )}
-                {workspaceId === "all" && (
-                  <span className="thread-workspace">
-                    {workspaceNames.get(thread.workspaceId) ?? "Unknown workspace"}
-                  </span>
-                )}
-                <ActivityBadge activity={thread.activity} show="running">
-                  <GradientSpinner />
-                </ActivityBadge>
-                <ActivityBadge activity={thread.activity} show="approval" attention>
-                  <CircleAlert size={12} aria-hidden="true" />
-                  Needs approval
-                </ActivityBadge>
-                <ActivityBadge activity={thread.activity} show="queued">
-                  Queued
-                </ActivityBadge>
-                <ActivityBadge activity={thread.activity} show="failed" attention>
-                  Failed
-                </ActivityBadge>
-                <PopPresence className="inline-flex shrink-0" show={finishedUnseen}>
-                  <UnseenMark />
-                </PopPresence>
+                </span>
+              </>
+            ) : (
+              <>
+                <span
+                  className={`inline-flex flex-[0_0_14px] text-[var(--text-tertiary)] ${railLabelClasses}`}
+                >
+                  <ProviderIcon provider={provider} size={14} />
+                </span>
+                <span
+                  className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
+                >
+                  <TextSwap text={thread.title} />
+                </span>
                 <time
+                  className={railLabelClasses}
                   dateTime={thread.updatedAt}
                   title={new Date(thread.updatedAt).toLocaleString()}
                 >
                   {relativeAge(thread.updatedAt)}
                 </time>
-              </span>
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="flex-[0_0_14px] text-[var(--text-tertiary)]">
-              <ThreadMark provider={provider} glance={glance} size={14} />
-            </span>
-            <span
-              className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
-            >
-              <TextSwap text={thread.title} />
-            </span>
-            <time
-              className={railLabelClasses}
-              dateTime={thread.updatedAt}
-              title={new Date(thread.updatedAt).toLocaleString()}
-            >
-              {relativeAge(thread.updatedAt)}
-            </time>
-          </>
-        )}
-      </BaseButton>
+              </>
+            )}
+          </BaseButton>
+        }
+      >
+        <RailSummary
+          thread={thread}
+          glance={glance}
+          workspaceId={workspaceId}
+          workspaceNames={workspaceNames}
+        />
+      </ContentTooltip>
       <div className={rowActionsClasses}>
         <IconButton
           unstyled
@@ -287,49 +315,66 @@ function InboxThread({
   )
 }
 
-/** The thread's provider, which the collapsed rail swaps for what the thread is doing. */
-function ThreadMark({
-  provider,
-  glance,
-  size,
-}: {
-  provider: Provider | undefined
-  glance: ThreadGlance
-  size: number
-}) {
+/**
+ * The thread as the collapsed rail shows it: its title's initials on a tile, with what it is doing
+ * as a badge on the corner. It fades in as the row's labels fade out.
+ */
+function RailTile({ title, glance }: { title: string; glance: ThreadGlance }) {
   return (
     <span
-      className="relative inline-flex shrink-0 items-center justify-center"
-      style={{ width: size, height: size }}
+      aria-hidden="true"
+      className="motion-colors motion-duration-220 pointer-events-none absolute inset-[0] grid place-items-center opacity-0 group-data-[rail]/inbox:opacity-100"
     >
-      <span className={`inline-flex ${railLabelClasses}`}>
-        <ProviderIcon provider={provider} size={size} />
-      </span>
-      <span
-        aria-hidden="true"
-        className="motion-colors motion-duration-220 absolute inset-[0] inline-flex items-center justify-center opacity-0 group-data-[rail]/inbox:opacity-100"
-      >
-        <GlanceMark glance={glance} size={size} />
+      <span className="rail-tile relative grid h-[26px] w-[26px] place-items-center rounded-[var(--radius-sm)] border-[1px] border-[color:var(--line)] bg-[var(--surface-hover)] text-[10.5px] font-semibold tracking-[0.02em]">
+        {threadMonogram(title)}
+        {glance !== "idle" && (
+          <span className="absolute right-[-5px] bottom-[-5px] grid h-[13px] w-[13px] place-items-center rounded-full bg-[var(--surface-menu)]">
+            <GlanceMark glance={glance} />
+          </span>
+        )}
       </span>
     </span>
   )
 }
 
-function GlanceMark({ glance, size }: { glance: ThreadGlance; size: number }) {
+function GlanceMark({ glance }: { glance: Exclude<ThreadGlance, "idle"> }) {
   switch (glance) {
     case "running":
-      return <GradientSpinner size={size - 1} />
+      return <GradientSpinner size={9} />
     case "approval":
-      return <CircleAlert size={size} strokeWidth={1.9} className="text-[var(--color-modified)]" />
+      return <CircleAlert size={11} strokeWidth={2.2} className="text-[var(--color-modified)]" />
     case "failed":
-      return <CircleX size={size} strokeWidth={1.9} className="text-[var(--color-deleted)]" />
+      return <CircleX size={11} strokeWidth={2.2} className="text-[var(--color-deleted)]" />
     case "queued":
-      return <Hourglass size={size - 1} strokeWidth={1.75} />
+      return <Hourglass size={9} strokeWidth={2} className="text-[var(--text-secondary)]" />
     case "done":
       return <span className="block w-[7px] h-[7px] rounded-full bg-[var(--color-info)]" />
-    case "idle":
-      return <span className="block w-[4px] h-[4px] rounded-full bg-current opacity-70" />
   }
+}
+
+/** The rail's tooltip for a thread: the title its tile abbreviates, then its state and age. */
+function RailSummary({
+  thread,
+  glance,
+  workspaceId,
+  workspaceNames,
+}: {
+  thread: Thread
+  glance: ThreadGlance
+  workspaceId: string
+  workspaceNames: ReadonlyMap<string, string>
+}) {
+  const workspaceName =
+    workspaceId === "all" ? (workspaceNames.get(thread.workspaceId) ?? null) : null
+  const details = [glanceLabel(glance), workspaceName, relativeAge(thread.updatedAt)].filter(
+    (detail) => detail !== null,
+  )
+  return (
+    <span className="flex flex-col gap-[2px]">
+      <span className="font-medium [overflow-wrap:anywhere]">{thread.title}</span>
+      <span className="text-[var(--text-tertiary)] text-[11px]">{details.join(" · ")}</span>
+    </span>
+  )
 }
 
 /** The colour that marks an inbox thread the operator should look at next, like an unread message. */
@@ -439,6 +484,7 @@ function inboxRows({
 }
 
 const ARCHIVED_ROW_HEIGHT = 40
+const RAIL_ROW_HEIGHT = 40
 /** The archived list grows with its threads until this height, then scrolls. */
 const ARCHIVED_MAX_HEIGHT = 220
 
@@ -511,7 +557,8 @@ export function Inbox({
       const row = rows[index]
       if (row?.type === "heading") return 34
       if (row?.type === "notice") return 110
-      return 60
+      // The rail shows a tile, not two lines of text, so its threads stack closer.
+      return rail ? RAIL_ROW_HEIGHT : 60
     },
     getItemKey: (index) => rows[index]?.id ?? index,
     overscan: 12,
@@ -527,6 +574,7 @@ export function Inbox({
   const archivedHeight = Math.min(settledThreads.length * ARCHIVED_ROW_HEIGHT, ARCHIVED_MAX_HEIGHT)
   const renderThread = (thread: Thread): React.JSX.Element => (
     <InboxThread
+      rail={rail}
       thread={thread}
       workspaceId={workspaceId}
       workspaceNames={workspaceNames}
@@ -775,6 +823,12 @@ const threadRowClasses = [
   "[&[data-status='settled']_.row-actions]:top-[4px]",
   "[&:is(:hover,_:focus-within,_[data-selected])_.row-actions]:opacity-[1]",
   "[&:is(:hover,_:focus-within,_[data-selected])_.row-button]:text-[var(--text-secondary)]",
+  // In the rail every row is a square around its tile.
+  "group-data-[rail]/inbox:min-h-0!",
+  "[&[data-status='settled']:not([data-selected])_.rail-tile]:text-[var(--text-tertiary)]",
+  "[&[data-attention]_.rail-tile]:text-[var(--text-primary)]",
+  "[&[data-selected]_.rail-tile]:text-[var(--text-primary)]",
+  "[&[data-selected]_.rail-tile]:[border-color:var(--line-strong)]",
 ].join(" ")
 
 const threadContextClasses = [
