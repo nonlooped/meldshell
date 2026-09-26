@@ -75,7 +75,7 @@ export class DeviceRelay extends DurableObject<Env> {
     for (const previous of this.openSockets("host")) previous.close(4001, "Host reconnected")
     this.ctx.acceptWebSocket(socket, ["host"])
     socket.serializeAttachment({ role: "host", connectedAt: Date.now() } satisfies Attachment)
-    socket.send(JSON.stringify({ type: "clients", count: this.clients().length }))
+    socket.send(JSON.stringify(this.clientPresence()))
     await this.ctx.storage.put("deviceId", deviceId)
     await setPresence(this.env.DB, deviceId, true)
   }
@@ -114,10 +114,16 @@ export class DeviceRelay extends DurableObject<Env> {
   }
 
   /** Lets the host skip streaming events while nobody is watching. */
+  private clientPresence(except?: WebSocket) {
+    const ids = this.clients(except).map(
+      (socket) => (socket.deserializeAttachment() as { id: string }).id,
+    )
+    return { type: "clients", count: ids.length, ids }
+  }
+
   private announceClients(except?: WebSocket) {
-    const count = this.clients(except).length
-    for (const host of this.openSockets("host"))
-      host.send(JSON.stringify({ type: "clients", count }))
+    const presence = this.clientPresence(except)
+    for (const host of this.openSockets("host")) host.send(JSON.stringify(presence))
   }
 
   private async hostGone() {
@@ -155,8 +161,13 @@ export class DeviceRelay extends DurableObject<Env> {
     } catch {
       return socket.close(1008, "Invalid host frame")
     }
-    if (frame.type === "event") for (const client of this.clients()) client.send(message)
-    else if (frame.type === "result" && typeof frame.clientId === "string") {
+    if (frame.type === "event") {
+      const clients =
+        typeof frame.clientId === "string"
+          ? this.openSockets(`client:${frame.clientId}`)
+          : this.clients()
+      for (const client of clients) client.send(message)
+    } else if (frame.type === "result" && typeof frame.clientId === "string") {
       this.pending.get(frame.clientId)?.delete(String(frame.id))
       for (const client of this.openSockets(`client:${frame.clientId}`)) client.send(message)
     }

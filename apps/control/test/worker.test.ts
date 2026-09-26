@@ -213,7 +213,7 @@ test("device flow links a host whose relay isolates accounts and ends access on 
   assert.equal(await closeCode(clientPath, alice.headers), 1012)
   const host = await socket(hostPath, { Authorization: `Bearer ${credential}` })
   const idle = await next(host)
-  assert.deepEqual(idle, { type: "clients", count: 0 })
+  assert.deepEqual(idle, { type: "clients", count: 0, ids: [] })
   const listed = (await (
     await api("/api/remote/v1/devices", { headers: alice.headers })
   ).json()) as {
@@ -233,7 +233,9 @@ test("device flow links a host whose relay isolates accounts and ends access on 
 
   const watching = next(host, (frame) => frame.type === "clients")
   const client = await socket(clientPath, alice.headers)
-  assert.deepEqual(await watching, { type: "clients", count: 1 })
+  const presence = await watching
+  assert.equal(presence.count, 1)
+  assert.equal((presence.ids as string[]).length, 1)
 
   const forwarded = next(host, (frame) => frame.type === "command")
   const id = crypto.randomUUID()
@@ -254,6 +256,23 @@ test("device flow links a host whose relay isolates accounts and ends access on 
   const event = next(client, (frame) => frame.type === "event")
   host.send(JSON.stringify({ type: "event", channel: "meldshell:runtime-changed", args: ["*"] }))
   assert.deepEqual((await event).args, ["*"])
+
+  // Private terminal output reaches only its owning browser, while state changes still fan out.
+  const second = await socket(clientPath, alice.headers)
+  const privateEvent = next(client, (frame) => frame.type === "event")
+  const publicEvent = next(second, (frame) => frame.type === "event")
+  host.send(
+    JSON.stringify({
+      type: "event",
+      clientId: command.clientId,
+      channel: "meldshell:terminal-data",
+      args: ["terminal", "private"],
+    }),
+  )
+  host.send(JSON.stringify({ type: "event", channel: "public-marker", args: [] }))
+  assert.equal((await privateEvent).channel, "meldshell:terminal-data")
+  assert.equal((await publicEvent).channel, "public-marker")
+  second.close()
 
   // Signing out closes that browser's relay connections immediately.
   const signedOut = closed(client)
@@ -303,6 +322,6 @@ test("relinking rotates the device credential and closes the old connection", as
   assert.equal(await rotated, 4003)
   assert.equal(await closeCode(hostPath, { Authorization: `Bearer ${first}` }), 4003)
   const current = await socket(hostPath, { Authorization: `Bearer ${second}` })
-  assert.deepEqual(await next(current), { type: "clients", count: 0 })
+  assert.deepEqual(await next(current), { type: "clients", count: 0, ids: [] })
   current.close()
 })
