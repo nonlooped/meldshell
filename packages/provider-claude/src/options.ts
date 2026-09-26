@@ -16,6 +16,9 @@ export const claudeOptions = (dispatch: TurnDispatch): Options => {
     cwd: dispatch.workspacePath,
     model: dispatch.model,
     settings: { fastMode: dispatch.speed === "fast" },
+    // Headless sessions omit thinking text by default. Request summaries without choosing the
+    // thinking mode, which stays each model's own default.
+    extraArgs: { "thinking-display": "summarized" },
     ...(effort === null ? {} : { effort: effort as NonNullable<Options["effort"]> }),
     ...(dispatch.nativeThreadId === null
       ? { sessionId: dispatch.turnId }

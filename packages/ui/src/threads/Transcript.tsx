@@ -155,8 +155,6 @@ function MessageAttachments({ payload }: { payload: unknown }) {
 const iconFor = (event: CanonicalEvent): React.JSX.Element => {
   const props = { size: 13, strokeWidth: 1.75 }
   switch (event.kind) {
-    case "reasoning":
-      return <Brain {...props} />
     case "plan":
       return <ListChecks {...props} />
     case "command":
@@ -173,7 +171,6 @@ const iconFor = (event: CanonicalEvent): React.JSX.Element => {
 const toolSummary = (event: CanonicalEvent): string => {
   const text = fallbackText(event)
   if (event.method === "turn/diff/updated") return "All changes in this turn"
-  if (event.kind === "reasoning") return "Reasoning"
   if (event.kind === "plan") return "Updated plan"
   if (event.kind === "command")
     return commandLabel(event.payload, text.split("\n\n", 1)[0] ?? "Command")
@@ -245,8 +242,7 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
     Boolean(tool.status) ||
     tool.failed ||
     event.kind === "plan" ||
-    commandOutput !== "" ||
-    event.kind === "reasoning"
+    commandOutput !== ""
 
   if (!detail) {
     return (
@@ -388,12 +384,13 @@ function WorkingSection({
         {turn.workingEvents.map((event) => {
           if (turn.complete && event.method === "turn/diff/updated") return null
           if (isFailure(event)) return null
-          if (event.kind === "assistant")
+          // Commentary and thinking read as prose, like the rest of the conversation.
+          if (event.kind === "assistant" || event.kind === "reasoning")
             return (
               <Markdown
                 key={event.id}
                 text={fallbackText(event)}
-                className="[padding:6px_8px] text-[var(--text-secondary)] text-[11.5px] leading-[1.55]"
+                className={`[padding:6px_8px] text-[11.5px] leading-[1.55] ${event.kind === "reasoning" ? "text-[var(--text-tertiary)]" : "text-[var(--text-secondary)]"}`}
               />
             )
           return <ToolLine key={event.id} event={event} />
