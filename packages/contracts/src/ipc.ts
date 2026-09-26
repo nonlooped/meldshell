@@ -1,3 +1,5 @@
+import type { RemotePreviewInput, RemotePreviewFrame } from "./remote-preview"
+
 import type {
   AppSnapshot,
   SearchTranscriptsInput,
@@ -41,6 +43,12 @@ export interface WorkspaceScope {
 export interface WorkspaceFileInput extends WorkspaceScope {
   readonly path: string
 }
+export interface HostFolders {
+  readonly path: string
+  readonly parent: string | null
+  readonly folders: readonly { name: string; path: string }[]
+}
+
 export interface DirectoryEntry {
   readonly name: string
   readonly path: string
@@ -149,7 +157,7 @@ export interface TerminalSession {
   readonly run?: RunScript
 }
 
-/** Shells run in the desktop's host environment (native Windows or WSL on Windows); web clients have no terminals. */
+/** Shells run in the host environment, including for remote browsers. */
 interface TerminalApi {
   readonly open: (input: TerminalOpenInput) => Promise<TerminalSession>
   readonly write: (id: string, data: string) => void
@@ -172,16 +180,19 @@ export interface DesktopEnvironment {
   readonly distribution: string | null
 }
 
-/** Workstation-only actions; a remote client leaves `MeldShellApi.desktop` undefined. */
+/** Host desktop actions. Remote clients route host actions and open external links in their browser. */
 interface DesktopApi {
   readonly environment?: {
-    readonly get: () => Promise<DesktopEnvironment>
+    readonly get: () => Promise<DesktopEnvironment | null>
     readonly switch: (mode: DesktopMode) => Promise<boolean>
   }
-  /** Editors found on this workstation, in a stable order, followed by the file manager. */
-  readonly listEditors: () => Promise<readonly ExternalEditor[]>
+  /**
+   * Editors found on this workstation, in a stable order, followed by the file manager. Remote
+   * clients omit this: an editor would open on a screen the remote user cannot see.
+   */
+  readonly listEditors?: () => Promise<readonly ExternalEditor[]>
   /** Opens the folder a thread works in, or the workspace folder, in the chosen editor. */
-  readonly openInEditor: (input: WorkspaceScope & { editorId: string }) => Promise<void>
+  readonly openInEditor?: (input: WorkspaceScope & { editorId: string }) => Promise<void>
   /** The first of the ports assigned to a thread, as scripts receive it in `MELDSHELL_PORT`. */
   readonly threadPort: (threadId: string) => Promise<number>
   /** Opens an http or https address in the system browser. */
@@ -206,6 +217,7 @@ export const requests = {
     request<
       () => Promise<{
         linked: boolean
+        desktop?: boolean
         account: { id: string; email: string; name: string } | null
         siteURL: string | null
         status: string
@@ -302,6 +314,10 @@ export const requests = {
   ),
   getSnapshot: request<() => Promise<AppSnapshot>>("meldshell:get-snapshot"),
   addWorkspace: request<() => Promise<AppSnapshot>>("meldshell:add-workspace"),
+  browseHostFolders: request<(path: string) => Promise<HostFolders>>(
+    "meldshell:browse-host-folders",
+  ),
+  addWorkspacePath: request<(path: string) => Promise<AppSnapshot>>("meldshell:add-workspace-path"),
   createThread:
     request<(input: CreateThreadInput) => Promise<AppSnapshot>>("meldshell:create-thread"),
   setThreadStatus: request<(input: SetThreadStatusInput) => Promise<AppSnapshot>>(
@@ -409,6 +425,11 @@ export type MeldShellApi = InvokeApi & {
   ) => () => void
   readonly onOpenAttention: (listener: (threadId: string) => void) => () => void
   readonly onUpdateStatus: (listener: (status: AppUpdateStatus) => void) => () => void
+  readonly remotePreview?: (input: RemotePreviewInput) => Promise<RemotePreviewFrame | null>
+  readonly hostControl?: {
+    readonly restart: () => Promise<void>
+    readonly shutdown: () => Promise<void>
+  }
   readonly terminal?: TerminalApi
   readonly desktop?: DesktopApi
 }

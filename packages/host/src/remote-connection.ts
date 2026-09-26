@@ -30,7 +30,8 @@ const REVOKED = "Authorization revoked; sign in again"
 /** Keeps this host connected to the relay while a device credential exists. */
 export function connectRelay(
   directory: string,
-  execute: (command: unknown) => Promise<RemoteResult>,
+  execute: (command: unknown, clientId: string) => Promise<RemoteResult>,
+  clients: (ids: readonly string[]) => void = () => undefined,
 ) {
   let credential: DeviceCredential | null = null
   let status = "Not linked"
@@ -87,6 +88,7 @@ export function connectRelay(
   })
   socket.addEventListener("close", (event) => {
     watchers = 0
+    clients([])
     if (event.code === 4003) status = REVOKED
     else if (credential) status = "Offline; reconnecting"
   })
@@ -96,6 +98,7 @@ export function connectRelay(
       type?: unknown
       clientId?: unknown
       count?: unknown
+      ids?: unknown
       command?: unknown
     }
     try {
@@ -105,11 +108,13 @@ export function connectRelay(
     }
     if (frame.type === "clients" && typeof frame.count === "number") {
       watchers = frame.count
+      if (Array.isArray(frame.ids) && frame.ids.every((id) => typeof id === "string"))
+        clients(frame.ids)
       return
     }
     const { clientId } = frame
     if (frame.type !== "command" || typeof clientId !== "string") return socket.reconnect(1008)
-    void execute(frame.command).then((result) => send({ ...result, clientId }))
+    void execute(frame.command, clientId).then((result) => send({ ...result, clientId }))
   })
   /** Connects, reconnects, or disconnects to match the stored credential. */
   const sync = async () => {
