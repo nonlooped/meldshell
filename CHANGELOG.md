@@ -27,7 +27,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Changed
 
-- Soften the composer's translucent surface, border, and shadow so it blends into the workbench.
+- The composer blends into the workbench in both themes with a faint surface tint, no backdrop blur or drop shadow, and a softer focus border without an outer ring.
 - Updated dependencies across the desktop app, remote site, account worker, and providers. Mermaid 12 also adds support for its new diagram types while keeping existing diagrams' layout and appearance.
 - Collapsing the inbox now leaves a narrow strip of its icons instead of hiding it. New thread, search, the workspace picker, and Settings stay where they were. In place of its provider icon, each thread shows what it is doing: a spinner while it runs, an alert when it needs approval, a cross when it failed, a blue dot when it finished while you were away, an hourglass while queued, and a small dot otherwise. Hovering a thread names it and its state. The New thread button's label is now left-aligned so its icon stays put.
 - On macOS and Linux, stopping or restarting Codex, Claude Code, or Cursor also stops the processes they started, such as running commands, as it already did on Windows.

@@ -834,11 +834,11 @@ const attachmentChipClasses = [
 
 const composerClasses = [
   "composer relative [container-type:inline-size] flex w-full max-w-[860px] [margin:0_auto] flex-col",
-  "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-xl)] bg-[var(--surface-composer)] [backdrop-filter:blur(24px)]",
-  "[box-shadow:0_2px_12px_rgba(0,_0,_0,_0.08)]",
-  "[&:focus-within]:[border-color:var(--line-strong)]",
-  "[&:focus-within]:[box-shadow:0_2px_12px_rgba(0,_0,_0,_0.08),_0_0_0_2px_var(--surface-hover)]",
-  "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-raised)] [@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
+  // The composer sits in its own row. Keep its surface flat against the workbench,
+  // including while typing, rather than giving it popup-style blur, shadow, or a halo.
+  "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-xl)] bg-[var(--surface-composer)]",
+  "[&:focus-within]:[border-color:var(--line)]",
+  "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-raised)]",
   "[@media(prefers-reduced-transparency:_reduce)]:[&:focus-within]:bg-[var(--surface-raised)]",
   "[&_textarea]:min-h-[72px] [&_textarea]:max-h-[210px] [&_textarea]:overflow-y-hidden",
   "[&_textarea]:[padding:15px_16px_10px] [&_textarea]:border-0 [&_textarea]:bg-transparent",
