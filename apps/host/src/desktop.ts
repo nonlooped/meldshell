@@ -38,6 +38,7 @@ const event = (channel: string, args: readonly unknown[]) => send({ type: "event
 const host = await startHost(
   directory,
   {
+    desktop: true,
     databasePath: join(directory, "meldshell.sqlite"),
     fork: (entry, _label, env) => forkWorker(entry, env, import.meta.url.endsWith(".js")),
     notify: ({ title, body, threadId }) => event("host:notification", [title, body, threadId]),

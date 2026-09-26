@@ -5,7 +5,7 @@ import { writeDesktopMode } from "./environment-settings"
 import { createEnvironmentSwitcher } from "./environment-switch"
 import { quitting, installingUpdate } from "./shutdown"
 
-const switchEnvironment = createEnvironmentSwitcher({
+export const switchEnvironment = createEnvironmentSwitcher({
   current: async () => (await desktopHost.environment()).mode,
   confirm: async (mode) => {
     if (quitting || installingUpdate) return false

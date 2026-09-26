@@ -50,7 +50,7 @@ function publish(channel: string, args: readonly unknown[]): void {
 async function connectLocal(): Promise<Connection> {
   const host = await startHost(
     process.env.MELDSHELL_DATA_DIR ?? app.getPath("userData"),
-    desktopPlatform(publish),
+    { ...desktopPlatform(publish), desktop: true },
     publish,
   )
   const { methods, notifications } = desktopService(host, publish, { spawnEditor: spawn })

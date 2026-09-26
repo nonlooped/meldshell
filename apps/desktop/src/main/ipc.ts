@@ -12,6 +12,7 @@ import { getWebPageTitle } from "./web-page-title"
 import { registerEnvironmentIpc } from "./runtime/environment"
 import { registerTerminalIpc } from "./terminals"
 import { registerEditorIpc } from "./editors"
+import { registerRemoteAdministration } from "./remote-administration"
 import { registerPreviewIpc } from "./preview"
 
 // The site serves the account API; development uses the site dev server, which proxies it.
@@ -59,6 +60,7 @@ const selectAttachments = Effect.gen(function* () {
 })
 
 export const registerIpc = (): void => {
+  registerRemoteAdministration()
   registerEnvironmentIpc()
   for (const channel of Object.keys(hostOperations)) {
     ipcMain.handle(channel, async (_event, ...args: unknown[]) => {
