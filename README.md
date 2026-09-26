@@ -17,6 +17,8 @@ Each MeldShell thread keeps a separate native session for each harness. Switchin
 
 Windows 11 x64 NSIS and Linux x64 AppImage are the configured release targets. Windows uses acrylic; Linux uses a solid backdrop. Release targets and implemented features do not imply completed certification. See the [release checklist](docs/release.md).
 
+On Windows, agents, Git, terminals, and thread storage run inside a selected WSL distribution. Follow the [Windows and WSL setup guide](docs/wsl.md) before first launch; there is no Windows tool fallback.
+
 ## Run from source
 
 Use Node.js 24 or newer:
