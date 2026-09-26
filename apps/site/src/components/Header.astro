@@ -1,0 +1,48 @@
+---
+/* Not a bar: the mark on the left, three quiet actions on the right, sitting on the page itself. */
+import BrandIcon from "./BrandIcon.astro"
+import Lucide from "./Lucide.astro"
+import Wordmark from "./Wordmark.astro"
+
+interface Props {
+  repo: string
+}
+const { repo } = Astro.props
+---
+
+<header class="mx-auto max-w-[1200px] px-5 sm:px-8 h-[72px] flex items-center justify-between">
+  <a href="/" class="flex items-center gap-3 text-ink" aria-label="MeldShell home">
+    <Wordmark size={22} />
+    <span class="font-display font-medium tracking-[-0.02em] text-[17px]">MeldShell</span>
+  </a>
+  <nav class="flex items-center gap-1 text-[13.5px]" aria-label="Site">
+    <a href={repo} class="link" title="Source on GitHub">
+      <BrandIcon name="github" size={15} />
+      <span class="hidden sm:inline">GitHub</span>
+    </a>
+    <a href="/sign-in" class="link hidden sm:inline-flex">Sign in</a>
+    <a href="#download" class="ml-2 inline-flex h-8 items-center gap-2 rounded-[7px] bg-ink px-3.5 text-[13px] font-medium text-window transition-colors hover:bg-white">
+      <Lucide name="ArrowDownToLine" size={14} strokeWidth={2} />
+      Download
+    </a>
+  </nav>
+</header>
+
+<style>
+  .link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 7px;
+    color: var(--color-ink-2);
+    transition:
+      color 0.15s,
+      background-color 0.15s;
+  }
+  .link:hover {
+    color: var(--color-ink);
+    background: var(--color-hover);
+  }
+</style>

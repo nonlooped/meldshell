@@ -1,0 +1,463 @@
+---
+/* The MeldShell window drawn in HTML from the renderer's own structure and tokens: title bar
+   with tabs and panel toggles, the inbox collapsed to its rail, and a three-way split. Each
+   thread is mid-turn differently: Codex asked a question, Claude Code is working with a message
+   queued behind it, Cursor has finished.
+
+   On load the three panes appear as separate windows and meld into one; the closest `[data-hero]`
+   ancestor carries the `data-meld` state so the headline can follow. Afterwards the glass catches
+   light from the pointer and the live details (timer, streaming reply) keep going. */
+import BrandIcon from "./BrandIcon.astro"
+import Lucide from "./Lucide.astro"
+import Spinner from "./Spinner.astro"
+import Wordmark from "./Wordmark.astro"
+
+interface Props {
+  class?: string
+}
+const { class: className } = Astro.props
+
+const rail = [
+  { monogram: "AK", glance: "question", selected: true },
+  { monogram: "RS", glance: "running", selected: true },
+  { monogram: "VR", glance: "done", selected: true },
+  { monogram: "TS", glance: "idle", selected: false },
+  { monogram: "PS", glance: "approval", selected: false },
+  { monogram: "DP", glance: "running", selected: false },
+] as const
+---
+
+<div class:list={["stage", className]} data-stage="1320" data-compact-at="720" data-compact-width="560" aria-hidden="true">
+<div class="ui ui-window window" data-window>
+  <div class="ui-titlebar frame">
+    <Wordmark size={17} class="text-ink" />
+    <span class="ui-iconbtn"><Lucide name="PanelLeftClose" size={16} /></span>
+    <span class="ui-sep"></span>
+    <div class="ui-tabs">
+      <span class="ui-tab" data-selected data-shared>
+        <span class="ui-tab-body">
+          <span class="mark"><Lucide name="Columns2" size={14} /></span>
+          <span class="title">Add keyboard navigation / Review session recovery / Validate request bodies</span>
+          <span class="count">3</span>
+        </span>
+        <span class="ui-tab-close"><Lucide name="X" size={12} strokeWidth={2} /></span>
+      </span>
+      <span class="ui-tab">
+        <span class="ui-tab-body">
+          <span class="mark"><BrandIcon name="cursor" size={13} /></span>
+          <span class="title">Trace startup latency</span>
+        </span>
+      </span>
+    </div>
+    <span class="ui-iconbtn"><Lucide name="FolderCode" size={15} /></span>
+    <span class="ui-iconbtn"><Lucide name="Play" size={15} /></span>
+    <span class="ui-sep" style="margin:0 6px"></span>
+    <span class="ui-iconbtn"><Lucide name="Globe" size={15} /></span>
+    <span class="ui-iconbtn" data-pressed><Lucide name="SquareTerminal" size={16} /></span>
+    <span class="ui-iconbtn"><Lucide name="PanelRightOpen" size={16} /></span>
+  </div>
+
+  <div class="body">
+    <aside class="ui-rail rail frame">
+      <span class="ui-rail-btn" data-primary><Lucide name="SquarePen" size={15} strokeWidth={1.8} /></span>
+      <span class="ui-rail-btn"><Lucide name="Search" size={15} strokeWidth={1.7} /></span>
+      <span class="ui-rail-btn" data-ws><Lucide name="Folder" size={15} strokeWidth={1.65} /></span>
+      <span class="ui-rail-rule"></span>
+      {
+        rail.map((thread) => (
+          <span
+            class="ui-rail-row"
+            data-selected={thread.selected || undefined}
+            data-attention={thread.glance === "approval" || thread.glance === "question" || undefined}
+          >
+            <span class="ui-tile">
+              {thread.monogram}
+              {thread.glance !== "idle" && (
+                <span class="ui-tile-badge">
+                  {thread.glance === "running" && <Spinner size={9} />}
+                  {(thread.glance === "approval" || thread.glance === "question") && (
+                    <Lucide name="CircleAlert" size={11} strokeWidth={2.2} class="text-[var(--color-modified)]" />
+                  )}
+                  {thread.glance === "done" && <span class="block w-[7px] h-[7px] rounded-full bg-[var(--color-info)]" />}
+                </span>
+              )}
+            </span>
+          </span>
+        ))
+      }
+      <span class="ui-rail-row" style="margin-top:auto;height:30px"><Lucide name="ChevronDown" size={13} class="text-[var(--text-secondary)] -rotate-90" /></span>
+    </aside>
+
+    <!-- Codex: asked a question -->
+    <section class="ui-pane pane pane-1">
+      <span class="label"><BrandIcon name="openai" size={12} /> Codex</span>
+      <div class="ui-pane-head">
+        <span class="title">Add keyboard navigation</span>
+        <span class="ui-iconbtn"><Lucide name="Ellipsis" size={15} /></span>
+        <span class="ui-iconbtn"><Lucide name="X" size={13} /></span>
+      </div>
+      <div class="ui-transcript">
+        <div class="ui-bubble">Add keyboard navigation to the thread switcher. Arrow keys to move, Enter to open.</div>
+        <div class="ui-work">
+          <Lucide name="ChevronRight" size={14} class="chev" />
+          <Lucide name="FilePen" size={12} />
+          Edited 2 files · read 3 files
+          <span class="duration">18s</span>
+        </div>
+        <p>Arrow keys and Enter work. Before I wire Escape, one question:</p>
+        <div class="ui-card">
+          <div class="ui-card-head"><Lucide name="MessageCircleQuestion" size={13} /> Codex asked</div>
+          <p>Should Escape also clear the search filter, or only close the switcher?</p>
+          <div class="flex flex-col gap-1.5">
+            <span class="ui-option" data-selected>Clear it and return focus to the list</span>
+            <span class="ui-option">Only close the switcher</span>
+            <span class="ui-option"><span class="text-[var(--text-secondary)]">Other</span></span>
+          </div>
+          <div><span class="ui-button" data-primary data-sm>Send answer</span></div>
+        </div>
+      </div>
+      <div class="ui-composer-zone">
+        <div class="ui-composer">
+          <div class="ui-textarea">Ask Codex to work in this workspace…</div>
+          <div class="ui-bar">
+            <span class="ui-chip"><Lucide name="Paperclip" size={13} /></span>
+            <span class="ui-chip"><Lucide name="AlarmClock" size={13} /></span>
+            <span class="ui-chip"><BrandIcon name="openai" size={13} /> GPT 5.4 <Lucide name="ChevronDown" size={13} class="chev" /></span>
+            <span class="ui-chip"><span class="ui-level" data-fill="3"><i></i><i></i><i></i></span> High effort <Lucide name="ChevronDown" size={13} class="chev" /></span>
+            <span class="ui-chip"><Lucide name="FolderPen" size={14} strokeWidth={1.7} /> Workspace write <Lucide name="ChevronDown" size={13} class="chev" /></span>
+            <span class="spacer"></span>
+            <span class="ui-send" data-disabled><Lucide name="ArrowUp" size={16} strokeWidth={2.25} /></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Claude Code: working, with a message queued -->
+    <section class="ui-pane pane pane-2" data-focused>
+      <span class="label"><BrandIcon name="claude" size={12} /> Claude Code</span>
+      <div class="ui-pane-head">
+        <span class="title">Review session recovery</span>
+        <span class="ui-iconbtn"><Lucide name="Ellipsis" size={15} /></span>
+        <span class="ui-iconbtn"><Lucide name="X" size={13} /></span>
+      </div>
+      <div class="ui-transcript">
+        <div class="ui-bubble">Review the session recovery changes. Don't edit files yet.</div>
+        <div class="ui-work">
+          <Lucide name="ChevronRight" size={14} class="chev" />
+          <Spinner size={11} />
+          <span class="ui-shimmer">Ran 2 commands · read 5 files</span>
+          <span class="duration"><span data-seconds>24</span>s</span>
+        </div>
+        <p class="stream"><span data-stream data-text="The recovery flow looks sound. Queued follow-ups survive a restart and interrupted turns are not replayed. One edge case: if a worker disconnects mid-delivery, the pending message should stay visible until you decide whether to retry."></span></p>
+      </div>
+      <div class="ui-composer-zone">
+        <div class="ui-composer">
+          <div class="ui-textarea" data-live>Also check the reconnect path after a WSL restart.</div>
+          <div class="ui-bar">
+            <span class="ui-chip"><Lucide name="Paperclip" size={13} /></span>
+            <span class="ui-chip"><Lucide name="AlarmClock" size={13} /></span>
+            <span class="ui-chip"><BrandIcon name="claude" size={13} /> Claude Opus 4.6 <Lucide name="ChevronDown" size={13} class="chev" /></span>
+            <span class="ui-chip"><span class="ui-level" data-fill="3"><i></i><i></i><i></i></span> High effort <Lucide name="ChevronDown" size={13} class="chev" /></span>
+            <span class="ui-chip"><Lucide name="Eye" size={14} strokeWidth={1.7} /> Manual <Lucide name="ChevronDown" size={13} class="chev" /></span>
+            <span class="spacer"></span>
+            <span class="ui-queued">1 queued message</span>
+            <span class="ui-interrupt"><Lucide name="Square" size={11} strokeWidth={2} fill="currentColor" /></span>
+            <span class="ui-send"><Lucide name="ListPlus" size={15} strokeWidth={2.25} /></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cursor: finished -->
+    <section class="ui-pane pane pane-3">
+      <span class="label"><BrandIcon name="cursor" size={12} /> Cursor</span>
+      <div class="ui-pane-head">
+        <span class="title">Validate request bodies</span>
+        <span class="ui-iconbtn"><Lucide name="Ellipsis" size={15} /></span>
+        <span class="ui-iconbtn"><Lucide name="X" size={13} /></span>
+      </div>
+      <div class="ui-transcript">
+        <div class="ui-bubble">Validate every request body against the OpenAPI schema before it reaches a handler.</div>
+        <div class="ui-work">
+          <Lucide name="ChevronRight" size={14} class="chev" />
+          <Lucide name="Terminal" size={12} />
+          Ran 4 commands · edited 3 files · read 6 files
+          <span class="duration">41s</span>
+        </div>
+        <p>Every route now validates its body with the generated schemas. Invalid requests return 400 with the failing path.</p>
+        <div class="ui-code">
+          <div class="ui-code-head"><span>src/http/validate.ts</span><span class="copy">Copy code</span></div>
+          <div class="ui-code-body">
+            <div class="ui-code-lines">1
+2
+3
+4
+5</div>
+            <pre><span class="k">export function</span> <span class="f">validate</span>(route: Route) &#123;
+  <span class="k">const</span> schema = schemas[route.operationId]
+  <span class="k">return</span> (body: unknown) =&gt;
+    schema.<span class="f">safeParse</span>(body) <span class="c">// 400 on failure</span>
+&#125;</pre>
+          </div>
+        </div>
+      </div>
+      <div class="ui-composer-zone">
+        <div class="ui-composer">
+          <div class="ui-textarea">Ask Cursor to work in this workspace…</div>
+          <div class="ui-bar">
+            <span class="ui-chip"><Lucide name="Paperclip" size={13} /></span>
+            <span class="ui-chip"><Lucide name="AlarmClock" size={13} /></span>
+            <span class="ui-chip"><BrandIcon name="cursor" size={13} /> Auto <Lucide name="ChevronDown" size={13} class="chev" /></span>
+            <span class="ui-chip"><Lucide name="Eye" size={14} strokeWidth={1.7} /> Ask Every Time <span class="ui-mini">Plan</span> <Lucide name="ChevronDown" size={13} class="chev" /></span>
+            <span class="spacer"></span>
+            <span class="ui-send" data-disabled><Lucide name="ArrowUp" size={16} strokeWidth={2.25} /></span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+
+<style>
+  /* Fixed layout at 1320×720; the stage scales the whole window to the container. Below the
+     compact width it becomes a 560×640 single-pane window instead of shrinking further. */
+  .stage {
+    aspect-ratio: 1320 / 720;
+  }
+  .window {
+    display: flex;
+    flex-direction: column;
+    height: 720px;
+    /* Panes travel outside the frame while apart; the bottom corners are rounded on the panes. */
+    overflow: visible;
+    --mx: 50%;
+    --my: 0%;
+    --light: 0;
+  }
+  .body {
+    display: grid;
+    grid-template-columns: 48px repeat(3, minmax(0, 1fr));
+    flex: 1;
+    min-height: 0;
+  }
+  .stream {
+    min-height: 1.65em;
+  }
+  [data-compact] .window {
+    height: 640px;
+  }
+  [data-compact] .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-compact] .rail,
+  [data-compact] .pane-2,
+  [data-compact] .pane-3,
+  [data-compact] .ui-tab:not([data-selected]) {
+    display: none;
+  }
+  [data-compact] .pane-1 .ui-transcript {
+    padding: 28px 22px 12px;
+  }
+
+  /* Meld. Panes start as separate windows with their own chrome and settle into the frame. */
+  .pane {
+    position: relative;
+    border: 1px solid transparent;
+    background: var(--color-window);
+    transition:
+      transform 1s cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 0.6s cubic-bezier(0.2, 0.7, 0.2, 1),
+      border-color 0.7s,
+      border-radius 0.7s,
+      box-shadow 1s;
+  }
+  .pane + .pane {
+    border-left-color: var(--line-subtle);
+  }
+  .pane-1 {
+    --apart: translate(-4%, 7%) rotate(-3deg) scale(0.9);
+    transition-delay: 0ms;
+  }
+  .pane-2 {
+    --apart: translate(0, -5%) scale(0.88);
+    transition-delay: 90ms;
+  }
+  .pane-3 {
+    --apart: translate(4%, 8%) rotate(2.5deg) scale(0.9);
+    transition-delay: 180ms;
+    border-radius: 0 0 var(--radius-window) 0;
+  }
+  [data-compact] .pane-1 {
+    --apart: translate(0, 4%) rotate(-1.5deg) scale(0.94);
+    border-radius: 0 0 var(--radius-window) var(--radius-window);
+  }
+  .label {
+    position: absolute;
+    top: -30px;
+    left: 2px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font: 500 12px var(--font-mono);
+    letter-spacing: 0.02em;
+    color: var(--color-ink-2);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  [data-meld="hidden"] .window .pane {
+    opacity: 0;
+    transform: var(--apart) translateY(40px);
+  }
+  [data-meld="hidden"] .window .pane,
+  [data-meld="apart"] .window .pane {
+    border-color: var(--line-strong);
+    border-radius: var(--radius-window);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.06),
+      0 30px 70px rgb(0 0 0 / 0.55);
+  }
+  [data-meld="apart"] .window .pane {
+    transform: var(--apart);
+  }
+  [data-meld="apart"] .label {
+    opacity: 1;
+  }
+  .window {
+    transition:
+      background-color 0.7s,
+      border-color 0.7s,
+      box-shadow 1s;
+  }
+  [data-meld="hidden"] .window,
+  [data-meld="apart"] .window {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .frame {
+    transition:
+      opacity 0.6s 0.35s,
+      transform 0.6s 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  [data-meld="hidden"] .frame,
+  [data-meld="apart"] .frame {
+    opacity: 0;
+    transform: translateY(-8px);
+    transition-delay: 0s;
+  }
+  .rail {
+    border-radius: 0 0 0 var(--radius-window);
+  }
+  [data-meld="hidden"] .rail,
+  [data-meld="apart"] .rail {
+    transform: translateX(-8px);
+  }
+
+  /* Light. A highlight in the working indicator's colours rides the frame under the pointer. */
+  .window::before,
+  .window::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--light);
+    transition: opacity 0.5s;
+  }
+  .window::before {
+    padding: 1px;
+    background:
+      radial-gradient(240px circle at var(--mx) var(--my), var(--color-spin-top), transparent 70%),
+      radial-gradient(420px circle at var(--mx) var(--my), var(--color-spin-bottom), transparent 70%);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    z-index: 2;
+  }
+  .window::after {
+    background: radial-gradient(520px circle at var(--mx) var(--my), rgb(255 255 255 / 0.035), transparent 60%);
+    z-index: 1;
+  }
+</style>
+
+<script>
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
+
+  document.querySelectorAll<HTMLElement>("[data-window]").forEach((root) => {
+    const stage = root.parentElement!
+    const host = root.closest<HTMLElement>("[data-hero]") ?? stage
+
+    /* Meld sequence. */
+    const meld = (state: string) => {
+      host.dataset.meld = state
+    }
+    if (reduced) {
+      meld("together")
+    } else {
+      meld("hidden")
+      document.fonts.ready.then(() => {
+        requestAnimationFrame(() => {
+          meld("apart")
+          setTimeout(() => meld("together"), 1500)
+        })
+      })
+    }
+
+    /* Light follows the pointer, in the window's own unscaled coordinates. */
+    if (matchMedia("(hover: hover)").matches) {
+      stage.addEventListener("pointermove", (event) => {
+        const rect = root.getBoundingClientRect()
+        const scale = rect.width / root.offsetWidth || 1
+        root.style.setProperty("--mx", `${(event.clientX - rect.left) / scale}px`)
+        root.style.setProperty("--my", `${(event.clientY - rect.top) / scale}px`)
+        root.style.setProperty("--light", "1")
+      })
+      stage.addEventListener("pointerleave", () => root.style.setProperty("--light", "0"))
+    }
+
+    /* Live details: the working timer counts and the reply streams in. */
+    const seconds = root.querySelector<HTMLElement>("[data-seconds]")
+    const stream = root.querySelector<HTMLElement>("[data-stream]")
+    const text = stream?.dataset.text ?? ""
+    if (reduced || !seconds || !stream) {
+      if (stream) stream.textContent = text
+      return
+    }
+
+    let count = 24
+    let index = 0
+    let pause = 0
+    let timers: number[] = []
+    stream.classList.add("ui-caret")
+
+    const write = () => {
+      if (index < text.length) {
+        index = Math.min(text.length, index + 1 + Math.floor(Math.random() * 3))
+        stream.textContent = text.slice(0, index)
+        return
+      }
+      pause += 1
+      if (pause > 90) {
+        pause = 0
+        index = 0
+        stream.textContent = ""
+      }
+    }
+    const count1 = () => {
+      count += 1
+      seconds.textContent = String(count)
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        if (timers.length === 0) timers = [window.setInterval(write, 60), window.setInterval(count1, 1000)]
+      } else {
+        timers.forEach((timer) => clearInterval(timer))
+        timers = []
+      }
+    })
+    observer.observe(root)
+  })
+</script>
