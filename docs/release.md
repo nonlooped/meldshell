@@ -23,7 +23,7 @@ When a release changes the account API or relay, put the compatible site and acc
 
 1. Confirm the D1 database ID and configure the Worker secrets: `BETTER_AUTH_SECRET` (at least 32 characters), plus both client ID and secret for at least one of Google or Discord. Register `https://meldshell.nonlooped.xyz/api/auth/callback/google` and `https://meldshell.nonlooped.xyz/api/auth/callback/discord` with the respective providers you enable.
 2. Apply D1 migrations and deploy the account Worker with `npm run deploy --workspace=@meldshell/control`. This command changes the production database; review its pending migrations first.
-3. Build the site with `npm run build --workspace=@meldshell/site`, then deploy `apps/site/dist` to the `meldshell` Pages project. Its `/api/*` Function needs the `CONTROL` service binding to `meldshell-control`.
+3. Changes under `apps/site/` or its shared `packages/ui/` and `packages/contracts/` dependencies on `main` automatically build and deploy the site through [Deploy site](../.github/workflows/site-deploy.yml) to the `meldshell` Pages project. Changes to that workflow also trigger a deployment. Confirm that deployment completed before cutting a compatible desktop release. The workflow needs the GitHub repository secrets `CLOUDFLARE_API_TOKEN` (Cloudflare Pages Edit permission) and `CLOUDFLARE_ACCOUNT_ID`. Its `/api/*` Function needs the `CONTROL` service binding to `meldshell-control`.
 4. Route `meldshell.nonlooped.xyz` to Pages. Confirm `/api/remote/v1/config` returns the enabled providers, and complete a real sign-in and device link before that release. A successful static home page alone does not verify the account API.
 
 ## Versioning
