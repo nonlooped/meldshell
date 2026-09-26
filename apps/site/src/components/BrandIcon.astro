@@ -1,29 +1,40 @@
 ---
-/* Official marks from the same icon packs the desktop app uses. Marks keep their own colors. */
+/* Official marks. Codex and Claude use the same icons as the desktop's ProviderIcon; the rest
+   come from the same packs. Marks keep their brand colours unless `mono` asks for currentColor. */
+import claudeCode from "@iconify-icons/logos/claude-code"
 import claude from "@iconify-icons/logos/claude-icon"
-import cursor from "@iconify-icons/simple-icons/cursor"
+import cursor from "@iconify-icons/logos/cursor-icon"
+import windows from "@iconify-icons/logos/microsoft-windows-icon"
+import openai from "@iconify-icons/logos/openai-icon"
 import github from "@iconify-icons/simple-icons/github"
-import openai from "@iconify-icons/simple-icons/openai"
+import linux from "@iconify-icons/simple-icons/linux"
 
-const icons = { claude, cursor, github, openai } as const
+const icons = { claude, claudeCode, cursor, github, linux, openai, windows } as const
 
 interface Props {
   name: keyof typeof icons
   size?: number
   class?: string
+  /** Draw in currentColor instead of the brand colour. */
+  mono?: boolean
 }
 
-const { name, size = 24, class: className } = Astro.props
+const { name, size = 24, class: className, mono = name === "cursor" } = Astro.props
 const icon = icons[name]
 const width = icon.width ?? 24
 const height = icon.height ?? 24
+/* Marks are square; a non-square viewBox is centred in a square box. */
+const side = Math.max(width, height)
+const viewBox = `${(width - side) / 2} ${(height - side) / 2} ${side} ${side}`
+const body = mono ? icon.body.replace(/ fill="#[0-9a-fA-F]{3,8}"/g, "") : icon.body
 ---
 
 <svg
-  viewBox={`0 0 ${width} ${height}`}
+  viewBox={viewBox}
   width={size}
   height={size}
-  class={className}
+  fill="currentColor"
+  class:list={["shrink-0", className]}
   aria-hidden="true"
-  set:html={icon.body}
+  set:html={body}
 />

@@ -1,0 +1,228 @@
+---
+/* Two claims, each shown by the piece of the window that delivers it, drawn with the renderer's
+   own structure. Fragments sit on a stage so they scale down instead of reflowing. */
+import BrandIcon from "./BrandIcon.astro"
+import Lucide from "./Lucide.astro"
+import Spinner from "./Spinner.astro"
+
+interface Props {
+  class?: string
+}
+const { class: className } = Astro.props
+
+type Agent = "openai" | "claude" | "cursor"
+const groups: {
+  agent: Agent
+  provider: string
+  harness?: string
+  models: { name: string; selected?: boolean }[]
+}[] = [
+  {
+    agent: "openai",
+    provider: "OpenAI",
+    harness: "Codex",
+    models: [{ name: "GPT 5.4", selected: true }],
+  },
+  { agent: "claude", provider: "Anthropic", models: [{ name: "Claude Opus 4.6" }] },
+  { agent: "cursor", provider: "Cursor", models: [{ name: "Auto" }] },
+]
+
+const pinned: {
+  title: string
+  agent: Agent
+  ws: string
+  state: "running" | "approval" | "done" | "idle"
+  worktree?: boolean
+  time: string
+  selected?: boolean
+}[] = [
+  {
+    title: "Add keyboard navigation",
+    agent: "openai",
+    ws: "MeldShell",
+    state: "running",
+    worktree: true,
+    time: "2m",
+  },
+  {
+    title: "Review session recovery",
+    agent: "claude",
+    ws: "MeldShell",
+    state: "approval",
+    time: "4m",
+    selected: true,
+  },
+]
+const inbox: typeof pinned = [
+  {
+    title: "Validate request bodies",
+    agent: "cursor",
+    ws: "Atlas",
+    state: "done",
+    worktree: true,
+    time: "6m",
+  },
+  {
+    title: "Polish the settings layout",
+    agent: "claude",
+    ws: "MeldShell",
+    state: "running",
+    time: "9m",
+  },
+  { title: "Trace startup latency", agent: "cursor", ws: "Atlas", state: "idle", time: "11m" },
+]
+---
+
+<section class:list={["mx-auto max-w-[1200px] px-5 sm:px-8", className]} aria-labelledby="features-heading">
+  <h2 id="features-heading" class="display text-[clamp(30px,3.8vw,46px)]">What's in the window</h2>
+
+  <div class="grid mt-10 gap-4 grid-cols-1 md:grid-cols-12">
+    <article data-reveal class="card md:col-span-7">
+      <div class="card-text">
+        <h3>Pick the agent and model per message.</h3>
+        <p>Switch mid-thread. Each agent resumes its own session.</p>
+      </div>
+      <div class="fragment">
+        <div data-stage="560">
+          <div class="ui composer-frag">
+            <div class="ui-menu menu">
+              <div class="ui-menu-search"><Lucide name="Search" size={14} /> Search models…</div>
+              {
+                groups.map((group) => (
+                  <>
+                    <div class="ui-menu-group">
+                      <BrandIcon name={group.agent} size={14} />
+                      {group.provider}
+                      {group.harness && <span class="harness">{group.harness}</span>}
+                    </div>
+                    {group.models.map((model) => (
+                      <div class="ui-menu-item" data-selected={model.selected || undefined}>
+                        {model.selected && <Lucide name="Check" size={13} strokeWidth={2.5} class="check" />}
+                        {model.name}
+                      </div>
+                    ))}
+                  </>
+                ))
+              }
+            </div>
+            <div class="ui-composer">
+              <div class="ui-textarea" data-live>Refactor the queue so retries preserve order.</div>
+              <div class="ui-bar">
+                <span class="ui-chip"><Lucide name="Paperclip" size={13} /></span>
+                <span class="ui-chip"><Lucide name="AlarmClock" size={13} /></span>
+                <span class="ui-chip" style="background:var(--surface-active);color:var(--text-primary)"><BrandIcon name="openai" size={13} /> GPT 5.4 <Lucide name="ChevronDown" size={13} class="chev" /></span>
+                <span class="ui-chip"><span class="ui-level" data-fill="3"><i></i><i></i><i></i></span> High effort <Lucide name="ChevronDown" size={13} class="chev" /></span>
+                <span class="ui-chip"><Lucide name="FolderPen" size={14} strokeWidth={1.7} /> Workspace write <Lucide name="ChevronDown" size={13} class="chev" /></span>
+                <span class="spacer"></span>
+                <span class="ui-send"><Lucide name="ArrowUp" size={16} strokeWidth={2.25} /></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article data-reveal class="card md:col-span-5">
+      <div class="card-text">
+        <h3>See who's working.</h3>
+        <p>Every thread shows its state. Closing a tab stops nothing.</p>
+      </div>
+      <div class="fragment">
+        <div data-stage="300">
+          <div class="ui ui-inbox">
+            <div class="ui-inbox-top">
+              <span class="ui-newthread"><Lucide name="SquarePen" size={15} strokeWidth={1.8} /> New thread</span>
+              <span class="ui-inbox-search"><Lucide name="Search" size={15} strokeWidth={1.7} /> Search <span class="ui-kbd">Ctrl</span><span class="ui-kbd -ml-[6px]">K</span></span>
+              <span class="ui-inbox-ws"><Lucide name="Folder" size={15} strokeWidth={1.65} /><span>All workspaces</span><Lucide name="ChevronsUpDown" size={13} strokeWidth={1.7} /></span>
+            </div>
+            <div class="ui-heading">Pinned <b>2</b></div>
+            {
+              [...pinned, { heading: "Inbox", count: 3 }, ...inbox].map((row) =>
+                "heading" in row ? (
+                  <div class="ui-heading">
+                    {row.heading} <b>{row.count}</b>
+                  </div>
+                ) : (
+                  <div
+                    class="ui-thread"
+                    data-selected={row.selected || undefined}
+                    data-attention={row.state === "approval" || undefined}
+                  >
+                    <span class="ui-thread-title">{row.title}</span>
+                    <span class="ui-thread-ctx">
+                      <BrandIcon name={row.agent} size={13} />
+                      {row.worktree && <Lucide name="GitBranch" size={12} />}
+                      <span class="ws">{row.ws}</span>
+                      {row.state === "running" && <Spinner size={12} />}
+                      {row.state === "approval" && (
+                        <span class="ui-activity" data-attention>
+                          <Lucide name="CircleAlert" size={12} /> Needs approval
+                        </span>
+                      )}
+                      {row.state === "done" && (
+                        <span class="ui-activity" data-done>
+                          Done
+                        </span>
+                      )}
+                      <time>{row.time}</time>
+                    </span>
+                  </div>
+                ),
+              )
+            }
+            <div class="ui-heading" style="margin-top:4px;border-top:1px solid var(--line-subtle);height:30px;padding-top:0">
+              <Lucide name="ChevronDown" size={13} class="-rotate-90" /> Archived <b>38</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<style>
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px 24px 0;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-window);
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 40%),
+      var(--color-window);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+    overflow: hidden;
+  }
+  .card-text h3 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+    text-wrap: balance;
+  }
+  .card-text p {
+    margin-top: 6px;
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--color-ink-2);
+    text-wrap: pretty;
+  }
+  .fragment {
+    flex: 1;
+    display: grid;
+    align-content: end;
+    padding-bottom: 24px;
+  }
+  .composer-frag {
+    display: grid;
+    align-content: end;
+  }
+  .composer-frag .menu {
+    width: 320px;
+    margin: 0 0 -8px 60px;
+    position: relative;
+    z-index: 1;
+  }
+</style>

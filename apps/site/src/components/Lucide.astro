@@ -1,0 +1,32 @@
+---
+/* The renderer's icon set, drawn at build time so window fragments use the exact glyphs, sizes,
+   and stroke widths the desktop does. */
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
+import * as lucide from "lucide-react"
+
+type IconName = {
+  [K in keyof typeof lucide]: (typeof lucide)[K] extends lucide.LucideIcon ? K : never
+}[keyof typeof lucide]
+
+interface Props {
+  name: IconName
+  size?: number
+  strokeWidth?: number
+  class?: string
+  fill?: string
+}
+const { name, size = 16, strokeWidth = 1.75, class: className, fill } = Astro.props
+const Icon = lucide[name] as lucide.LucideIcon
+const markup = renderToStaticMarkup(
+  createElement(Icon, {
+    size,
+    strokeWidth,
+    className,
+    fill,
+    "aria-hidden": "true",
+  }),
+)
+---
+
+<Fragment set:html={markup} />

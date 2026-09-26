@@ -23,7 +23,7 @@ const structuredData = softwareApplication
       description,
       image: ogImage,
       applicationCategory: "DeveloperApplication",
-      operatingSystem: "Windows 11 (x64)",
+      operatingSystem: "Windows 11 (x64), Linux (x64)",
       offers: {
         "@type": "Offer",
         price: 0,
@@ -34,9 +34,10 @@ const structuredData = softwareApplication
 ---
 
 <!doctype html>
-<html lang="en" class="scheme-dark [-webkit-text-size-adjust:100%] [&_:focus-visible]:outline-2 [&_:focus-visible]:outline-ink [&_:focus-visible]:outline-offset-[3px] [&_:focus-visible]:rounded-[3px]">
+<html lang="en" class="scheme-dark">
   <head>
     <meta charset="utf-8" />
+    <script is:inline>document.documentElement.classList.add("js")</script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="google-site-verification" content="d5maEtSw1GYOz8UJ1bQmUxojH-Pk34YWDovb2u_cR_Q" />
     <title>{title}</title>
@@ -58,20 +59,16 @@ const structuredData = softwareApplication
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
     <meta name="twitter:image:alt" content={ogImageAlt} />
-    <meta name="theme-color" content="#161617" />
+    <meta name="theme-color" content="#0f0f10" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..600&display=swap"
-    />
     {structuredData && <script type="application/ld+json" set:html={structuredData}></script>}
   </head>
   <body class="min-h-dvh bg-desktop text-ink font-sans antialiased">
     <slot />
     <script>
       import "../scripts/motion"
+      import "../scripts/stage"
+      import "../scripts/reveal"
     </script>
   </body>
 </html>
