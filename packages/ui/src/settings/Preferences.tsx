@@ -84,6 +84,17 @@ export function Preferences({
       {section === "general" ? (
         <>
           <SettingRow
+            label="Always full permissions"
+            description="Use full access without permission prompts for every harness starting with the next turn. Hide permission controls in the composer."
+          >
+            <Switch
+              label="Always full permissions"
+              checked={settings.alwaysFullPermissions ?? false}
+              disabled={pending}
+              onCheckedChange={(alwaysFullPermissions) => onChange({ alwaysFullPermissions })}
+            />
+          </SettingRow>
+          <SettingRow
             label="Show archived threads"
             description="Keep archived threads visible in the inbox. Search always includes them."
           >

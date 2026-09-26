@@ -6,6 +6,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
+- Add an **Always full permissions** preference that applies full access without permission prompts to every harness on each new turn and hides the composer permission selector. Turning it off restores per-thread permission choices.
+
 - Settings › Providers shows when a newer release of Codex, Claude Code, or Cursor CLI is available and can install it. The provider row has an **Update** button that runs the provider's own updater, or Homebrew's for a Homebrew install, without leaving MeldShell. The **Version** row names the installed and latest versions. A provider installed by a system package manager shows which one to use instead, and its row marks **Update available**. Versions are compared when a provider connects and every four hours after that; **Check for updates** compares them now. After an update, the provider reconnects with the new version when no turns are running.
 
 - Cursor can ask you questions. Cursor does not offer its own question tool to apps like MeldShell, so MeldShell gives Cursor turns a question tool of its own. Its questions open the same dialog as Claude Code's, with option descriptions and room for your own answer.

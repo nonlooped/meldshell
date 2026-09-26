@@ -9,7 +9,7 @@ import { runMigrations } from "./database/migrations"
 import { getSnapshot } from "./snapshots"
 import { beginShutdown, recordRuntimeEvent, submitTurn } from "./turns"
 import { initializeDatabase } from "./database/persistence"
-import { isShuttingDown } from "./settings"
+import { isShuttingDown, setAppSettings } from "./settings"
 
 const model: ProviderModelCatalogEntry = {
   catalogId: "sonnet",
@@ -123,3 +123,47 @@ it.effect(
       assert.equal(errors.length, 0)
     }).pipe(Effect.provide(TestDatabase)),
 )
+
+for (const providerKey of ["openai", "anthropic", "cursor"] as const) {
+  it.effect(
+    `${providerKey} applies full permissions to new and queued turns and restores thread choices`,
+    () =>
+      Effect.gen(function* () {
+        yield* runMigrations
+        yield* seedCatalog
+        const catalog = yield* syncProviderCatalog({ providerKey, models: [model] })
+        const selected = catalog.models.find((entry) => entry.slug === model.slug)!
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`INSERT INTO workspaces VALUES ('w', '/w', 'w', '2026-09-01', '2026-09-01')`
+        yield* sql`INSERT INTO threads (id, workspace_id, title, status, created_at, updated_at, title_locked)
+        VALUES ('t', 'w', 'Thread', 'active', '2026-09-01', '2026-09-01', 1)`
+        yield* sql`INSERT INTO thread_settings (thread_id, provider_id, model_id, sandbox, approval_policy)
+        VALUES ('t', ${selected.providerId}, ${selected.id}, 'read-only', 'on-request')`
+        yield* setAppSettings({ alwaysFullPermissions: true })
+        const first = (yield* submitTurn({ threadId: "t", text: "Work" })).dispatch!
+        assert.equal(first.sandbox, "danger-full-access")
+        assert.equal(first.approvalPolicy, "never")
+        assert.equal((yield* submitTurn({ threadId: "t", text: "Queued" })).disposition, "queued")
+        const next = (yield* recordRuntimeEvent({
+          threadId: "t",
+          turnId: first.turnId,
+          validated: true,
+          method: "turn/completed",
+          params: { turn: { status: "completed" } },
+        })).nextDispatch!
+        assert.equal(next.sandbox, "danger-full-access")
+        assert.equal(next.approvalPolicy, "never")
+        yield* submitTurn({ threadId: "t", text: "Restore" })
+        yield* setAppSettings({ alwaysFullPermissions: false })
+        const restored = (yield* recordRuntimeEvent({
+          threadId: "t",
+          turnId: next.turnId,
+          validated: true,
+          method: "turn/completed",
+          params: { turn: { status: "completed" } },
+        })).nextDispatch!
+        assert.equal(restored.sandbox, "read-only")
+        assert.equal(restored.approvalPolicy, "on-request")
+      }).pipe(Effect.provide(TestDatabase)),
+  )
+}

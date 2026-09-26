@@ -7,6 +7,7 @@ import { runMigrations } from "./database/migrations"
 import { readAppSettings, setAppSettings } from "./settings"
 
 const defaults = {
+  alwaysFullPermissions: false,
   opacity: undefined,
   titleModelId: "current",
   showSettled: true,
@@ -25,6 +26,7 @@ it.effect(
       yield* runMigrations
       assert.deepEqual(yield* readAppSettings, defaults)
       const preferences = {
+        alwaysFullPermissions: true,
         opacity: 75,
         titleModelId: "custom-model",
         showSettled: false,
@@ -48,6 +50,7 @@ it.effect("invalid stored preferences fall back to defaults", () =>
       yield* runMigrations
       const sql = yield* SqlClient.SqlClient
       for (const key of [
+        "alwaysFullPermissions",
         "opacity",
         "showSettled",
         "theme",

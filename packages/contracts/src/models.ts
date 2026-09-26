@@ -346,6 +346,7 @@ export const Theme = Schema.Literal("dark", "light", "system")
 export const TranscriptSize = Schema.Literal("small", "medium", "large")
 
 export const AppSettings = Schema.Struct({
+  alwaysFullPermissions: Schema.optional(Schema.Boolean),
   opacity: Schema.optional(AppOpacity),
   showSettled: Schema.optional(Schema.Boolean),
   theme: Schema.optional(Theme),

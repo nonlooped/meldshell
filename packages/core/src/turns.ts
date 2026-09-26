@@ -28,7 +28,7 @@ import {
   buildTitleRequest,
 } from "./titles"
 import { getSnapshot } from "./snapshots"
-import { isShuttingDown, markShuttingDown } from "./settings"
+import { isShuttingDown, markShuttingDown, readAppSettings } from "./settings"
 import {
   CLAUDE_EXIT_PLAN_MODE,
   CLAUDE_PERMISSION_MODE,
@@ -101,6 +101,7 @@ const createDispatch = (
           : "fast"
         : "default"
 
+    const { alwaysFullPermissions } = yield* readAppSettings
     const turnId = randomUUID()
     const timestamp = new Date().toISOString()
     yield* sql`
@@ -129,8 +130,8 @@ const createDispatch = (
       speed: row.speed,
       serviceTier,
       mode: row.mode,
-      sandbox: row.sandbox,
-      approvalPolicy: row.approval_policy,
+      sandbox: alwaysFullPermissions ? "danger-full-access" : row.sandbox,
+      approvalPolicy: alwaysFullPermissions ? "never" : row.approval_policy,
       text,
       attachments,
     } satisfies TurnDispatch

@@ -339,20 +339,7 @@ const harnessModes = (harness: string): readonly CollaborationMode[] => {
   return modes.length > 1 ? modes : []
 }
 
-function ComposerSettings({
-  snapshot,
-  threadId,
-  selection,
-  onChangeSettings,
-}: Pick<ComposerProps, "snapshot" | "threadId" | "onChangeSettings"> & {
-  selection: ModelSelection | null
-}): React.JSX.Element {
-  if (selection === null)
-    return (
-      <span className="text-[var(--text-tertiary)] text-[10.5px] tabular-nums whitespace-nowrap">
-        No model is enabled. Add one in Settings.
-      </span>
-    )
+function permissionOptions(selection: ModelSelection) {
   const isClaude = selection.provider.harness === "claude-code"
   const isCursor = selection.provider.harness === "cursor"
   const toolPermissions = isClaude || isCursor
@@ -430,8 +417,27 @@ function ComposerSettings({
         options.find((option) => option.sandbox === selection.sandbox) ??
         options.find((option) => option.id === "ask")!)
       : options.find((option) => option.sandbox === selection.sandbox)!
+  return { isClaude, toolPermissions, options, selected }
+}
+
+function ComposerSettings({
+  snapshot,
+  threadId,
+  selection,
+  onChangeSettings,
+}: Pick<ComposerProps, "snapshot" | "threadId" | "onChangeSettings"> & {
+  selection: ModelSelection | null
+}): React.JSX.Element {
+  if (selection === null)
+    return (
+      <span className="text-[var(--text-tertiary)] text-[10.5px] tabular-nums whitespace-nowrap">
+        No model is enabled. Add one in Settings.
+      </span>
+    )
+  const { isClaude, toolPermissions, options, selected } = permissionOptions(selection)
   // Every harness lists its least guarded permission last; it stays visibly distinct when chosen.
   const riskiest = options[options.length - 1]!
+  const fullPermissions = snapshot.settings.alwaysFullPermissions ?? false
   const modes = harnessModes(selection.provider.harness)
   const visible = selectableModels(snapshot).filter((model) => !model.hidden)
   return (
@@ -449,91 +455,101 @@ function ComposerSettings({
         onChangeSettings={onChangeSettings}
       />
 
-      <DropdownMenu
-        trigger={
-          <BaseButton
-            render={<Pressable />}
-            type="button"
-            className={`motion-colors ${chipClasses} ${riskyChipClasses}`}
-            data-risky={selected.id === riskiest.id}
-            aria-label={
-              toolPermissions
-                ? `Change ${isClaude ? "Claude" : "Cursor"} mode and permissions`
-                : "Change sandbox access"
-            }
-          >
-            <SandboxIcon mode={selection.sandbox} />
-            <span className="overflow-hidden text-ellipsis">{selected.label}</span>
-            {selection.mode !== "default" && modes.includes(selection.mode) && (
-              <span className="flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[10.5px] leading-[1.3]">
-                {MODES[selection.mode].label}
-              </span>
-            )}
-            <ChevronDown
-              size={13}
-              strokeWidth={1.75}
-              className="flex-none text-[var(--text-tertiary)]"
-            />
-          </BaseButton>
-        }
-      >
-        {modes.length > 0 && (
-          <>
-            <MenuRadioGroup
-              value={selection.mode}
-              onValueChange={(value) =>
-                onChangeSettings({ threadId, mode: String(value) as CollaborationMode })
+      {(!fullPermissions || modes.length > 0) && (
+        <DropdownMenu
+          trigger={
+            <BaseButton
+              render={<Pressable />}
+              type="button"
+              className={`motion-colors ${chipClasses} ${riskyChipClasses}`}
+              data-risky={!fullPermissions && selected.id === riskiest.id}
+              aria-label={
+                fullPermissions
+                  ? "Change mode"
+                  : toolPermissions
+                    ? `Change ${isClaude ? "Claude" : "Cursor"} mode and permissions`
+                    : "Change sandbox access"
               }
             >
-              <MenuGroup label="Mode">
-                {modes.map((mode) => {
-                  const { label, icon: ModeIcon } = MODES[mode]
-                  return (
-                    <MenuChoice key={mode} value={mode}>
-                      {label}
-                      <span className="grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] place-items-center text-[var(--text-secondary)]">
-                        <ModeIcon size={14} strokeWidth={1.7} />
+              {!fullPermissions && <SandboxIcon mode={selection.sandbox} />}
+              <span className="overflow-hidden text-ellipsis">
+                {fullPermissions ? MODES[selection.mode].label : selected.label}
+              </span>
+              {!fullPermissions &&
+                selection.mode !== "default" &&
+                modes.includes(selection.mode) && (
+                  <span className="flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[10.5px] leading-[1.3]">
+                    {MODES[selection.mode].label}
+                  </span>
+                )}
+              <ChevronDown
+                size={13}
+                strokeWidth={1.75}
+                className="flex-none text-[var(--text-tertiary)]"
+              />
+            </BaseButton>
+          }
+        >
+          {modes.length > 0 && (
+            <>
+              <MenuRadioGroup
+                value={selection.mode}
+                onValueChange={(value) =>
+                  onChangeSettings({ threadId, mode: String(value) as CollaborationMode })
+                }
+              >
+                <MenuGroup label="Mode">
+                  {modes.map((mode) => {
+                    const { label, icon: ModeIcon } = MODES[mode]
+                    return (
+                      <MenuChoice key={mode} value={mode}>
+                        {label}
+                        <span className="grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] place-items-center text-[var(--text-secondary)]">
+                          <ModeIcon size={14} strokeWidth={1.7} />
+                        </span>
+                      </MenuChoice>
+                    )
+                  })}
+                </MenuGroup>
+              </MenuRadioGroup>
+              {!fullPermissions && <MenuSeparator />}
+            </>
+          )}
+          {!fullPermissions && (
+            <MenuRadioGroup
+              value={selected.id}
+              onValueChange={(value) => {
+                const option = options.find((entry) => entry.id === value)
+                if (option)
+                  onChangeSettings({
+                    threadId,
+                    sandbox: option.sandbox,
+                    ...(toolPermissions ? { approvalPolicy: option.approvalPolicy } : {}),
+                  })
+              }}
+            >
+              <MenuGroup label={toolPermissions ? "Tool permissions" : "Filesystem access"}>
+                {options.map((option) => (
+                  <Fragment key={option.id}>
+                    {option === riskiest && <MenuSeparator />}
+                    <MenuChoice
+                      value={option.id}
+                      className={option === riskiest ? "text-[var(--color-modified)]!" : undefined}
+                    >
+                      {option.label}
+                      <span
+                        className={`grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] place-items-center ${option === riskiest ? "text-inherit" : "text-[var(--text-secondary)]"}`}
+                      >
+                        <SandboxIcon mode={option.sandbox} />
                       </span>
                     </MenuChoice>
-                  )
-                })}
+                  </Fragment>
+                ))}
               </MenuGroup>
             </MenuRadioGroup>
-            <MenuSeparator />
-          </>
-        )}
-        <MenuRadioGroup
-          value={selected.id}
-          onValueChange={(value) => {
-            const option = options.find((entry) => entry.id === value)
-            if (option)
-              onChangeSettings({
-                threadId,
-                sandbox: option.sandbox,
-                ...(toolPermissions ? { approvalPolicy: option.approvalPolicy } : {}),
-              })
-          }}
-        >
-          <MenuGroup label={toolPermissions ? "Tool permissions" : "Filesystem access"}>
-            {options.map((option) => (
-              <Fragment key={option.id}>
-                {option === riskiest && <MenuSeparator />}
-                <MenuChoice
-                  value={option.id}
-                  className={option === riskiest ? "text-[var(--color-modified)]!" : undefined}
-                >
-                  {option.label}
-                  <span
-                    className={`grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] place-items-center ${option === riskiest ? "text-inherit" : "text-[var(--text-secondary)]"}`}
-                  >
-                    <SandboxIcon mode={option.sandbox} />
-                  </span>
-                </MenuChoice>
-              </Fragment>
-            ))}
-          </MenuGroup>
-        </MenuRadioGroup>
-      </DropdownMenu>
+          )}
+        </DropdownMenu>
+      )}
     </>
   )
 }

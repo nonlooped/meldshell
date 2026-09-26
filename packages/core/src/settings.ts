@@ -16,6 +16,7 @@ const SHUTTING_DOWN_SETTING = "shutting_down"
 
 /** Preferences stored as strings, one row each, in the order `setAppSettings` accepts them. */
 const PREFERENCES = [
+  "alwaysFullPermissions",
   "opacity",
   "showSettled",
   "theme",
@@ -49,6 +50,8 @@ export const readAppSettings = Effect.gen(function* () {
   `
   const values = new Map(rows.map((row) => [row.key, row.value]))
   return {
+    alwaysFullPermissions:
+      stored(Schema.BooleanFromString, values.get("alwaysFullPermissions")) ?? false,
     opacity: stored(Opacity, values.get("opacity")),
     titleModelId: values.get(TITLE_MODEL_SETTING) ?? CURRENT_TITLE_MODEL,
     showSettled: stored(Schema.BooleanFromString, values.get("showSettled")) ?? true,
