@@ -373,7 +373,7 @@ function createInstance(id: string): Instance {
     macOptionIsMeta: true,
     scrollback: 5000,
     theme: terminalTheme(),
-    ...(window.meldshell.platform === "win32" ? { windowsPty: { backend: "conpty" } } : {}),
+    // Windows desktops also use Linux PTYs, through their WSL host.
   })
   const fit = new FitAddon()
   term.loadAddon(fit)

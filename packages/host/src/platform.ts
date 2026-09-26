@@ -13,11 +13,11 @@ export interface HostProcess {
   off(event: "exit", listener: (code: number) => void): unknown
 }
 
+/** Desktops show this and bring the thread into view when it is clicked. */
 export interface HostNotification {
   readonly title: string
   readonly body: string
   readonly threadId: string
-  readonly onClick: () => void
 }
 
 export class HostPlatform extends Context.Tag("MeldShell/HostPlatform")<

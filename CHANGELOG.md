@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- The Windows desktop runs its host inside a selected WSL distribution. Agents, MCP tools, Git, worktrees, setup scripts, terminals, provider updates, and thread data use Linux; Windows is only the desktop interface. First launch chooses the distribution and prepares a matching Linux host; later app updates replace the cached Linux host instead of accumulating old ones. File selections are translated into that distribution's paths, editors are discovered inside Linux, and a lost host connection fails pending requests without replaying them. WSL requires Linux Node.js 24+, npm, Python 3, make, and a C++ compiler. Existing Windows thread data is retained separately. See [Windows and WSL setup](docs/wsl.md).
+
 ## [0.11.0] - 2026-09-26
 
 ### Added

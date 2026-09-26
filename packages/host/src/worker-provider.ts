@@ -171,7 +171,6 @@ const providerRuntime = (
           title: approval ? `${label} needs approval` : `${label} turn finished`,
           body: thread.title,
           threadId,
-          onClick: () => runFork(hostEvents.publish({ _tag: "AttentionRequested", threadId })),
         })
       })
 

@@ -22,8 +22,7 @@ export const prepareToClose = Effect.gen(function* () {
 
   return yield* Effect.gen(function* () {
     const mainWindow = getMainWindow()
-    const host = yield* Effect.promise(() => desktopHost.start())
-    const active = yield* Effect.promise(() => host.activeTurns())
+    const active = yield* Effect.promise(() => desktopHost.activeTurns())
     if (active > 0 && mainWindow !== null) {
       const currentWindow = mainWindow
       const answer = yield* Effect.tryPromise({

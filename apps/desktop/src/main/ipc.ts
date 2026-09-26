@@ -19,8 +19,11 @@ const controlURL =
   (import.meta.env.DEV ? "http://localhost:4321" : "https://meldshell.nonlooped.xyz")
 
 const selectAttachments = Effect.gen(function* () {
+  const host = yield* Effect.promise(() => desktopHost.start())
+  const defaultPath = yield* Effect.promise(() => desktopHost.pickerPath())
   const options: Electron.OpenDialogOptions = {
     title: "Attach files to this turn",
+    defaultPath,
     buttonLabel: "Attach",
     properties: ["openFile", "multiSelections"],
   }
@@ -37,17 +40,18 @@ const selectAttachments = Effect.gen(function* () {
   return yield* Effect.promise(() =>
     Promise.all(
       choice.filePaths.map(async (path): Promise<ComposerAttachment> => {
+        const value = await host.request("toHostPath", path)
         if (basename(path).toLowerCase() === "skill.md") {
-          return { type: "skill", value: path, name: basename(dirname(path)) }
+          return { type: "skill", value, name: basename(dirname(path)) }
         }
         if (imageExtensions.has(extname(path).toLowerCase())) {
           const previewUrl = await nativeImage
             .createThumbnailFromPath(path, { width: 160, height: 160 })
             .then((image) => (image.isEmpty() ? undefined : image.toDataURL()))
             .catch(() => undefined)
-          return { type: "localImage", value: path, name: basename(path), previewUrl }
+          return { type: "localImage", value, name: basename(path), previewUrl }
         }
-        return { type: "mention", value: path, name: basename(path) }
+        return { type: "mention", value, name: basename(path) }
       }),
     ),
   )
@@ -71,7 +75,7 @@ export const registerIpc = (): void => {
         })
         if (result.response !== 1) return
       }
-      const result = await (await desktopHost.start()).call(channel, args)
+      const result = await (await desktopHost.start()).request("call", channel, args)
       if (channel === IPC.getSnapshot || channel === IPC.setAppSettings)
         applyAppearance(result as AppSnapshot)
       return result
@@ -81,8 +85,10 @@ export const registerIpc = (): void => {
     typeof url === "string" ? getWebPageTitle(url) : null,
   )
   ipcMain.handle(IPC.addWorkspace, async () => {
+    const host = await desktopHost.start()
     const options: Electron.OpenDialogOptions = {
       title: "Add a workspace",
+      defaultPath: await desktopHost.pickerPath(),
       buttonLabel: "Add workspace",
       properties: ["openDirectory", "createDirectory"],
     }
@@ -90,10 +96,9 @@ export const registerIpc = (): void => {
     const choice = await (window
       ? dialog.showOpenDialog(window, options)
       : dialog.showOpenDialog(options))
-    const host = await desktopHost.start()
     return choice.canceled || !choice.filePaths[0]
-      ? host.call(IPC.getSnapshot, [])
-      : host.addWorkspace(choice.filePaths[0])
+      ? host.request("call", IPC.getSnapshot, [])
+      : host.request("addWorkspace", await host.request("toHostPath", choice.filePaths[0]))
   })
   ipcMain.handle(IPC.selectAttachments, () => Effect.runPromise(selectAttachments))
   ipcMain.handle(IPC.closeApp, () => Effect.runPromise(confirmAndClose))
@@ -109,19 +114,19 @@ export const registerIpc = (): void => {
     markInstallingUpdate()
     return updateService.install()
   })
-  const remote = async () => (await desktopHost.start()).remote
-  ipcMain.handle(IPC.getRemoteStatus, async () => (await remote()).status())
-  ipcMain.handle(IPC.linkRemote, async () => {
-    return (await remote()).link(controlURL)
-  })
+  const remoteStatus = async () => (await desktopHost.start()).request("remote.status")
+  ipcMain.handle(IPC.getRemoteStatus, remoteStatus)
+  ipcMain.handle(IPC.linkRemote, async () =>
+    (await desktopHost.start()).request("remote.link", controlURL),
+  )
   ipcMain.handle(IPC.openRemotePage, async (_event, raw: unknown) => {
-    const status = await (await remote()).status()
+    const status = await remoteStatus()
     const url = raw === "sign-in" ? status.linking?.verificationURL : `${status.siteURL}/dashboard`
     if (!url?.startsWith("http")) throw new Error("This page is no longer available.")
     await shell.openExternal(url)
   })
-  ipcMain.handle(IPC.unlinkRemote, async () => (await remote()).unlink())
-  ipcMain.handle(IPC.retryRemote, async () => (await remote()).retry())
+  ipcMain.handle(IPC.unlinkRemote, async () => (await desktopHost.start()).request("remote.unlink"))
+  ipcMain.handle(IPC.retryRemote, async () => (await desktopHost.start()).request("remote.retry"))
   registerTerminalIpc()
   registerEditorIpc()
   registerPreviewIpc()

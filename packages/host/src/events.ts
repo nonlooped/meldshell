@@ -14,7 +14,6 @@ export type HostEvent =
       readonly threadId: string
       readonly snapshotChanged?: boolean
     }
-  | { readonly _tag: "AttentionRequested"; readonly threadId: string }
 
 export class HostEvents extends Effect.Service<HostEvents>()("MeldShell/HostEvents", {
   scoped: Effect.gen(function* () {
@@ -38,9 +37,7 @@ export function eventFrames(batch: Iterable<HostEvent>): RemoteEvent[] {
       )
     else if (event._tag === "ProviderStatusChanged")
       frames.push({ type: "event", channel: IPC.providerStatusChanged, args: [event.status] })
-    else if (event._tag === "ProviderUpdateChanged")
-      frames.push({ type: "event", channel: IPC.providerUpdateChanged, args: [event.status] })
-    else frames.push({ type: "event", channel: IPC.attentionRequested, args: [event.threadId] })
+    else frames.push({ type: "event", channel: IPC.providerUpdateChanged, args: [event.status] })
   }
   for (const [threadId, snapshotChanged] of changed)
     frames.push({ type: "event", channel: IPC.runtimeChanged, args: [threadId, snapshotChanged] })

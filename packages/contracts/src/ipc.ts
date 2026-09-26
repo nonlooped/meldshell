@@ -147,7 +147,7 @@ export interface TerminalSession {
   readonly run?: RunScript
 }
 
-/** Shells run on the workstation only; a remote client leaves `MeldShellApi.terminal` undefined. */
+/** Shells run in the desktop's host environment (WSL on Windows); web clients have no terminals. */
 interface TerminalApi {
   readonly open: (input: TerminalOpenInput) => Promise<TerminalSession>
   readonly write: (id: string, data: string) => void
