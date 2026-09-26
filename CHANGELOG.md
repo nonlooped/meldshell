@@ -17,6 +17,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - When a turn ends with more than one final message, the earlier ones stay in the turn's working log instead of disappearing.
 - The question dialog no longer shows the question's raw JSON above the choices. Its title names who is asking, each question shows its short label, every option is a full-width row, and writing your own answer is an **Other** choice that opens a text field. The questions now line up with the dialog's title and buttons.
 - Provider updates prevent overlapping installers and reconnect automatically after running turns finish.
+- Claude Code commands in the working log show the command they ran instead of "Ran a command", as Codex commands do. PowerShell commands on Windows are shown as commands too, and a command no longer appears a second time with a "Subagent" label.
 
 - Malformed provider messages and stored approvals now report decoding errors with field paths instead of being treated as empty objects or trusted without validation.
 - The remote workspace identifies its runtime as Web in Settings › About.

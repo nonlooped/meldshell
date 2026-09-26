@@ -1,5 +1,6 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk"
 import { asRecord } from "@meldshell/contracts"
+import { shellTools } from "./approvals"
 
 const display = (value: unknown): string =>
   typeof value === "string" ? value : (JSON.stringify(value) ?? "")
@@ -18,6 +19,14 @@ type TaskMessage = Extract<
   { subtype: "task_started" | "task_progress" | "task_notification" | "task_updated" }
 >
 
+/** What started a task. A shell task belongs to the main agent; only subagents nest under their call. */
+const taskOrigin = (message: TaskMessage, previous: Record<string, unknown> | undefined) => {
+  const taskType = ("task_type" in message ? message.task_type : undefined) ?? previous?.taskType
+  return "tool_use_id" in message && taskType !== "local_bash"
+    ? { taskType, parentToolUseId: message.tool_use_id }
+    : { taskType }
+}
+
 export class ClaudeEvents {
   private readonly messages = new Map<string, string>()
   private readonly tools = new Map<string, Record<string, unknown>>()
@@ -25,6 +34,7 @@ export class ClaudeEvents {
   private readonly nextBlock = new Map<string, number>()
   private readonly tasks = new Map<string, Record<string, unknown>>()
   private readonly hiddenTasks = new Set<string>()
+  private readonly foregroundCommands = new Set<string>()
   private compactionId: string | null = null
   constructor(
     private readonly emit: (method: string, params: unknown, validated?: boolean) => void,
@@ -165,7 +175,7 @@ export class ClaudeEvents {
       status: "inProgress",
       parentToolUseId: message.parent_tool_use_id,
     }
-    if (block.name === "Bash")
+    if (shellTools.includes(block.name))
       Object.assign(item, {
         type: "commandExecution",
         command: display(input.command),
@@ -247,11 +257,25 @@ export class ClaudeEvents {
       ]
     }
   }
+  // A foreground shell task repeats the command row its tool call already shows.
+  private foregroundCommand(message: TaskMessage): boolean {
+    if (
+      message.subtype === "task_started" &&
+      message.task_type === "local_bash" &&
+      message.is_backgrounded === false
+    )
+      this.foregroundCommands.add(message.task_id)
+    if (message.subtype === "task_updated" && message.patch.is_backgrounded)
+      this.foregroundCommands.delete(message.task_id)
+    return this.foregroundCommands.has(message.task_id)
+  }
   private task(message: TaskMessage): void {
     if ("skip_transcript" in message && message.skip_transcript)
       this.hiddenTasks.add(message.task_id)
 
     if (this.hiddenTasks.has(message.task_id)) return
+
+    if (this.foregroundCommand(message)) return
 
     const previous = this.tasks.get(message.task_id)
 
@@ -267,6 +291,7 @@ export class ClaudeEvents {
       id: `task:${message.task_id}`,
       type: "dynamicToolCall",
       tool: "Background task",
+      ...taskOrigin(message, previous),
       text:
         ("description" in message ? message.description : patch.description) ??
         previous?.text ??
@@ -277,7 +302,6 @@ export class ClaudeEvents {
           : status === "killed"
             ? "stopped"
             : status,
-      ...("tool_use_id" in message ? { parentToolUseId: message.tool_use_id } : {}),
       ...("summary" in message ? { aggregatedOutput: message.summary } : {}),
       ...("usage" in message ? { usage: message.usage } : {}),
       ...("output_file" in message ? { outputFile: message.output_file } : {}),

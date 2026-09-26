@@ -2,10 +2,6 @@ import { asRecord, asText } from "@meldshell/contracts"
 
 export function commandLabel(payload: unknown, fallback: string): string {
   const item = asRecord(asRecord(payload).item)
-  // The Claude adapter preserves the native tool name on Bash executions.
-  if (item.tool === "Bash")
-    return item.status === "inProgress" ? "Running a command" : "Ran a command"
-
   const summary = commandSummary(payload)
   if (summary !== null) return summary
   const actions = item.commandActions

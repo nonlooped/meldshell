@@ -8,6 +8,9 @@ import { asRecords, type ApprovalDecision } from "@meldshell/contracts"
 /** Claude Code's own mode switch out of planning, which MeldShell reviews as a plan. */
 const EXIT_PLAN_MODE = "ExitPlanMode"
 
+/** Claude Code runs shell commands through Bash, and through PowerShell on Windows. */
+export const shellTools: ReadonlyArray<string> = ["Bash", "PowerShell"]
+
 interface ToolQuestion {
   readonly id: string
   readonly header: string
@@ -35,7 +38,7 @@ const toolQuestions = (toolName: string, toolInput: Record<string, unknown>): To
 const approvalMethod = (toolName: string, asksQuestions: boolean): string => {
   if (toolName === EXIT_PLAN_MODE) return "claude/exit_plan_mode"
   if (asksQuestions) return "item/tool/requestUserInput"
-  if (toolName === "Bash") return "item/commandExecution/requestApproval"
+  if (shellTools.includes(toolName)) return "item/commandExecution/requestApproval"
   if (["Edit", "Write", "NotebookEdit"].includes(toolName)) return "item/fileChange/requestApproval"
   return "item/permissions/requestApproval"
 }

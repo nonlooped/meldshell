@@ -14,6 +14,7 @@ test("tool calls raise the interaction that matches the tool", () => {
   const method = (toolName: string, input: Record<string, unknown> = {}) =>
     toolApproval(toolName, input, [], "default").method
   assert.equal(method("Bash"), "item/commandExecution/requestApproval")
+  assert.equal(method("PowerShell"), "item/commandExecution/requestApproval")
   assert.equal(method("Write"), "item/fileChange/requestApproval")
   assert.equal(method("ExitPlanMode"), "claude/exit_plan_mode")
   assert.equal(
