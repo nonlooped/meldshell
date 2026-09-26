@@ -45,13 +45,11 @@ function QuestionInput({
   question,
   draft,
   disabled,
-  allowOther,
   onDraftChange,
 }: {
   question: Question
   draft: Draft
   disabled: boolean
-  allowOther: boolean
   onDraftChange: (draft: Draft) => void
 }): React.JSX.Element {
   const options = question.options ?? []
@@ -61,9 +59,7 @@ function QuestionInput({
       label: option.label,
       description: option.description,
     })),
-    ...(allowOther && options.length > 0
-      ? [{ value: OTHER, label: "Other", description: "" }]
-      : []),
+    ...(options.length > 0 ? [{ value: OTHER, label: "Other", description: "" }] : []),
   ]
   const writing = options.length === 0 || draft.selected.includes(OTHER)
   const rows = choices.map((choice) => (
@@ -257,7 +253,6 @@ export function InteractionDialog({
               question={question}
               draft={drafts[question.id] ?? emptyDraft}
               disabled={pending}
-              allowOther={question.isOther !== false}
               onDraftChange={(draft) =>
                 setDrafts((current) => ({ ...current, [question.id]: draft }))
               }

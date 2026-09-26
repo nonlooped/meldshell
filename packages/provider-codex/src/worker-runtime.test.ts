@@ -13,7 +13,10 @@ const until = async (predicate: () => boolean): Promise<void> => {
   }
   throw new Error("Timed out waiting for Codex worker")
 }
-const setup = (beforeProbe?: () => Promise<void>) => {
+const setup = (
+  beforeProbe?: () => Promise<void>,
+  steer?: (params: unknown) => Promise<unknown>,
+) => {
   const output: Record<string, unknown>[] = []
   const instances: FakeServer[] = []
   let probes = 0
@@ -40,8 +43,9 @@ const setup = (beforeProbe?: () => Promise<void>) => {
     rejectRequest() {
       throw new Error("Unexpected interaction rejection")
     }
-    async request(method: string): Promise<unknown> {
+    async request(method: string, params?: unknown): Promise<unknown> {
       this.requests.push(method)
+      if (method === "turn/steer" && steer) return steer(params)
       if (method === "model/list")
         return {
           data: [
@@ -208,3 +212,42 @@ test("shutdown cancels tracked discovery and ignores refresh requests afterward"
   assert.equal(mock.instances.length, 0)
   assert.equal(mock.ready(), 0)
 })
+
+for (const fail of [false, true]) {
+  test(`steering acknowledges after Codex ${fail ? "rejects" : "accepts"} the answer`, async (t) => {
+    let resolve!: () => void
+    let reject!: (cause: Error) => void
+    let received: unknown
+    const mock = setup(undefined, (params) => {
+      received = params
+      return new Promise((yes, no) => {
+        resolve = () => yes({ turnId: "native-turn" })
+        reject = no
+      })
+    })
+    t.after(() => mock.worker.shutdown())
+    await until(() => mock.ready() === 1)
+    mock.send({
+      type: "steer-turn",
+      commandId: "answer",
+      nativeThreadId: "native-thread",
+      nativeTurnId: "native-turn",
+      text: "Custom answer",
+    })
+    await until(() => received !== undefined)
+    assert.deepEqual(received, {
+      threadId: "native-thread",
+      expectedTurnId: "native-turn",
+      input: [{ type: "text", text: "Custom answer", text_elements: [] }],
+    })
+    assert.equal(
+      mock.output.some((message) => message.commandId === "answer"),
+      false,
+    )
+    if (fail) reject(new Error("Turn ended"))
+    else resolve()
+    await until(() => mock.output.some((message) => message.commandId === "answer"))
+    const ack = mock.output.find((message) => message.commandId === "answer")
+    assert.equal(ack?.error, fail ? "Turn ended" : undefined)
+  })
+}

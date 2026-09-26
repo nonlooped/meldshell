@@ -79,3 +79,46 @@ test("question requests name the provider instead of repeating the tool input", 
     "Cursor has a question",
   )
 })
+
+test("mid-turn native replies survive reloads, deduplicate and resolve earlier questions", () => {
+  const questions = [{ title: "Which topic?", options: ["Science", "History"] }]
+  const reply = {
+    item: { type: "userMessage", id: "reply", content: [{ type: "text", text: "My own topic" }] },
+  }
+  const [turn] = prepareTranscriptTurns([
+    agentMessage(1, "ask", "Which topic?", { delivery: "async", questions }),
+    event(2, "item/started", reply, "user"),
+    event(3, "item/completed", reply, "user"),
+    agentMessage(4, "next", "Which length?", {
+      delivery: "async",
+      questions: [{ title: "Which length?" }],
+    }),
+  ])
+  assert.deepEqual(
+    turn?.userMessages.map((entry) => entry.text),
+    ["My own topic"],
+  )
+  assert.deepEqual(turn?.questions, [{ title: "Which length?", options: [] }])
+})
+
+test("an initial native prompt stays deduplicated while its mid-turn answer resolves questions", () => {
+  const nativeUser = (id: string, text: string) => ({
+    item: { type: "userMessage", id, content: [{ type: "text", text }] },
+  })
+  const initial = { ...event(1, "user/message", { text: "Help me" }, "user"), text: "Help me" }
+  const [turn] = prepareTranscriptTurns([
+    initial,
+    event(2, "item/started", nativeUser("initial", "Help me"), "user"),
+    event(3, "item/completed", nativeUser("initial", "Help me"), "user"),
+    agentMessage(4, "ask", "Which topic?", {
+      delivery: "async",
+      questions: [{ title: "Which topic?", options: ["Science"] }],
+    }),
+    event(5, "item/completed", nativeUser("reply", "Something else"), "user"),
+  ])
+  assert.deepEqual(
+    turn?.userMessages.map((entry) => entry.text),
+    ["Help me", "Something else"],
+  )
+  assert.deepEqual(turn?.questions, [])
+})

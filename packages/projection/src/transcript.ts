@@ -189,6 +189,21 @@ const updatePlan = (plans: Map<string, CanonicalEvent>, event: CanonicalEvent): 
     text: eventText(event.method, event.payload),
   })
 }
+const nativeReply = (
+  event: CanonicalEvent,
+  payload: NativePayload,
+  previous: CanonicalEvent | undefined,
+): CanonicalEvent => {
+  const content = payload.item?.content
+  const text = Array.isArray(content)
+    ? content
+        .map((part) => nonEmptyText(asRecord(part).text) ?? "")
+        .filter(Boolean)
+        .join("\n")
+    : event.text
+  return { ...event, sequence: previous?.sequence ?? event.sequence, text }
+}
+
 export const prepareTranscriptEvents = (
   events: ReadonlyArray<CanonicalEvent>,
 ): ReadonlyArray<CanonicalEvent> => {
@@ -196,6 +211,14 @@ export const prepareTranscriptEvents = (
   const diffs = new Map<string, CanonicalEvent>()
   const plans = new Map<string, CanonicalEvent>()
   const standalone: CanonicalEvent[] = []
+  const questionTurns = new Set<string | null>()
+  const replies = new Map<string, CanonicalEvent>()
+
+  const appendReply = (event: CanonicalEvent, payload: NativePayload, id: string): void => {
+    if (!questionTurns.has(event.turnId)) return
+    const key = `${event.turnId}:${id}`
+    replies.set(key, nativeReply(event, payload, replies.get(key)))
+  }
 
   const append = (event: CanonicalEvent): void => {
     const decoded = decodeNativePayload(event.payload)
@@ -218,7 +241,12 @@ export const prepareTranscriptEvents = (
 
     const item = itemDetails(decoded.right)
     const kind = event.kind === "unknown" ? eventKind(event.method, event.payload) : event.kind
-    if (kind === "user" && item.id !== null) return
+    if (kind === "user" && item.id !== null) {
+      // Initial prompts already have a local user/message. Native replies to mid-turn
+      // questions have no local duplicate and must survive transcript reloads.
+      appendReply(event, decoded.right, item.id)
+      return
+    }
 
     const groupKey = `${event.turnId ?? event.threadId}:${item.id}`
     const existing = groups.get(groupKey)
@@ -233,11 +261,14 @@ export const prepareTranscriptEvents = (
   }
 
   // MCP startup progress never appears in the transcript, so its payload shape cannot fail a turn.
-  for (const event of prepareCursorEvents(events))
+  for (const event of prepareCursorEvents(events)) {
+    if (asyncQuestions(event).length > 0) questionTurns.add(event.turnId)
     if (event.method !== "mcpServer/startupStatus/updated") append(event)
+  }
 
   return [
     ...standalone,
+    ...replies.values(),
     ...diffs.values(),
     ...plans.values(),
     ...[...groups.values()].flatMap((group) => finishGroup(group) ?? []),
@@ -326,6 +357,8 @@ export const prepareTranscriptTurns = (
     const questions = entry.kind === "assistant" ? asyncQuestions(entry) : []
     if (entry.kind === "user") {
       turn.userMessages.push(entry)
+      // A steered answer belongs to the same turn and resolves its earlier questions.
+      turn.questions = []
     } else if (questions.length > 0) {
       turn.questions.push(...questions)
     } else if (entry.kind === "assistant" && assistantPhase(entry) === "final_answer") {

@@ -431,7 +431,7 @@ function TurnRow({
   readonly turn: TranscriptTurn
   readonly flash?: number
   /** Answers the turn's open questions with a new message; absent once they cannot be answered. */
-  readonly onAnswer?: (text: string) => void
+  readonly onAnswer?: (text: string) => Promise<void>
   /** The thread's latest turn while the provider is still working on it. */
   readonly live?: boolean
   /** A turn appended while the thread is open rises into place once. */
@@ -483,7 +483,11 @@ function TurnRow({
             turn.complete && <TurnChanges events={turn.workingEvents} />
           )}
           {turn.questions.length > 0 && (
-            <AsyncQuestions questions={turn.questions} onAnswer={onAnswer} />
+            <AsyncQuestions
+              key={`${turn.userMessages.length}:${JSON.stringify(turn.questions)}`}
+              questions={turn.questions}
+              onAnswer={onAnswer}
+            />
           )}
         </motion.article>
       </MarkdownStreaming>
@@ -518,7 +522,7 @@ export function Transcript({
 }: {
   readonly running?: boolean
   /** Sends a reply to the latest turn's questions; absent while the thread cannot take one. */
-  readonly onAnswer?: (text: string) => void
+  readonly onAnswer?: (text: string, turnId: string) => Promise<void>
   readonly targetTurnId?: string
   readonly threadId: string
   /** Where file references resolve; a worktree thread reads its own checkout. */
@@ -634,7 +638,11 @@ export function Transcript({
                     entering={turn.id === enteringTurn}
                     flash={jump?.turnId === turn.id ? jump.at : undefined}
                     live={running && item.index === turns.length - 1}
-                    onAnswer={item.index === turns.length - 1 ? onAnswer : undefined}
+                    onAnswer={
+                      item.index === turns.length - 1 && onAnswer
+                        ? (text) => onAnswer(text, turn.id)
+                        : undefined
+                    }
                   />
                 </div>
               )

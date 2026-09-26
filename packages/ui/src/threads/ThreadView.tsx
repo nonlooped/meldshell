@@ -69,11 +69,12 @@ export function ThreadView({
   }
   const busy = ["running", "queued", "approval"].includes(thread.activity)
   /** Replies to a question Codex left in the transcript. */
-  const answer = async (text: string) => {
+  const answer = async (text: string, questionTurnId: string) => {
     try {
-      await submitTurnMutation.mutateAsync({ threadId: thread.id, text, attachments: [] })
+      await submitTurnMutation.mutateAsync({ threadId: thread.id, text, questionTurnId })
     } catch (error) {
       update(thread.id, { error: errorMessage(error) })
+      throw error
     }
   }
   const error =
@@ -84,7 +85,7 @@ export function ThreadView({
         <Transcript
           threadId={thread.id}
           running={thread.activity === "running"}
-          onAnswer={busy || submitTurnMutation.isPending ? undefined : (text) => void answer(text)}
+          onAnswer={submitTurnMutation.isPending ? undefined : answer}
           scope={workspaceScope(thread)}
           origin={<ThreadOrigin thread={thread} workspaces={snapshot.workspaces} />}
           targetTurnId={

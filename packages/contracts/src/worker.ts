@@ -11,6 +11,12 @@ import {
 } from "./models"
 
 export const WorkerCommand = Schema.Union(
+  Schema.Struct({
+    type: Schema.Literal("steer-turn"),
+    nativeThreadId: Schema.String,
+    nativeTurnId: Schema.String,
+    text: Schema.String,
+  }),
   Schema.Struct({ type: Schema.Literal("start-turn"), dispatch: TurnDispatch }),
   Schema.Struct({ type: Schema.Literal("generate-title"), request: TitleRequest }),
   Schema.Struct({

@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+
+- Agent questions always allow a custom answer. Codex questions in the transcript now have their own answer fields and remain usable while Codex is working; replies reach the active turn immediately instead of waiting in the message queue.
+
 ### Added
 
 - Switch between **Windows (native)** and **WSL (Linux)** in Settings → General → Execution environment. The choice is saved and applied with a confirmed restart; each environment keeps its own threads, settings, and provider sign-ins. Windows mode restores native agents, terminals, and editors without requiring WSL. Existing WSL installations keep their selected mode, and WSL setup errors offer an explicit **Use Windows** option.

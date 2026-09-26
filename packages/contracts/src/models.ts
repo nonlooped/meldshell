@@ -644,6 +644,8 @@ export const ComposerCommand = Schema.Struct({
 export type ComposerCommand = typeof ComposerCommand.Type
 
 export const SubmitTurnInput = Schema.Struct({
+  /** Reply to asynchronous questions from this turn; steer it when still active. */
+  questionTurnId: Schema.optional(Schema.String),
   threadId: Schema.String,
   text: Schema.String,
   attachments: Schema.optional(Schema.Array(InputAttachment)),
@@ -734,7 +736,7 @@ export type TitleRequest = typeof TitleRequest.Type
 
 export const SubmitTurnResult = Schema.Struct({
   snapshot: AppSnapshot,
-  disposition: Schema.Literal("started", "queued"),
+  disposition: Schema.Literal("started", "queued", "steered"),
   dispatch: Schema.NullOr(TurnDispatch),
   titleRequest: Schema.NullOr(TitleRequest),
 })

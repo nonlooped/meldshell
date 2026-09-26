@@ -46,6 +46,7 @@ const ACKNOWLEDGED_ON_COMPLETION = new Set<WorkerCommand["type"]>([
   "resolve-approval",
   "shutdown",
   "interrupt-turn",
+  "steer-turn",
 ])
 
 /** Messages held for a turn Codex has not yet accepted; more than this stops the server. */
@@ -517,6 +518,20 @@ export const runCodexWorker = (
         break
       case "generate-title":
         void generateTitle(input.request)
+        break
+      case "steer-turn":
+        void serverForRequest()
+          .then((server) =>
+            server.request("turn/steer", {
+              threadId: input.nativeThreadId,
+              expectedTurnId: input.nativeTurnId,
+              input: [{ type: "text", text: input.text, text_elements: [] }],
+            }),
+          )
+          .then(
+            () => acknowledge(),
+            (cause: unknown) => acknowledge(errorMessage(cause)),
+          )
         break
       case "interrupt-turn":
         void serverForRequest()
