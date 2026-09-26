@@ -114,7 +114,9 @@ export async function startHost(
       }
     })())
   onCoreExit = () => {
-    void close().catch((cause) => console.error("Host stopped after core failure", cause))
+    void close()
+      .catch((cause) => console.error("Host stopped after core failure", cause))
+      .finally(() => platform.onCoreExit?.())
   }
   return {
     call: api.call,
