@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/main.tsx",
-    "./styles.css": "./src/app/styles.css"
+    "./styles.css": "./src/app/styles.css",
+    "./host-folder-picker": "./src/workspaces/host-folder-picker.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"

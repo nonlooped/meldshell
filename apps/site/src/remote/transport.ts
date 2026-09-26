@@ -1,4 +1,5 @@
 import ReconnectingWebSocket from "partysocket/ws"
+import { browserTerminals } from "./terminals"
 import { selectBrowserImages } from "./attachments"
 import {
   IPC,
@@ -15,13 +16,19 @@ import { accountURL } from "./accounts"
 type Listener = (...args: unknown[]) => void
 /** Connection phases the workspace chrome renders; the message explains the current phase. */
 export type RemoteState = "connecting" | "connected" | "reconnecting" | "offline" | "ended"
+type HostStatus = Awaited<ReturnType<MeldShellApi["getRemoteStatus"]>>
+// Hosts from before remote administration reject these; the site is deployed ahead of them.
 const unsupported = () =>
-  Promise.reject(new Error("Use MeldShell on the host computer for this operation."))
+  Promise.reject(new Error("Update MeldShell on the host computer to use this remotely."))
 
+/**
+ * `api` works with any host. After connecting, `forHost` adds what that host reports it supports:
+ * nothing for older hosts, and the workstation's browser and lifecycle only for desktop hosts.
+ */
 export function remoteApi(
   deviceId: string,
   status: (message: string, state: RemoteState) => void,
-): MeldShellApi {
+): { api: MeldShellApi; forHost: (host: HostStatus | null) => MeldShellApi } {
   const listeners = new Map<string, Set<Listener>>()
   const pending = new Map<
     string,
@@ -61,6 +68,7 @@ export function remoteApi(
     if (data === HEARTBEAT_PONG) return
     const frame = JSON.parse(data)
     if (frame.type === "connected") {
+      if (terminalsEnabled) terminals.connected()
       status("Connected", "connected")
       emit(IPC.runtimeChanged, ["*", true])
     } else if (frame.type === "event") emit(frame.channel, frame.args)
@@ -78,6 +86,7 @@ export function remoteApi(
         new Error("The connection dropped before this was confirmed. Check the conversation."),
       )
     pending.clear()
+    terminals.disconnected()
     if (event.code === 4003)
       status("Access to this computer ended. Return to your devices to reconnect.", "ended")
     else if (event.code === 1012)
@@ -103,8 +112,10 @@ export function remoteApi(
         return reject(new Error("Not connected to this computer. Nothing was sent."))
       pending.set(id, { resolve, reject })
     })
+  const terminals = browserTerminals(invoke, subscribe, emit)
+  let terminalsEnabled = false
   const api = createInvoker((channel, ...args) => invoke(channel, args))
-  return {
+  const base: MeldShellApi = {
     ...api,
     platform: "web",
     addWorkspace: unsupported,
@@ -140,5 +151,94 @@ export function remoteApi(
     onRuntimeChanged: (listener) => subscribe(IPC.runtimeChanged, listener as Listener),
     onOpenAttention: (listener) => subscribe(IPC.attentionRequested, listener as Listener),
     onUpdateStatus: () => () => undefined,
+  }
+  const hostApi = (): MeldShellApi => ({
+    ...base,
+    addWorkspace: async () => {
+      const { selectHostFolder } = await import("@meldshell/ui/host-folder-picker")
+      const path = await selectHostFolder(api)
+      return path === null ? api.getSnapshot() : api.addWorkspacePath(path)
+    },
+    getUpdateStatus: api.getUpdateStatus,
+    checkForUpdates: api.checkForUpdates,
+    setUpdateChannel: api.setUpdateChannel,
+    installUpdate: async () =>
+      confirm("Restart and update the host? Running agents and terminals will be interrupted.") &&
+      (await api.installUpdate()),
+    getRemoteStatus: api.getRemoteStatus,
+    linkRemote: async () => {
+      const state = await api.getRemoteStatus()
+      if (!state.linking) throw new Error("This computer is already linked.")
+      return state.linking
+    },
+    openRemotePage: async () => {
+      window.open("/dashboard", "_blank", "noopener,noreferrer")
+    },
+    unlinkRemote: api.unlinkRemote,
+    retryRemote: api.retryRemote,
+    terminal: terminals.api,
+    onUpdateStatus: (listener) => {
+      let active = true
+      const timer = setInterval(() => {
+        void api
+          .getUpdateStatus()
+          .then((status) => {
+            if (active) listener(status)
+          })
+          .catch(() => undefined)
+      }, 2000)
+      return () => {
+        active = false
+        clearInterval(timer)
+      }
+    },
+  })
+  const desktopApi = (): MeldShellApi => ({
+    ...hostApi(),
+    getWebPageTitle: api.getWebPageTitle,
+    remotePreview: (input) =>
+      invoke("meldshell:remote-preview", [input]) as ReturnType<
+        NonNullable<MeldShellApi["remotePreview"]>
+      >,
+    desktop: {
+      threadPort: (id) => invoke(IPC.threadPort, [id]) as Promise<number>,
+      openExternal: async (url) => {
+        window.open(url, "_blank", "noopener,noreferrer")
+      },
+      environment: {
+        get: () =>
+          invoke(IPC.getDesktopEnvironment, []) as ReturnType<
+            NonNullable<NonNullable<MeldShellApi["desktop"]>["environment"]>["get"]
+          >,
+        switch: async (mode) =>
+          confirm(
+            "Restart the host and switch environments? Active work will be interrupted. The other environment must already be linked for remote access.",
+          ) && ((await invoke(IPC.switchDesktopEnvironment, [mode])) as boolean),
+      },
+    },
+    hostControl: {
+      restart: async () => {
+        if (confirm("Restart MeldShell on the host? Active work will be interrupted."))
+          await invoke("meldshell:restart-host", [])
+      },
+      shutdown: async () => {
+        if (
+          confirm(
+            "Shut down MeldShell on the host? Remote access will stop until MeldShell is started there again.",
+          )
+        )
+          await invoke("meldshell:shutdown-host", [])
+      },
+    },
+  })
+  return {
+    api: { ...base, getRemoteStatus: api.getRemoteStatus },
+    forHost: (host) => {
+      // Older hosts omit `desktop` and handle none of the remote terminal or host operations.
+      if (typeof host?.desktop !== "boolean") return base
+      terminalsEnabled = true
+      terminals.connected()
+      return host.desktop ? desktopApi() : hostApi()
+    },
   }
 }

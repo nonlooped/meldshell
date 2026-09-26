@@ -6,6 +6,7 @@ import { SettingRow } from "./SettingRow"
 
 export function Environment(): React.JSX.Element | null {
   const api = window.meldshell.desktop?.environment
+  const [supported, setSupported] = useState(true)
   const [current, setCurrent] = useState<DesktopEnvironment | null>(null)
   const [mode, setMode] = useState<DesktopMode>("windows")
   const [pending, setPending] = useState(false)
@@ -17,6 +18,10 @@ export function Environment(): React.JSX.Element | null {
       .get()
       .then((value) => {
         if (disposed) return
+        if (value === null) {
+          setSupported(false)
+          return
+        }
         setCurrent(value)
         setMode(value.mode)
       })
@@ -27,7 +32,7 @@ export function Environment(): React.JSX.Element | null {
       disposed = true
     }
   }, [api])
-  if (!api) return null
+  if (!api || !supported) return null
   const switchMode = async () => {
     setPending(true)
     setError(null)
