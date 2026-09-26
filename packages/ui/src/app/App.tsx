@@ -39,6 +39,7 @@ import { useTabStore, type FileTab } from "./tab-store"
 import { visibleThreads } from "./thread-layout"
 import { useViewStore } from "./view-store"
 import { ThreadWorkbench } from "./ThreadWorkbench"
+import { LaunchReveal, LaunchScreen, useLaunch } from "./LaunchScreen"
 import { useThreadDrafts } from "./thread-drafts"
 import { useThreadSignals, useWatchedThreadIds } from "./thread-signals"
 import { terminalApi, useRunningScripts, useTerminalStore } from "../terminals/terminal-store"
@@ -413,6 +414,7 @@ export function App(): React.JSX.Element {
   const layout = remoteLayout(remotePhone, inbox.width, sourceControl.width)
 
   const { snapshotQuery, threadPagesQuery, snapshot } = useAppData()
+  const launch = useLaunch(!snapshotQuery.isPending, snapshot.providers)
 
   const {
     pinMutation,
@@ -610,266 +612,273 @@ export function App(): React.JSX.Element {
 
   return (
     <MotionPreferences reduceMotion={snapshot.settings.reduceMotion ?? false}>
-      <Tabs.Root
-        className="w-full h-full grid grid-rows-[var(--titlebar-height)_minmax(0,_1fr)] text-[var(--text-primary)] bg-[var(--scrim)] text-[13px] leading-[1.45]"
-        value={selectedTabId}
-        onValueChange={(value) => {
-          if (typeof value === "string") {
-            closeSettings()
-            selectThread(value)
-          }
-        }}
-      >
-        <AppScale />
-        <TitleBar
-          openThreads={openThreads}
-          providersByThreadId={providersByThreadId}
-          selectedTabId={selectedTabId}
-          onCloseTab={closeThread}
-          sidebarsVisible={!settingsOpen}
-          inboxCollapsed={inbox.collapsed}
-          sourceControlCollapsed={sourceControl.collapsed}
-          onToggleInbox={toggleInbox}
-          onToggleSourceControl={toggleSourceControl}
-          terminalShown={terminal.shown}
-          onToggleTerminal={terminal.toggle}
-          runScripts={terminal.runScripts}
-          runningScripts={terminal.running}
-          onRun={terminal.run}
-          onStopRun={terminal.stopRun}
-          previewShown={preview.shown}
-          onTogglePreview={preview.toggle}
-          editors={editor.editors}
-          editorFolder={editorFolder(worktreeThread)}
-          onOpenInEditor={editor.open}
-        />
-
-        {settingsOpen ? (
-          <SettingsView
-            snapshot={snapshot}
-            settingsPending={appSettingsMutation.isPending}
-            settingsError={appSettingsMutation.error?.message ?? null}
-            sidebarWidth={inbox.width}
-            onUpdateProvider={(providerId, patch) =>
-              updateProviderMutation.mutate({ providerId, ...patch })
-            }
-            onUpsertModel={(input) => upsertModelMutation.mutate(input)}
-            onDeleteModel={(modelId) => deleteModelMutation.mutate(modelId)}
-            onResetCatalog={(providerId) => resetCatalogMutation.mutate(providerId)}
-            onChangeAppSettings={(input) => appSettingsMutation.mutate(input)}
-          />
-        ) : (
-          <Group
-            elementRef={panelMotion.groupRef}
-            className="motion-panels motion-duration-220 min-h-0"
-            orientation={layout.orientation}
+      {/* The app and the launch screen crossfade over one shared backdrop. */}
+      <div className="relative w-full h-full bg-[var(--scrim)]">
+        <LaunchReveal loading={launch.loading}>
+          <Tabs.Root
+            className="w-full h-full grid grid-rows-[var(--titlebar-height)_minmax(0,_1fr)] text-[var(--text-primary)] text-[13px] leading-[1.45]"
+            value={selectedTabId}
+            onValueChange={(value) => {
+              if (typeof value === "string") {
+                closeSettings()
+                selectThread(value)
+              }
+            }}
           >
-            <SidebarPanel
-              id="inbox"
-              panelRef={inbox.panelRef}
-              elementRef={inbox.elementRef}
-              onTransitionEnd={inbox.onTransitionEnd}
-              collapsible
-              collapsedSize={inbox.collapsedSize}
-              // The rail's controls size against the panel's live width, so they track its edge.
-              className="@container"
-              defaultSize={inbox.defaultSize}
-              minSize={layout.inboxMin}
-              maxSize={layout.inboxMax}
-              groupResizeBehavior="preserve-pixel-size"
-              onResize={inbox.onResize}
-            >
-              <aside {...inbox.asideProps} style={{ width: layout.inboxWidth }}>
-                <Inbox
-                  rail={inbox.rail}
-                  showSettled={snapshot.settings.showSettled ?? true}
-                  onSearch={() => setThreadPaletteOpen(true)}
-                  onManageWorkspaces={() => setWorkspacesOpen(true)}
-                  onPin={(thread) => pinMutation.mutate(thread)}
-                  threads={inboxThreads}
-                  workspaces={snapshot.workspaces}
-                  workspaceNames={workspaceNames}
-                  providersByThreadId={providersByThreadId}
-                  selectedThreadId={selectedThreadId}
-                  unseenThreadIds={unseenThreadIds}
-                  onNewThread={requestNewThread}
-                  onAddWorkspace={() => addWorkspaceMutation.mutate()}
-                  onOpen={(threadId) => {
-                    closeSettings()
-                    openThread(threadId)
-                  }}
-                  onOpenBeside={(threadId, edge) => {
-                    closeSettings()
-                    openBeside(threadId, edge)
-                  }}
-                  onSetStatus={toggleArchived}
-                  onDelete={setDeleteTarget}
-                  canLoadMore={threadPagesQuery.hasNextPage}
-                  loadingMore={threadPagesQuery.isFetchingNextPage}
-                  onLoadMore={() => void threadPagesQuery.fetchNextPage()}
-                />
+            <AppScale />
+            <TitleBar
+              openThreads={openThreads}
+              providersByThreadId={providersByThreadId}
+              selectedTabId={selectedTabId}
+              onCloseTab={closeThread}
+              sidebarsVisible={!settingsOpen}
+              inboxCollapsed={inbox.collapsed}
+              sourceControlCollapsed={sourceControl.collapsed}
+              onToggleInbox={toggleInbox}
+              onToggleSourceControl={toggleSourceControl}
+              terminalShown={terminal.shown}
+              onToggleTerminal={terminal.toggle}
+              runScripts={terminal.runScripts}
+              runningScripts={terminal.running}
+              onRun={terminal.run}
+              onStopRun={terminal.stopRun}
+              previewShown={preview.shown}
+              onTogglePreview={preview.toggle}
+              editors={editor.editors}
+              editorFolder={editorFolder(worktreeThread)}
+              onOpenInEditor={editor.open}
+            />
 
-                <InboxFooter rail={inbox.rail} onOpenSettings={() => openSettings()} />
-              </aside>
-            </SidebarPanel>
-
-            <Separator className="motion-colors relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]" />
-
-            <Panel id="thread" minSize={layout.threadMin}>
-              <main className="grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]">
-                <FileOrThread file={selectedFile}>
-                  <ThreadPane
-                    databaseError={snapshotQuery.isError}
-                    hasThread={selectedThread !== null}
-                    onNewThread={requestNewThread}
-                  >
-                    <ThreadWorkbench
-                      snapshot={snapshot}
-                      threads={allThreads}
-                      searchTarget={searchTarget}
-                    />
-                  </ThreadPane>
-                </FileOrThread>
-              </main>
-            </Panel>
-            <Separator className="motion-colors relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]" />
-            <SidebarPanel
-              id="source-control"
-              panelRef={sourceControl.panelRef}
-              elementRef={sourceControl.elementRef}
-              onTransitionEnd={sourceControl.onTransitionEnd}
-              collapsible
-              collapsedSize={0}
-              inert={sourceControl.collapsed}
-              defaultSize={sourceControl.defaultSize}
-              minSize="240px"
-              maxSize="480px"
-              groupResizeBehavior="preserve-pixel-size"
-              onResize={sourceControl.onResize}
-            >
-              <div
-                className={`motion-colors motion-duration-220 h-full ${sourceControl.collapsed ? "opacity-0" : ""}`}
-                style={{ width: layout.filesWidth }}
+            {settingsOpen ? (
+              <SettingsView
+                snapshot={snapshot}
+                settingsPending={appSettingsMutation.isPending}
+                settingsError={appSettingsMutation.error?.message ?? null}
+                sidebarWidth={inbox.width}
+                onUpdateProvider={(providerId, patch) =>
+                  updateProviderMutation.mutate({ providerId, ...patch })
+                }
+                onUpsertModel={(input) => upsertModelMutation.mutate(input)}
+                onDeleteModel={(modelId) => deleteModelMutation.mutate(modelId)}
+                onResetCatalog={(providerId) => resetCatalogMutation.mutate(providerId)}
+                onChangeAppSettings={(input) => appSettingsMutation.mutate(input)}
+              />
+            ) : (
+              <Group
+                elementRef={panelMotion.groupRef}
+                className="motion-panels motion-duration-220 min-h-0"
+                orientation={layout.orientation}
               >
-                <FilesSidebar
-                  threadId={selectedThread?.id}
-                  key={`${activeWorkspaceId}:${activeScope?.threadId ?? ""}`}
-                  workspace={workspaceById.get(activeWorkspaceId)}
-                  scope={activeScope}
-                  worktreeThread={worktreeThread}
+                <SidebarPanel
+                  id="inbox"
+                  panelRef={inbox.panelRef}
+                  elementRef={inbox.elementRef}
+                  onTransitionEnd={inbox.onTransitionEnd}
+                  collapsible
+                  collapsedSize={inbox.collapsedSize}
+                  // The rail's controls size against the panel's live width, so they track its edge.
+                  className="@container"
+                  defaultSize={inbox.defaultSize}
+                  minSize={layout.inboxMin}
+                  maxSize={layout.inboxMax}
+                  groupResizeBehavior="preserve-pixel-size"
+                  onResize={inbox.onResize}
+                >
+                  <aside {...inbox.asideProps} style={{ width: layout.inboxWidth }}>
+                    <Inbox
+                      rail={inbox.rail}
+                      showSettled={snapshot.settings.showSettled ?? true}
+                      onSearch={() => setThreadPaletteOpen(true)}
+                      onManageWorkspaces={() => setWorkspacesOpen(true)}
+                      onPin={(thread) => pinMutation.mutate(thread)}
+                      threads={inboxThreads}
+                      workspaces={snapshot.workspaces}
+                      workspaceNames={workspaceNames}
+                      providersByThreadId={providersByThreadId}
+                      selectedThreadId={selectedThreadId}
+                      unseenThreadIds={unseenThreadIds}
+                      onNewThread={requestNewThread}
+                      onAddWorkspace={() => addWorkspaceMutation.mutate()}
+                      onOpen={(threadId) => {
+                        closeSettings()
+                        openThread(threadId)
+                      }}
+                      onOpenBeside={(threadId, edge) => {
+                        closeSettings()
+                        openBeside(threadId, edge)
+                      }}
+                      onSetStatus={toggleArchived}
+                      onDelete={setDeleteTarget}
+                      canLoadMore={threadPagesQuery.hasNextPage}
+                      loadingMore={threadPagesQuery.isFetchingNextPage}
+                      onLoadMore={() => void threadPagesQuery.fetchNextPage()}
+                    />
+
+                    <InboxFooter rail={inbox.rail} onOpenSettings={() => openSettings()} />
+                  </aside>
+                </SidebarPanel>
+
+                <Separator className="motion-colors relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]" />
+
+                <Panel id="thread" minSize={layout.threadMin}>
+                  <main className="grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]">
+                    <FileOrThread file={selectedFile}>
+                      <ThreadPane
+                        databaseError={snapshotQuery.isError}
+                        hasThread={selectedThread !== null}
+                        onNewThread={requestNewThread}
+                      >
+                        <ThreadWorkbench
+                          snapshot={snapshot}
+                          threads={allThreads}
+                          searchTarget={searchTarget}
+                        />
+                      </ThreadPane>
+                    </FileOrThread>
+                  </main>
+                </Panel>
+                <Separator className="motion-colors relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]" />
+                <SidebarPanel
+                  id="source-control"
+                  panelRef={sourceControl.panelRef}
+                  elementRef={sourceControl.elementRef}
+                  onTransitionEnd={sourceControl.onTransitionEnd}
+                  collapsible
+                  collapsedSize={0}
+                  inert={sourceControl.collapsed}
+                  defaultSize={sourceControl.defaultSize}
+                  minSize="240px"
+                  maxSize="480px"
+                  groupResizeBehavior="preserve-pixel-size"
+                  onResize={sourceControl.onResize}
+                >
+                  <div
+                    className={`motion-colors motion-duration-220 h-full ${sourceControl.collapsed ? "opacity-0" : ""}`}
+                    style={{ width: layout.filesWidth }}
+                  >
+                    <FilesSidebar
+                      threadId={selectedThread?.id}
+                      key={`${activeWorkspaceId}:${activeScope?.threadId ?? ""}`}
+                      workspace={workspaceById.get(activeWorkspaceId)}
+                      scope={activeScope}
+                      worktreeThread={worktreeThread}
+                    />
+                  </div>
+                </SidebarPanel>
+              </Group>
+            )}
+
+            {archivedThread !== null && (
+              <ActionToast
+                key={archivedThread.id}
+                message={`Archived “${archivedThread.title}”`}
+                actionLabel="Undo"
+                onAction={() => {
+                  setStatusMutation.mutate({ threadId: archivedThread.id, status: "active" })
+                  setArchivedThread(null)
+                }}
+                onDismiss={dismissArchived}
+              />
+            )}
+            <MutationErrors
+              mutations={[
+                pinMutation,
+                setStatusMutation,
+                deleteThreadMutation,
+                addWorkspaceMutation,
+                createThreadMutation,
+                editor.mutation,
+              ]}
+            />
+            <AppDialog
+              open={workspacesOpen}
+              onOpenChange={setWorkspacesOpen}
+              title="Manage workspaces"
+              actions={<Button onClick={() => setWorkspacesOpen(false)}>Done</Button>}
+            >
+              <div className="workspace-manager max-h-[60vh] [padding:0_20px] overflow-y-auto [scrollbar-gutter:stable]">
+                <WorkspaceManager
+                  workspaces={snapshot.workspaces}
+                  onAdd={() => manageAddWorkspaceMutation.mutateAsync()}
+                  onRename={(workspaceId, name) =>
+                    renameWorkspaceMutation.mutateAsync({ workspaceId, name })
+                  }
+                  onRemove={(workspaceId) => removeWorkspaceMutation.mutateAsync(workspaceId)}
                 />
               </div>
-            </SidebarPanel>
-          </Group>
-        )}
-
-        {archivedThread !== null && (
-          <ActionToast
-            key={archivedThread.id}
-            message={`Archived “${archivedThread.title}”`}
-            actionLabel="Undo"
-            onAction={() => {
-              setStatusMutation.mutate({ threadId: archivedThread.id, status: "active" })
-              setArchivedThread(null)
-            }}
-            onDismiss={dismissArchived}
-          />
-        )}
-        <MutationErrors
-          mutations={[
-            pinMutation,
-            setStatusMutation,
-            deleteThreadMutation,
-            addWorkspaceMutation,
-            createThreadMutation,
-            editor.mutation,
-          ]}
-        />
-        <AppDialog
-          open={workspacesOpen}
-          onOpenChange={setWorkspacesOpen}
-          title="Manage workspaces"
-          actions={<Button onClick={() => setWorkspacesOpen(false)}>Done</Button>}
-        >
-          <div className="workspace-manager max-h-[60vh] [padding:0_20px] overflow-y-auto [scrollbar-gutter:stable]">
-            <WorkspaceManager
+            </AppDialog>
+            <ThreadPalette
+              open={threadPaletteOpen}
+              onOpenChange={setThreadPaletteOpen}
+              threads={allThreads}
               workspaces={snapshot.workspaces}
-              onAdd={() => manageAddWorkspaceMutation.mutateAsync()}
-              onRename={(workspaceId, name) =>
-                renameWorkspaceMutation.mutateAsync({ workspaceId, name })
-              }
-              onRemove={(workspaceId) => removeWorkspaceMutation.mutateAsync(workspaceId)}
+              onOpenThread={(threadId) => {
+                closeSettings()
+                openThread(threadId)
+              }}
+              onOpenMatch={(result) => {
+                setSearchThreads((threads) => [
+                  ...threads.filter((thread) => thread.id !== result.thread.id),
+                  result.thread,
+                ])
+                setSearchTarget(result)
+                closeSettings()
+                openThread(result.thread.id)
+              }}
             />
-          </div>
-        </AppDialog>
-        <ThreadPalette
-          open={threadPaletteOpen}
-          onOpenChange={setThreadPaletteOpen}
-          threads={allThreads}
-          workspaces={snapshot.workspaces}
-          onOpenThread={(threadId) => {
-            closeSettings()
-            openThread(threadId)
-          }}
-          onOpenMatch={(result) => {
-            setSearchThreads((threads) => [
-              ...threads.filter((thread) => thread.id !== result.thread.id),
-              result.thread,
-            ])
-            setSearchTarget(result)
-            closeSettings()
-            openThread(result.thread.id)
-          }}
-        />
-        <FilePalette
-          open={filePaletteOpen}
-          onOpenChange={setFilePaletteOpen}
-          workspaces={snapshot.workspaces}
-          activeScope={activeScope}
-          onOpenFile={(scope, path) => {
-            closeSettings()
-            openFile(scope, path)
-          }}
-        />
+            <FilePalette
+              open={filePaletteOpen}
+              onOpenChange={setFilePaletteOpen}
+              workspaces={snapshot.workspaces}
+              activeScope={activeScope}
+              onOpenFile={(scope, path) => {
+                closeSettings()
+                openFile(scope, path)
+              }}
+            />
 
-        {selectedApproval !== null && (
-          <InteractionDialog
-            key={selectedApproval.id}
-            request={selectedApproval}
-            pending={resolveApprovalMutation.isPending}
-            error={resolveApprovalMutation.error?.message ?? null}
-            onResolve={(input) => resolveApprovalMutation.mutate(input)}
-          />
-        )}
+            {selectedApproval !== null && !launch.loading && (
+              <InteractionDialog
+                key={selectedApproval.id}
+                request={selectedApproval}
+                pending={resolveApprovalMutation.isPending}
+                error={resolveApprovalMutation.error?.message ?? null}
+                onResolve={(input) => resolveApprovalMutation.mutate(input)}
+              />
+            )}
 
-        <AppDialog
-          alert
-          open={deleteTarget !== null}
-          onOpenChange={(open) => {
-            if (!open) setDeleteTarget(null)
-          }}
-          title="Delete this thread permanently?"
-          actions={
-            <>
-              <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
-              <Button
-                variant="primary"
-                disabled={deleteThreadMutation.isPending}
-                onClick={() => {
-                  if (deleteTarget !== null) deleteThreadMutation.mutate(deleteTarget.id)
-                }}
-              >
-                Delete permanently
-              </Button>
-            </>
-          }
-        >
-          <p>
-            “{deleteTarget?.title}” and its complete history will be removed. This cannot be undone.
-          </p>
-          <DeleteWorktreeNote thread={deleteTarget} />
-        </AppDialog>
-      </Tabs.Root>
+            <AppDialog
+              alert
+              open={deleteTarget !== null}
+              onOpenChange={(open) => {
+                if (!open) setDeleteTarget(null)
+              }}
+              title="Delete this thread permanently?"
+              actions={
+                <>
+                  <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
+                  <Button
+                    variant="primary"
+                    disabled={deleteThreadMutation.isPending}
+                    onClick={() => {
+                      if (deleteTarget !== null) deleteThreadMutation.mutate(deleteTarget.id)
+                    }}
+                  >
+                    Delete permanently
+                  </Button>
+                </>
+              }
+            >
+              <p>
+                “{deleteTarget?.title}” and its complete history will be removed. This cannot be
+                undone.
+              </p>
+              <DeleteWorktreeNote thread={deleteTarget} />
+            </AppDialog>
+          </Tabs.Root>
+        </LaunchReveal>
+        <LaunchScreen launch={launch} />
+      </div>
     </MotionPreferences>
   )
 }

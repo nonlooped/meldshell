@@ -31,6 +31,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Changed
 
+- MeldShell opens on a branded launch screen while it loads your threads and connects to Codex, Claude Code, and Cursor, then fades into the app once they are ready, instead of showing the app while providers are still connecting. Each enabled provider's icon lights up as it connects. A provider that has not answered after 12 seconds no longer holds the app back. Reduce motion turns the animation off.
 - Showing or hiding a thread's terminal or browser preview slides the panel open and shut, as the sidebars do, instead of switching instantly. Reduce motion turns the animation off.
 - The composer blends into the workbench in both themes with a faint surface tint, no backdrop blur or drop shadow, and a softer focus border without an outer ring.
 - Updated dependencies across the desktop app, remote site, account worker, and providers. Mermaid 12 also adds support for its new diagram types while keeping existing diagrams' layout and appearance.
