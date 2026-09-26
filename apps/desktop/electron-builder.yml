@@ -27,6 +27,9 @@ asarUnpack:
   - node_modules/node-pty/**
   - resources/**
 win:
+  extraResources:
+    - from: out/wsl-host
+      to: wsl-host
   executableName: MeldShell
   icon: build/icon.ico
   target:

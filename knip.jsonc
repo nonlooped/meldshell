@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignore": ["packages/provider-codex/src/generated/**"],
-  "ignoreBinaries": ["install-electron"],
+  "ignoreBinaries": ["install-electron", "wsl.exe"],
   "includeEntryExports": true,
   // The compiler loads its plugin by name. SQLite and semver stay direct desktop dependencies
   // because bundled workers leave them external for Electron packaging. The site
@@ -11,8 +11,8 @@
     "apps/desktop": {
       "entry": ["src/main/index.ts", "src/main/workers/*.ts", "src/**/*.test.mjs"],
       "project": ["src/**/*.{ts,tsx,mjs,css}"],
-      // Imported through the bundled @meldshell/host package; listing them keeps them external
-      // and packaged. Core and provider-runtime are bundled workspace sources of the host.
+      // Imported through bundled workspace packages (host, providers); listing them keeps them
+      // external and packaged. Core and provider-runtime are bundled workspace sources of the host.
       "ignoreDependencies": [
         "@effect/experimental",
         "@effect/platform",
@@ -20,8 +20,14 @@
         "@effect/sql-sqlite-node",
         "@meldshell/core",
         "@meldshell/provider-runtime",
+        "node-pty",
+        "cross-spawn",
+        "which",
         "ws"
       ]
+    },
+    "apps/host": {
+      "entry": ["src/index.ts", "src/desktop.ts", "src/worker.ts"]
     },
     "apps/control": {
       "entry": ["test/*.test.ts"],

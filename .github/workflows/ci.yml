@@ -106,6 +106,15 @@ jobs:
       - name: Build desktop
         if: needs.changes.outputs.desktop == 'true'
         run: npm run build
+      # Installs the payload the way the WSL bootstrap does, then drives the bundled host over its pipe.
+      - name: Test the bundled WSL host
+        if: needs.changes.outputs.desktop == 'true'
+        run: |
+          MELDSHELL_BUILD_WSL_HOST=1 npm run build:wsl-host --workspace=@meldshell/desktop
+          cp -R apps/desktop/out/wsl-host "$RUNNER_TEMP/wsl-host"
+          npm ci --prefix "$RUNNER_TEMP/wsl-host" --ignore-scripts --omit=optional
+          npm rebuild --prefix "$RUNNER_TEMP/wsl-host" node-pty --ignore-scripts=false
+          MELDSHELL_TEST_WSL_BUNDLE="$RUNNER_TEMP/wsl-host/desktop.js" node --import tsx --test tests/wsl-host.test.ts
       - name: Build website
         if: needs.changes.outputs.site == 'true'
         run: npm run build --workspace=@meldshell/site
