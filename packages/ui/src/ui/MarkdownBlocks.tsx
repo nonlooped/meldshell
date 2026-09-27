@@ -16,6 +16,8 @@ import { tableDelimited } from "./markdown-model"
 import { copyableText } from "./MarkdownTools"
 import { cx, markdownInlineClasses, markdownProseClasses } from "./styles"
 import { ImageContextMenu } from "./ImageContextMenu"
+import { MarkdownWorkspace } from "./MarkdownContexts"
+import { useTabStore } from "../app/tab-store"
 
 export const MarkdownStreaming = createContext(false)
 export const MarkdownSearch = createContext("")
@@ -148,6 +150,8 @@ export function CodeBlock({
   children?: ReactNode
 }) {
   const [expanded, setExpanded] = useState(false)
+  const scope = useContext(MarkdownWorkspace)
+  const openFile = useTabStore((state) => state.openFile)
   const query = useContext(MarkdownSearch)
   const streaming = useContext(MarkdownStreaming)
   const lines = text.replace(/\n$/, "").split("\n")
@@ -199,6 +203,11 @@ export function CodeBlock({
       }
     >
       <MenuAction onClick={() => void navigator.clipboard.writeText(text)}>Copy code</MenuAction>
+      {path && scope && (
+        <MenuAction onClick={() => openFile(scope, path, startLine)}>
+          Open referenced file
+        </MenuAction>
+      )}
       <MenuAction
         onClick={() =>
           void navigator.clipboard.writeText(window.getSelection()?.toString() || text)

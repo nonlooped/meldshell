@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react"
+import { useContext, useState, type ReactNode } from "react"
 import type { Element } from "hast"
 import { useQuery } from "@tanstack/react-query"
 import { ContentTooltip, ContextMenu, MenuAction } from "./controls"
@@ -16,10 +16,9 @@ import {
   type FileReference,
 } from "./markdown-model"
 import { MarkdownSearch } from "./MarkdownBlocks"
+import { MarkdownWorkspace, MarkdownSources } from "./MarkdownContexts"
 
-/** The folder that file references in rendered Markdown resolve against. */
-export const MarkdownWorkspace = createContext<WorkspaceScope | undefined>(undefined)
-export const MarkdownSources = createContext<ReadonlyMap<string, string>>(new Map())
+export { MarkdownWorkspace, MarkdownSources } from "./MarkdownContexts"
 
 function SearchText({ text }: { text: string }) {
   const query = useContext(MarkdownSearch)

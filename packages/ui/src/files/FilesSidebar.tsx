@@ -207,6 +207,7 @@ function FileRow({
   const [expanded, setExpanded] = useState(false)
   const [operation, setOperation] = useState<FileOperation | null>(null)
   const openFile = useTabStore((state) => state.openFile)
+  const openDiff = useTabStore((state) => state.openDiff)
   const client = useQueryClient()
   const kind = statusKind(entry.status)
   const letter = statusLetters[kind]
@@ -260,7 +261,24 @@ function FileRow({
           {expanded ? "Collapse folder" : "Expand folder"}
         </MenuAction>
       ) : (
-        <MenuAction onClick={() => openFile(scope, entry.path)}>Open file</MenuAction>
+        <>
+          <MenuAction onClick={() => openFile(scope, entry.path)}>Open file</MenuAction>
+          {entry.status &&
+            entry.status !== "!!" &&
+            entry.status[0] !== " " &&
+            entry.status !== "??" && (
+              <MenuAction onClick={() => openDiff(scope, entry.path, "staged")}>
+                Open staged changes
+              </MenuAction>
+            )}
+          {entry.status &&
+            entry.status !== "!!" &&
+            (entry.status[1] !== " " || entry.status === "??") && (
+              <MenuAction onClick={() => openDiff(scope, entry.path, "unstaged")}>
+                Open unstaged changes
+              </MenuAction>
+            )}
+        </>
       )}
       <MenuAction onClick={() => void navigator.clipboard.writeText(entry.path)}>
         Copy relative path
@@ -309,8 +327,11 @@ function FileRow({
         for (const file of affected) store.closeTab(file.id)
         if (operation === "rename") {
           const parent = entry.path.slice(0, Math.max(0, entry.path.lastIndexOf("/") + 1))
-          for (const file of affected)
-            store.openFile(scope, `${parent}${name}${file.path.slice(entry.path.length)}`)
+          for (const file of affected) {
+            const nextPath = `${parent}${name}${file.path.slice(entry.path.length)}`
+            if (file.diffSide) store.openDiff(scope, nextPath, file.diffSide)
+            else store.openFile(scope, nextPath, file.line, file.endLine)
+          }
         }
       }}
     />
@@ -364,7 +385,7 @@ function Directory({
   if (query.isError) return <QueryError query={query} />
   return (
     <ul
-      className="[list-style:none] p-0 m-0"
+      className="shrink-0 [list-style:none] p-0 m-0"
       role={depth === 0 ? "tree" : "group"}
       aria-label={path || "Workspace files"}
       onKeyDown={depth === 0 ? moveInTree : undefined}
@@ -465,11 +486,28 @@ export function FilesSidebar({
             <RefreshCw size={14} />
           </IconButton>
         </div>
-        <div className="overflow-y-auto [scrollbar-gutter:stable] overflow-auto flex-1">
+        <div className="flex flex-col overflow-y-auto [scrollbar-gutter:stable] overflow-auto flex-1">
           {workspace && scope ? (
             <Directory key={workspace.id} scope={scope} path="" />
           ) : (
             <PanelNote>Choose a thread to browse its workspace.</PanelNote>
+          )}
+          {scope && (
+            <ContextMenu
+              trigger={<div className="flex-1 min-h-[48px]" aria-label="Empty files area" />}
+            >
+              <MenuAction onClick={() => setRootOperation("create-file")}>New file…</MenuAction>
+              <MenuAction onClick={() => setRootOperation("create-folder")}>New folder…</MenuAction>
+              <MenuAction
+                onClick={() =>
+                  void client.invalidateQueries({
+                    queryKey: ["workspace-directory", scope.workspaceId],
+                  })
+                }
+              >
+                Refresh files
+              </MenuAction>
+            </ContextMenu>
           )}
         </div>
       </Tabs.Panel>

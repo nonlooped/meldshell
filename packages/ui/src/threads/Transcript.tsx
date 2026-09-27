@@ -8,7 +8,15 @@ import {
 } from "../ui/motion"
 import { motion } from "motion/react"
 import { queryKeys } from "../data/cache"
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import { Collapsible } from "@base-ui-components/react/collapsible"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { Button as BaseButton } from "@base-ui-components/react/button"
@@ -49,6 +57,7 @@ import { CopyIconButton, copyStatusText, useCopy } from "../ui/CopyButton"
 import { MarkdownWorkspace, MarkdownSources, ReferenceChip } from "../ui/MarkdownReference"
 import { MarkdownStreaming, ToolImageGallery } from "../ui/MarkdownBlocks"
 import { fileReference, sourceTitles } from "../ui/markdown-model"
+import { useTabStore } from "../app/tab-store"
 import type { TranscriptTurn } from "@meldshell/projection"
 
 const fallbackText = (event: CanonicalEvent): string =>
@@ -253,14 +262,18 @@ function ToolBody({
 function ToolLineActions({
   event,
   tool,
+  patches,
   open,
   onToggle,
 }: {
   event: CanonicalEvent
   tool: ReturnType<typeof toolDetails>
+  patches: ReturnType<typeof fileChangePatches>
   open: boolean
   onToggle: () => void
 }) {
+  const scope = useContext(MarkdownWorkspace)
+  const openFile = useTabStore((state) => state.openFile)
   return (
     <>
       <MenuAction onClick={onToggle}>{open ? "Collapse details" : "Expand details"}</MenuAction>
@@ -277,6 +290,12 @@ function ToolLineActions({
           Copy output
         </MenuAction>
       )}
+      {scope &&
+        patches.map(({ path }) => (
+          <MenuAction key={path} onClick={() => openFile(scope, path)}>
+            Open {path}
+          </MenuAction>
+        ))}
     </>
   )
 }
@@ -341,6 +360,7 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
         <ToolLineActions
           event={event}
           tool={tool}
+          patches={patches}
           open={open}
           onToggle={() => setOpen((value) => !value)}
         />

@@ -701,6 +701,9 @@ export function App(): React.JSX.Element {
                       selectedThreadId={selectedThreadId}
                       unseenThreadIds={unseenThreadIds}
                       onNewThread={requestNewThread}
+                      onNewThreadInWorkspace={(workspaceId) =>
+                        createThreadMutation.mutate({ workspaceId })
+                      }
                       onRename={(thread) => {
                         setRenameTarget(thread)
                         setRenameTitle(thread.title)
