@@ -8,6 +8,7 @@ import { seedCatalog, syncProviderCatalog } from "./catalog"
 import { runMigrations } from "./database/migrations"
 import { renameThread, setThreadStatus } from "./threads"
 import { submitTurn } from "./turns"
+import { setThreadTitle } from "./titles"
 
 const model: ProviderModelCatalogEntry = {
   catalogId: "gpt",
@@ -60,7 +61,10 @@ it.effect("manual thread rename trims and locks the title", () =>
       VALUES ('t', 'w', 'New thread', 'active', '2026-09-01', '2026-09-01', 0)`
     const snapshot = yield* renameThread("t", "  A useful name  ")
     assert.equal(snapshot.threads[0]?.title, "A useful name")
-    const rows = yield* sql`SELECT title_locked FROM threads WHERE id = 't'`
+    const late = yield* setThreadTitle({ threadId: "t", title: "Late generated name" })
+    assert.equal(late.threads[0]?.title, "A useful name")
+    const rows = yield* sql`SELECT title_locked, title_manual FROM threads WHERE id = 't'`
     assert.equal(rows[0]?.title_locked, 1)
+    assert.equal(rows[0]?.title_manual, 1)
   }).pipe(Effect.provide(TestDatabase)),
 )

@@ -98,7 +98,7 @@ export const renameThread = (threadId: string, title: string) =>
       return yield* Effect.fail(
         new CoreProtocolError({ message: "Thread title must be 1–100 characters." }),
       )
-    yield* sql`UPDATE threads SET title = ${trimmed}, title_locked = 1, updated_at = ${new Date().toISOString()} WHERE id = ${threadId}`
+    yield* sql`UPDATE threads SET title = ${trimmed}, title_locked = 1, title_manual = 1, updated_at = ${new Date().toISOString()} WHERE id = ${threadId}`
     return yield* getSnapshot
   })
 
@@ -116,12 +116,12 @@ export const createThread = (input: RecordThreadInput) =>
       Effect.gen(function* () {
         yield* sql`
           INSERT INTO threads (
-            id, workspace_id, title, status, created_at, updated_at, title_locked,
+            id, workspace_id, title, status, created_at, updated_at, title_locked, title_manual,
             worktree_path, worktree_branch, worktree_base, worktree_state
           )
           VALUES (
             ${threadId}, ${input.workspaceId}, ${title}, 'active',
-            ${timestamp}, ${timestamp}, ${titleLocked},
+            ${timestamp}, ${timestamp}, ${titleLocked}, ${titleLocked},
             ${input.worktree?.path ?? null}, ${input.worktree?.branch ?? null},
             ${input.worktree?.baseBranch ?? null}, ${input.worktree === undefined ? null : "ready"}
           )

@@ -301,6 +301,10 @@ export const runMigrations = Effect.gen(function* () {
         yield* sql`CREATE INDEX scheduled_prompts_thread_idx ON scheduled_prompts(thread_id)`
       }),
     },
+    {
+      version: 11,
+      apply: sql`ALTER TABLE threads ADD COLUMN title_manual INTEGER NOT NULL DEFAULT 0`,
+    },
   ]
   const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table'`
   const has = (name: string) => tables.some((table) => table.name === name)

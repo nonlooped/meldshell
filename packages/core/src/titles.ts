@@ -122,6 +122,6 @@ export const setThreadTitle = (input: SetThreadTitleInput) =>
     const sql = yield* SqlClient.SqlClient
     const title = sanitizeGeneratedTitle(input.title)
     if (title === null) return yield* getSnapshot
-    yield* sql`UPDATE threads SET title = ${title} WHERE id = ${input.threadId}`
+    yield* sql`UPDATE threads SET title = ${title} WHERE id = ${input.threadId} AND title_manual = 0`
     return yield* getSnapshot
   })
