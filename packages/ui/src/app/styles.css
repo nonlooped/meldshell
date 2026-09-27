@@ -115,9 +115,9 @@
     --color-deleted: #ed9393;
     --color-renamed: #b8a1ed;
     --color-info: #88b9ed;
-    --spin-top: #b6d3ef;
-    --spin-middle: #edb185;
-    --spin-bottom: #f888a0;
+    --spin-top: var(--color-info);
+    --spin-middle: var(--accent);
+    --spin-bottom: var(--color-renamed);
 
     /* ANSI colours for thread terminals, drawn from the status colours above. */
     --terminal-black: #2c2c30;
@@ -300,9 +300,6 @@
     --color-deleted: #a83a42;
     --color-renamed: #7650af;
     --color-info: #24619f;
-    --spin-top: #4f8cc9;
-    --spin-middle: #d7803f;
-    --spin-bottom: #e0536f;
     --terminal-black: #3b3a40;
     --terminal-cyan: #1d6b68;
     --terminal-white: #6e6d74;
