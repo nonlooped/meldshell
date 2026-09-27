@@ -7,7 +7,7 @@ import {
   type ReactNode,
   createContext,
 } from "react"
-import { Button, AppDialog } from "./controls"
+import { Button, AppDialog, ContextMenu, MenuAction } from "./controls"
 import { Swap } from "./motion"
 import { SourceCode } from "./SourceCode"
 import { ChangeDiff } from "./ChangeDiff"
@@ -155,44 +155,62 @@ export function CodeBlock({
   const diff = /^(diff|patch)$/.test(language)
   const diagram = language === "mermaid"
   return (
-    <section className={markdownCodeClasses} aria-label={path || language || "Code block"}>
-      <header>
-        {path && <FileIcon path={path} size={14} />}
-        <span>{path || language || "Text"}</span>
-        <CopyButton value={text} label="Copy code" />
-      </header>
-      {diagram && <Diagram text={text} />}
-      {diff && !streaming && !query ? (
-        <ChangeDiff path={path} patch={text} />
-      ) : (
-        <div
-          className="markdown-code-scroll flex max-h-[65vh] overflow-auto [&[data-folded]]:max-h-[300px] [&[data-folded]]:overflow-y-hidden"
-          data-folded={(long && !showAll) || undefined}
-        >
-          <pre className="markdown-line-numbers" aria-hidden="true">
-            {lines.map((_, i) => startLine + i).join("\n")}
-          </pre>
-          <pre tabIndex={0}>
-            {query ? (
-              children
-            ) : (
-              <SourceCode text={text} path={path} language={language || undefined} />
-            )}
-          </pre>
-        </div>
+    <ContextMenu
+      trigger={
+        <section className={markdownCodeClasses} aria-label={path || language || "Code block"}>
+          <header>
+            {path && <FileIcon path={path} size={14} />}
+            <span>{path || language || "Text"}</span>
+            <CopyButton value={text} label="Copy code" />
+          </header>
+          {diagram && <Diagram text={text} />}
+          {diff && !streaming && !query ? (
+            <ChangeDiff path={path} patch={text} />
+          ) : (
+            <div
+              className="markdown-code-scroll flex max-h-[65vh] overflow-auto [&[data-folded]]:max-h-[300px] [&[data-folded]]:overflow-y-hidden"
+              data-folded={(long && !showAll) || undefined}
+            >
+              <pre className="markdown-line-numbers" aria-hidden="true">
+                {lines.map((_, i) => startLine + i).join("\n")}
+              </pre>
+              <pre tabIndex={0}>
+                {query ? (
+                  children
+                ) : (
+                  <SourceCode text={text} path={path} language={language || undefined} />
+                )}
+              </pre>
+            </div>
+          )}
+          {long && !(diff && !streaming && !query) && (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-expanded={showAll}
+              onClick={() => setExpanded(!expanded)}
+              disabled={!!query}
+            >
+              {showAll ? "Show less" : `Show all ${lines.length} lines`}
+            </Button>
+          )}
+        </section>
+      }
+    >
+      <MenuAction onClick={() => void navigator.clipboard.writeText(text)}>Copy code</MenuAction>
+      <MenuAction
+        onClick={() =>
+          void navigator.clipboard.writeText(window.getSelection()?.toString() || text)
+        }
+      >
+        Copy selection or code
+      </MenuAction>
+      {long && (
+        <MenuAction disabled={!!query} onClick={() => setExpanded((value) => !value)}>
+          {showAll ? "Show less" : "Show all lines"}
+        </MenuAction>
       )}
-      {long && !(diff && !streaming && !query) && (
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-expanded={showAll}
-          onClick={() => setExpanded(!expanded)}
-          disabled={!!query}
-        >
-          {showAll ? "Show less" : `Show all ${lines.length} lines`}
-        </Button>
-      )}
-    </section>
+    </ContextMenu>
   )
 }
 
@@ -207,57 +225,95 @@ export function MarkdownTable({ children }: { children?: ReactNode }) {
       separator,
     )
   return (
-    <div className="[&[data-expanded]_.markdown-table]:max-h-[80vh]">
-      <div className="flex items-center flex-wrap gap-[4px] [margin:4px_0_8px] [font-family:var(--font-text)] [&_.button]:text-[11px] [&_.text-input]:flex-1 [&_.text-input]:min-w-[120px]">
-        <CopyButton label="Copy CSV" value={() => tableText(",")} />
-        <CopyButton label="Copy TSV" value={() => tableText("\t")} />
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-haspopup="dialog"
-          onClick={() => setExpanded(!expanded)}
-        >
-          Expand table
-        </Button>
-      </div>
-      <div className="markdown-table" role="region" aria-label="Markdown table" tabIndex={0}>
-        <table ref={ref}>{children}</table>
-      </div>
-      {expanded && (
-        <AppDialog
-          open={expanded}
-          onOpenChange={setExpanded}
-          title="Table"
-          actions={
-            <>
-              <CopyButton label="Copy CSV" value={() => tableText(",")} />
-              <CopyButton label="Copy TSV" value={() => tableText("\t")} />
-              <Button onClick={() => setExpanded(false)}>Close</Button>
-            </>
-          }
-        >
-          <div className={eventMarkdownClasses}>
-            <div className="markdown-table" tabIndex={0} role="region" aria-label="Expanded table">
-              <table>{children}</table>
-            </div>
+    <ContextMenu
+      trigger={
+        <div className="[&[data-expanded]_.markdown-table]:max-h-[80vh]">
+          <div className="flex items-center flex-wrap gap-[4px] [margin:4px_0_8px] [font-family:var(--font-text)] [&_.button]:text-[11px] [&_.text-input]:flex-1 [&_.text-input]:min-w-[120px]">
+            <CopyButton label="Copy CSV" value={() => tableText(",")} />
+            <CopyButton label="Copy TSV" value={() => tableText("\t")} />
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-haspopup="dialog"
+              onClick={() => setExpanded(!expanded)}
+            >
+              Expand table
+            </Button>
           </div>
-        </AppDialog>
-      )}
-    </div>
+          <div className="markdown-table" role="region" aria-label="Markdown table" tabIndex={0}>
+            <table ref={ref}>{children}</table>
+          </div>
+          {expanded && (
+            <AppDialog
+              open={expanded}
+              onOpenChange={setExpanded}
+              title="Table"
+              actions={
+                <>
+                  <CopyButton label="Copy CSV" value={() => tableText(",")} />
+                  <CopyButton label="Copy TSV" value={() => tableText("\t")} />
+                  <Button onClick={() => setExpanded(false)}>Close</Button>
+                </>
+              }
+            >
+              <div className={eventMarkdownClasses}>
+                <div
+                  className="markdown-table"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Expanded table"
+                >
+                  <table>{children}</table>
+                </div>
+              </div>
+            </AppDialog>
+          )}
+        </div>
+      }
+    >
+      <MenuAction onClick={() => void navigator.clipboard.writeText(tableText(","))}>
+        Copy as CSV
+      </MenuAction>
+      <MenuAction onClick={() => void navigator.clipboard.writeText(tableText("\t"))}>
+        Copy as TSV
+      </MenuAction>
+      <MenuAction onClick={() => setExpanded(true)}>Expand table</MenuAction>
+    </ContextMenu>
   )
 }
 
 export function FoldedQuote({ children, length }: { children: ReactNode; length: number }) {
   const [expanded, setExpanded] = useState(false)
+  const quoteRef = useRef<HTMLQuoteElement>(null)
   const query = useContext(MarkdownSearch)
   return (
     <div>
-      <blockquote
-        className="[&[data-folded]]:max-h-[180px] [&[data-folded]]:overflow-hidden"
-        data-folded={(length > 1200 && !expanded && !query) || undefined}
+      <ContextMenu
+        trigger={
+          <blockquote
+            ref={quoteRef}
+            className="[&[data-folded]]:max-h-[180px] [&[data-folded]]:overflow-hidden"
+            data-folded={(length > 1200 && !expanded && !query) || undefined}
+          >
+            {children}
+          </blockquote>
+        }
       >
-        {children}
-      </blockquote>
+        <MenuAction
+          onClick={() =>
+            void navigator.clipboard.writeText(
+              window.getSelection()?.toString() || quoteRef.current?.innerText || "",
+            )
+          }
+        >
+          Copy quote
+        </MenuAction>
+        {length > 1200 && (
+          <MenuAction disabled={!!query} onClick={() => setExpanded((value) => !value)}>
+            {expanded ? "Show less" : "Show full quote"}
+          </MenuAction>
+        )}
+      </ContextMenu>
       {length > 1200 && (
         <Button
           size="sm"

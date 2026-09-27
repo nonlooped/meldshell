@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react"
 import type { Element } from "hast"
 import { useQuery } from "@tanstack/react-query"
-import { ContentTooltip } from "./controls"
+import { ContentTooltip, ContextMenu, MenuAction } from "./controls"
 import { BookOpen, Globe } from "lucide-react"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { useTabStore } from "../app/tab-store"
@@ -96,29 +96,58 @@ export function ReferenceChip({ reference, label }: { reference: FileReference; 
   )
   if (!scope)
     return (
-      <span className={referenceChipClasses} title={title}>
-        {content}
-      </span>
+      <ContextMenu
+        trigger={
+          <span className={referenceChipClasses} title={title}>
+            {content}
+          </span>
+        }
+      >
+        <MenuAction onClick={() => void navigator.clipboard.writeText(title)}>
+          Copy reference
+        </MenuAction>
+        <MenuAction onClick={() => void navigator.clipboard.writeText(reference.path)}>
+          Copy path
+        </MenuAction>
+      </ContextMenu>
     )
   return (
-    <ContentTooltip
-      open={open}
-      onOpenChange={setOpen}
-      className={referencePreviewClasses}
+    <ContextMenu
       trigger={
-        <button
-          type="button"
-          className={referenceChipClasses}
-          aria-label={`Open ${title}`}
-          onClick={() => openFile(scope, reference.path, reference.line, reference.endLine)}
-        >
-          {content}
-        </button>
+        <span className="inline-flex">
+          <ContentTooltip
+            open={open}
+            onOpenChange={setOpen}
+            className={referencePreviewClasses}
+            trigger={
+              <button
+                type="button"
+                className={referenceChipClasses}
+                aria-label={`Open ${title}`}
+                onClick={() => openFile(scope, reference.path, reference.line, reference.endLine)}
+              >
+                {content}
+              </button>
+            }
+          >
+            <span>{title}</span>
+            {open && <ReferenceExcerpt reference={reference} scope={scope} />}
+          </ContentTooltip>
+        </span>
       }
     >
-      <span>{title}</span>
-      {open && <ReferenceExcerpt reference={reference} scope={scope} />}
-    </ContentTooltip>
+      <MenuAction
+        onClick={() => openFile(scope, reference.path, reference.line, reference.endLine)}
+      >
+        Open file
+      </MenuAction>
+      <MenuAction onClick={() => void navigator.clipboard.writeText(title)}>
+        Copy reference
+      </MenuAction>
+      <MenuAction onClick={() => void navigator.clipboard.writeText(reference.path)}>
+        Copy path
+      </MenuAction>
+    </ContextMenu>
   )
 }
 
@@ -166,9 +195,18 @@ export function MarkdownLink({
   if (!/^https?:\/\//i.test(href)) return <span>{children}</span>
   if (node?.children.some((child) => child.type === "element" && child.tagName === "img"))
     return (
-      <a href={href} target="_blank" rel="noreferrer">
-        {children}
-      </a>
+      <ContextMenu
+        trigger={
+          <a href={href} target="_blank" rel="noreferrer">
+            {children}
+          </a>
+        }
+      >
+        <MenuAction onClick={() => void window.open(href, "_blank")}>Open link</MenuAction>
+        <MenuAction onClick={() => void navigator.clipboard.writeText(href)}>
+          Copy link address
+        </MenuAction>
+      </ContextMenu>
     )
   return (
     <WebPageLink
@@ -197,15 +235,24 @@ function WebPageLink({
   })
   const title = webLinkLabel(query.data, sources.get(href) || suppliedTitle, fallback)
   return (
-    <a
-      className={"[&_>_svg]:[vertical-align:-1px] [&_>_svg]:mr-[4px]"}
-      href={href}
-      target="_blank"
-      rel="noreferrer"
+    <ContextMenu
+      trigger={
+        <a
+          className={"[&_>_svg]:[vertical-align:-1px] [&_>_svg]:mr-[4px]"}
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Globe size={12} aria-hidden="true" />
+          <SearchText text={title} />
+        </a>
+      }
     >
-      <Globe size={12} aria-hidden="true" />
-      <SearchText text={title} />
-    </a>
+      <MenuAction onClick={() => void window.open(href, "_blank")}>Open link</MenuAction>
+      <MenuAction onClick={() => void navigator.clipboard.writeText(href)}>
+        Copy link address
+      </MenuAction>
+    </ContextMenu>
   )
 }
 
