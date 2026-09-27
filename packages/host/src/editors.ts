@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process"
 import { stat } from "node:fs/promises"
+import { dirname } from "node:path"
 import which from "which"
 import type { ExternalEditor } from "@meldshell/contracts/ipc"
 import { childEnvironment } from "./environment"
@@ -50,10 +51,10 @@ export async function listEditors(): Promise<ExternalEditor[]> {
   return found.flat().map(({ id, name }) => ({ id, name }))
 }
 
-const launch = (file: string, folder: string, spawnEditor: EditorSpawn): Promise<void> =>
+const launch = (file: string, args: string[], spawnEditor: EditorSpawn): Promise<void> =>
   new Promise((resolve, reject) => {
-    // The folder is a single argument, including when its name contains spaces or shell syntax.
-    const child = spawnEditor(file, [folder], {
+    // Paths stay single arguments, including when they contain spaces or shell syntax.
+    const child = spawnEditor(file, args, {
       detached: true,
       windowsHide: true,
       stdio: "ignore",
@@ -82,5 +83,18 @@ export async function openEditor(
   if (!editor) throw new Error("MeldShell does not know this editor.")
   const file = await locate(editor)
   if (!file) throw new Error(`${editor.name} is not installed in this environment.`)
-  await launch(file, folder, spawnEditor)
+  await launch(file, [folder], spawnEditor)
+}
+
+export async function revealFile(path: string, spawnEditor: EditorSpawn = spawn): Promise<void> {
+  const editor = EDITORS.find((entry) => entry.id === "file-manager")!
+  const file = await locate(editor)
+  if (!file) throw new Error("A file manager is not installed in this environment.")
+  const args =
+    process.platform === "win32"
+      ? ["/select,", path]
+      : process.platform === "darwin"
+        ? ["-R", path]
+        : [dirname(path)]
+  await launch(file, args, spawnEditor)
 }

@@ -29,6 +29,7 @@ export interface DesktopMethods {
   "terminal.close": (id: string) => Promise<void>
   "editor.list": () => Promise<ExternalEditor[]>
   "editor.open": (scope: WorkspaceScope, id: string) => Promise<void>
+  "editor.reveal": (scope: WorkspaceScope, path: string) => Promise<void>
   toHostPath: (path: string) => Promise<string>
   close: () => Promise<void>
 }

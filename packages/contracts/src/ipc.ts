@@ -199,6 +199,7 @@ interface DesktopApi {
   readonly listEditors?: () => Promise<readonly ExternalEditor[]>
   /** Opens the folder a thread works in, or the workspace folder, in the chosen editor. */
   readonly openInEditor?: (input: WorkspaceScope & { editorId: string }) => Promise<void>
+  readonly revealFile?: (input: WorkspaceFileInput) => Promise<void>
   /** The first of the ports assigned to a thread, as scripts receive it in `MELDSHELL_PORT`. */
   readonly threadPort: (threadId: string) => Promise<number>
   /** Opens an http or https address in the system browser. */
@@ -429,6 +430,7 @@ export const IPC = {
   switchDesktopEnvironment: "meldshell:switch-desktop-environment",
   listEditors: "meldshell:list-editors",
   openInEditor: "meldshell:open-in-editor",
+  revealFile: "meldshell:reveal-file",
   threadPort: "meldshell:thread-port",
   openExternal: "meldshell:open-external",
 } as const

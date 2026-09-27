@@ -11,6 +11,7 @@ import { diffLineCounts, parseFileDiffs } from "../ui/diff-model"
 import { FileIcon } from "../ui/FileIcon"
 import { ContextMenu, MenuAction, PanelNote } from "../ui/controls"
 import { useTabStore } from "../app/tab-store"
+import { RevealFileAction } from "../ui/FileContextActions"
 
 export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide }) {
   const openFile = useTabStore((state) => state.openFile)
@@ -117,6 +118,7 @@ export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide })
           <MenuAction onClick={() => void navigator.clipboard.writeText(file.path)}>
             Copy file path
           </MenuAction>
+          <RevealFileAction scope={file} path={file.path} />
           <MenuAction
             onClick={() =>
               void navigator.clipboard.writeText(window.getSelection()?.toString() || query.data)
