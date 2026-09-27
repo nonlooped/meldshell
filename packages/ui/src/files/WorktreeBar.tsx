@@ -157,9 +157,11 @@ export function WorktreeBar({ thread }: { thread: Thread }): React.JSX.Element |
               Run setup again
             </MenuAction>
           )}
-          <MenuAction disabled={busy} onClick={() => setRemoving(true)}>
-            Remove worktree…
-          </MenuAction>
+          {worktree.state !== "removed" && (
+            <MenuAction disabled={busy} onClick={() => setRemoving(true)}>
+              Remove worktree…
+            </MenuAction>
+          )}
         </ContextMenu>
         <span
           className={`shrink-0 text-[10.5px] ${ready ? "text-[var(--text-tertiary)]" : "text-[var(--color-modified)]"}`}

@@ -30,6 +30,23 @@ async function pngBlob(source: string): Promise<Blob> {
   }
 }
 
+function downloadName(name: string | undefined, type: string): string {
+  const base = name?.trim() || "image"
+  if (/\.[a-z0-9]{2,5}$/i.test(base)) return base
+  const extension: Record<string, string> = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "image/svg+xml": "svg",
+    "image/bmp": "bmp",
+    "image/avif": "avif",
+    "image/x-icon": "ico",
+    "image/vnd.microsoft.icon": "ico",
+  }
+  return `${base}.${extension[type] ?? "png"}`
+}
+
 export function ImageContextMenu({
   trigger,
   source,
@@ -52,7 +69,7 @@ export function ImageContextMenu({
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.download = name || "image"
+    link.download = downloadName(name, blob.type)
     link.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }

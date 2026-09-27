@@ -200,6 +200,7 @@ function AddressBar({
         title={invalid ? "Enter an http or https address." : undefined}
         spellCheck={false}
         value={draft}
+        onContextMenu={(event) => event.stopPropagation()}
         onFocus={(event) => {
           editing.current = true
           event.currentTarget.select()

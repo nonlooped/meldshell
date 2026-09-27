@@ -37,6 +37,16 @@ test("workspace file actions reject traversal and symlinked parents", async () =
       workspaceFileAction(root, { path: "", action: "create-file", name: "../bad" }),
       /without path separators/,
     )
+    for (const path of ["", ".", "..", root, `${root}/outside`, "src/../outside"]) {
+      await assert.rejects(
+        workspaceFileAction(root, { path, action: "delete" }),
+        /inside the workspace/,
+      )
+      await assert.rejects(
+        workspaceFileAction(root, { path, action: "rename", name: "moved" }),
+        /inside the workspace/,
+      )
+    }
   } finally {
     await rm(root, { recursive: true, force: true })
     await rm(outside, { recursive: true, force: true })

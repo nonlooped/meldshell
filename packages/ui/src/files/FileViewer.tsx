@@ -133,7 +133,7 @@ export function FileViewer({ file }: { file: FileTab }) {
           Copy file path
         </MenuAction>
         <RevealFileAction scope={file} path={file.path} />
-        {preview && preview.kind !== "unsupported" && (
+        {preview && preview.kind !== "unsupported" && preview.kind !== "image" && (
           <MenuAction onClick={() => void navigator.clipboard.writeText(preview.content)}>
             Copy file contents
           </MenuAction>

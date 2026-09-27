@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import {
   Button,
+  AppDialog,
   ContextMenu,
   IconButton,
   DropdownMenu,
@@ -119,6 +120,7 @@ function FileRow({
 }): React.JSX.Element {
   const openDiff = useTabStore((state) => state.openDiff)
   const openFile = useTabStore((state) => state.openFile)
+  const [confirmRestore, setConfirmRestore] = useState(false)
   const slash = change.path.lastIndexOf("/")
   const rowRef = useRef<HTMLDivElement>(null)
   const reduced = useMotionPreference()
@@ -167,7 +169,9 @@ function FileRow({
           }
         >
           <MenuAction onClick={() => openDiff(scope, change.path, side)}>Open diff</MenuAction>
-          <MenuAction onClick={() => openFile(scope, change.path)}>Open file</MenuAction>
+          {!change.status.includes("D") && (
+            <MenuAction onClick={() => openFile(scope, change.path)}>Open file</MenuAction>
+          )}
           <MenuAction
             disabled={busy}
             onClick={() => onAction(change.path, side === "staged" ? "unstage" : "stage")}
@@ -177,7 +181,7 @@ function FileRow({
           {side === "unstaged" && (
             <MenuAction
               disabled={busy || /U|AA|DD/.test(change.status)}
-              onClick={() => onAction(change.path, "restore")}
+              onClick={() => setConfirmRestore(true)}
             >
               Restore changes…
             </MenuAction>
@@ -210,12 +214,35 @@ function FileRow({
           <IconButton
             label={`Restore ${change.path}`}
             disabled={busy || /U|AA|DD/.test(change.status)}
-            onClick={() => onAction(change.path, "restore")}
+            onClick={() => setConfirmRestore(true)}
           >
             <Undo2 size={14} />
           </IconButton>
         )}
       </div>
+      <AppDialog
+        alert
+        open={confirmRestore}
+        onOpenChange={setConfirmRestore}
+        title="Restore changes?"
+        actions={
+          <>
+            <Button onClick={() => setConfirmRestore(false)}>Cancel</Button>
+            <Button
+              variant="primary"
+              disabled={busy}
+              onClick={() => {
+                onAction(change.path, "restore")
+                setConfirmRestore(false)
+              }}
+            >
+              Restore changes
+            </Button>
+          </>
+        }
+      >
+        <p>Discard uncommitted changes in {change.path}?</p>
+      </AppDialog>
     </motion.div>
   )
 }
