@@ -1,6 +1,10 @@
-import { open, readdir, realpath, stat } from "node:fs/promises"
-import { extname, isAbsolute, relative, resolve, sep } from "node:path"
-import type { DirectoryEntry, FilePreview } from "@meldshell/contracts/ipc"
+import { lstat, mkdir, open, readdir, realpath, rename, rm, stat } from "node:fs/promises"
+import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path"
+import type {
+  DirectoryEntry,
+  FilePreview,
+  WorkspaceFileActionInput,
+} from "@meldshell/contracts/ipc"
 import mime from "mime"
 import { git, gitValue, parseStatus } from "./git"
 
@@ -11,6 +15,53 @@ async function workspaceFile(root: string, path: string): Promise<string> {
   if (within === ".." || within.startsWith(`..${sep}`) || isAbsolute(within))
     throw new Error("This path is outside the workspace.")
   return target
+}
+
+export const workspaceAbsolutePath = workspaceFile
+
+function entryName(name: string | undefined): string {
+  const trimmed = name?.trim() ?? ""
+  if (!trimmed || trimmed === "." || trimmed === ".." || /[/\\\0]/.test(trimmed))
+    throw new Error("Enter a file or folder name without path separators.")
+  return trimmed
+}
+
+async function existingEntry(root: string, path: string): Promise<string> {
+  if (!path || basename(path) === "." || basename(path) === "..")
+    throw new Error("Select a file or folder inside the workspace.")
+  const parent = await workspaceFile(root, dirname(path))
+  const target = resolve(parent, basename(path))
+  await lstat(target)
+  return target
+}
+
+export async function workspaceFileAction(
+  root: string,
+  input: Pick<WorkspaceFileActionInput, "path" | "action" | "name">,
+): Promise<void> {
+  if (input.action === "create-file" || input.action === "create-folder") {
+    const parent = await workspaceFile(root, input.path)
+    const target = resolve(parent, entryName(input.name))
+    if (input.action === "create-folder") await mkdir(target)
+    else await (await open(target, "wx")).close()
+    return
+  }
+  const target = await existingEntry(root, input.path)
+  if (input.action === "delete") {
+    await rm(target, { recursive: true, force: false })
+    return
+  }
+  const destination = resolve(dirname(target), entryName(input.name))
+  if (destination === target) return
+  const occupied = await lstat(destination).then(
+    () => true,
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return false
+      throw error
+    },
+  )
+  if (occupied) throw new Error("A file or folder with that name already exists.")
+  await rename(target, destination)
 }
 
 /** Entry states for one directory; a folder outside Git has none. */

@@ -258,6 +258,15 @@ export async function gitFileAction(
   })
 }
 
+export async function gitBulkAction(
+  workspacePath: string,
+  action: "stage" | "unstage",
+): Promise<void> {
+  await writeRepository(workspacePath, async (root) => {
+    await git(root, action === "stage" ? ["add", "-A"] : ["reset"])
+  })
+}
+
 async function restoreChange(root: string, change: GitChange): Promise<void> {
   if (/U|AA|DD/.test(change.status))
     throw new Error("Resolve this conflict before restoring the file.")

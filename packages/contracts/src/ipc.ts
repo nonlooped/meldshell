@@ -44,6 +44,11 @@ export interface WorkspaceScope {
 export interface WorkspaceFileInput extends WorkspaceScope {
   readonly path: string
 }
+export interface WorkspaceFileActionInput extends WorkspaceFileInput {
+  readonly action: "create-file" | "create-folder" | "rename" | "delete"
+  /** A single entry name, required for creation and rename. */
+  readonly name?: string | undefined
+}
 export interface HostFolders {
   readonly path: string
   readonly parent: string | null
@@ -251,9 +256,18 @@ export const requests = {
   readWorkspaceFile: request<(input: WorkspaceFileInput) => Promise<FilePreview>>(
     "meldshell:read-workspace-file",
   ),
+  workspaceAbsolutePath: request<(input: WorkspaceFileInput) => Promise<string>>(
+    "meldshell:workspace-absolute-path",
+  ),
+  workspaceFileAction: request<(input: WorkspaceFileActionInput) => Promise<void>>(
+    "meldshell:workspace-file-action",
+  ),
   gitFileAction: request<
     (input: WorkspaceScope & { path: string; action: GitFileAction }) => Promise<void>
   >("meldshell:git-file-action"),
+  gitBulkAction: request<
+    (input: WorkspaceScope & { action: "stage" | "unstage" }) => Promise<void>
+  >("meldshell:git-bulk-action"),
   gitCommit:
     request<(input: WorkspaceScope & { message: string }) => Promise<void>>("meldshell:git-commit"),
   gitPush: request<(input: WorkspaceScope) => Promise<void>>("meldshell:git-push"),
