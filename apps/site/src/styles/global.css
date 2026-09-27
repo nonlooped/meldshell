@@ -6,7 +6,7 @@
 @import "@fontsource/monaspace-neon/600.css";
 
 /* Tokens follow the desktop app's monochrome system: its dark base is the page background, and
-   the only hues are status and brand colors plus the working indicator's three-tone gradient. */
+   the only hues are status and brand colors. */
 
 @theme {
   --color-*: initial;
@@ -29,9 +29,9 @@
   --color-queued: #b8a1ed;
   --color-added: #83c994;
   --color-deleted: #ed9393;
-  --color-spin-top: #b6d3ef;
-  --color-spin-middle: #edb185;
-  --color-spin-bottom: #f888a0;
+  --color-spin-top: var(--color-running);
+  --color-spin-middle: var(--color-accent);
+  --color-spin-bottom: var(--color-queued);
   --color-white: #fff;
   --color-black: #000;
 
