@@ -11,7 +11,7 @@ import { GitSidebar } from "./GitSidebar"
 import { WorktreeBar } from "./WorktreeBar"
 import { scopeKey } from "../data/workspace-scope"
 import { FileIcon } from "../ui/FileIcon"
-import { Button, IconButton, PanelNote, QueryError } from "../ui/controls"
+import { Button, ContextMenu, IconButton, MenuAction, PanelNote, QueryError } from "../ui/controls"
 import { useTabStore } from "../app/tab-store"
 import { panelNoteClasses, panelTabsClasses } from "../ui/styles"
 
@@ -108,6 +108,7 @@ function FileRow({
 }) {
   const [expanded, setExpanded] = useState(false)
   const openFile = useTabStore((state) => state.openFile)
+  const client = useQueryClient()
   const kind = statusKind(entry.status)
   const letter = statusLetters[kind]
   const row = (
@@ -153,10 +154,40 @@ function FileRow({
         ))}
     </BaseButton>
   )
-  if (!entry.directory) return <li role="none">{row}</li>
+  const actions = (
+    <>
+      {entry.directory ? (
+        <MenuAction onClick={() => setExpanded((value) => !value)}>
+          {expanded ? "Collapse folder" : "Expand folder"}
+        </MenuAction>
+      ) : (
+        <MenuAction onClick={() => openFile(scope, entry.path)}>Open file</MenuAction>
+      )}
+      <MenuAction onClick={() => void navigator.clipboard.writeText(entry.path)}>
+        Copy relative path
+      </MenuAction>
+      {entry.directory && (
+        <MenuAction
+          onClick={() =>
+            void client.invalidateQueries({
+              queryKey: ["workspace-directory", ...scopeKey(scope), entry.path],
+            })
+          }
+        >
+          Refresh folder
+        </MenuAction>
+      )}
+    </>
+  )
+  if (!entry.directory)
+    return (
+      <li role="none">
+        <ContextMenu trigger={row}>{actions}</ContextMenu>
+      </li>
+    )
   return (
     <Collapsible.Root render={<li role="none" />} open={expanded} onOpenChange={setExpanded}>
-      <Collapsible.Trigger render={row} />
+      <ContextMenu trigger={<Collapsible.Trigger render={row} />}>{actions}</ContextMenu>
       <CollapsiblePanel>
         <Directory
           scope={scope}

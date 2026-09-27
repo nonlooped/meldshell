@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { Thread, ThreadWorktree } from "@meldshell/contracts"
 import { GitBranch, GitMerge, MoreHorizontal, RotateCw, ScrollText, Trash2 } from "lucide-react"
-import { AppDialog, Button, Checkbox, DropdownMenu, MenuAction } from "../ui/controls"
+import { AppDialog, Button, Checkbox, ContextMenu, DropdownMenu, MenuAction } from "../ui/controls"
 import { replaceSnapshot } from "../data/cache"
 import { useWorkspaceScripts } from "../terminals/workspace-scripts"
 import { SetupLogDialog, WorktreeSetupNote, useWorktreeSetupActions } from "./WorktreeSetup"
@@ -124,12 +124,43 @@ export function WorktreeBar({ thread }: { thread: Thread }): React.JSX.Element |
     >
       <div className="flex items-center gap-[7px] min-w-0">
         <GitBranch size={13} className="shrink-0 text-[var(--text-tertiary)]" aria-hidden="true" />
-        <span
-          className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-          title={worktree.path}
+        <ContextMenu
+          trigger={
+            <span
+              className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+              title={worktree.path}
+            >
+              {worktree.branch}
+            </span>
+          }
         >
-          {worktree.branch}
-        </span>
+          <MenuAction onClick={() => void navigator.clipboard.writeText(worktree.branch)}>
+            Copy branch name
+          </MenuAction>
+          <MenuAction onClick={() => void navigator.clipboard.writeText(worktree.path)}>
+            Copy worktree path
+          </MenuAction>
+          <MenuAction
+            disabled={!ready || worktree.baseBranch === null || merge.isPending}
+            onClick={() => merge.mutate()}
+          >
+            Merge into base branch…
+          </MenuAction>
+          {worktree.setup !== undefined && (
+            <MenuAction onClick={() => setShowingSetupLog(true)}>Show setup output</MenuAction>
+          )}
+          {scripts.data?.setup != null && (
+            <MenuAction
+              disabled={!ready || busy || worktree.setup === "running" || rerun.isPending}
+              onClick={() => rerun.mutate()}
+            >
+              Run setup again
+            </MenuAction>
+          )}
+          <MenuAction disabled={busy} onClick={() => setRemoving(true)}>
+            Remove worktree…
+          </MenuAction>
+        </ContextMenu>
         <span
           className={`shrink-0 text-[10.5px] ${ready ? "text-[var(--text-tertiary)]" : "text-[var(--color-modified)]"}`}
         >

@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm"
 import type { FileTab } from "../app/tab-store"
 import { useTabStore } from "../app/tab-store"
 import { FileIcon } from "../ui/FileIcon"
-import { Button, PanelNote } from "../ui/controls"
+import { Button, ContextMenu, MenuAction, PanelNote } from "../ui/controls"
 import { cx, markdownProseClasses } from "../ui/styles"
 import { useEffect, useRef } from "react"
 
@@ -108,21 +108,35 @@ export function FileViewer({ file }: { file: FileTab }) {
       className="flex flex-col h-full min-h-0 overflow-hidden"
       aria-label={`File viewer: ${file.path}`}
     >
-      <header className="flex items-center gap-[8px] [padding:10px_16px] border-b-[1px] border-b-[color:var(--line)] [&_span]:flex-1 [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap">
-        <FileIcon path={file.path} />
-        <span title={file.path}>
-          {file.path}
-          {file.line ? ` · L${file.line}` : ""}
-        </span>
-        {file.line && (
-          <Button size="sm" onClick={() => openFile(file, file.path)}>
-            Clear line reference
-          </Button>
+      <ContextMenu
+        trigger={
+          <header className="flex items-center gap-[8px] [padding:10px_16px] border-b-[1px] border-b-[color:var(--line)] [&_span]:flex-1 [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap">
+            <FileIcon path={file.path} />
+            <span title={file.path}>
+              {file.path}
+              {file.line ? ` · L${file.line}` : ""}
+            </span>
+            {file.line && (
+              <Button size="sm" onClick={() => openFile(file, file.path)}>
+                Clear line reference
+              </Button>
+            )}
+            <Button size="sm" disabled={query.isFetching} onClick={() => void query.refetch()}>
+              Refresh
+            </Button>
+          </header>
+        }
+      >
+        <MenuAction onClick={() => void navigator.clipboard.writeText(file.path)}>
+          Copy file path
+        </MenuAction>
+        {preview && preview.kind !== "unsupported" && (
+          <MenuAction onClick={() => void navigator.clipboard.writeText(preview.content)}>
+            Copy file contents
+          </MenuAction>
         )}
-        <Button size="sm" disabled={query.isFetching} onClick={() => void query.refetch()}>
-          Refresh
-        </Button>
-      </header>
+        <MenuAction onClick={() => void query.refetch()}>Refresh file</MenuAction>
+      </ContextMenu>
       {query.isPending && <PanelNote role="status">Loading file…</PanelNote>}
       {query.isError && <PanelNote role="alert">{query.error.message}</PanelNote>}
       {preview?.kind === "unsupported" && <PanelNote>{preview.content}</PanelNote>}
@@ -133,27 +147,45 @@ export function FileViewer({ file }: { file: FileTab }) {
         </div>
       )}
       {preview?.kind === "text" && (
-        <pre
-          className={fileSourceClasses}
-          tabIndex={0}
-          aria-label={file.line ? `Source at line ${file.line}` : "Source"}
+        <ContextMenu
+          trigger={
+            <pre
+              className={fileSourceClasses}
+              tabIndex={0}
+              aria-label={file.line ? `Source at line ${file.line}` : "Source"}
+            >
+              <span className="relative inline-block min-w-full">
+                {file.line && file.line <= lineCount && (
+                  <span
+                    ref={lineRef}
+                    className="absolute left-[0] right-[0] bg-[var(--surface-active)] [outline:1px_solid_var(--line-strong)] pointer-events-none"
+                    data-path={file.path}
+                    aria-hidden="true"
+                    style={{
+                      top: `${(file.line - 1) * 1.6}em`,
+                      height: `${(Math.min(file.endLine ?? file.line, lineCount) - file.line + 1) * 1.6}em`,
+                    }}
+                  />
+                )}
+                <SourceCode path={file.path} text={preview.content} />
+              </span>
+            </pre>
+          }
         >
-          <span className="relative inline-block min-w-full">
-            {file.line && file.line <= lineCount && (
-              <span
-                ref={lineRef}
-                className="absolute left-[0] right-[0] bg-[var(--surface-active)] [outline:1px_solid_var(--line-strong)] pointer-events-none"
-                data-path={file.path}
-                aria-hidden="true"
-                style={{
-                  top: `${(file.line - 1) * 1.6}em`,
-                  height: `${(Math.min(file.endLine ?? file.line, lineCount) - file.line + 1) * 1.6}em`,
-                }}
-              />
-            )}
-            <SourceCode path={file.path} text={preview.content} />
-          </span>
-        </pre>
+          <MenuAction
+            onClick={() =>
+              void navigator.clipboard.writeText(
+                window.getSelection()?.toString() || preview.content,
+              )
+            }
+          >
+            Copy selection or file
+          </MenuAction>
+          <MenuAction onClick={() => void navigator.clipboard.writeText(file.path)}>
+            Copy file path
+          </MenuAction>
+          <MenuAction onClick={() => void query.refetch()}>Refresh file</MenuAction>
+        </ContextMenu>
       )}
       {preview?.kind === "markdown" && (
         <div className={eventMarkdownClasses}>

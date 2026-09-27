@@ -9,9 +9,11 @@ import { ChangeDiff } from "../ui/ChangeDiff"
 import type { DiffViewType } from "../ui/ChangeDiffContent"
 import { diffLineCounts, parseFileDiffs } from "../ui/diff-model"
 import { FileIcon } from "../ui/FileIcon"
-import { PanelNote } from "../ui/controls"
+import { ContextMenu, MenuAction, PanelNote } from "../ui/controls"
+import { useTabStore } from "../app/tab-store"
 
 export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide }) {
+  const openFile = useTabStore((state) => state.openFile)
   const [viewType, setViewType] = useState<DiffViewType>("unified")
   const [wrap, setWrap] = useState(true)
   // The whole file comes back so unchanged runs can be expanded in place. Git is polled, so the
@@ -90,23 +92,39 @@ export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide })
       {query.isPending && <PanelNote role="status">Loading diff…</PanelNote>}
       {query.isError && <PanelNote role="alert">{query.error.message}</PanelNote>}
       {query.data !== undefined && (
-        <div
-          className={`flex-1 min-h-0 min-w-0 overflow-auto p-[16px] [&_.event-diff]:overflow-visible [&_.event-diff]:w-full [&_.event-diff]:max-w-full [&_.event-diff-header_>_span]:min-w-0 overflow-y-auto [scrollbar-gutter:stable] ${wrap ? wrapClasses : ""}`}
-          tabIndex={0}
-          role="region"
-          aria-label={`${side} changes to ${file.path}`}
+        <ContextMenu
+          trigger={
+            <div
+              className={`flex-1 min-h-0 min-w-0 overflow-auto p-[16px] [&_.event-diff]:overflow-visible [&_.event-diff]:w-full [&_.event-diff]:max-w-full [&_.event-diff-header_>_span]:min-w-0 overflow-y-auto [scrollbar-gutter:stable] ${wrap ? wrapClasses : ""}`}
+              tabIndex={0}
+              role="region"
+              aria-label={`${side} changes to ${file.path}`}
+            >
+              {query.data.trim() ? (
+                <ChangeDiff
+                  path={file.path}
+                  patch={query.data}
+                  showHeader={false}
+                  viewType={viewType}
+                />
+              ) : (
+                <PanelNote>No {side} changes remain for this file.</PanelNote>
+              )}
+            </div>
+          }
         >
-          {query.data.trim() ? (
-            <ChangeDiff
-              path={file.path}
-              patch={query.data}
-              showHeader={false}
-              viewType={viewType}
-            />
-          ) : (
-            <PanelNote>No {side} changes remain for this file.</PanelNote>
-          )}
-        </div>
+          <MenuAction onClick={() => openFile(file, file.path)}>Open file</MenuAction>
+          <MenuAction onClick={() => void navigator.clipboard.writeText(file.path)}>
+            Copy file path
+          </MenuAction>
+          <MenuAction
+            onClick={() =>
+              void navigator.clipboard.writeText(window.getSelection()?.toString() || query.data)
+            }
+          >
+            Copy selection or patch
+          </MenuAction>
+        </ContextMenu>
       )}
     </section>
   )
