@@ -27,7 +27,14 @@ function entryName(name: string | undefined): string {
 }
 
 async function existingEntry(root: string, path: string): Promise<string> {
-  if (!path || basename(path) === "." || basename(path) === "..")
+  if (
+    !path ||
+    isAbsolute(path) ||
+    path.split(/[/\\]/).some((part) => part === ".." || part === ".") ||
+    !basename(path) ||
+    basename(path) === "." ||
+    basename(path) === ".."
+  )
     throw new Error("Select a file or folder inside the workspace.")
   const parent = await workspaceFile(root, dirname(path))
   const target = resolve(parent, basename(path))
