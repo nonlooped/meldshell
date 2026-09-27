@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import {
   Button,
+  ContextMenu,
   IconButton,
   DropdownMenu,
   MenuAction,
@@ -116,6 +117,7 @@ function FileRow({
   change: GitChange
 }): React.JSX.Element {
   const openDiff = useTabStore((state) => state.openDiff)
+  const openFile = useTabStore((state) => state.openFile)
   const slash = change.path.lastIndexOf("/")
   const rowRef = useRef<HTMLDivElement>(null)
   const reduced = useMotionPreference()
@@ -139,26 +141,50 @@ function FileRow({
           "flex items-center gap-[0] pr-[6px] [&_.git-file]:flex-1 [&_.git-file]:min-w-0 [&_.git-file]:pr-[6px] [&_>_.icon-button]:shrink-0 [&_>_.icon-button]:opacity-[0] [&:hover_>_.icon-button]:opacity-[1] [&:focus-within_>_.icon-button]:opacity-[1] [@media(hover:_none)]:[&_>_.icon-button]:opacity-[1] [&:hover]:bg-[var(--surface-hover)]"
         }
       >
-        <button
-          type="button"
-          onClick={() => openDiff(scope, change.path, side)}
-          className={
-            "git-file flex items-center gap-[7px] w-full h-[28px] border-0 [padding:0_14px] bg-transparent text-left cursor-pointer [&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)]"
+        <ContextMenu
+          trigger={
+            <button
+              type="button"
+              onClick={() => openDiff(scope, change.path, side)}
+              className={
+                "git-file flex items-center gap-[7px] w-full h-[28px] border-0 [padding:0_14px] bg-transparent text-left cursor-pointer [&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)]"
+              }
+              title={`${change.originalPath ? `${change.originalPath} → ` : ""}${change.path} · ${statusLabel(change)}`}
+              aria-label={`${change.path}, ${statusLabel(change)}`}
+            >
+              <FileIcon path={change.path} size={16} />
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-primary)]">
+                {change.path.slice(slash + 1)}
+              </span>
+              <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] text-[10px]">
+                {change.path.slice(0, Math.max(0, slash))}
+              </span>
+              <span className={gitFileStatusClasses} data-kind={changeKind(change.status)}>
+                {change.status === "??" ? "U" : change.status.trim()}
+              </span>
+            </button>
           }
-          title={`${change.originalPath ? `${change.originalPath} → ` : ""}${change.path} · ${statusLabel(change)}`}
-          aria-label={`${change.path}, ${statusLabel(change)}`}
         >
-          <FileIcon path={change.path} size={16} />
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-primary)]">
-            {change.path.slice(slash + 1)}
-          </span>
-          <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] text-[10px]">
-            {change.path.slice(0, Math.max(0, slash))}
-          </span>
-          <span className={gitFileStatusClasses} data-kind={changeKind(change.status)}>
-            {change.status === "??" ? "U" : change.status.trim()}
-          </span>
-        </button>
+          <MenuAction onClick={() => openDiff(scope, change.path, side)}>Open diff</MenuAction>
+          <MenuAction onClick={() => openFile(scope, change.path)}>Open file</MenuAction>
+          <MenuAction
+            disabled={busy}
+            onClick={() => onAction(change.path, side === "staged" ? "unstage" : "stage")}
+          >
+            {side === "staged" ? "Unstage file" : "Stage file"}
+          </MenuAction>
+          {side === "unstaged" && (
+            <MenuAction
+              disabled={busy || /U|AA|DD/.test(change.status)}
+              onClick={() => onAction(change.path, "restore")}
+            >
+              Restore changes…
+            </MenuAction>
+          )}
+          <MenuAction onClick={() => void navigator.clipboard.writeText(change.path)}>
+            Copy relative path
+          </MenuAction>
+        </ContextMenu>
         <IconButton
           label={`${side === "staged" ? "Unstage" : "Stage"} ${change.path}`}
           disabled={busy}
@@ -633,55 +659,69 @@ function CommitRow({
   const ref = primaryRef(commit.refs)
   return (
     <Collapsible.Root render={<li />}>
-      <Collapsible.Trigger
-        className="w-full border-0 bg-transparent text-left cursor-pointer pl-[0] flex items-center gap-[6px] h-[28px] pr-[12px] [&:hover]:bg-[var(--surface-hover)] [&[aria-expanded='true']]:bg-[var(--surface-hover)]"
-        title={`${commit.subject}\n${commit.author} · ${new Date(commit.date).toLocaleString()}\n${commit.hash.slice(0, 7)}${commit.refs ? `\n${commit.refs}` : ""}`}
-      >
-        <svg
-          width={graphWidth}
-          height={28}
-          aria-hidden="true"
-          className="shrink-0 overflow-visible [&_path]:[fill:none] [&_path]:[stroke:currentColor] [&_path]:stroke-[1.25] [&_circle]:[fill:currentColor] [&_circle]:[stroke:currentColor]"
-        >
-          {edges.map((edge, index) => (
-            <path
-              key={index}
-              style={{ color: laneColor(edge.color) }}
-              d={`M ${12 + edge.from * 14} ${edge.startsAtNode ? 14 : 0} L ${12 + edge.from * 14} 14 L ${12 + edge.to * 14} 28`}
-            />
-          ))}
-          {incoming && (
-            <path style={{ color: laneColor(row.color) }} d={`M ${12 + lane * 14} 0 V 14`} />
-          )}
-          <circle style={{ color: laneColor(row.color) }} cx={12 + lane * 14} cy={14} r={3.5} />
-        </svg>
-        <span className="flex-1 min-w-[50px] overflow-hidden text-ellipsis whitespace-nowrap">
-          {commit.subject}
-        </span>
-        {ref !== null && (
-          <span
-            className="inline-flex max-w-[96px] shrink-0 items-center gap-[4px] h-[18px] [padding:0_6px] rounded-[9px] bg-[color-mix(in_srgb,var(--color-info)_12%,transparent)] text-[10.5px] text-[var(--color-info)]"
-            title={commit.refs}
+      <ContextMenu
+        trigger={
+          <Collapsible.Trigger
+            className="w-full border-0 bg-transparent text-left cursor-pointer pl-[0] flex items-center gap-[6px] h-[28px] pr-[12px] [&:hover]:bg-[var(--surface-hover)] [&[aria-expanded='true']]:bg-[var(--surface-hover)]"
+            title={`${commit.subject}\n${commit.author} · ${new Date(commit.date).toLocaleString()}\n${commit.hash.slice(0, 7)}${commit.refs ? `\n${commit.refs}` : ""}`}
           >
-            {ref.head && (
-              <span
-                aria-label="HEAD"
-                className="w-[5px] h-[5px] shrink-0 rounded-full bg-current"
-              />
-            )}
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-              {ref.name}
+            <svg
+              width={graphWidth}
+              height={28}
+              aria-hidden="true"
+              className="shrink-0 overflow-visible [&_path]:[fill:none] [&_path]:[stroke:currentColor] [&_path]:stroke-[1.25] [&_circle]:[fill:currentColor] [&_circle]:[stroke:currentColor]"
+            >
+              {edges.map((edge, index) => (
+                <path
+                  key={index}
+                  style={{ color: laneColor(edge.color) }}
+                  d={`M ${12 + edge.from * 14} ${edge.startsAtNode ? 14 : 0} L ${12 + edge.from * 14} 14 L ${12 + edge.to * 14} 28`}
+                />
+              ))}
+              {incoming && (
+                <path style={{ color: laneColor(row.color) }} d={`M ${12 + lane * 14} 0 V 14`} />
+              )}
+              <circle style={{ color: laneColor(row.color) }} cx={12 + lane * 14} cy={14} r={3.5} />
+            </svg>
+            <span className="flex-1 min-w-[50px] overflow-hidden text-ellipsis whitespace-nowrap">
+              {commit.subject}
             </span>
-            {ref.more > 0 && <span className="shrink-0 opacity-[0.7]">+{ref.more}</span>}
-          </span>
-        )}
-        <time
-          dateTime={commit.date}
-          className="shrink-0 min-w-[24px] text-right text-[var(--text-tertiary)] text-[10.5px] tabular-nums"
-        >
-          {relativeAge(commit.date)}
-        </time>
-      </Collapsible.Trigger>
+            {ref !== null && (
+              <span
+                className="inline-flex max-w-[96px] shrink-0 items-center gap-[4px] h-[18px] [padding:0_6px] rounded-[9px] bg-[color-mix(in_srgb,var(--color-info)_12%,transparent)] text-[10.5px] text-[var(--color-info)]"
+                title={commit.refs}
+              >
+                {ref.head && (
+                  <span
+                    aria-label="HEAD"
+                    className="w-[5px] h-[5px] shrink-0 rounded-full bg-current"
+                  />
+                )}
+                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                  {ref.name}
+                </span>
+                {ref.more > 0 && <span className="shrink-0 opacity-[0.7]">+{ref.more}</span>}
+              </span>
+            )}
+            <time
+              dateTime={commit.date}
+              className="shrink-0 min-w-[24px] text-right text-[var(--text-tertiary)] text-[10.5px] tabular-nums"
+            >
+              {relativeAge(commit.date)}
+            </time>
+          </Collapsible.Trigger>
+        }
+      >
+        <MenuAction onClick={() => void navigator.clipboard.writeText(commit.hash)}>
+          Copy full hash
+        </MenuAction>
+        <MenuAction onClick={() => void navigator.clipboard.writeText(commit.hash.slice(0, 7))}>
+          Copy short hash
+        </MenuAction>
+        <MenuAction onClick={() => void navigator.clipboard.writeText(commit.subject)}>
+          Copy commit subject
+        </MenuAction>
+      </ContextMenu>
       <CollapsiblePanel>
         <div
           className="[&_.event-diff]:border-0 [&_.event-diff]:rounded-[0] max-h-[480px] overflow-auto border-y-[1px] border-y-[color:var(--line-subtle)] [&_.work-item-output]:m-0 [&_.work-item-output]:whitespace-pre-wrap [&_.work-item-output]:[overflow-wrap:anywhere]"
