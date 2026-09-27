@@ -19,7 +19,14 @@ import {
 } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { ExternalEditor, RunScript } from "@meldshell/contracts/ipc"
-import { DropdownMenu, IconButton, MenuAction, MenuGroup, MenuSeparator } from "../ui/controls"
+import {
+  ContextMenu,
+  DropdownMenu,
+  IconButton,
+  MenuAction,
+  MenuGroup,
+  MenuSeparator,
+} from "../ui/controls"
 import { Pressable, TextSwap, useMotionPreference } from "../ui/motion"
 import { iconButtonClasses } from "../ui/styles"
 import { MeldMark } from "../ui/MeldMark"
@@ -264,6 +271,9 @@ export function TitleBar({
 }: TitleBarProps): React.JSX.Element {
   const files = useTabStore((state) => state.files)
   const threadTabs = useTabStore((state) => state.threadTabs)
+  const tabIds = [...threadTabs.map((tab) => tab.id), ...files.map((file) => file.id)]
+  const closeOthers = (id: string) => tabIds.filter((tabId) => tabId !== id).forEach(onCloseTab)
+  const closeRight = (id: string) => tabIds.slice(tabIds.indexOf(id) + 1).forEach(onCloseTab)
   const reduced = useMotionPreference()
   const bindings = useKeybindings((state) => state.bindings)
   const hasThreadTools = (editors !== null && editors.length > 0) || runScripts.length > 0
@@ -324,34 +334,48 @@ export function TitleBar({
               selected={tab.id === selectedTabId}
               shared={shared}
             >
-              <Tabs.Tab
-                value={tab.id}
-                aria-label={shared ? label : `${title}, ${providerLabel}`}
-                title={
-                  shared
-                    ? `${label}\n${members.length} threads`
-                    : `${title}\n${providerLabel}\nDrag onto a pane to move or split it`
-                }
-                className="flex min-w-0 flex-[1_1_auto] items-center gap-[7px] [padding:0_6px] border-0 bg-transparent text-inherit overflow-hidden text-[12px] cursor-default"
-              >
-                <span
-                  className="tab-provider-mark grid w-[14px] h-[14px] flex-[0_0_14px] text-[var(--text-tertiary)] place-items-center"
-                  aria-hidden="true"
-                >
-                  <TabMark layout={tab.layout} provider={provider} />
-                </span>
-                <span className="relative min-w-0 overflow-hidden">
-                  <TextSwap text={title} />
-                </span>
-                {shared && (
-                  <span
-                    className="flex-none text-[var(--text-tertiary)] text-[10px] tabular-nums"
-                    aria-hidden="true"
+              <ContextMenu
+                trigger={
+                  <Tabs.Tab
+                    value={tab.id}
+                    aria-label={shared ? label : `${title}, ${providerLabel}`}
+                    title={
+                      shared
+                        ? `${label}\n${members.length} threads`
+                        : `${title}\n${providerLabel}\nDrag onto a pane to move or split it`
+                    }
+                    className="flex min-w-0 flex-[1_1_auto] items-center gap-[7px] [padding:0_6px] border-0 bg-transparent text-inherit overflow-hidden text-[12px] cursor-default"
                   >
-                    {members.length}
-                  </span>
-                )}
-              </Tabs.Tab>
+                    <span
+                      className="tab-provider-mark grid w-[14px] h-[14px] flex-[0_0_14px] text-[var(--text-tertiary)] place-items-center"
+                      aria-hidden="true"
+                    >
+                      <TabMark layout={tab.layout} provider={provider} />
+                    </span>
+                    <span className="relative min-w-0 overflow-hidden">
+                      <TextSwap text={title} />
+                    </span>
+                    {shared && (
+                      <span
+                        className="flex-none text-[var(--text-tertiary)] text-[10px] tabular-nums"
+                        aria-hidden="true"
+                      >
+                        {members.length}
+                      </span>
+                    )}
+                  </Tabs.Tab>
+                }
+              >
+                <MenuAction onClick={() => onCloseTab(tab.id)}>
+                  {shared ? "Close split tab" : "Close tab"}
+                </MenuAction>
+                <MenuAction disabled={tabIds.length < 2} onClick={() => closeOthers(tab.id)}>
+                  Close other tabs
+                </MenuAction>
+                <MenuAction disabled={tabIds.at(-1) === tab.id} onClick={() => closeRight(tab.id)}>
+                  Close tabs to the right
+                </MenuAction>
+              </ContextMenu>
               <IconButton
                 unstyled
                 className={tabCloseClasses}
@@ -370,17 +394,32 @@ export function TitleBar({
             className={`motion-colors starting:opacity-0 ${tabClasses}`}
             {...(file.id === selectedTabId ? { "data-selected": "" } : {})}
           >
-            <Tabs.Tab
-              value={file.id}
-              className="flex min-w-0 flex-[1_1_auto] items-center gap-[7px] [padding:0_6px] border-0 bg-transparent text-inherit overflow-hidden text-[12px] cursor-default"
-              title={`${file.path}${file.diffSide ? ` · ${file.diffSide} changes` : ""}`}
+            <ContextMenu
+              trigger={
+                <Tabs.Tab
+                  value={file.id}
+                  className="flex min-w-0 flex-[1_1_auto] items-center gap-[7px] [padding:0_6px] border-0 bg-transparent text-inherit overflow-hidden text-[12px] cursor-default"
+                  title={`${file.path}${file.diffSide ? ` · ${file.diffSide} changes` : ""}`}
+                >
+                  <FileIcon path={file.path} size={14} />
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                    {file.path.split("/").pop()}
+                    {file.diffSide ? ` · ${file.diffSide} changes` : ""}
+                  </span>
+                </Tabs.Tab>
+              }
             >
-              <FileIcon path={file.path} size={14} />
-              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                {file.path.split("/").pop()}
-                {file.diffSide ? ` · ${file.diffSide} changes` : ""}
-              </span>
-            </Tabs.Tab>
+              <MenuAction onClick={() => onCloseTab(file.id)}>Close tab</MenuAction>
+              <MenuAction disabled={tabIds.length < 2} onClick={() => closeOthers(file.id)}>
+                Close other tabs
+              </MenuAction>
+              <MenuAction disabled={tabIds.at(-1) === file.id} onClick={() => closeRight(file.id)}>
+                Close tabs to the right
+              </MenuAction>
+              <MenuAction onClick={() => void navigator.clipboard.writeText(file.path)}>
+                Copy file path
+              </MenuAction>
+            </ContextMenu>
             <IconButton
               unstyled
               className={tabCloseClasses}

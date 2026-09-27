@@ -20,6 +20,7 @@ import { AlertDialog } from "@base-ui-components/react/alert-dialog"
 import { Checkbox as BaseCheckbox } from "@base-ui-components/react/checkbox"
 import { Radio as BaseRadio } from "@base-ui-components/react/radio"
 import { Menu } from "@base-ui-components/react/menu"
+import { ContextMenu as BaseContextMenu } from "@base-ui-components/react/context-menu"
 import { Select } from "@base-ui-components/react/select"
 import { Switch as BaseSwitch } from "@base-ui-components/react/switch"
 import { Tooltip } from "@base-ui-components/react/tooltip"
@@ -400,6 +401,29 @@ export function DropdownMenu({
         </Menu.Positioner>
       </Menu.Portal>
     </Menu.Root>
+  )
+}
+
+/** Shares the action menu's appearance and keyboard behavior with secondary-click menus. */
+export function ContextMenu({
+  trigger,
+  children,
+  className,
+}: Pick<MenuRootProps, "trigger" | "children" | "className">): React.JSX.Element {
+  return (
+    <BaseContextMenu.Root>
+      <BaseContextMenu.Trigger render={trigger} />
+      <BaseContextMenu.Portal>
+        <BaseContextMenu.Positioner className="z-[200]" collisionPadding={10}>
+          <BaseContextMenu.Popup
+            render={<MotionSurface kind="popup" />}
+            className={cx(menuPopupClasses, className)}
+          >
+            {children}
+          </BaseContextMenu.Popup>
+        </BaseContextMenu.Positioner>
+      </BaseContextMenu.Portal>
+    </BaseContextMenu.Root>
   )
 }
 

@@ -18,6 +18,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
+- Right-click menus provide contextual actions across threads and workspace surfaces.
+
 - Remote control can browse host folders and add workspaces, open terminals and run scripts, manage the linked account, check and install desktop updates, change update channels, and restart or shut down the host. Windows/WSL switching is available remotely with confirmation. Remote terminals retain their processes for five minutes through connection loss and replay bounded output on reconnect; input is never retried. Desktop hosts provide an isolated, interactive browser preview rendered on the workstation, so local development servers stay on the host. Standalone headless hosts retain their service-manager update and lifecycle workflow.
 
 - Switch between **Windows (native)** and **WSL (Linux)** in Settings → General → Execution environment. The choice is saved and applied with a confirmed restart; each environment keeps its own threads, settings, and provider sign-ins. Windows mode restores native agents, terminals, and editors without requiring WSL. Existing WSL installations keep their selected mode, and WSL setup errors offer an explicit **Use Windows** option.

@@ -34,6 +34,7 @@ import {
   Button,
   ChordKeys,
   ContentTooltip,
+  ContextMenu,
   DropdownMenu,
   IconButton,
   MenuAction,
@@ -127,191 +128,207 @@ function InboxThread({
   const glance = threadGlance(thread.activity, thread.status === "active" && finishedUnseen)
   const provider = providersByThreadId.get(thread.id)
   return (
-    <div
-      className={`motion-colors ${threadRowClasses}`}
-      data-status={thread.status}
-      data-activity={thread.activity}
-      {...(selected ? { "data-selected": "" } : {})}
-      {...(attention !== null ? { "data-attention": "" } : {})}
-    >
-      {attention !== null && (
-        <span
-          aria-hidden="true"
-          className="absolute left-[0] top-[12px] bottom-[12px] w-[2px] rounded-full"
-          style={{ background: attention }}
-        />
-      )}
-      <ContentTooltip
-        side="right"
-        disabled={!rail}
-        className="max-w-[280px]"
-        trigger={
-          <BaseButton
-            ref={draggable.ref}
-            type="button"
-            className="thread-open relative flex min-w-0 flex-1 flex-col overflow-hidden justify-start gap-[5px] [padding:8px_10px] border-0 bg-transparent text-inherit cursor-default text-left [&:focus-visible]:[outline-offset:-2px]"
-            data-dragging={draggable.isDragging ? "" : undefined}
-            aria-current={selected ? "true" : undefined}
-            // The rail names the thread in its own tooltip instead.
-            title={
-              rail
-                ? undefined
-                : [thread.title, glanceLabel(glance), "Drag onto a pane to open it there"]
-                    .filter((line) => line !== null)
-                    .join("\n")
-            }
-            onClick={() => onOpen(thread.id)}
-          >
-            <RailTile title={thread.title} glance={glance} />
-            {thread.status === "active" ? (
-              <>
-                <span
-                  className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
-                >
-                  <TextSwap text={thread.title} />
-                </span>
-                <span className={`${threadContextClasses} ${railLabelClasses}`}>
-                  <ProviderIcon provider={provider} size={13} />
-                  <span className="flex min-w-0 flex-1 items-center gap-[6px] overflow-visible!">
-                    {thread.worktree !== undefined && (
-                      <span
-                        className="inline-flex shrink-0"
-                        role="img"
-                        aria-label={`Own branch ${thread.worktree.branch}`}
-                        title={`Works on its own branch: ${thread.worktree.branch}`}
-                      >
-                        <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
+    <ContextMenu
+      trigger={
+        <div
+          className={`motion-colors ${threadRowClasses}`}
+          data-status={thread.status}
+          data-activity={thread.activity}
+          {...(selected ? { "data-selected": "" } : {})}
+          {...(attention !== null ? { "data-attention": "" } : {})}
+        >
+          {attention !== null && (
+            <span
+              aria-hidden="true"
+              className="absolute left-[0] top-[12px] bottom-[12px] w-[2px] rounded-full"
+              style={{ background: attention }}
+            />
+          )}
+          <ContentTooltip
+            side="right"
+            disabled={!rail}
+            className="max-w-[280px]"
+            trigger={
+              <BaseButton
+                ref={draggable.ref}
+                type="button"
+                className="thread-open relative flex min-w-0 flex-1 flex-col overflow-hidden justify-start gap-[5px] [padding:8px_10px] border-0 bg-transparent text-inherit cursor-default text-left [&:focus-visible]:[outline-offset:-2px]"
+                data-dragging={draggable.isDragging ? "" : undefined}
+                aria-current={selected ? "true" : undefined}
+                // The rail names the thread in its own tooltip instead.
+                title={
+                  rail
+                    ? undefined
+                    : [thread.title, glanceLabel(glance), "Drag onto a pane to open it there"]
+                        .filter((line) => line !== null)
+                        .join("\n")
+                }
+                onClick={() => onOpen(thread.id)}
+              >
+                <RailTile title={thread.title} glance={glance} />
+                {thread.status === "active" ? (
+                  <>
+                    <span
+                      className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
+                    >
+                      <TextSwap text={thread.title} />
+                    </span>
+                    <span className={`${threadContextClasses} ${railLabelClasses}`}>
+                      <ProviderIcon provider={provider} size={13} />
+                      <span className="flex min-w-0 flex-1 items-center gap-[6px] overflow-visible!">
+                        {thread.worktree !== undefined && (
+                          <span
+                            className="inline-flex shrink-0"
+                            role="img"
+                            aria-label={`Own branch ${thread.worktree.branch}`}
+                            title={`Works on its own branch: ${thread.worktree.branch}`}
+                          >
+                            <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
+                          </span>
+                        )}
+                        {scheduled && (
+                          <span
+                            className="inline-flex shrink-0"
+                            role="img"
+                            aria-label="Has scheduled prompts"
+                            title="Has scheduled prompts"
+                          >
+                            <AlarmClock size={12} strokeWidth={1.75} aria-hidden="true" />
+                          </span>
+                        )}
+                        {workspaceId === "all" && (
+                          <span className="thread-workspace">
+                            {workspaceNames.get(thread.workspaceId) ?? "Unknown workspace"}
+                          </span>
+                        )}
+                        <ActivityBadge activity={thread.activity} show="running">
+                          <GradientSpinner />
+                        </ActivityBadge>
+                        <ActivityBadge activity={thread.activity} show="approval" attention>
+                          <CircleAlert size={12} aria-hidden="true" />
+                          Needs approval
+                        </ActivityBadge>
+                        <ActivityBadge activity={thread.activity} show="queued">
+                          Queued
+                        </ActivityBadge>
+                        <ActivityBadge activity={thread.activity} show="failed" attention>
+                          Failed
+                        </ActivityBadge>
+                        <PopPresence className="inline-flex shrink-0" show={finishedUnseen}>
+                          <UnseenMark />
+                        </PopPresence>
+                        <time
+                          dateTime={thread.updatedAt}
+                          title={new Date(thread.updatedAt).toLocaleString()}
+                        >
+                          {relativeAge(thread.updatedAt)}
+                        </time>
                       </span>
-                    )}
-                    {scheduled && (
-                      <span
-                        className="inline-flex shrink-0"
-                        role="img"
-                        aria-label="Has scheduled prompts"
-                        title="Has scheduled prompts"
-                      >
-                        <AlarmClock size={12} strokeWidth={1.75} aria-hidden="true" />
-                      </span>
-                    )}
-                    {workspaceId === "all" && (
-                      <span className="thread-workspace">
-                        {workspaceNames.get(thread.workspaceId) ?? "Unknown workspace"}
-                      </span>
-                    )}
-                    <ActivityBadge activity={thread.activity} show="running">
-                      <GradientSpinner />
-                    </ActivityBadge>
-                    <ActivityBadge activity={thread.activity} show="approval" attention>
-                      <CircleAlert size={12} aria-hidden="true" />
-                      Needs approval
-                    </ActivityBadge>
-                    <ActivityBadge activity={thread.activity} show="queued">
-                      Queued
-                    </ActivityBadge>
-                    <ActivityBadge activity={thread.activity} show="failed" attention>
-                      Failed
-                    </ActivityBadge>
-                    <PopPresence className="inline-flex shrink-0" show={finishedUnseen}>
-                      <UnseenMark />
-                    </PopPresence>
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className={`inline-flex flex-[0_0_14px] text-[var(--text-tertiary)] ${railLabelClasses}`}
+                    >
+                      <ProviderIcon provider={provider} size={14} />
+                    </span>
+                    <span
+                      className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
+                    >
+                      <TextSwap text={thread.title} />
+                    </span>
                     <time
+                      className={railLabelClasses}
                       dateTime={thread.updatedAt}
                       title={new Date(thread.updatedAt).toLocaleString()}
                     >
                       {relativeAge(thread.updatedAt)}
                     </time>
-                  </span>
-                </span>
-              </>
-            ) : (
-              <>
-                <span
-                  className={`inline-flex flex-[0_0_14px] text-[var(--text-tertiary)] ${railLabelClasses}`}
-                >
-                  <ProviderIcon provider={provider} size={14} />
-                </span>
-                <span
-                  className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
-                >
-                  <TextSwap text={thread.title} />
-                </span>
-                <time
-                  className={railLabelClasses}
-                  dateTime={thread.updatedAt}
-                  title={new Date(thread.updatedAt).toLocaleString()}
-                >
-                  {relativeAge(thread.updatedAt)}
-                </time>
-              </>
-            )}
-          </BaseButton>
-        }
-      >
-        <RailSummary
-          thread={thread}
-          glance={glance}
-          workspaceId={workspaceId}
-          workspaceNames={workspaceNames}
-        />
-      </ContentTooltip>
-      <div className={rowActionsClasses}>
-        <IconButton
-          unstyled
-          className={rowButtonClasses}
-          label={selected ? withShortcut(archiveLabel, archiveChord) : archiveLabel}
-          onClick={() => onSetStatus(thread)}
-        >
-          {thread.status === "active" ? (
-            <Archive size={14} strokeWidth={1.75} />
-          ) : (
-            <ArchiveRestore size={14} strokeWidth={1.75} />
-          )}
-        </IconButton>
-        <DropdownMenu
-          align="end"
-          trigger={
-            <BaseButton
-              type="button"
+                  </>
+                )}
+              </BaseButton>
+            }
+          >
+            <RailSummary
+              thread={thread}
+              glance={glance}
+              workspaceId={workspaceId}
+              workspaceNames={workspaceNames}
+            />
+          </ContentTooltip>
+          <div className={rowActionsClasses}>
+            <IconButton
+              unstyled
               className={rowButtonClasses}
-              aria-label={`Actions for ${thread.title}`}
+              label={selected ? withShortcut(archiveLabel, archiveChord) : archiveLabel}
+              onClick={() => onSetStatus(thread)}
             >
-              <MoreHorizontal size={15} strokeWidth={1.75} />
-            </BaseButton>
-          }
-        >
-          <MenuAction
-            icon={<Columns2 size={13} strokeWidth={1.75} />}
-            onClick={() => onOpenBeside(thread.id, "right")}
-          >
-            Open to the right
-          </MenuAction>
-          <MenuAction
-            icon={<Rows2 size={13} strokeWidth={1.75} />}
-            onClick={() => onOpenBeside(thread.id, "bottom")}
-          >
-            Open below
-          </MenuAction>
-          <MenuAction
-            icon={thread.pinned ? <PinOff size={13} /> : <Pin size={13} />}
-            onClick={() => onPin(thread)}
-          >
-            {thread.pinned ? "Unpin thread" : "Pin thread"}
-          </MenuAction>
-          <MenuAction
-            icon={<Archive size={13} strokeWidth={1.75} />}
-            onClick={() => onSetStatus(thread)}
-          >
-            {thread.status === "active" ? "Archive thread" : "Restore to inbox"}
-          </MenuAction>
-          <MenuAction
-            icon={<Trash2 size={13} strokeWidth={1.75} />}
-            onClick={() => onDelete(thread)}
-          >
-            Delete permanently
-          </MenuAction>
-        </DropdownMenu>
-      </div>
-    </div>
+              {thread.status === "active" ? (
+                <Archive size={14} strokeWidth={1.75} />
+              ) : (
+                <ArchiveRestore size={14} strokeWidth={1.75} />
+              )}
+            </IconButton>
+            <DropdownMenu
+              align="end"
+              trigger={
+                <BaseButton
+                  type="button"
+                  className={rowButtonClasses}
+                  aria-label={`Actions for ${thread.title}`}
+                >
+                  <MoreHorizontal size={15} strokeWidth={1.75} />
+                </BaseButton>
+              }
+            >
+              <MenuAction
+                icon={<Columns2 size={13} strokeWidth={1.75} />}
+                onClick={() => onOpenBeside(thread.id, "right")}
+              >
+                Open to the right
+              </MenuAction>
+              <MenuAction
+                icon={<Rows2 size={13} strokeWidth={1.75} />}
+                onClick={() => onOpenBeside(thread.id, "bottom")}
+              >
+                Open below
+              </MenuAction>
+              <MenuAction
+                icon={thread.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+                onClick={() => onPin(thread)}
+              >
+                {thread.pinned ? "Unpin thread" : "Pin thread"}
+              </MenuAction>
+              <MenuAction
+                icon={<Archive size={13} strokeWidth={1.75} />}
+                onClick={() => onSetStatus(thread)}
+              >
+                {thread.status === "active" ? "Archive thread" : "Restore to inbox"}
+              </MenuAction>
+              <MenuAction
+                icon={<Trash2 size={13} strokeWidth={1.75} />}
+                onClick={() => onDelete(thread)}
+              >
+                Delete permanently
+              </MenuAction>
+            </DropdownMenu>
+          </div>
+        </div>
+      }
+    >
+      <MenuAction onClick={() => onOpen(thread.id)}>Open thread</MenuAction>
+      <MenuAction onClick={() => onOpenBeside(thread.id, "right")}>Open to the right</MenuAction>
+      <MenuAction onClick={() => onOpenBeside(thread.id, "bottom")}>Open below</MenuAction>
+      <MenuAction onClick={() => onPin(thread)}>
+        {thread.pinned ? "Unpin thread" : "Pin thread"}
+      </MenuAction>
+      <MenuAction onClick={() => void navigator.clipboard.writeText(thread.title)}>
+        Copy thread title
+      </MenuAction>
+      <MenuAction onClick={() => onSetStatus(thread)}>{archiveLabel}</MenuAction>
+      <MenuAction onClick={() => onDelete(thread)}>Delete permanently…</MenuAction>
+    </ContextMenu>
   )
 }
 
