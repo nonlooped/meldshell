@@ -15,6 +15,7 @@ import { FileIcon } from "./FileIcon"
 import { tableDelimited } from "./markdown-model"
 import { copyableText } from "./MarkdownTools"
 import { cx, markdownInlineClasses, markdownProseClasses } from "./styles"
+import { ImageContextMenu } from "./ImageContextMenu"
 
 export const MarkdownStreaming = createContext(false)
 export const MarkdownSearch = createContext("")
@@ -394,11 +395,17 @@ export function ImageLightbox({
     >
       <div className="markdown-lightbox max-h-[65vh] overflow-auto">
         {image && (
-          <img
-            src={image.src}
-            alt={image.alt}
-            className="max-w-none!"
-            style={{ width: `${zoom * 100}%` }}
+          <ImageContextMenu
+            source={image.src}
+            name={image.alt}
+            trigger={
+              <img
+                src={image.src}
+                alt={image.alt}
+                className="max-w-none!"
+                style={{ width: `${zoom * 100}%` }}
+              />
+            }
           />
         )}
       </div>
@@ -417,14 +424,21 @@ export function ToolImageGallery({ images }: { images: readonly string[] }) {
           className="min-w-0 m-0 [&_figcaption]:mb-[8px] [&_figcaption]:text-[var(--text-secondary)] [&_figcaption]:text-[11px] [&_figcaption]:font-medium [&_img]:block [&_img]:max-w-full [&_img]:max-h-[600px] [&_img]:object-contain [&_img]:rounded-[var(--radius)]"
         >
           <figcaption>Image result{images.length > 1 ? ` ${i + 1}` : ""}</figcaption>
-          <button
-            type="button"
-            className="markdown-image-button inline-block p-0 border-0 bg-transparent cursor-zoom-in max-w-full [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]"
-            aria-label={`Enlarge ${image.alt}`}
-            onClick={() => setIndex(i)}
-          >
-            <img src={image.src} alt={image.alt} />
-          </button>
+          <ImageContextMenu
+            source={image.src}
+            name={image.alt}
+            onEnlarge={() => setIndex(i)}
+            trigger={
+              <button
+                type="button"
+                className="markdown-image-button inline-block p-0 border-0 bg-transparent cursor-zoom-in max-w-full [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]"
+                aria-label={`Enlarge ${image.alt}`}
+                onClick={() => setIndex(i)}
+              >
+                <img src={image.src} alt={image.alt} />
+              </button>
+            }
+          />
         </figure>
       ))}
       {index !== undefined && (
