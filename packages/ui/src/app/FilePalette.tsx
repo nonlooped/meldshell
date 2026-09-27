@@ -4,6 +4,7 @@ import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { useState } from "react"
 import { FileIcon } from "../ui/FileIcon"
 import { Palette, PaletteRow, PaletteSearch, useDebouncedQuery } from "./Palette"
+import { MenuAction } from "../ui/controls"
 
 const FILE_LIMIT = 30
 
@@ -73,6 +74,14 @@ function FileSearch({
       itemKey={(path) => path}
       itemLabel={(path) => path}
       onPick={onPick}
+      contextActions={(path) => (
+        <>
+          <MenuAction onClick={() => onPick(path)}>Open file</MenuAction>
+          <MenuAction onClick={() => void navigator.clipboard.writeText(path)}>
+            Copy relative path
+          </MenuAction>
+        </>
+      )}
       renderItem={(path) => (
         <PaletteRow
           icon={<FileIcon path={path} size={15} />}

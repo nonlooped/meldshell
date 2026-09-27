@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { RotateCcw, X } from "lucide-react"
 import type { SetAppSettingsInput } from "@meldshell/contracts"
 import {
@@ -12,7 +12,7 @@ import {
   type ShortcutDefinition,
   useKeybindings,
 } from "../app/keybindings"
-import { Button, ChordKeys, IconButton } from "../ui/controls"
+import { Button, ChordKeys, ContextMenu, IconButton, MenuAction } from "../ui/controls"
 
 const GROUPS = ["Navigation", "Tabs", "Panels", "Workspace"] as const
 
@@ -41,13 +41,24 @@ function ChordRecorder({
   chord,
   onRecord,
   onProblem,
+  requested,
+  onStarted,
 }: {
   definition: ShortcutDefinition
   chord: string
   onRecord: (chord: string) => void
   onProblem: (message: string) => void
+  requested: boolean
+  onStarted: () => void
 }): React.JSX.Element {
   const [recording, setRecording] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!requested) return
+    buttonRef.current?.focus()
+    setRecording(true)
+    onStarted()
+  }, [requested, onStarted])
   // Modifiers held so far, so the recorder shows the chord taking shape.
   const [held, setHeld] = useState("")
   const stop = () => {
@@ -56,6 +67,7 @@ function ChordRecorder({
   }
   return (
     <button
+      ref={buttonRef}
       type="button"
       className={`motion-colors flex h-[30px] min-w-[148px] items-center justify-center [padding:0_10px] border-[1px] rounded-[var(--radius-sm)] cursor-default text-[12px] ${
         recording
@@ -119,6 +131,7 @@ export function KeyboardSettings({
 }): React.JSX.Element {
   const bindings = useKeybindings((state) => state.bindings)
   const [notice, setNotice] = useState<RowNotice | null>(null)
+  const [requested, setRequested] = useState<ShortcutAction | null>(null)
 
   const save = (next: Keybindings) => {
     // Shown at once; the saved settings arrive with the next snapshot.
@@ -164,73 +177,93 @@ export function KeyboardSettings({
               const changed = chord !== entry.chord
               const rowNotice = notice?.id === entry.id ? notice : null
               return (
-                <div
+                <ContextMenu
                   key={entry.id}
-                  className="group/shortcut [padding:8px_0] border-b-[1px] border-b-[color:var(--line-subtle)]"
-                >
-                  <div className="flex min-h-[32px] items-center justify-between gap-[24px]">
-                    <span className="flex min-w-0 flex-col gap-[1px]">
-                      <span className="text-[var(--text-primary)] text-[13px]">{entry.label}</span>
-                      {changed && (
-                        <span className="text-[var(--text-tertiary)] text-[11px]">
-                          Default: {chordLabel(entry.chord)}
-                        </span>
-                      )}
-                    </span>
-                    <span className="flex flex-none items-center gap-[2px]">
-                      <ChordRecorder
-                        definition={entry}
-                        chord={chord}
-                        onRecord={(next) => assign(entry.id, next)}
-                        onProblem={(text) => setNotice({ id: entry.id, tone: "error", text })}
-                      />
-                      {/* Removing is always possible, so it waits for the row to be pointed at. */}
-                      <span className="opacity-[0] motion-colors group-hover/shortcut:opacity-[1] group-focus-within/shortcut:opacity-[1] [@media(hover:_none)]:opacity-[1]">
-                        <IconButton
-                          label={`Remove the shortcut for ${entry.label}`}
-                          disabled={pending || chord === ""}
-                          onClick={() => assign(entry.id, "")}
-                        >
-                          <X size={14} />
-                        </IconButton>
-                      </span>
-                      <span className={changed ? "" : "invisible"}>
-                        <IconButton
-                          label={`Restore ${chordLabel(entry.chord)} for ${entry.label}`}
-                          disabled={pending || !changed}
-                          onClick={() => assign(entry.id, entry.chord)}
-                        >
-                          <RotateCcw size={14} />
-                        </IconButton>
-                      </span>
-                    </span>
-                  </div>
-                  {rowNotice !== null && (
-                    <p
-                      role={rowNotice.tone === "error" ? "alert" : "status"}
-                      className={`flex items-center gap-[8px] [margin:4px_0_0] text-[11.5px] ${
-                        rowNotice.tone === "error"
-                          ? "text-[var(--color-deleted)]"
-                          : "text-[var(--text-secondary)]"
-                      }`}
+                  trigger={
+                    <div
+                      key={entry.id}
+                      className="group/shortcut [padding:8px_0] border-b-[1px] border-b-[color:var(--line-subtle)]"
                     >
-                      {rowNotice.text}
-                      {rowNotice.undo !== undefined && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={pending}
-                          onClick={() => {
-                            if (rowNotice.undo !== undefined) save(rowNotice.undo)
-                            setNotice(null)
-                          }}
+                      <div className="flex min-h-[32px] items-center justify-between gap-[24px]">
+                        <span className="flex min-w-0 flex-col gap-[1px]">
+                          <span className="text-[var(--text-primary)] text-[13px]">
+                            {entry.label}
+                          </span>
+                          {changed && (
+                            <span className="text-[var(--text-tertiary)] text-[11px]">
+                              Default: {chordLabel(entry.chord)}
+                            </span>
+                          )}
+                        </span>
+                        <span className="flex flex-none items-center gap-[2px]">
+                          <ChordRecorder
+                            definition={entry}
+                            chord={chord}
+                            requested={requested === entry.id}
+                            onStarted={() => setRequested(null)}
+                            onRecord={(next) => assign(entry.id, next)}
+                            onProblem={(text) => setNotice({ id: entry.id, tone: "error", text })}
+                          />
+                          {/* Removing is always possible, so it waits for the row to be pointed at. */}
+                          <span className="opacity-[0] motion-colors group-hover/shortcut:opacity-[1] group-focus-within/shortcut:opacity-[1] [@media(hover:_none)]:opacity-[1]">
+                            <IconButton
+                              label={`Remove the shortcut for ${entry.label}`}
+                              disabled={pending || chord === ""}
+                              onClick={() => assign(entry.id, "")}
+                            >
+                              <X size={14} />
+                            </IconButton>
+                          </span>
+                          <span className={changed ? "" : "invisible"}>
+                            <IconButton
+                              label={`Restore ${chordLabel(entry.chord)} for ${entry.label}`}
+                              disabled={pending || !changed}
+                              onClick={() => assign(entry.id, entry.chord)}
+                            >
+                              <RotateCcw size={14} />
+                            </IconButton>
+                          </span>
+                        </span>
+                      </div>
+                      {rowNotice !== null && (
+                        <p
+                          role={rowNotice.tone === "error" ? "alert" : "status"}
+                          className={`flex items-center gap-[8px] [margin:4px_0_0] text-[11.5px] ${
+                            rowNotice.tone === "error"
+                              ? "text-[var(--color-deleted)]"
+                              : "text-[var(--text-secondary)]"
+                          }`}
                         >
-                          Undo
-                        </Button>
+                          {rowNotice.text}
+                          {rowNotice.undo !== undefined && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={pending}
+                              onClick={() => {
+                                if (rowNotice.undo !== undefined) save(rowNotice.undo)
+                                setNotice(null)
+                              }}
+                            >
+                              Undo
+                            </Button>
+                          )}
+                        </p>
                       )}
-                    </p>
-                  )}
-                </div>
+                    </div>
+                  }
+                >
+                  <MenuAction onClick={() => setRequested(entry.id)}>Change shortcut</MenuAction>
+                  <MenuAction
+                    disabled={!changed || pending}
+                    onClick={() => assign(entry.id, entry.chord)}
+                  >
+                    Restore default
+                  </MenuAction>
+                  <MenuAction disabled={!chord || pending} onClick={() => assign(entry.id, "")}>
+                    Remove shortcut
+                  </MenuAction>
+                </ContextMenu>
               )
             })}
           </div>

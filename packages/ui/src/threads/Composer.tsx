@@ -34,18 +34,21 @@ import {
 import { effortLabel, resolveSelection, selectableModels } from "../data/catalog"
 import { workspaceScope } from "../data/workspace-scope"
 import { FileIcon } from "../ui/FileIcon"
+import { ImageLightbox } from "../ui/MarkdownBlocks"
 import { ModelPicker } from "./ModelPicker"
 import { useComposerCompletion } from "./ComposerCompletion"
 import type { ComposerToken } from "./composer-completion"
 import { dropText, launchFromText } from "../ui/flight"
 import {
   Button,
+  ContextMenu,
   IconButton,
   DropdownMenu,
   MenuChoice,
   MenuGroup,
   MenuRadioGroup,
   MenuSeparator,
+  MenuAction,
 } from "../ui/controls"
 
 interface ComposerProps {
@@ -151,39 +154,71 @@ function ComposerAttachments({
   onRemoveAttachment,
 }: Pick<ComposerProps, "attachments" | "onRemoveAttachment">): React.JSX.Element {
   const reduced = useMotionPreference()
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+  const preview = previewIndex === null ? null : attachments[previewIndex]
   return (
-    <AnimatePresence initial={false}>
-      {attachments.length > 0 && (
-        <motion.div
-          key="attachments"
-          className="relative flex gap-[8px] overflow-x-auto p-[8px] border-b-[1px] border-b-[color:var(--line-subtle)]"
-          aria-label="Turn attachments"
-          initial={reduced ? false : { opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: reduced ? 0 : 0.2 }}
-        >
-          <AnimatePresence initial={false} mode="popLayout">
-            {attachments.map((attachment, index) => (
-              <motion.div
-                layout={!reduced}
-                className={attachmentChipClasses}
-                key={`${attachment.type}:${attachment.value}`}
-                initial={reduced ? false : { opacity: 0, scale: 0.94 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: reduced ? 1 : 0.9 }}
-                transition={{ duration: reduced ? 0 : 0.2 }}
-              >
-                <AttachmentChip
-                  attachment={attachment}
-                  onRemove={() => onRemoveAttachment(index)}
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
+    <>
+      <AnimatePresence initial={false}>
+        {attachments.length > 0 && (
+          <motion.div
+            key="attachments"
+            className="relative flex gap-[8px] overflow-x-auto p-[8px] border-b-[1px] border-b-[color:var(--line-subtle)]"
+            aria-label="Turn attachments"
+            initial={reduced ? false : { opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: reduced ? 0 : 0.2 }}
+          >
+            <AnimatePresence initial={false} mode="popLayout">
+              {attachments.map((attachment, index) => (
+                <motion.div
+                  layout={!reduced}
+                  className={attachmentChipClasses}
+                  key={`${attachment.type}:${attachment.value}`}
+                  initial={reduced ? false : { opacity: 0, scale: 0.94 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: reduced ? 1 : 0.9 }}
+                  transition={{ duration: reduced ? 0 : 0.2 }}
+                >
+                  <ContextMenu
+                    trigger={
+                      <div className="flex min-w-0 flex-1 items-center gap-[8px]">
+                        <AttachmentChip
+                          attachment={attachment}
+                          onRemove={() => onRemoveAttachment(index)}
+                        />
+                      </div>
+                    }
+                  >
+                    {(attachment.type === "image" || attachment.previewUrl) && (
+                      <MenuAction onClick={() => setPreviewIndex(index)}>Preview image</MenuAction>
+                    )}
+                    <MenuAction
+                      onClick={() =>
+                        void navigator.clipboard.writeText(attachment.name ?? attachment.value)
+                      }
+                    >
+                      Copy name or path
+                    </MenuAction>
+                    <MenuAction onClick={() => onRemoveAttachment(index)}>
+                      Remove attachment
+                    </MenuAction>
+                  </ContextMenu>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {preview && (preview.type === "image" || preview.previewUrl) && (
+        <ImageLightbox
+          images={[{ src: preview.previewUrl ?? preview.value, alt: preview.name ?? "Attachment" }]}
+          index={0}
+          onClose={() => setPreviewIndex(null)}
+          onIndex={() => setPreviewIndex(null)}
+        />
       )}
-    </AnimatePresence>
+    </>
   )
 }
 
@@ -756,83 +791,100 @@ export function Composer({
           />
         </div>
 
-        <div className="flex items-center flex-wrap gap-[6px] [padding:2px_8px_8px] [@container(max-width:_620px)]:gap-[4px] [@container(max-width:_620px)]:[&_.chip]:px-[6px]">
-          <IconButton
-            unstyled
-            className={`motion-colors ${chipClasses}`}
-            label="Attach image, file, or skill"
+        <ContextMenu
+          trigger={
+            <div className="flex items-center flex-wrap gap-[6px] [padding:2px_8px_8px] [@container(max-width:_620px)]:gap-[4px] [@container(max-width:_620px)]:[&_.chip]:px-[6px]">
+              <IconButton
+                unstyled
+                className={`motion-colors ${chipClasses}`}
+                label="Attach image, file, or skill"
+                disabled={loadingAttachments || sending}
+                onClick={() => void addAttachments(() => window.meldshell.selectAttachments())}
+              >
+                <Paperclip size={13} strokeWidth={1.75} />
+              </IconButton>
+              <IconButton
+                unstyled
+                className={`motion-colors ${chipClasses}`}
+                label="Schedule this prompt"
+                disabled={sending}
+                onClick={onSchedule}
+              >
+                <AlarmClock size={13} strokeWidth={1.75} />
+              </IconButton>
+              <ComposerSettings
+                snapshot={snapshot}
+                threadId={threadId}
+                selection={selection}
+                onChangeSettings={onChangeSettings}
+              />
+
+              <span className="flex-[1_1_auto] min-w-[8px]" />
+
+              <div className="flex flex-none items-center gap-[6px] ml-[auto]">
+                <PopPresence show={queuedCount > 0}>
+                  <span className="inline-flex gap-[3px] text-[var(--text-tertiary)] text-[10.5px] tabular-nums whitespace-nowrap">
+                    <Swap id={String(lastQueuedCount.current)}>{lastQueuedCount.current}</Swap>
+                    queued {lastQueuedCount.current === 1 ? "message" : "messages"}
+                  </span>
+                </PopPresence>
+
+                <PopPresence show={running}>
+                  <IconButton
+                    unstyled
+                    className="[display:inline-grid] w-[28px] h-[28px] flex-[0_0_28px] border-[1px] border-[color:var(--line)] rounded-[50%] bg-transparent text-[var(--text-secondary)] cursor-default place-items-center [&:hover]:bg-[var(--surface-hover)] [&:hover]:[border-color:var(--line-strong)] [&:hover]:text-[var(--text-primary)]"
+                    label={interrupting ? "Stopping turn" : "Interrupt turn"}
+                    disabled={interrupting}
+                    onClick={onInterrupt}
+                  >
+                    <Square size={11} fill="currentColor" strokeWidth={1.5} />
+                  </IconButton>
+                </PopPresence>
+
+                <span ref={sendButtonRef} className="inline-flex">
+                  <IconButton
+                    unstyled
+                    className={`motion-colors ${sendButtonClasses}`}
+                    disabled={!canSend}
+                    aria-label={running ? "Queue message" : "Send message"}
+                    label={sendTitle({
+                      sending,
+                      providerReady,
+                      providerName,
+                      hasSelection: selection !== null,
+                      loadingAttachments,
+                      hasContent: draft.trim().length > 0 || attachments.length > 0,
+                      running,
+                      settingUp,
+                    })}
+                    onClick={send}
+                  >
+                    <Swap id={running ? "queue" : "send"}>
+                      {running ? (
+                        <ListPlus size={15} strokeWidth={2.25} />
+                      ) : (
+                        <ArrowUp size={16} strokeWidth={2.25} />
+                      )}
+                    </Swap>
+                  </IconButton>
+                </span>
+              </div>
+            </div>
+          }
+        >
+          <MenuAction
             disabled={loadingAttachments || sending}
             onClick={() => void addAttachments(() => window.meldshell.selectAttachments())}
           >
-            <Paperclip size={13} strokeWidth={1.75} />
-          </IconButton>
-          <IconButton
-            unstyled
-            className={`motion-colors ${chipClasses}`}
-            label="Schedule this prompt"
-            disabled={sending}
-            onClick={onSchedule}
-          >
-            <AlarmClock size={13} strokeWidth={1.75} />
-          </IconButton>
-          <ComposerSettings
-            snapshot={snapshot}
-            threadId={threadId}
-            selection={selection}
-            onChangeSettings={onChangeSettings}
-          />
-
-          <span className="flex-[1_1_auto] min-w-[8px]" />
-
-          <div className="flex flex-none items-center gap-[6px] ml-[auto]">
-            <PopPresence show={queuedCount > 0}>
-              <span className="inline-flex gap-[3px] text-[var(--text-tertiary)] text-[10.5px] tabular-nums whitespace-nowrap">
-                <Swap id={String(lastQueuedCount.current)}>{lastQueuedCount.current}</Swap>
-                queued {lastQueuedCount.current === 1 ? "message" : "messages"}
-              </span>
-            </PopPresence>
-
-            <PopPresence show={running}>
-              <IconButton
-                unstyled
-                className="[display:inline-grid] w-[28px] h-[28px] flex-[0_0_28px] border-[1px] border-[color:var(--line)] rounded-[50%] bg-transparent text-[var(--text-secondary)] cursor-default place-items-center [&:hover]:bg-[var(--surface-hover)] [&:hover]:[border-color:var(--line-strong)] [&:hover]:text-[var(--text-primary)]"
-                label={interrupting ? "Stopping turn" : "Interrupt turn"}
-                disabled={interrupting}
-                onClick={onInterrupt}
-              >
-                <Square size={11} fill="currentColor" strokeWidth={1.5} />
-              </IconButton>
-            </PopPresence>
-
-            <span ref={sendButtonRef} className="inline-flex">
-              <IconButton
-                unstyled
-                className={`motion-colors ${sendButtonClasses}`}
-                disabled={!canSend}
-                aria-label={running ? "Queue message" : "Send message"}
-                label={sendTitle({
-                  sending,
-                  providerReady,
-                  providerName,
-                  hasSelection: selection !== null,
-                  loadingAttachments,
-                  hasContent: draft.trim().length > 0 || attachments.length > 0,
-                  running,
-                  settingUp,
-                })}
-                onClick={send}
-              >
-                <Swap id={running ? "queue" : "send"}>
-                  {running ? (
-                    <ListPlus size={15} strokeWidth={2.25} />
-                  ) : (
-                    <ArrowUp size={16} strokeWidth={2.25} />
-                  )}
-                </Swap>
-              </IconButton>
-            </span>
-          </div>
-        </div>
+            Attach file or image…
+          </MenuAction>
+          <MenuAction disabled={sending} onClick={onSchedule}>
+            Schedule this prompt…
+          </MenuAction>
+          <MenuAction disabled={!draft} onClick={() => onDraftChange("")}>
+            Clear draft
+          </MenuAction>
+        </ContextMenu>
       </div>
     </div>
   )

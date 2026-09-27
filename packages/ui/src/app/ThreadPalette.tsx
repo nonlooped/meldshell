@@ -4,6 +4,8 @@ import { MessageSquare, TextSearch } from "lucide-react"
 import { useState } from "react"
 import { queryKeys } from "../data/cache"
 import { Palette, PaletteRow, PaletteSearch, useDebouncedQuery } from "./Palette"
+import { MenuAction } from "../ui/controls"
+import { useTabStore } from "./tab-store"
 
 const THREAD_LIMIT = 20
 
@@ -62,6 +64,7 @@ export function ThreadPalette({
       <ThreadSearch
         threads={threads}
         workspaces={workspaces}
+        onDismiss={() => onOpenChange(false)}
         onPick={(item) => {
           if (item.kind === "thread") onOpenThread(item.thread.id)
           else onOpenMatch(item.result)
@@ -76,10 +79,12 @@ function ThreadSearch({
   threads,
   workspaces,
   onPick,
+  onDismiss,
 }: {
   readonly threads: ReadonlyArray<Thread>
   readonly workspaces: ReadonlyArray<Workspace>
   readonly onPick: (item: ThreadItem) => void
+  readonly onDismiss: () => void
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
   const debounced = useDebouncedQuery(query)
@@ -110,6 +115,45 @@ function ThreadSearch({
       itemKey={itemKey}
       itemLabel={itemLabel}
       onPick={onPick}
+      contextActions={(item) =>
+        item.kind === "thread" ? (
+          <>
+            <MenuAction onClick={() => onPick(item)}>Open thread</MenuAction>
+            <MenuAction
+              onClick={() => {
+                useTabStore.getState().openBeside(item.thread.id, "right")
+                onDismiss()
+              }}
+            >
+              Open to the right
+            </MenuAction>
+            <MenuAction
+              onClick={() => {
+                useTabStore.getState().openBeside(item.thread.id, "bottom")
+                onDismiss()
+              }}
+            >
+              Open below
+            </MenuAction>
+            <MenuAction onClick={() => void navigator.clipboard.writeText(item.thread.title)}>
+              Copy thread title
+            </MenuAction>
+          </>
+        ) : (
+          <>
+            <MenuAction onClick={() => onPick(item)}>Open matching message</MenuAction>
+            <MenuAction
+              onClick={() =>
+                void navigator.clipboard.writeText(
+                  item.result.snippet.replaceAll("[match]", "").replaceAll("[/match]", ""),
+                )
+              }
+            >
+              Copy snippet
+            </MenuAction>
+          </>
+        )
+      }
       renderItem={(item) =>
         item.kind === "thread" ? (
           <PaletteRow
