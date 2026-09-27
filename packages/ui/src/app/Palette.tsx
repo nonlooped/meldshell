@@ -3,6 +3,7 @@ import { Dialog } from "@base-ui-components/react/dialog"
 import { Search } from "lucide-react"
 import { useEffect, useState } from "react"
 import { MotionSurface } from "../ui/motion"
+import { ContextMenu } from "../ui/controls"
 
 /** Results follow typing after a pause, so a burst of keys runs one search instead of one per key. */
 const DEBOUNCE_MS = 120
@@ -59,6 +60,7 @@ export function PaletteSearch<Item>({
   itemLabel,
   onPick,
   renderItem,
+  contextActions,
 }: {
   readonly items: readonly Item[]
   readonly query: string
@@ -68,6 +70,7 @@ export function PaletteSearch<Item>({
   readonly itemLabel: (item: Item) => string
   readonly onPick: (item: Item) => void
   readonly renderItem: (item: Item) => React.ReactNode
+  readonly contextActions?: (item: Item) => React.ReactNode
 }): React.JSX.Element {
   return (
     <Combobox.Root<Item>
@@ -98,11 +101,20 @@ export function PaletteSearch<Item>({
           className="flex max-h-[min(360px,_60vh)] flex-col gap-[1px] overflow-y-auto p-[6px] border-t-[1px] border-t-[color:var(--line-subtle)]"
           aria-label="Results"
         >
-          {(item: Item) => (
-            <Combobox.Item className={itemClasses} key={itemKey(item)} value={item}>
-              {renderItem(item)}
-            </Combobox.Item>
-          )}
+          {(item: Item) => {
+            const row = (
+              <Combobox.Item className={itemClasses} key={itemKey(item)} value={item}>
+                {renderItem(item)}
+              </Combobox.Item>
+            )
+            return contextActions ? (
+              <ContextMenu key={itemKey(item)} trigger={row}>
+                {contextActions(item)}
+              </ContextMenu>
+            ) : (
+              row
+            )
+          }}
         </Combobox.List>
       )}
     </Combobox.Root>
