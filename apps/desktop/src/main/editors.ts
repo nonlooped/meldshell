@@ -12,4 +12,11 @@ export function registerEditorIpc(): void {
     const scope = { workspaceId, threadId: typeof threadId === "string" ? threadId : undefined }
     await (await desktopHost.start()).request("editor.open", scope, editorId)
   })
+  ipcMain.handle(IPC.revealFile, async (_event, input: unknown) => {
+    const { workspaceId, threadId, path } = (input ?? {}) as Record<string, unknown>
+    if (typeof workspaceId !== "string" || typeof path !== "string")
+      throw new Error("Choose a workspace file to reveal.")
+    const scope = { workspaceId, threadId: typeof threadId === "string" ? threadId : undefined }
+    await (await desktopHost.start()).request("editor.reveal", scope, path)
+  })
 }

@@ -5,6 +5,7 @@ import { useState } from "react"
 import { FileIcon } from "../ui/FileIcon"
 import { Palette, PaletteRow, PaletteSearch, useDebouncedQuery } from "./Palette"
 import { MenuAction } from "../ui/controls"
+import { RevealFileAction } from "../ui/FileContextActions"
 
 const FILE_LIMIT = 30
 
@@ -80,6 +81,7 @@ function FileSearch({
           <MenuAction onClick={() => void navigator.clipboard.writeText(path)}>
             Copy relative path
           </MenuAction>
+          {scope && <RevealFileAction scope={scope} path={path} />}
         </>
       )}
       renderItem={(path) => (

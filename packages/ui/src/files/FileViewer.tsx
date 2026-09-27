@@ -8,6 +8,7 @@ import { FileIcon } from "../ui/FileIcon"
 import { Button, ContextMenu, MenuAction, PanelNote } from "../ui/controls"
 import { cx, markdownProseClasses } from "../ui/styles"
 import { useEffect, useRef } from "react"
+import { RevealFileAction } from "../ui/FileContextActions"
 
 function localPath(file: FileTab, source: string): string | null {
   if (!source || /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(source)) return null
@@ -130,6 +131,7 @@ export function FileViewer({ file }: { file: FileTab }) {
         <MenuAction onClick={() => void navigator.clipboard.writeText(file.path)}>
           Copy file path
         </MenuAction>
+        <RevealFileAction scope={file} path={file.path} />
         {preview && preview.kind !== "unsupported" && (
           <MenuAction onClick={() => void navigator.clipboard.writeText(preview.content)}>
             Copy file contents

@@ -23,6 +23,7 @@ import {
 } from "../ui/controls"
 import { useTabStore } from "../app/tab-store"
 import { panelNoteClasses, panelTabsClasses } from "../ui/styles"
+import { CopyAbsolutePathAction, RevealFileAction } from "../ui/FileContextActions"
 
 type FileOperation = "create-file" | "create-folder" | "rename" | "delete"
 
@@ -264,15 +265,8 @@ function FileRow({
       <MenuAction onClick={() => void navigator.clipboard.writeText(entry.path)}>
         Copy relative path
       </MenuAction>
-      <MenuAction
-        onClick={() =>
-          void window.meldshell
-            .workspaceAbsolutePath({ ...scope, path: entry.path })
-            .then((path) => navigator.clipboard.writeText(path))
-        }
-      >
-        Copy absolute path
-      </MenuAction>
+      <CopyAbsolutePathAction scope={scope} path={entry.path} />
+      <RevealFileAction scope={scope} path={entry.path} />
       {entry.directory && (
         <>
           <MenuAction onClick={() => setOperation("create-file")}>New file…</MenuAction>

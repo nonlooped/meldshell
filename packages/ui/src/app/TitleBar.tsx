@@ -29,6 +29,7 @@ import {
 } from "../ui/controls"
 import { Pressable, TextSwap, useMotionPreference } from "../ui/motion"
 import { iconButtonClasses } from "../ui/styles"
+import { RevealFileAction } from "../ui/FileContextActions"
 import { MeldMark } from "../ui/MeldMark"
 import { ProviderIcon } from "../ui/ProviderIcon"
 import { useKeybindings, withShortcut } from "./keybindings"
@@ -419,6 +420,7 @@ export function TitleBar({
               <MenuAction onClick={() => void navigator.clipboard.writeText(file.path)}>
                 Copy file path
               </MenuAction>
+              <RevealFileAction scope={file} path={file.path} />
             </ContextMenu>
             <IconButton
               unstyled

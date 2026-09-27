@@ -6,7 +6,8 @@ import {
 } from "./desktop-protocol"
 import type { Host } from "./host"
 import { createTerminals } from "./terminals"
-import { listEditors, openEditor, type EditorSpawn } from "./editors"
+import { listEditors, openEditor, revealFile, type EditorSpawn } from "./editors"
+import { workspaceAbsolutePath } from "./workspace-files"
 
 export interface DesktopService {
   readonly methods: DesktopMethods
@@ -45,6 +46,11 @@ export function desktopService(
       "editor.list": listEditors,
       "editor.open": async (scope, id) =>
         openEditor(await host.scopePath(scope), id, options.spawnEditor),
+      "editor.reveal": async (scope, path) =>
+        revealFile(
+          await workspaceAbsolutePath(await host.scopePath(scope), path),
+          options.spawnEditor,
+        ),
       toHostPath: options.toHostPath ?? (async (path) => path),
       close: async () => {
         await terminals.closeAll()

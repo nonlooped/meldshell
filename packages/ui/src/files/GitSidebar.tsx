@@ -41,6 +41,7 @@ import { ChangeDiff } from "../ui/ChangeDiff"
 import { type GraphRow, layoutGraph } from "./git-graph"
 import { relativeAge } from "../ui/relative-age"
 import { scopeKey } from "../data/workspace-scope"
+import { CopyAbsolutePathAction, RevealFileAction } from "../ui/FileContextActions"
 const graphColors = [
   "var(--color-info)",
   "var(--color-added)",
@@ -184,6 +185,10 @@ function FileRow({
           <MenuAction onClick={() => void navigator.clipboard.writeText(change.path)}>
             Copy relative path
           </MenuAction>
+          {!change.status.includes("D") && (
+            <CopyAbsolutePathAction scope={scope} path={change.path} />
+          )}
+          {!change.status.includes("D") && <RevealFileAction scope={scope} path={change.path} />}
         </ContextMenu>
         <IconButton
           label={`${side === "staged" ? "Unstage" : "Stage"} ${change.path}`}
