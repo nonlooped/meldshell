@@ -556,6 +556,13 @@ export const SetThreadTitleInput = Schema.Struct({
 
 export type SetThreadTitleInput = typeof SetThreadTitleInput.Type
 
+export const RenameThreadInput = Schema.Struct({
+  threadId: Schema.String,
+  title: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+})
+
+export type RenameThreadInput = typeof RenameThreadInput.Type
+
 export const SetThreadStatusInput = Schema.Struct({
   threadId: Schema.String,
   status: ThreadStatus,

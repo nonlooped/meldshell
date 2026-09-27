@@ -15,6 +15,7 @@ import type {
   SetAppSettingsInput,
   SetThreadSettingsInput,
   SetThreadStatusInput,
+  RenameThreadInput,
   UpdateProviderInput,
   UpsertModelInput,
   ResolveApprovalInput,
@@ -323,6 +324,8 @@ export const requests = {
   setThreadStatus: request<(input: SetThreadStatusInput) => Promise<AppSnapshot>>(
     "meldshell:set-thread-status",
   ),
+  renameThread:
+    request<(input: RenameThreadInput) => Promise<AppSnapshot>>("meldshell:rename-thread"),
   deleteThread: request<(threadId: string) => Promise<AppSnapshot>>("meldshell:delete-thread"),
   updateProvider: request<(input: UpdateProviderInput) => Promise<AppSnapshot>>(
     "meldshell:update-provider",

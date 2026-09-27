@@ -112,6 +112,9 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.setThreadStatus]: coreCall(C.SetThreadStatusInput, false, (core, input) =>
     core.SetThreadStatus(input),
   ),
+  [C.IPC.renameThread]: coreCall(C.RenameThreadInput, false, (core, input) =>
+    core.RenameThread(input),
+  ),
   [C.IPC.deleteThread]: operation(Schema.String, false, deleteThread),
   [C.IPC.updateProvider]: coreCall(C.UpdateProviderInput, false, (core, input) =>
     core.UpdateProvider(input),
