@@ -98,6 +98,12 @@ interface Instance {
 }
 
 const instances = new Map<string, Instance>()
+
+export const terminalSelection = (id: string): string =>
+  instances.get(id)?.term.getSelection() ?? ""
+export const terminalSelectAll = (id: string): void => instances.get(id)?.term.selectAll()
+export const terminalClear = (id: string): void => instances.get(id)?.term.clear()
+export const terminalPaste = (id: string, text: string): void => instances.get(id)?.term.paste(text)
 let pendingFocus: string | null = null
 // The run script each run shell starts, and the open shell for each thread's run script.
 const runShells = new Map<string, string>()

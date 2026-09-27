@@ -2,12 +2,16 @@ import { useEffect, useRef } from "react"
 import type { Thread } from "@meldshell/contracts"
 import { Group, Panel, Separator } from "react-resizable-panels"
 import { ChevronDown, Columns2, Rows2, SquareTerminal, Trash2, X } from "lucide-react"
-import { IconButton } from "../ui/controls"
+import { ContextMenu, IconButton, MenuAction } from "../ui/controls"
 import { paneSeparatorClasses } from "../ui/styles"
 import { useKeybindings, withShortcut } from "../app/keybindings"
 import type { TerminalLayout } from "./terminal-layout"
 import {
   attachTerminal,
+  terminalClear,
+  terminalPaste,
+  terminalSelectAll,
+  terminalSelection,
   useTerminalStore,
   type TerminalInfo,
   type ThreadTerminals,
@@ -67,11 +71,37 @@ function TerminalPane({
     >
       {/* xterm places its pointer from unzoomed coordinates, so the pane undoes the app scale and
           the terminal scales its font instead. */}
-      <div
-        ref={hostRef}
-        className="terminal-host absolute [inset:0] [padding:6px_6px_4px_12px]"
-        style={{ zoom: "calc(1 / var(--app-scale, 1))" }}
-      />
+      <ContextMenu
+        trigger={
+          <div
+            ref={hostRef}
+            className="terminal-host absolute [inset:0] [padding:6px_6px_4px_12px]"
+            style={{ zoom: "calc(1 / var(--app-scale, 1))" }}
+          />
+        }
+      >
+        <MenuAction onClick={() => void navigator.clipboard.writeText(terminalSelection(id))}>
+          Copy selection
+        </MenuAction>
+        <MenuAction
+          onClick={() =>
+            void navigator.clipboard.readText().then((text) => terminalPaste(id, text))
+          }
+        >
+          Paste
+        </MenuAction>
+        <MenuAction onClick={() => terminalSelectAll(id)}>Select all</MenuAction>
+        <MenuAction onClick={() => terminalClear(id)}>Clear terminal</MenuAction>
+        <MenuAction onClick={() => useTerminalStore.getState().split(threadId, "horizontal")}>
+          Split right
+        </MenuAction>
+        <MenuAction onClick={() => useTerminalStore.getState().split(threadId, "vertical")}>
+          Split down
+        </MenuAction>
+        <MenuAction onClick={() => useTerminalStore.getState().close(threadId, id)}>
+          Close this terminal
+        </MenuAction>
+      </ContextMenu>
       {multiple && (
         <IconButton
           unstyled

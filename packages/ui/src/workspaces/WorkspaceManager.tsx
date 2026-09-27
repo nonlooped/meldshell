@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { errorMessage, type Workspace } from "@meldshell/contracts"
 import { Folder, FolderPlus } from "lucide-react"
-import { AppDialog, Button, TextField } from "../ui/controls"
+import { AppDialog, Button, ContextMenu, MenuAction, TextField } from "../ui/controls"
 
 export function WorkspaceManager({
   workspaces,
@@ -49,36 +49,66 @@ export function WorkspaceManager({
         </p>
       )}
       {workspaces.map((workspace) => (
-        <section className={workspaceCardClasses} key={workspace.id}>
-          <Folder size={19} />
-          <div className="min-w-0 flex-1">
-            <h3>{workspace.name}</h3>
-            <code>{workspace.path}</code>
-          </div>
-          <div className="flex flex-wrap gap-[8px] [@media(max-width:_1050px)]:ml-[35px]">
-            <Button
-              size="sm"
-              disabled={pending}
-              onClick={() => {
-                setError("")
-                setName(workspace.name)
-                setEditing(workspace)
-              }}
+        <ContextMenu
+          key={workspace.id}
+          trigger={
+            <section className={workspaceCardClasses}>
+              <Folder size={19} />
+              <div className="min-w-0 flex-1">
+                <h3>{workspace.name}</h3>
+                <code>{workspace.path}</code>
+              </div>
+              <div className="flex flex-wrap gap-[8px] [@media(max-width:_1050px)]:ml-[35px]">
+                <Button
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => {
+                    setError("")
+                    setName(workspace.name)
+                    setEditing(workspace)
+                  }}
+                >
+                  Rename
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => {
+                    setError("")
+                    setRemoving(workspace)
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            </section>
+          }
+        >
+          <MenuAction
+            onClick={() => {
+              setName(workspace.name)
+              setEditing(workspace)
+            }}
+          >
+            Rename workspace…
+          </MenuAction>
+          <MenuAction onClick={() => void navigator.clipboard.writeText(workspace.path)}>
+            Copy workspace path
+          </MenuAction>
+          {window.meldshell.desktop?.openInEditor && (
+            <MenuAction
+              onClick={() =>
+                void window.meldshell.desktop?.openInEditor?.({
+                  workspaceId: workspace.id,
+                  editorId: "file-manager",
+                })
+              }
             >
-              Rename
-            </Button>
-            <Button
-              size="sm"
-              disabled={pending}
-              onClick={() => {
-                setError("")
-                setRemoving(workspace)
-              }}
-            >
-              Remove
-            </Button>
-          </div>
-        </section>
+              Open in file manager
+            </MenuAction>
+          )}
+          <MenuAction onClick={() => setRemoving(workspace)}>Remove workspace…</MenuAction>
+        </ContextMenu>
       ))}
       <AppDialog
         open={editing !== null}

@@ -14,7 +14,14 @@ import {
   SquareCode,
   X,
 } from "lucide-react"
-import { Button, DropdownMenu, IconButton, MenuGroup, MenuAction } from "../ui/controls"
+import {
+  Button,
+  ContextMenu,
+  DropdownMenu,
+  IconButton,
+  MenuGroup,
+  MenuAction,
+} from "../ui/controls"
 import { Pressable } from "../ui/motion"
 import { centeredStateClasses } from "../ui/styles"
 import { useKeybindings, withShortcut } from "../app/keybindings"
@@ -277,63 +284,90 @@ function PreviewToolbar({
   const closeChord = useKeybindings((state) => state.bindings.togglePreview)
   const element = () => view?.current ?? null
   return (
-    <div className="relative flex min-w-0 items-center gap-[2px] [padding:4px_6px] border-b-[1px] border-b-[color:var(--line-subtle)] text-[var(--text-tertiary)]">
-      <IconButton label="Back" disabled={!page?.canGoBack} onClick={() => element()?.goBack()}>
-        <ArrowLeft size={14} />
-      </IconButton>
-      <IconButton
-        label="Forward"
-        disabled={!page?.canGoForward}
-        onClick={() => element()?.goForward()}
-      >
-        <ArrowRight size={14} />
-      </IconButton>
-      <IconButton
-        label={page?.loading ? "Stop loading" : "Reload"}
-        disabled={page === null}
-        onClick={() => (page?.loading ? element()?.stop() : element()?.reload())}
-      >
-        {page?.loading ? <X size={14} /> : <RotateCw size={14} />}
-      </IconButton>
-      <span className="w-[4px] flex-none" aria-hidden="true" />
-      <AddressBar url={url} suggestions={suggestions} onSubmit={onNavigate} />
-      <span className="w-[4px] flex-none" aria-hidden="true" />
-      <IconButton
-        label={page?.devTools ? "Close developer tools" : "Developer tools"}
-        aria-pressed={page?.devTools ?? false}
-        className="[&[aria-pressed='true']]:bg-[var(--surface-selected)] [&[aria-pressed='true']]:text-[var(--text-primary)]"
+    <ContextMenu
+      trigger={
+        <div className="relative flex min-w-0 items-center gap-[2px] [padding:4px_6px] border-b-[1px] border-b-[color:var(--line-subtle)] text-[var(--text-tertiary)]">
+          <IconButton label="Back" disabled={!page?.canGoBack} onClick={() => element()?.goBack()}>
+            <ArrowLeft size={14} />
+          </IconButton>
+          <IconButton
+            label="Forward"
+            disabled={!page?.canGoForward}
+            onClick={() => element()?.goForward()}
+          >
+            <ArrowRight size={14} />
+          </IconButton>
+          <IconButton
+            label={page?.loading ? "Stop loading" : "Reload"}
+            disabled={page === null}
+            onClick={() => (page?.loading ? element()?.stop() : element()?.reload())}
+          >
+            {page?.loading ? <X size={14} /> : <RotateCw size={14} />}
+          </IconButton>
+          <span className="w-[4px] flex-none" aria-hidden="true" />
+          <AddressBar url={url} suggestions={suggestions} onSubmit={onNavigate} />
+          <span className="w-[4px] flex-none" aria-hidden="true" />
+          <IconButton
+            label={page?.devTools ? "Close developer tools" : "Developer tools"}
+            aria-pressed={page?.devTools ?? false}
+            className="[&[aria-pressed='true']]:bg-[var(--surface-selected)] [&[aria-pressed='true']]:text-[var(--text-primary)]"
+            disabled={page === null}
+            onClick={() => {
+              const current = element()
+              if (current === null) return
+              if (current.isDevToolsOpened()) current.closeDevTools()
+              else current.openDevTools()
+            }}
+          >
+            <SquareCode size={14} />
+          </IconButton>
+          <IconButton
+            label="Open in browser"
+            disabled={url === ""}
+            onClick={() => void desktopApi?.openExternal(url)}
+          >
+            <SquareArrowOutUpRight size={14} />
+          </IconButton>
+          <IconButton
+            label={withShortcut("Hide preview", closeChord)}
+            onClick={() => usePreviewStore.getState().toggle(thread.id)}
+          >
+            <X size={15} />
+          </IconButton>
+          {page?.loading && (
+            <span
+              aria-hidden="true"
+              className="absolute left-[0] right-[0] bottom-[-1px] h-[2px] overflow-hidden"
+            >
+              <span className="block h-full w-full animate-shimmer [background:linear-gradient(90deg,_transparent_0%,_var(--accent)_40%,_var(--accent)_60%,_transparent_100%)] [background-size:50%_100%] [background-repeat:no-repeat]" />
+            </span>
+          )}
+        </div>
+      }
+    >
+      <MenuAction disabled={!url} onClick={() => void navigator.clipboard.writeText(url)}>
+        Copy URL
+      </MenuAction>
+      <MenuAction disabled={page === null} onClick={() => element()?.reload()}>
+        Reload
+      </MenuAction>
+      <MenuAction disabled={!url} onClick={() => void desktopApi?.openExternal(url)}>
+        Open in browser
+      </MenuAction>
+      <MenuAction
         disabled={page === null}
         onClick={() => {
           const current = element()
-          if (current === null) return
-          if (current.isDevToolsOpened()) current.closeDevTools()
-          else current.openDevTools()
+          if (current?.isDevToolsOpened()) current.closeDevTools()
+          else current?.openDevTools()
         }}
       >
-        <SquareCode size={14} />
-      </IconButton>
-      <IconButton
-        label="Open in browser"
-        disabled={url === ""}
-        onClick={() => void desktopApi?.openExternal(url)}
-      >
-        <SquareArrowOutUpRight size={14} />
-      </IconButton>
-      <IconButton
-        label={withShortcut("Hide preview", closeChord)}
-        onClick={() => usePreviewStore.getState().toggle(thread.id)}
-      >
-        <X size={15} />
-      </IconButton>
-      {page?.loading && (
-        <span
-          aria-hidden="true"
-          className="absolute left-[0] right-[0] bottom-[-1px] h-[2px] overflow-hidden"
-        >
-          <span className="block h-full w-full animate-shimmer [background:linear-gradient(90deg,_transparent_0%,_var(--accent)_40%,_var(--accent)_60%,_transparent_100%)] [background-size:50%_100%] [background-repeat:no-repeat]" />
-        </span>
-      )}
-    </div>
+        {page?.devTools ? "Close developer tools" : "Open developer tools"}
+      </MenuAction>
+      <MenuAction onClick={() => usePreviewStore.getState().toggle(thread.id)}>
+        Hide preview
+      </MenuAction>
+    </ContextMenu>
   )
 }
 

@@ -32,7 +32,15 @@ import {
 import { SettingRow } from "./SettingRow"
 import { effortLabel } from "../data/catalog"
 import { ProviderIcon } from "../ui/ProviderIcon"
-import { Button, DropdownMenu, MenuAction, SelectField, Switch, TextField } from "../ui/controls"
+import {
+  Button,
+  ContextMenu,
+  DropdownMenu,
+  MenuAction,
+  SelectField,
+  Switch,
+  TextField,
+} from "../ui/controls"
 
 interface ProviderCardProps {
   readonly provider: Provider
@@ -512,67 +520,86 @@ function ModelRow({
   const name = modelLabel(model.displayName)
   const visibility = visibilityOf(model)
   return (
-    <li className={modelRowClasses} data-off={visibility === "off"}>
-      <div className="flex min-w-0 flex-col gap-[2px] [padding:10px_0]">
-        <span className="flex min-w-0 items-center gap-[6px]">
+    <ContextMenu
+      trigger={
+        <li className={modelRowClasses} data-off={visibility === "off"}>
+          <div className="flex min-w-0 flex-col gap-[2px] [padding:10px_0]">
+            <span className="flex min-w-0 items-center gap-[6px]">
+              <span
+                className="model-name overflow-hidden text-[var(--text-primary)] text-[12.5px] text-ellipsis whitespace-nowrap"
+                title={name}
+              >
+                {name}
+              </span>
+              {model.isDefault && <Badge>Default</Badge>}
+              {!model.builtIn && <Badge>Custom</Badge>}
+              {model.supportsFast && <Badge>Fast</Badge>}
+            </span>
+            <span
+              className="model-slug overflow-hidden text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.5px] text-ellipsis whitespace-nowrap"
+              title={model.slug}
+            >
+              {model.slug}
+            </span>
+          </div>
           <span
-            className="model-name overflow-hidden text-[var(--text-primary)] text-[12.5px] text-ellipsis whitespace-nowrap"
-            title={name}
+            className="overflow-hidden text-[var(--text-secondary)] text-[11.5px] text-ellipsis whitespace-nowrap [@container(max-width:_540px)]:hidden"
+            title={
+              model.reasoningEfforts.length === 0
+                ? "No reasoning efforts"
+                : `Reasoning: ${model.reasoningEfforts.map(effortLabel).join(", ")}`
+            }
           >
-            {name}
+            {effortRange(model)}
           </span>
-          {model.isDefault && <Badge>Default</Badge>}
-          {!model.builtIn && <Badge>Custom</Badge>}
-          {model.supportsFast && <Badge>Fast</Badge>}
-        </span>
-        <span
-          className="model-slug overflow-hidden text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.5px] text-ellipsis whitespace-nowrap"
-          title={model.slug}
-        >
-          {model.slug}
-        </span>
-      </div>
-      <span
-        className="overflow-hidden text-[var(--text-secondary)] text-[11.5px] text-ellipsis whitespace-nowrap [@container(max-width:_540px)]:hidden"
-        title={
-          model.reasoningEfforts.length === 0
-            ? "No reasoning efforts"
-            : `Reasoning: ${model.reasoningEfforts.map(effortLabel).join(", ")}`
-        }
-      >
-        {effortRange(model)}
-      </span>
-      <SelectField<Visibility>
-        label={`Visibility of ${name}`}
-        value={visibility}
-        options={VISIBILITY_OPTIONS}
-        onValueChange={onChangeVisibility}
-      />
-      <DropdownMenu
-        align="end"
-        trigger={
-          <BaseButton
-            render={<Pressable />}
-            type="button"
-            className={`motion-colors ${iconButtonClasses}`}
-            aria-label={`Actions for ${name}`}
-            title={`Actions for ${name}`}
+          <SelectField<Visibility>
+            label={`Visibility of ${name}`}
+            value={visibility}
+            options={VISIBILITY_OPTIONS}
+            onValueChange={onChangeVisibility}
+          />
+          <DropdownMenu
+            align="end"
+            trigger={
+              <BaseButton
+                render={<Pressable />}
+                type="button"
+                className={`motion-colors ${iconButtonClasses}`}
+                aria-label={`Actions for ${name}`}
+                title={`Actions for ${name}`}
+              >
+                <MoreHorizontal size={15} strokeWidth={1.75} />
+              </BaseButton>
+            }
           >
-            <MoreHorizontal size={15} strokeWidth={1.75} />
-          </BaseButton>
-        }
-      >
-        <MenuAction icon={<Pencil size={13} strokeWidth={1.75} />} onClick={onEdit}>
-          Edit model
+            <MenuAction icon={<Pencil size={13} strokeWidth={1.75} />} onClick={onEdit}>
+              Edit model
+            </MenuAction>
+            {/* Discovery re-adds built-in models, so only custom ones can be removed for good. */}
+            {!model.builtIn && (
+              <MenuAction icon={<Trash2 size={13} strokeWidth={1.75} />} onClick={onDelete}>
+                Remove from catalog
+              </MenuAction>
+            )}
+          </DropdownMenu>
+        </li>
+      }
+    >
+      <MenuAction onClick={onEdit}>Edit model…</MenuAction>
+      <MenuAction onClick={() => void navigator.clipboard.writeText(model.slug)}>
+        Copy model ID
+      </MenuAction>
+      {VISIBILITY_OPTIONS.map((option) => (
+        <MenuAction
+          key={option.value}
+          disabled={visibility === option.value}
+          onClick={() => onChangeVisibility(option.value)}
+        >
+          Set visibility: {option.label}
         </MenuAction>
-        {/* Discovery re-adds built-in models, so only custom ones can be removed for good. */}
-        {!model.builtIn && (
-          <MenuAction icon={<Trash2 size={13} strokeWidth={1.75} />} onClick={onDelete}>
-            Remove from catalog
-          </MenuAction>
-        )}
-      </DropdownMenu>
-    </li>
+      ))}
+      {!model.builtIn && <MenuAction onClick={onDelete}>Remove from catalog…</MenuAction>}
+    </ContextMenu>
   )
 }
 
