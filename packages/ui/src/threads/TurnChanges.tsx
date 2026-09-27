@@ -7,6 +7,10 @@ import { diffLineCounts, parseFileDiffs } from "../ui/diff-model"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { FileIcon } from "../ui/FileIcon"
 import { disclosureChevronClasses } from "../ui/styles"
+import { useContext, useState } from "react"
+import { MarkdownWorkspace } from "../ui/MarkdownReference"
+import { useTabStore } from "../app/tab-store"
+import { ContextMenu, MenuAction } from "../ui/controls"
 
 function Counts({ insertions, deletions }: { insertions: number; deletions: number }) {
   return (
@@ -21,30 +25,48 @@ function Counts({ insertions, deletions }: { insertions: number; deletions: numb
 }
 
 function FileChangeRow({ path, patch }: { path: string; patch: string }) {
+  const [open, setOpen] = useState(false)
+  const scope = useContext(MarkdownWorkspace)
+  const openFile = useTabStore((state) => state.openFile)
   const files = parseFileDiffs(patch)
   const file = files[0]
   const renamed =
     file && file.type !== "add" && file.type !== "delete" && file.oldPath !== file.newPath
   const label = renamed ? `${file.oldPath} → ${path}` : path
   return (
-    <Collapsible.Root className="turn-change-file">
-      <Collapsible.Trigger className={turnChangeTriggerClasses}>
-        <ChevronRight size={13} className={disclosureChevronClasses} aria-hidden="true" />
-        <FileIcon path={path} />
-        <span
-          className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-          title={label}
-        >
-          {label}
-        </span>
-        {file?.type === "add" && (
-          <span className="text-[var(--text-tertiary)] text-[11px]">Added</span>
-        )}
-        {file?.type === "delete" && (
-          <span className="text-[var(--text-tertiary)] text-[11px]">Deleted</span>
-        )}
-        {files.length > 0 && <Counts {...diffLineCounts(files)} />}
-      </Collapsible.Trigger>
+    <Collapsible.Root className="turn-change-file" open={open} onOpenChange={setOpen}>
+      <ContextMenu
+        trigger={
+          <Collapsible.Trigger className={turnChangeTriggerClasses}>
+            <ChevronRight size={13} className={disclosureChevronClasses} aria-hidden="true" />
+            <FileIcon path={path} />
+            <span
+              className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+              title={label}
+            >
+              {label}
+            </span>
+            {file?.type === "add" && (
+              <span className="text-[var(--text-tertiary)] text-[11px]">Added</span>
+            )}
+            {file?.type === "delete" && (
+              <span className="text-[var(--text-tertiary)] text-[11px]">Deleted</span>
+            )}
+            {files.length > 0 && <Counts {...diffLineCounts(files)} />}
+          </Collapsible.Trigger>
+        }
+      >
+        <MenuAction onClick={() => setOpen((value) => !value)}>
+          {open ? "Collapse changes" : "Expand changes"}
+        </MenuAction>
+        {scope && <MenuAction onClick={() => openFile(scope, path)}>Open file</MenuAction>}
+        <MenuAction onClick={() => void navigator.clipboard.writeText(path)}>
+          Copy file path
+        </MenuAction>
+        <MenuAction onClick={() => void navigator.clipboard.writeText(patch)}>
+          Copy patch
+        </MenuAction>
+      </ContextMenu>
       <CollapsiblePanel
         className={
           "[&_>_.event-diff]:[margin:4px_0_10px] [&_>_.event-diff]:rounded-[0] [&_>_.event-diff]:border-x-0"

@@ -12,7 +12,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { Collapsible } from "@base-ui-components/react/collapsible"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { Button as BaseButton } from "@base-ui-components/react/button"
-import { Button } from "../ui/controls"
+import { Button, ContextMenu, MenuAction } from "../ui/controls"
 import { disclosureChevronClasses } from "../ui/styles"
 import type { CanonicalEvent } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
@@ -60,6 +60,7 @@ function Message({
   children,
   arrivingIn,
   flash,
+  onQuote,
 }: {
   readonly event: CanonicalEvent
   readonly className?: string
@@ -68,6 +69,7 @@ function Message({
   readonly arrivingIn?: string
   /** Changes each time the reader jumps to this message, briefly marking where they landed. */
   readonly flash?: number
+  readonly onQuote?: (text: string) => void
 }): React.JSX.Element {
   const [copyState, copy] = useCopy()
   const [showTime, setShowTime] = useState(false)
@@ -96,37 +98,56 @@ function Message({
   }, [flash, reduced])
 
   return (
-    <div
-      ref={rootRef}
-      className={`min-w-0 [&:hover_>_.message-actions]:opacity-[1] [&:focus-within_>_.message-actions]:opacity-[1] [&_>_.turn-changes]:mt-[14px] ${className}`}
-    >
-      <Markdown text={text} />
-      {event.kind === "user" && <MessageAttachments payload={event.payload} />}
-      {children}
-      <div className={`motion-colors ${workingSectionClasses}`}>
-        <CopyIconButton
-          label={copyState === "copied" ? "Copied" : "Copy message"}
-          state={copyState}
-          onClick={() => void copy(text)}
-        />
-        <Toggle
-          className="message-time"
-          title={fullTime}
-          aria-label={`Show full message time: ${fullTime}`}
-          pressed={showTime}
-          onPressedChange={setShowTime}
+    <ContextMenu
+      trigger={
+        <div
+          ref={rootRef}
+          className={`min-w-0 [&:hover_>_.message-actions]:opacity-[1] [&:focus-within_>_.message-actions]:opacity-[1] [&_>_.turn-changes]:mt-[14px] ${className}`}
         >
-          <time dateTime={event.createdAt}>
-            {showTime
-              ? fullTime
-              : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-          </time>
-        </Toggle>
-        <span className="text-[var(--text-secondary)] text-[11px]" role="status">
-          {copyStatusText(copyState)}
-        </span>
-      </div>
-    </div>
+          <Markdown text={text} />
+          {event.kind === "user" && <MessageAttachments payload={event.payload} />}
+          {children}
+          <div className={`motion-colors ${workingSectionClasses}`}>
+            <CopyIconButton
+              label={copyState === "copied" ? "Copied" : "Copy message"}
+              state={copyState}
+              onClick={() => void copy(text)}
+            />
+            <Toggle
+              className="message-time"
+              title={fullTime}
+              aria-label={`Show full message time: ${fullTime}`}
+              pressed={showTime}
+              onPressedChange={setShowTime}
+            >
+              <time dateTime={event.createdAt}>
+                {showTime
+                  ? fullTime
+                  : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              </time>
+            </Toggle>
+            <span className="text-[var(--text-secondary)] text-[11px]" role="status">
+              {copyStatusText(copyState)}
+            </span>
+          </div>
+        </div>
+      }
+    >
+      <MenuAction onClick={() => void navigator.clipboard.writeText(text)}>
+        Copy message as Markdown
+      </MenuAction>
+      <MenuAction
+        onClick={() =>
+          void navigator.clipboard.writeText(window.getSelection()?.toString() || text)
+        }
+      >
+        Copy selection or message
+      </MenuAction>
+      {onQuote && <MenuAction onClick={() => onQuote(text)}>Quote in composer</MenuAction>}
+      <MenuAction onClick={() => void navigator.clipboard.writeText(fullTime)}>
+        Copy timestamp
+      </MenuAction>
+    </ContextMenu>
   )
 }
 
@@ -229,7 +250,39 @@ function ToolBody({
   )
 }
 
+function ToolLineActions({
+  event,
+  tool,
+  open,
+  onToggle,
+}: {
+  event: CanonicalEvent
+  tool: ReturnType<typeof toolDetails>
+  open: boolean
+  onToggle: () => void
+}) {
+  return (
+    <>
+      <MenuAction onClick={onToggle}>{open ? "Collapse details" : "Expand details"}</MenuAction>
+      <MenuAction onClick={() => void navigator.clipboard.writeText(toolSummary(event))}>
+        Copy summary
+      </MenuAction>
+      {event.kind === "command" && tool.command && (
+        <MenuAction onClick={() => void navigator.clipboard.writeText(tool.command)}>
+          Copy command
+        </MenuAction>
+      )}
+      {tool.output && (
+        <MenuAction onClick={() => void navigator.clipboard.writeText(tool.output)}>
+          Copy output
+        </MenuAction>
+      )}
+    </>
+  )
+}
+
 function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
   const tool = toolDetails(event)
   const text = fallbackText(event)
   const commandOutput = event.kind === "command" ? text.split("\n\n").slice(1).join("\n\n") : ""
@@ -246,33 +299,52 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
 
   if (!detail) {
     return (
-      <div className="flex min-w-0 min-h-[28px] items-center gap-[7px] [padding:4px_7px] rounded-[var(--radius-sm)] text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.75px] [&_span]:min-w-0 [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap">
-        {iconFor(event)}
-        <span>{toolSummary(event)}</span>
-      </div>
+      <ContextMenu
+        trigger={
+          <div className="flex min-w-0 min-h-[28px] items-center gap-[7px] [padding:4px_7px] rounded-[var(--radius-sm)] text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.75px] [&_span]:min-w-0 [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap">
+            {iconFor(event)}
+            <span>{toolSummary(event)}</span>
+          </div>
+        }
+      >
+        <MenuAction onClick={() => void navigator.clipboard.writeText(toolSummary(event))}>
+          Copy summary
+        </MenuAction>
+      </ContextMenu>
     )
   }
   return (
-    <Collapsible.Root className="work-item" defaultOpen={false}>
-      <Collapsible.Trigger className={`motion-colors ${workItemTriggerClasses}`}>
-        {iconFor(event)}
-        <span className="work-item-title" title={toolSummary(event)}>
-          {toolSummary(event)}
-        </span>
-        {tool.status && (
-          <span
-            className="work-item-status [&[data-failed]]:text-[var(--color-deleted)]"
-            data-failed={tool.failed || undefined}
-          >
-            {tool.status}
-          </span>
-        )}
-        {tool.status === "Running" && tool.progress && (
-          <span title={tool.progress}>{tool.progress}</span>
-        )}
-        {tool.parent && <span title={tool.parent}>Subagent</span>}
-        <ChevronRight className={disclosureChevronClasses} size={13} />
-      </Collapsible.Trigger>
+    <Collapsible.Root className="work-item" open={open} onOpenChange={setOpen}>
+      <ContextMenu
+        trigger={
+          <Collapsible.Trigger className={`motion-colors ${workItemTriggerClasses}`}>
+            {iconFor(event)}
+            <span className="work-item-title" title={toolSummary(event)}>
+              {toolSummary(event)}
+            </span>
+            {tool.status && (
+              <span
+                className="work-item-status [&[data-failed]]:text-[var(--color-deleted)]"
+                data-failed={tool.failed || undefined}
+              >
+                {tool.status}
+              </span>
+            )}
+            {tool.status === "Running" && tool.progress && (
+              <span title={tool.progress}>{tool.progress}</span>
+            )}
+            {tool.parent && <span title={tool.parent}>Subagent</span>}
+            <ChevronRight className={disclosureChevronClasses} size={13} />
+          </Collapsible.Trigger>
+        }
+      >
+        <ToolLineActions
+          event={event}
+          tool={tool}
+          open={open}
+          onToggle={() => setOpen((value) => !value)}
+        />
+      </ContextMenu>
       <CollapsiblePanel className="grid gap-[10px] min-w-0 [margin:6px_6px_16px_26px]">
         <ToolBody
           event={event}
@@ -426,12 +498,14 @@ function TurnRow({
   live = false,
   flash,
   onAnswer,
+  onQuote,
 }: {
   readonly threadId: string
   readonly turn: TranscriptTurn
   readonly flash?: number
   /** Answers the turn's open questions with a new message; absent once they cannot be answered. */
   readonly onAnswer?: (text: string) => Promise<void>
+  readonly onQuote?: (text: string) => void
   /** The thread's latest turn while the provider is still working on it. */
   readonly live?: boolean
   /** A turn appended while the thread is open rises into place once. */
@@ -457,6 +531,7 @@ function TurnRow({
               event={event}
               arrivingIn={entering && !reduced && index === 0 ? threadId : undefined}
               flash={index === 0 ? flash : undefined}
+              onQuote={onQuote}
               className={
                 "[&_>_.message-actions]:justify-end [&_>_.event-markdown]:[padding:12px_16px] [&_>_.event-markdown]:border-[1px] [&_>_.event-markdown]:border-[color:var(--line-subtle)] [&_>_.event-markdown]:rounded-[var(--radius-lg)] [&_>_.event-markdown]:bg-[var(--surface-hover)] [&_>_.event-markdown]:text-[var(--text-primary)] w-[fit-content] max-w-[min(78%,_680px)] ml-[auto] relative [&_>_.message-actions]:absolute [&_>_.message-actions]:bottom-[0] [&_>_.message-actions]:right-[calc(100%_+_4px)] [&_>_.message-actions]:mt-[0] [&_>_.message-actions]:flex-row-reverse [&_>_.message-actions]:flex-nowrap [&_>_.message-actions]:whitespace-nowrap"
               }
@@ -473,6 +548,7 @@ function TurnRow({
           {turn.finalResponse !== null ? (
             <Message
               event={turn.finalResponse}
+              onQuote={onQuote}
               className={
                 "[&_>_.event-markdown]:text-[var(--text-primary)] text-[var(--text-primary)]"
               }
@@ -519,10 +595,12 @@ export function Transcript({
   origin,
   running = false,
   onAnswer,
+  onQuote,
 }: {
   readonly running?: boolean
   /** Sends a reply to the latest turn's questions; absent while the thread cannot take one. */
   readonly onAnswer?: (text: string, turnId: string) => Promise<void>
+  readonly onQuote?: (text: string) => void
   readonly targetTurnId?: string
   readonly threadId: string
   /** Where file references resolve; a worktree thread reads its own checkout. */
@@ -638,6 +716,7 @@ export function Transcript({
                     entering={turn.id === enteringTurn}
                     flash={jump?.turnId === turn.id ? jump.at : undefined}
                     live={running && item.index === turns.length - 1}
+                    onQuote={onQuote}
                     onAnswer={
                       item.index === turns.length - 1 && onAnswer
                         ? (text) => onAnswer(text, turn.id)

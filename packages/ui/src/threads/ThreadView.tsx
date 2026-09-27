@@ -87,6 +87,14 @@ export function ThreadView({
           running={thread.activity === "running"}
           onAnswer={submitTurnMutation.isPending ? undefined : answer}
           scope={workspaceScope(thread)}
+          onQuote={(text) => {
+            const current = useThreadDrafts.getState().drafts[thread.id]?.text ?? ""
+            const quote = text
+              .split("\n")
+              .map((line) => `> ${line}`)
+              .join("\n")
+            update(thread.id, { text: `${current}${current ? "\n\n" : ""}${quote}\n\n` })
+          }}
           origin={<ThreadOrigin thread={thread} workspaces={snapshot.workspaces} />}
           targetTurnId={
             searchTarget?.thread.id === thread.id

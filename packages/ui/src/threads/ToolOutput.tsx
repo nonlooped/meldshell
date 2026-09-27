@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { CopyIconButton, copyStatusText, useCopy } from "../ui/CopyButton"
 import { Toggle } from "@base-ui-components/react/toggle"
-import { SelectField } from "../ui/controls"
+import { ContextMenu, MenuAction, SelectField } from "../ui/controls"
 import { SourceCode } from "../ui/SourceCode"
 import { toolLanguage } from "./tool-language"
 
@@ -70,17 +70,35 @@ export function ToolOutput({
           onClick={() => void copy(text)}
         />
       </div>
-      <pre
-        className={
-          "[&_>_code]:[font:inherit] [&:focus-visible]:[outline:1px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:-2px] max-h-[240px] m-0 p-[12px] overflow-auto text-[var(--text-primary)] [font:12px_/_1.65_var(--font-mono)] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:2] [&[data-expanded]]:max-h-none overflow-y-auto [scrollbar-gutter:stable]"
+      <ContextMenu
+        trigger={
+          <pre
+            className={
+              "[&_>_code]:[font:inherit] [&:focus-visible]:[outline:1px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:-2px] max-h-[240px] m-0 p-[12px] overflow-auto text-[var(--text-primary)] [font:12px_/_1.65_var(--font-mono)] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:2] [&[data-expanded]]:max-h-none overflow-y-auto [scrollbar-gutter:stable]"
+            }
+            data-expanded={expanded || undefined}
+            tabIndex={0}
+            aria-label={`${label} content`}
+            role={error ? "alert" : undefined}
+          >
+            <SourceCode text={text} language={language === "auto" ? detectedLanguage : language} />
+          </pre>
         }
-        data-expanded={expanded || undefined}
-        tabIndex={0}
-        aria-label={`${label} content`}
-        role={error ? "alert" : undefined}
       >
-        <SourceCode text={text} language={language === "auto" ? detectedLanguage : language} />
-      </pre>
+        <MenuAction onClick={() => void copy(text)}>Copy all</MenuAction>
+        <MenuAction
+          onClick={() =>
+            void navigator.clipboard.writeText(window.getSelection()?.toString() || text)
+          }
+        >
+          Copy selection or all
+        </MenuAction>
+        {long && (
+          <MenuAction onClick={() => setExpanded((value) => !value)}>
+            {expanded ? "Collapse output" : "Expand output"}
+          </MenuAction>
+        )}
+      </ContextMenu>
     </section>
   )
 }
