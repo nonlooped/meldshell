@@ -4,11 +4,17 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
-## [0.12.0] - 2026-09-27
-
 ### Changed
 
 - The Working indicator now uses the app's blue, accent, and violet colors in both themes. The launch and website glows use the same palette.
+
+### Added
+
+- Right-click menus provide contextual actions across threads and workspace surfaces.
+
+## [0.12.0] - 2026-09-27
+
+### Changed
 
 - The website hero now reads “Your coding agents, side by side.” and appears immediately. The main download button selects the Windows or Linux installer for the visitor’s operating system, and the bottom download panel has been removed.
 
@@ -19,8 +25,6 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Agent questions always allow a custom answer. Codex questions in the transcript now have their own answer fields and remain usable while Codex is working; replies reach the active turn immediately instead of waiting in the message queue.
 
 ### Added
-
-- Right-click menus provide contextual actions across threads and workspace surfaces.
 
 - Remote control can browse host folders and add workspaces, open terminals and run scripts, manage the linked account, check and install desktop updates, change update channels, and restart or shut down the host. Windows/WSL switching is available remotely with confirmation. Remote terminals retain their processes for five minutes through connection loss and replay bounded output on reconnect; input is never retried. Desktop hosts provide an isolated, interactive browser preview rendered on the workstation, so local development servers stay on the host. Standalone headless hosts retain their service-manager update and lifecycle workflow.
 
