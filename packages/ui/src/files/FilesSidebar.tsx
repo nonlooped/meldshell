@@ -11,9 +11,106 @@ import { GitSidebar } from "./GitSidebar"
 import { WorktreeBar } from "./WorktreeBar"
 import { scopeKey } from "../data/workspace-scope"
 import { FileIcon } from "../ui/FileIcon"
-import { Button, ContextMenu, IconButton, MenuAction, PanelNote, QueryError } from "../ui/controls"
+import {
+  AppDialog,
+  Button,
+  ContextMenu,
+  IconButton,
+  MenuAction,
+  PanelNote,
+  QueryError,
+  TextField,
+} from "../ui/controls"
 import { useTabStore } from "../app/tab-store"
 import { panelNoteClasses, panelTabsClasses } from "../ui/styles"
+
+type FileOperation = "create-file" | "create-folder" | "rename" | "delete"
+
+function FileActionDialog({
+  scope,
+  path,
+  operation,
+  initialName = "",
+  onClose,
+  onComplete,
+}: {
+  scope: WorkspaceScope
+  path: string
+  operation: FileOperation
+  initialName?: string
+  onClose: () => void
+  onComplete?: (name: string) => void
+}) {
+  const [name, setName] = useState(initialName)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState("")
+  const client = useQueryClient()
+  const title = {
+    "create-file": "New file",
+    "create-folder": "New folder",
+    rename: "Rename",
+    delete: "Delete from disk?",
+  }[operation]
+  const submit = async () => {
+    setBusy(true)
+    setError("")
+    try {
+      await window.meldshell.workspaceFileAction({
+        ...scope,
+        path,
+        action: operation,
+        name: operation === "delete" ? undefined : name.trim(),
+      })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["workspace-directory", ...scopeKey(scope)] }),
+        client.invalidateQueries({ queryKey: ["workspace-file", ...scopeKey(scope)] }),
+        client.invalidateQueries({ queryKey: ["git", ...scopeKey(scope)] }),
+      ])
+      onComplete?.(name.trim())
+      onClose()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <AppDialog
+      open
+      alert={operation === "delete"}
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose()
+      }}
+      title={title}
+      actions={
+        <>
+          <Button disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            disabled={busy || (operation !== "delete" && !name.trim())}
+            onClick={() => void submit()}
+          >
+            {title}
+          </Button>
+        </>
+      }
+    >
+      {operation === "delete" ? (
+        <p>Delete “{path}” from disk? Folders and their contents will be removed.</p>
+      ) : (
+        <TextField
+          autoFocus
+          label={operation === "create-folder" ? "Folder name" : "File name"}
+          value={name}
+          onValueChange={setName}
+        />
+      )}
+      {error && <p role="alert">{error}</p>}
+    </AppDialog>
+  )
+}
 
 function statusKind(status: string): string {
   if (status === "!!") return "ignored"
@@ -107,6 +204,7 @@ function FileRow({
   depth: number
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [operation, setOperation] = useState<FileOperation | null>(null)
   const openFile = useTabStore((state) => state.openFile)
   const client = useQueryClient()
   const kind = statusKind(entry.status)
@@ -166,6 +264,23 @@ function FileRow({
       <MenuAction onClick={() => void navigator.clipboard.writeText(entry.path)}>
         Copy relative path
       </MenuAction>
+      <MenuAction
+        onClick={() =>
+          void window.meldshell
+            .workspaceAbsolutePath({ ...scope, path: entry.path })
+            .then((path) => navigator.clipboard.writeText(path))
+        }
+      >
+        Copy absolute path
+      </MenuAction>
+      {entry.directory && (
+        <>
+          <MenuAction onClick={() => setOperation("create-file")}>New file…</MenuAction>
+          <MenuAction onClick={() => setOperation("create-folder")}>New folder…</MenuAction>
+        </>
+      )}
+      <MenuAction onClick={() => setOperation("rename")}>Rename…</MenuAction>
+      <MenuAction onClick={() => setOperation("delete")}>Delete from disk…</MenuAction>
       {entry.directory && (
         <MenuAction
           onClick={() =>
@@ -179,24 +294,57 @@ function FileRow({
       )}
     </>
   )
+  const dialog = operation && (
+    <FileActionDialog
+      key={`${entry.path}:${operation}`}
+      scope={scope}
+      path={entry.path}
+      operation={operation}
+      initialName={operation === "rename" ? entry.name : ""}
+      onClose={() => setOperation(null)}
+      onComplete={(name) => {
+        if (operation !== "rename" && operation !== "delete") return
+        const store = useTabStore.getState()
+        const affected = store.files.filter(
+          (file) =>
+            file.workspaceId === scope.workspaceId &&
+            file.threadId === scope.threadId &&
+            (file.path === entry.path ||
+              (entry.directory && file.path.startsWith(`${entry.path}/`))),
+        )
+        for (const file of affected) store.closeTab(file.id)
+        if (operation === "rename") {
+          const parent = entry.path.slice(0, Math.max(0, entry.path.lastIndexOf("/") + 1))
+          for (const file of affected)
+            store.openFile(scope, `${parent}${name}${file.path.slice(entry.path.length)}`)
+        }
+      }}
+    />
+  )
   if (!entry.directory)
     return (
-      <li role="none">
-        <ContextMenu trigger={row}>{actions}</ContextMenu>
-      </li>
+      <>
+        <li role="none">
+          <ContextMenu trigger={row}>{actions}</ContextMenu>
+        </li>
+        {dialog}
+      </>
     )
   return (
-    <Collapsible.Root render={<li role="none" />} open={expanded} onOpenChange={setExpanded}>
-      <ContextMenu trigger={<Collapsible.Trigger render={row} />}>{actions}</ContextMenu>
-      <CollapsiblePanel>
-        <Directory
-          scope={scope}
-          path={entry.path}
-          depth={depth + 1}
-          inheritedStatus={entry.status}
-        />
-      </CollapsiblePanel>
-    </Collapsible.Root>
+    <>
+      <Collapsible.Root render={<li role="none" />} open={expanded} onOpenChange={setExpanded}>
+        <ContextMenu trigger={<Collapsible.Trigger render={row} />}>{actions}</ContextMenu>
+        <CollapsiblePanel>
+          <Directory
+            scope={scope}
+            path={entry.path}
+            depth={depth + 1}
+            inheritedStatus={entry.status}
+          />
+        </CollapsiblePanel>
+      </Collapsible.Root>
+      {dialog}
+    </>
   )
 }
 
@@ -268,6 +416,7 @@ export function FilesSidebar({
   threadId?: string
 }) {
   const client = useQueryClient()
+  const [rootOperation, setRootOperation] = useState<FileOperation | null>(null)
   return (
     <Tabs.Root defaultValue="files" className="flex flex-col h-full min-h-0 overflow-hidden">
       {worktreeThread !== undefined && <WorktreeBar thread={worktreeThread} />}
@@ -277,12 +426,41 @@ export function FilesSidebar({
       </Tabs.List>
       <Tabs.Panel value="files" className="flex flex-col h-full min-h-0 overflow-hidden">
         <div className="flex items-center shrink-0 pr-[6px] [&_.git-section-heading]:flex-1 [&_.git-section-heading]:min-w-0">
-          <span
-            className="flex-1 [padding:8px_12px] overflow-hidden text-ellipsis whitespace-nowrap"
-            title={worktreeThread?.worktree?.path ?? workspace?.path}
+          <ContextMenu
+            trigger={
+              <span
+                className="flex-1 [padding:8px_12px] overflow-hidden text-ellipsis whitespace-nowrap"
+                title={worktreeThread?.worktree?.path ?? workspace?.path}
+              >
+                {workspace?.name ?? "Files"}
+              </span>
+            }
           >
-            {workspace?.name ?? "Files"}
-          </span>
+            {scope && (
+              <MenuAction onClick={() => setRootOperation("create-file")}>New file…</MenuAction>
+            )}
+            {scope && (
+              <MenuAction onClick={() => setRootOperation("create-folder")}>New folder…</MenuAction>
+            )}
+            {scope && (
+              <MenuAction
+                onClick={() =>
+                  void window.meldshell
+                    .workspaceAbsolutePath({ ...scope, path: "" })
+                    .then((path) => navigator.clipboard.writeText(path))
+                }
+              >
+                Copy workspace path
+              </MenuAction>
+            )}
+            <MenuAction
+              onClick={() =>
+                void client.invalidateQueries({ queryKey: ["workspace-directory", workspace?.id] })
+              }
+            >
+              Refresh files
+            </MenuAction>
+          </ContextMenu>
           <IconButton
             label="Refresh files"
             onClick={() => {
@@ -301,6 +479,15 @@ export function FilesSidebar({
           )}
         </div>
       </Tabs.Panel>
+      {rootOperation && scope && (
+        <FileActionDialog
+          key={rootOperation}
+          scope={scope}
+          path=""
+          operation={rootOperation}
+          onClose={() => setRootOperation(null)}
+        />
+      )}
       <Tabs.Panel value="changes" className="flex flex-col h-full min-h-0 overflow-hidden">
         <GitSidebar workspace={workspace} scope={scope} threadId={threadId} />
       </Tabs.Panel>

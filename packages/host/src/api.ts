@@ -14,11 +14,17 @@ import {
   getGitDiff,
   getGitCommitDiff,
   gitFileAction,
+  gitBulkAction,
   gitCommit,
   gitPush,
   commitMessagePrompt,
 } from "./git"
-import { listDirectory, readWorkspaceFile } from "./workspace-files"
+import {
+  listDirectory,
+  readWorkspaceFile,
+  workspaceAbsolutePath,
+  workspaceFileAction,
+} from "./workspace-files"
 import { searchWorkspacePaths } from "./workspace-search"
 import { requestGeneratedText } from "./generated-text"
 import { readWorkspaceScripts } from "./workspace-scripts"
@@ -176,6 +182,19 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.readWorkspaceFile]: operation(fileInput, true, (input) =>
     withWorkspace(input, (path) => readWorkspaceFile(path, input.path)),
   ),
+  [C.IPC.workspaceAbsolutePath]: operation(fileInput, true, (input) =>
+    withWorkspace(input, (path) => workspaceAbsolutePath(path, input.path)),
+  ),
+  [C.IPC.workspaceFileAction]: operation(
+    Schema.Struct({
+      ...scopeFields,
+      path: Schema.String,
+      action: Schema.Literal("create-file", "create-folder", "rename", "delete"),
+      name: Schema.optional(Schema.String),
+    }),
+    false,
+    (input) => withWorkspace(input, (path) => workspaceFileAction(path, input)),
+  ),
   [C.IPC.getGitSnapshot]: operation(
     Schema.Struct({
       ...scopeFields,
@@ -208,6 +227,11 @@ export const hostOperations: Record<string, Operation> = {
     }),
     false,
     (input) => withWorkspace(input, (path) => gitFileAction(path, input.path, input.action)),
+  ),
+  [C.IPC.gitBulkAction]: operation(
+    Schema.Struct({ ...scopeFields, action: Schema.Literal("stage", "unstage") }),
+    false,
+    (input) => withWorkspace(input, (path) => gitBulkAction(path, input.action)),
   ),
   [C.IPC.gitCommit]: operation(
     Schema.Struct({ ...scopeFields, message: Schema.String }),

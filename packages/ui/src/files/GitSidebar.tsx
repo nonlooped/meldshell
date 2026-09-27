@@ -237,6 +237,11 @@ export function GitSidebar({
       window.meldshell.gitFileAction({ ...scope!, ...input }),
     onSettled: refresh,
   })
+  const bulkAction = useMutation({
+    mutationFn: (operation: "stage" | "unstage") =>
+      window.meldshell.gitBulkAction({ ...scope!, action: operation }),
+    onSettled: refresh,
+  })
   const [commitBusy, setCommitBusy] = useState(false)
   const [changesOpen, setChangesOpen] = useState(true)
   const [graphOpen, setGraphOpen] = useState(true)
@@ -274,6 +279,7 @@ export function GitSidebar({
             onRefresh={refresh}
           />
           {action.isError && <PanelNote role="alert">{action.error.message}</PanelNote>}
+          {bulkAction.isError && <PanelNote role="alert">{bulkAction.error.message}</PanelNote>}
           <Group className="min-h-0 flex-1" orientation="vertical">
             <Panel
               id="changes"
@@ -292,8 +298,9 @@ export function GitSidebar({
                   if (open) changesPanelRef.current?.expand()
                   else changesPanelRef.current?.collapse()
                 }}
-                busy={action.isPending || commitBusy}
+                busy={action.isPending || bulkAction.isPending || commitBusy}
                 onAction={(path, operation) => action.mutate({ path, action: operation })}
+                onBulkAction={(operation) => bulkAction.mutate(operation)}
                 scope={scope}
                 changes={query.data.changes}
                 refreshing={query.isFetching}
@@ -494,6 +501,7 @@ function ChangesSection({
   changes,
   busy,
   onAction,
+  onBulkAction,
   scope,
   refreshing,
   onRefresh,
@@ -503,6 +511,7 @@ function ChangesSection({
   changes: readonly GitChange[]
   busy: boolean
   onAction: (path: string, action: GitFileAction) => void
+  onBulkAction: (action: "stage" | "unstage") => void
   scope: WorkspaceScope
   refreshing: boolean
   onRefresh: () => void
@@ -543,14 +552,26 @@ function ChangesSection({
           if (changes.length === 0) return null
           return (
             <div key={side}>
-              <div
-                className={`flex items-center gap-[6px] [padding:7px_14px] text-[11px] font-medium ${files.length === 0 ? "text-[var(--text-tertiary)]" : ""}`}
+              <ContextMenu
+                trigger={
+                  <div
+                    className={`flex items-center gap-[6px] [padding:7px_14px] text-[11px] font-medium ${files.length === 0 ? "text-[var(--text-tertiary)]" : ""}`}
+                  >
+                    {side === "staged" ? "Staged changes" : "Unstaged changes"}
+                    <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
+                      {files.length}
+                    </span>
+                  </div>
+                }
               >
-                {side === "staged" ? "Staged changes" : "Unstaged changes"}
-                <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
-                  {files.length}
-                </span>
-              </div>
+                <MenuAction
+                  disabled={busy || files.length === 0}
+                  onClick={() => onBulkAction(side === "staged" ? "unstage" : "stage")}
+                >
+                  {side === "staged" ? "Unstage all" : "Stage all"}
+                </MenuAction>
+                <MenuAction onClick={onRefresh}>Refresh changes</MenuAction>
+              </ContextMenu>
               {files.length === 0 ? null : (
                 <AnimatePresence initial={false}>
                   {files.map((change) => (
