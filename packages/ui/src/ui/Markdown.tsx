@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm"
 import { ErrorBoundary } from "react-error-boundary"
 import { mayContainMath } from "./markdown-math"
 import { cx, markdownInlineClasses, markdownProseClasses } from "./styles"
+import { ImageContextMenu } from "./ImageContextMenu"
 import { useQuery } from "@tanstack/react-query"
 import { MarkdownLink, MarkdownWorkspace, ReferenceChip } from "./MarkdownReference"
 import {
@@ -23,6 +24,7 @@ import {
 } from "./markdown-model"
 
 function MarkdownImage({ src, alt, node }: { src?: string; alt?: string; node?: Element }) {
+  const buttonRef = useRef<HTMLButtonElement>(null)
   const [failed, setFailed] = useState<string>()
   const scope = useContext(MarkdownWorkspace)
   const reference = fileReference(src ?? "")
@@ -41,13 +43,21 @@ function MarkdownImage({ src, alt, node }: { src?: string; alt?: string; node?: 
   )
   if (node?.properties.dataLinked) return image
   return (
-    <button
-      type="button"
-      className="markdown-image-button inline-block p-0 border-0 bg-transparent cursor-zoom-in max-w-full [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]"
-      aria-label={`Enlarge ${alt || "image"}`}
-    >
-      {image}
-    </button>
+    <ImageContextMenu
+      source={source}
+      name={alt}
+      onEnlarge={() => buttonRef.current?.click()}
+      trigger={
+        <button
+          ref={buttonRef}
+          type="button"
+          className="markdown-image-button inline-block p-0 border-0 bg-transparent cursor-zoom-in max-w-full [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]"
+          aria-label={`Enlarge ${alt || "image"}`}
+        >
+          {image}
+        </button>
+      }
+    />
   )
 }
 

@@ -9,6 +9,7 @@ import { Button, ContextMenu, MenuAction, PanelNote } from "../ui/controls"
 import { cx, markdownProseClasses } from "../ui/styles"
 import { useEffect, useRef } from "react"
 import { RevealFileAction } from "../ui/FileContextActions"
+import { ImageContextMenu } from "../ui/ImageContextMenu"
 
 function localPath(file: FileTab, source: string): string | null {
   if (!source || /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(source)) return null
@@ -145,7 +146,11 @@ export function FileViewer({ file }: { file: FileTab }) {
       {preview?.kind === "html" && <HtmlPreview file={file} content={preview.content} />}
       {preview?.kind === "image" && (
         <div className="flex-1 overflow-auto p-[24px] text-center [&_img]:max-w-full [&_img]:h-auto overflow-y-auto [scrollbar-gutter:stable]">
-          <img src={preview.content} alt={file.path} />
+          <ImageContextMenu
+            source={preview.content}
+            name={file.path.split("/").at(-1)}
+            trigger={<img src={preview.content} alt={file.path} />}
+          />
         </div>
       )}
       {preview?.kind === "text" && (
