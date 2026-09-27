@@ -6,6 +6,7 @@ export { getSnapshot, listThreads } from "./snapshots"
 export { getTranscript } from "./transcript"
 export {
   setThreadPinned,
+  renameThread,
   createThread,
   setThreadStatus,
   deleteThread,

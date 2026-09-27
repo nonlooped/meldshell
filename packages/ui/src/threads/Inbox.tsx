@@ -68,6 +68,7 @@ interface InboxProps {
   readonly onSearch: () => void
   readonly onManageWorkspaces: () => void
   readonly onPin: (thread: Thread) => void
+  readonly onRename: (thread: Thread) => void
   readonly threads: ReadonlyArray<Thread>
   readonly workspaces: ReadonlyArray<Workspace>
   readonly workspaceNames: ReadonlyMap<string, string>
@@ -97,6 +98,7 @@ function InboxThread({
   onOpen,
   onOpenBeside,
   onPin,
+  onRename,
   onSetStatus,
   onDelete,
   unseen,
@@ -110,6 +112,7 @@ function InboxThread({
   | "onOpen"
   | "onOpenBeside"
   | "onPin"
+  | "onRename"
   | "onSetStatus"
   | "onDelete"
 > & {
@@ -300,6 +303,7 @@ function InboxThread({
               >
                 {thread.pinned ? "Unpin thread" : "Pin thread"}
               </MenuAction>
+              <MenuAction onClick={() => onRename(thread)}>Rename thread…</MenuAction>
               <MenuAction
                 icon={<Archive size={13} strokeWidth={1.75} />}
                 onClick={() => onSetStatus(thread)}
@@ -323,6 +327,7 @@ function InboxThread({
       <MenuAction onClick={() => onPin(thread)}>
         {thread.pinned ? "Unpin thread" : "Pin thread"}
       </MenuAction>
+      <MenuAction onClick={() => onRename(thread)}>Rename thread…</MenuAction>
       <MenuAction onClick={() => void navigator.clipboard.writeText(thread.title)}>
         Copy thread title
       </MenuAction>
@@ -512,6 +517,7 @@ export function Inbox({
   onSearch,
   onManageWorkspaces,
   onPin,
+  onRename,
   workspaces,
   workspaceNames,
   providersByThreadId,
@@ -602,6 +608,7 @@ export function Inbox({
       onOpen={onOpen}
       onOpenBeside={onOpenBeside}
       onPin={onPin}
+      onRename={onRename}
       onSetStatus={onSetStatus}
       onDelete={onDelete}
     />

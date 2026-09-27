@@ -90,6 +90,18 @@ export const setThreadPinned = (threadId: string, pinned: boolean) =>
     return yield* getSnapshot
   })
 
+export const renameThread = (threadId: string, title: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const trimmed = title.trim()
+    if (trimmed.length === 0 || trimmed.length > 100)
+      return yield* Effect.fail(
+        new CoreProtocolError({ message: "Thread title must be 1–100 characters." }),
+      )
+    yield* sql`UPDATE threads SET title = ${trimmed}, title_locked = 1, updated_at = ${new Date().toISOString()} WHERE id = ${threadId}`
+    return yield* getSnapshot
+  })
+
 export const createThread = (input: RecordThreadInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient

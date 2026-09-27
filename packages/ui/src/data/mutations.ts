@@ -84,6 +84,9 @@ export function useThreadActions(
   const setStatusMutation = useSnapshotMutation((input: Input<"setThreadStatus">) =>
     window.meldshell.setThreadStatus(input),
   )
+  const renameThreadMutation = useSnapshotMutation((input: Input<"renameThread">) =>
+    window.meldshell.renameThread(input),
+  )
   const deleteThreadMutation = useSnapshotMutation(
     (id: string) => window.meldshell.deleteThread(id),
     (_next, id) => {
@@ -114,6 +117,7 @@ export function useThreadActions(
     pinMutation,
     createThreadMutation,
     setStatusMutation,
+    renameThreadMutation,
     deleteThreadMutation,
     threadSettingsMutation,
     submitTurnMutation,

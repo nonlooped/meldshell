@@ -31,7 +31,7 @@ import { MeldMark } from "../ui/MeldMark"
 import { WorkspaceManager } from "../workspaces/WorkspaceManager"
 import { TitleBar } from "./TitleBar"
 import { AppScale } from "./AppScale"
-import { AppDialog, Button } from "../ui/controls"
+import { AppDialog, Button, TextField } from "../ui/controls"
 import { ActionToast, ErrorToast } from "../ui/Notice"
 import { handleAppShortcut } from "./app-shortcuts"
 import { useKeybindings } from "./keybindings"
@@ -404,6 +404,8 @@ export function App(): React.JSX.Element {
   const [searchTarget, setSearchTarget] = useState<TranscriptSearchResult | null>(null)
   const [searchThreads, setSearchThreads] = useState<ReadonlyArray<Thread>>([])
   const [deleteTarget, setDeleteTarget] = useState<Thread | null>(null)
+  const [renameTarget, setRenameTarget] = useState<Thread | null>(null)
+  const [renameTitle, setRenameTitle] = useState("")
   const [filePaletteOpen, setFilePaletteOpen] = useState(false)
   const remotePhone = useRemotePhone()
   const inbox = useInboxSidebar(remotePhone)
@@ -420,6 +422,7 @@ export function App(): React.JSX.Element {
     pinMutation,
     createThreadMutation,
     setStatusMutation,
+    renameThreadMutation,
     deleteThreadMutation,
     resolveApprovalMutation,
   } = useThreadActions(snapshot, {
@@ -698,6 +701,10 @@ export function App(): React.JSX.Element {
                       selectedThreadId={selectedThreadId}
                       unseenThreadIds={unseenThreadIds}
                       onNewThread={requestNewThread}
+                      onRename={(thread) => {
+                        setRenameTarget(thread)
+                        setRenameTitle(thread.title)
+                      }}
                       onAddWorkspace={() => addWorkspaceMutation.mutate()}
                       onOpen={(threadId) => {
                         closeSettings()
@@ -847,6 +854,42 @@ export function App(): React.JSX.Element {
               />
             )}
 
+            <AppDialog
+              open={renameTarget !== null}
+              onOpenChange={(open) => {
+                if (!open && !renameThreadMutation.isPending) setRenameTarget(null)
+              }}
+              title="Rename thread"
+              actions={
+                <>
+                  <Button onClick={() => setRenameTarget(null)}>Cancel</Button>
+                  <Button
+                    variant="primary"
+                    disabled={!renameTitle.trim() || renameThreadMutation.isPending}
+                    onClick={() => {
+                      if (renameTarget)
+                        renameThreadMutation.mutate(
+                          { threadId: renameTarget.id, title: renameTitle.trim() },
+                          { onSuccess: () => setRenameTarget(null) },
+                        )
+                    }}
+                  >
+                    Save name
+                  </Button>
+                </>
+              }
+            >
+              <TextField
+                autoFocus
+                label="Thread name"
+                value={renameTitle}
+                maxLength={100}
+                onValueChange={setRenameTitle}
+              />
+              {renameThreadMutation.isError && (
+                <p role="alert">{renameThreadMutation.error.message}</p>
+              )}
+            </AppDialog>
             <AppDialog
               alert
               open={deleteTarget !== null}
