@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import type { RemotePreviewFrame, RemotePreviewInput } from "@meldshell/contracts/remote-preview"
 import { errorMessage } from "@meldshell/contracts"
 import { ArrowLeft, ArrowRight, RotateCw, X } from "lucide-react"
-import { Button, IconButton, TextField } from "../ui/controls"
+import { Button, ContextMenu, IconButton, MenuAction, TextField } from "../ui/controls"
 import { usePreviewStore } from "./preview-store"
 import { previewAddress } from "./server-urls"
 
@@ -112,22 +112,51 @@ export function RemotePreview({ threadId, url }: { threadId: string; url: string
           }
         }}
       >
-        <IconButton label="Back" disabled={!frame?.back} onClick={() => send({ action: "back" })}>
-          <ArrowLeft size={14} />
-        </IconButton>
-        <IconButton
-          label="Forward"
-          disabled={!frame?.forward}
-          onClick={() => send({ action: "forward" })}
+        <ContextMenu
+          trigger={
+            <span className="inline-flex items-center gap-[4px]">
+              <IconButton
+                label="Back"
+                disabled={!frame?.back}
+                onClick={() => send({ action: "back" })}
+              >
+                <ArrowLeft size={14} />
+              </IconButton>
+              <IconButton
+                label="Forward"
+                disabled={!frame?.forward}
+                onClick={() => send({ action: "forward" })}
+              >
+                <ArrowRight size={14} />
+              </IconButton>
+              <IconButton
+                label="Reload"
+                onClick={() => send({ action: "navigate", url: frame?.url || url })}
+              >
+                <RotateCw size={14} />
+              </IconButton>
+            </span>
+          }
         >
-          <ArrowRight size={14} />
-        </IconButton>
-        <IconButton
-          label="Reload"
-          onClick={() => send({ action: "navigate", url: frame?.url || url })}
-        >
-          <RotateCw size={14} />
-        </IconButton>
+          <MenuAction
+            disabled={!frame?.url && !url}
+            onClick={() => void navigator.clipboard.writeText(frame?.url || url)}
+          >
+            Copy URL
+          </MenuAction>
+          <MenuAction onClick={() => send({ action: "navigate", url: frame?.url || url })}>
+            Reload
+          </MenuAction>
+          <MenuAction
+            disabled={!frame?.url && !url}
+            onClick={() => void window.open(frame?.url || url, "_blank", "noopener,noreferrer")}
+          >
+            Open in browser
+          </MenuAction>
+          <MenuAction onClick={() => usePreviewStore.getState().toggle(threadId)}>
+            Hide preview
+          </MenuAction>
+        </ContextMenu>
         <TextField
           aria-label="Host preview address"
           className="flex-1 min-w-[120px]"

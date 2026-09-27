@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react"
-import { Decoration, Diff, Hunk } from "react-diff-view"
+import { Decoration, Diff, Hunk, getChangeKey } from "react-diff-view"
 import { ErrorBoundary } from "react-error-boundary"
 import { diffLineCounts, foldDiff, parseFileDiffs, type FileDiff } from "./diff-model"
 import { diffTokens, visibleDiffHunks } from "./diff-highlighting"
 import { FileIcon } from "./FileIcon"
-import { Button } from "./controls"
+import { Button, ContextMenu, MenuAction } from "./controls"
 import { PlainPatch } from "./ChangeDiff"
 
 const pageSize = 400
@@ -21,6 +21,7 @@ function FileChanges({
   viewType: DiffViewType
 }) {
   const [limit, setLimit] = useState(pageSize)
+  const [selectedHunk, setSelectedHunk] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
   const name = file.type === "delete" ? file.oldPath : file.newPath
   const segments = useMemo(() => foldDiff(file.hunks, expanded), [file.hunks, expanded])
@@ -59,47 +60,81 @@ function FileChanges({
   })
   const { insertions, deletions } = diffLineCounts([file])
   return (
-    <section className={eventDiffClasses} aria-label={`Changes to ${name}`}>
-      {showHeader && (
-        <div className="event-diff-header flex items-center gap-[6px] [padding:7px_10px] border-b-[1px] border-b-[color:var(--line-subtle)] text-[var(--text-secondary)] [overflow-wrap:anywhere] [&_.file-icon]:shrink-0">
-          <FileIcon path={name} />
-          <span>
-            {file.oldPath !== file.newPath && file.type !== "add" && file.type !== "delete"
-              ? `${file.oldPath} → ${name}`
-              : name}
-          </span>
-          <span className="text-[var(--color-added)]">+{insertions}</span>
-          <span className="text-[var(--color-deleted)]">−{deletions}</span>
-        </div>
+    <ContextMenu
+      trigger={
+        <section
+          className={eventDiffClasses}
+          aria-label={`Changes to ${name}`}
+          onContextMenuCapture={(event) => {
+            const key = (event.target as Element)
+              .closest("[data-change-key]")
+              ?.getAttribute("data-change-key")
+            const hunk = key
+              ? file.hunks.find((candidate) =>
+                  candidate.changes.some((change) => getChangeKey(change) === key),
+                )
+              : undefined
+            setSelectedHunk(
+              hunk
+                ? [hunk.content, ...hunk.changes.map((change) => change.content)].join("\n")
+                : null,
+            )
+          }}
+        >
+          {showHeader && (
+            <div className="event-diff-header flex items-center gap-[6px] [padding:7px_10px] border-b-[1px] border-b-[color:var(--line-subtle)] text-[var(--text-secondary)] [overflow-wrap:anywhere] [&_.file-icon]:shrink-0">
+              <FileIcon path={name} />
+              <span>
+                {file.oldPath !== file.newPath && file.type !== "add" && file.type !== "delete"
+                  ? `${file.oldPath} → ${name}`
+                  : name}
+              </span>
+              <span className="text-[var(--color-added)]">+{insertions}</span>
+              <span className="text-[var(--color-deleted)]">−{deletions}</span>
+            </div>
+          )}
+          {file.hunks.length === 0 ? (
+            <pre className="work-item-output max-h-[220px] m-0 overflow-auto text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[10.75px] leading-[1.55] whitespace-pre-wrap">
+              {file.patch}
+            </pre>
+          ) : (
+            <Diff viewType={viewType} diffType={file.type} hunks={hunks} tokens={tokens}>
+              {() => rendered}
+            </Diff>
+          )}
+          {total > limit && (
+            <div className="[padding:6px_10px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[11px]">
+              <Button onClick={() => setLimit((value) => value + pageSize)}>
+                Show {Math.min(pageSize, total - limit)} more lines ({total - limit} remaining)
+              </Button>
+            </div>
+          )}
+          {(!file.oldEndingNewLine || !file.newEndingNewLine) && (
+            <div className="[padding:6px_10px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[11px]">
+              No newline at end of{" "}
+              {!file.oldEndingNewLine && !file.newEndingNewLine
+                ? "either version"
+                : !file.oldEndingNewLine
+                  ? "old version"
+                  : "new version"}
+              .
+            </div>
+          )}
+        </section>
+      }
+    >
+      {selectedHunk && (
+        <MenuAction onClick={() => void navigator.clipboard.writeText(selectedHunk)}>
+          Copy hunk
+        </MenuAction>
       )}
-      {file.hunks.length === 0 ? (
-        <pre className="work-item-output max-h-[220px] m-0 overflow-auto text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[10.75px] leading-[1.55] whitespace-pre-wrap">
-          {file.patch}
-        </pre>
-      ) : (
-        <Diff viewType={viewType} diffType={file.type} hunks={hunks} tokens={tokens}>
-          {() => rendered}
-        </Diff>
-      )}
-      {total > limit && (
-        <div className="[padding:6px_10px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[11px]">
-          <Button onClick={() => setLimit((value) => value + pageSize)}>
-            Show {Math.min(pageSize, total - limit)} more lines ({total - limit} remaining)
-          </Button>
-        </div>
-      )}
-      {(!file.oldEndingNewLine || !file.newEndingNewLine) && (
-        <div className="[padding:6px_10px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[11px]">
-          No newline at end of{" "}
-          {!file.oldEndingNewLine && !file.newEndingNewLine
-            ? "either version"
-            : !file.oldEndingNewLine
-              ? "old version"
-              : "new version"}
-          .
-        </div>
-      )}
-    </section>
+      <MenuAction onClick={() => void navigator.clipboard.writeText(file.patch)}>
+        Copy patch
+      </MenuAction>
+      <MenuAction onClick={() => void navigator.clipboard.writeText(name)}>
+        Copy file path
+      </MenuAction>
+    </ContextMenu>
   )
 }
 

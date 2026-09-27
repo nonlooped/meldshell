@@ -681,10 +681,11 @@ function CommitRow({
   row: GraphRow
   graphWidth: number
 }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
   const { commit, lane, edges, incoming } = row
   const ref = primaryRef(commit.refs)
   return (
-    <Collapsible.Root render={<li />}>
+    <Collapsible.Root render={<li />} open={open} onOpenChange={setOpen}>
       <ContextMenu
         trigger={
           <Collapsible.Trigger
@@ -740,6 +741,9 @@ function CommitRow({
       >
         <MenuAction onClick={() => void navigator.clipboard.writeText(commit.hash)}>
           Copy full hash
+        </MenuAction>
+        <MenuAction onClick={() => setOpen((value) => !value)}>
+          {open ? "Hide commit changes" : "Show commit changes"}
         </MenuAction>
         <MenuAction onClick={() => void navigator.clipboard.writeText(commit.hash.slice(0, 7))}>
           Copy short hash

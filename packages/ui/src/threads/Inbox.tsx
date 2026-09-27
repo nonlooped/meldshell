@@ -77,6 +77,7 @@ interface InboxProps {
   /** Threads that finished out of view and have not been opened since. */
   readonly unseenThreadIds: ReadonlySet<string>
   readonly onNewThread: () => void
+  readonly onNewThreadInWorkspace: (workspaceId: string) => void
   readonly onAddWorkspace: () => void
   readonly onOpen: (threadId: string) => void
   /** Opens the thread in a new pane beside the one in front, the keyboard route to a split. */
@@ -524,6 +525,7 @@ export function Inbox({
   selectedThreadId,
   unseenThreadIds,
   onNewThread,
+  onNewThreadInWorkspace,
   onAddWorkspace,
   onOpen,
   onOpenBeside,
@@ -648,39 +650,68 @@ export function Inbox({
             <ChordKeys chord={bindings.threadPalette} className={railLabelClasses} />
           )}
         </BaseButton>
-        <DropdownMenu
-          align="start"
+        <ContextMenu
           trigger={
-            <BaseButton
-              type="button"
-              className={`motion-colors ${workspaceSelectorClasses}`}
-              title={rail ? selectedWorkspaceName : undefined}
-              aria-label={`Show threads from: ${selectedWorkspaceName}`}
-            >
-              <Folder size={15} strokeWidth={1.65} />
-              <span className={railLabelClasses}>{selectedWorkspaceName}</span>
-              <ChevronsUpDown size={13} strokeWidth={1.7} className={railLabelClasses} />
-            </BaseButton>
+            <div className="w-full">
+              <DropdownMenu
+                align="start"
+                trigger={
+                  <BaseButton
+                    type="button"
+                    className={`motion-colors ${workspaceSelectorClasses}`}
+                    title={rail ? selectedWorkspaceName : undefined}
+                    aria-label={`Show threads from: ${selectedWorkspaceName}`}
+                  >
+                    <Folder size={15} strokeWidth={1.65} />
+                    <span className={railLabelClasses}>{selectedWorkspaceName}</span>
+                    <ChevronsUpDown size={13} strokeWidth={1.7} className={railLabelClasses} />
+                  </BaseButton>
+                }
+              >
+                <MenuRadioGroup
+                  value={workspaceId}
+                  onValueChange={(value) => setWorkspaceId(String(value))}
+                >
+                  <MenuChoice value="all">All workspaces</MenuChoice>
+                  {workspaces.map((workspace) => (
+                    <MenuChoice key={workspace.id} value={workspace.id}>
+                      {workspace.name}
+                    </MenuChoice>
+                  ))}
+                </MenuRadioGroup>
+                <MenuAction icon={<FolderPlus size={14} />} onClick={onAddWorkspace}>
+                  Add workspace
+                </MenuAction>
+                <MenuAction icon={<Settings size={14} />} onClick={onManageWorkspaces}>
+                  Manage workspaces
+                </MenuAction>
+              </DropdownMenu>
+            </div>
           }
         >
-          <MenuRadioGroup
-            value={workspaceId}
-            onValueChange={(value) => setWorkspaceId(String(value))}
+          <MenuAction
+            onClick={() =>
+              workspaceId === "all" ? onNewThread() : onNewThreadInWorkspace(workspaceId)
+            }
           >
-            <MenuChoice value="all">All workspaces</MenuChoice>
-            {workspaces.map((workspace) => (
-              <MenuChoice key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </MenuChoice>
-            ))}
-          </MenuRadioGroup>
-          <MenuAction icon={<FolderPlus size={14} />} onClick={onAddWorkspace}>
-            Add workspace
+            {workspaceId === "all" ? "New thread" : "New thread in this workspace"}
           </MenuAction>
-          <MenuAction icon={<Settings size={14} />} onClick={onManageWorkspaces}>
-            Manage workspaces
-          </MenuAction>
-        </DropdownMenu>
+          {workspaceId !== "all" && (
+            <MenuAction onClick={() => setWorkspaceId("all")}>Show all workspaces</MenuAction>
+          )}
+          {workspaceId !== "all" && (
+            <MenuAction
+              onClick={() =>
+                void navigator.clipboard.writeText(
+                  workspaces.find((workspace) => workspace.id === workspaceId)?.path ?? "",
+                )
+              }
+            >
+              Copy workspace path
+            </MenuAction>
+          )}
+          <MenuAction onClick={onManageWorkspaces}>Manage workspaces</MenuAction>
+        </ContextMenu>
       </div>
 
       <div

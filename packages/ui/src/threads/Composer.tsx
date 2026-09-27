@@ -222,6 +222,60 @@ function ComposerAttachments({
   )
 }
 
+function ComposerTextActions({
+  input,
+  onAttach,
+  onSchedule,
+  disabled,
+}: {
+  input: React.RefObject<HTMLTextAreaElement | null>
+  onAttach: () => void
+  onSchedule: () => void
+  disabled: boolean
+}) {
+  const edit = (command: string, value?: string) => {
+    input.current?.focus()
+    document.execCommand(command, false, value)
+  }
+  const selected = () => {
+    const field = input.current
+    return field?.value.slice(field.selectionStart, field.selectionEnd) ?? ""
+  }
+  return (
+    <>
+      <MenuAction onClick={() => edit("undo")}>Undo</MenuAction>
+      <MenuAction onClick={() => edit("redo")}>Redo</MenuAction>
+      <MenuAction
+        onClick={() =>
+          void navigator.clipboard.writeText(selected()).then(() => edit("insertText", ""))
+        }
+      >
+        Cut
+      </MenuAction>
+      <MenuAction onClick={() => void navigator.clipboard.writeText(selected())}>Copy</MenuAction>
+      <MenuAction
+        onClick={() => void navigator.clipboard.readText().then((text) => edit("insertText", text))}
+      >
+        Paste
+      </MenuAction>
+      <MenuAction
+        onClick={() => {
+          input.current?.focus()
+          input.current?.select()
+        }}
+      >
+        Select all
+      </MenuAction>
+      <MenuAction disabled={disabled} onClick={onAttach}>
+        Attach file or image…
+      </MenuAction>
+      <MenuAction disabled={disabled} onClick={onSchedule}>
+        Schedule this prompt…
+      </MenuAction>
+    </>
+  )
+}
+
 function sendTitle({
   sending,
   providerReady,
@@ -727,68 +781,79 @@ export function Composer({
         )}
         <div className="relative grid">
           {completion.highlight}
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            rows={2}
-            placeholder={`Ask ${providerName} to work in this workspace…`}
-            aria-label={`Message ${providerName}`}
-            aria-keyshortcuts="Enter"
-            {...completion.inputProps}
-            onChange={(event) => {
-              onDraftChange(event.target.value)
-              completion.syncCaret(event)
-            }}
-            onPaste={(event) => {
-              const images = Array.from(event.clipboardData.files).filter((file) =>
-                file.type.startsWith("image/"),
-              )
-              if (images.length === 0) return
-              event.preventDefault()
-              void addAttachments(() =>
-                Promise.all(
-                  images.map(
-                    (file) =>
-                      new Promise<ComposerAttachment>((resolve, reject) => {
-                        const reader = new FileReader()
-                        reader.onload = () => {
-                          if (typeof reader.result !== "string") {
-                            reject(new Error("Could not read image"))
-                            return
-                          }
-                          resolve({
-                            type: "image",
-                            value: reader.result,
-                            name: file.name || "Pasted image",
-                          })
-                        }
-                        reader.onerror = () => reject(reader.error)
-                        reader.onabort = () => reject(new Error("Image read cancelled"))
-                        reader.readAsDataURL(file)
-                      }),
-                  ),
-                ),
-              )
-            }}
-            onKeyDown={(event) => {
-              if (completion.handleKeyDown(event)) {
-                event.preventDefault()
-                event.stopPropagation()
-                return
-              }
-              if (
-                event.key === "Enter" &&
-                !event.nativeEvent.isComposing &&
-                !event.shiftKey &&
-                !event.altKey &&
-                canSend &&
-                attachmentReadsPending.current === 0
-              ) {
-                event.preventDefault()
-                send()
-              }
-            }}
-          />
+          <ContextMenu
+            trigger={
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                rows={2}
+                placeholder={`Ask ${providerName} to work in this workspace…`}
+                aria-label={`Message ${providerName}`}
+                aria-keyshortcuts="Enter"
+                {...completion.inputProps}
+                onChange={(event) => {
+                  onDraftChange(event.target.value)
+                  completion.syncCaret(event)
+                }}
+                onPaste={(event) => {
+                  const images = Array.from(event.clipboardData.files).filter((file) =>
+                    file.type.startsWith("image/"),
+                  )
+                  if (images.length === 0) return
+                  event.preventDefault()
+                  void addAttachments(() =>
+                    Promise.all(
+                      images.map(
+                        (file) =>
+                          new Promise<ComposerAttachment>((resolve, reject) => {
+                            const reader = new FileReader()
+                            reader.onload = () => {
+                              if (typeof reader.result !== "string") {
+                                reject(new Error("Could not read image"))
+                                return
+                              }
+                              resolve({
+                                type: "image",
+                                value: reader.result,
+                                name: file.name || "Pasted image",
+                              })
+                            }
+                            reader.onerror = () => reject(reader.error)
+                            reader.onabort = () => reject(new Error("Image read cancelled"))
+                            reader.readAsDataURL(file)
+                          }),
+                      ),
+                    ),
+                  )
+                }}
+                onKeyDown={(event) => {
+                  if (completion.handleKeyDown(event)) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    return
+                  }
+                  if (
+                    event.key === "Enter" &&
+                    !event.nativeEvent.isComposing &&
+                    !event.shiftKey &&
+                    !event.altKey &&
+                    canSend &&
+                    attachmentReadsPending.current === 0
+                  ) {
+                    event.preventDefault()
+                    send()
+                  }
+                }}
+              />
+            }
+          >
+            <ComposerTextActions
+              input={textareaRef}
+              disabled={loadingAttachments || sending}
+              onAttach={() => void addAttachments(() => window.meldshell.selectAttachments())}
+              onSchedule={onSchedule}
+            />
+          </ContextMenu>
         </div>
 
         <ContextMenu
