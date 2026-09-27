@@ -10,7 +10,14 @@ import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/con
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import { Columns2, Globe, Maximize2, MoreHorizontal, Rows2, SquareTerminal, X } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
-import { AppDialog, Button, DropdownMenu, IconButton, MenuAction } from "../ui/controls"
+import {
+  AppDialog,
+  Button,
+  ContextMenu,
+  DropdownMenu,
+  IconButton,
+  MenuAction,
+} from "../ui/controls"
 import { ThreadView } from "../threads/ThreadView"
 import { TerminalPanel } from "../terminals/TerminalPanel"
 import { terminalApi, useTerminalStore } from "../terminals/terminal-store"
@@ -125,19 +132,42 @@ function ThreadTileHeader({
   const previewShown = usePreviewStore((state) => state.threads[thread.id]?.open === true)
   return (
     <div className="thread-tile-header flex min-w-0 items-center gap-[2px] [padding:3px_6px] border-b-[1px] border-b-[color:var(--line-subtle)] text-[var(--text-tertiary)]">
-      <BaseButton
-        ref={draggable.ref}
-        type="button"
-        className={
-          "flex min-w-0 flex-1 items-center gap-[8px] p-[4px] border-0 bg-transparent text-inherit [font:inherit] text-[12px] text-left [cursor:grab] [&_>_span]:overflow-hidden [&_>_span]:text-ellipsis [&_>_span]:whitespace-nowrap [&_>_small]:flex-none [&_>_small]:text-[var(--color-modified)] [&_>_small]:whitespace-nowrap"
+      <ContextMenu
+        trigger={
+          <BaseButton
+            ref={draggable.ref}
+            type="button"
+            className={
+              "flex min-w-0 flex-1 items-center gap-[8px] p-[4px] border-0 bg-transparent text-inherit [font:inherit] text-[12px] text-left [cursor:grab] [&_>_span]:overflow-hidden [&_>_span]:text-ellipsis [&_>_span]:whitespace-nowrap [&_>_small]:flex-none [&_>_small]:text-[var(--color-modified)] [&_>_small]:whitespace-nowrap"
+            }
+            data-dragging={draggable.isDragging ? "" : undefined}
+            onClick={onFocus}
+            title={`${thread.title}\nDrag onto a pane to move or split it`}
+          >
+            <span>{thread.title}</span>
+            {thread.activity === "approval" && <small>Needs approval</small>}
+          </BaseButton>
         }
-        data-dragging={draggable.isDragging ? "" : undefined}
-        onClick={onFocus}
-        title={`${thread.title}\nDrag onto a pane to move or split it`}
       >
-        <span>{thread.title}</span>
-        {thread.activity === "approval" && <small>Needs approval</small>}
-      </BaseButton>
+        <MenuAction onClick={() => setPicker("right")}>Split right…</MenuAction>
+        <MenuAction onClick={() => setPicker("bottom")}>Split below…</MenuAction>
+        <MenuAction onClick={() => useTabStore.getState().maximizeThread(thread.id)}>
+          Show only this thread
+        </MenuAction>
+        {previewSupported && (
+          <MenuAction onClick={() => usePreviewStore.getState().toggle(thread.id)}>
+            {previewShown ? "Hide preview" : "Show preview"}
+          </MenuAction>
+        )}
+        {terminalApi !== undefined && (
+          <MenuAction onClick={() => useTerminalStore.getState().toggle(thread.id)}>
+            {terminalShown ? "Hide terminal" : "Show terminal"}
+          </MenuAction>
+        )}
+        <MenuAction onClick={() => useTabStore.getState().closeThread(thread.id)}>
+          Close pane
+        </MenuAction>
+      </ContextMenu>
       <DropdownMenu
         align="end"
         trigger={
