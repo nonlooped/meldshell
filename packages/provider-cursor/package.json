@@ -8,7 +8,7 @@
     "./worker": "./src/worker-runtime.ts"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "1.5.0",
+    "@agentclientprotocol/sdk": "1.5.1",
     "@meldshell/contracts": "*",
     "@meldshell/provider-runtime": "*",
     "effect": "3.22.2",
