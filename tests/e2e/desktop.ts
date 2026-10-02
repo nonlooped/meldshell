@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process"
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import type { MeldShellApi } from "@meldshell/contracts/ipc"
@@ -34,6 +34,8 @@ export class Desktop {
     this.directory = await mkdtemp(join(tmpdir(), "meldshell-e2e-"))
     this.workspace = join(this.directory, "workspace with spaces")
     await mkdir(this.workspace)
+    // Windows TEMP can use an 8.3 alias; the host stores the canonical folder path.
+    this.workspace = await realpath(this.workspace)
     await writeFile(join(this.workspace, "README.md"), "# E2E workspace\n")
     execFileSync("git", ["init", this.workspace])
     execFileSync("git", ["-C", this.workspace, "add", "."])
@@ -102,7 +104,10 @@ export class Desktop {
   async addWorkspace() {
     const snapshot = await this.call("addWorkspacePath", this.workspace)
     const workspace = snapshot.workspaces.find((item) => item.path === this.workspace)
-    if (!workspace) throw new Error("Added workspace missing from snapshot")
+    if (!workspace)
+      throw new Error(
+        `Added workspace missing from snapshot: expected ${this.workspace}, received ${snapshot.workspaces.map((item) => item.path).join(", ")}`,
+      )
     return workspace
   }
 }

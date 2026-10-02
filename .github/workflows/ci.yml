@@ -169,5 +169,6 @@ jobs:
         with:
           name: e2e-${{ runner.os }}
           path: .e2e/
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7
