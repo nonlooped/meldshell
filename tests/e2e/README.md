@@ -31,10 +31,10 @@ Ten journeys replace 72 application test files. They test outcomes across bounda
 
 | Journey | Boundaries and outcomes |
 | --- | --- |
-| Returning user | Real preload IPC, workspace/thread mutations, worker/database persistence, full Electron restart, rendered names |
-| Archive and delete | Durable archive status, deletion, sibling preservation, rendered survivor after restart |
+| Returning user | Real preload IPC, workspace/thread mutations, worker/database persistence, full Electron restart, renamed entries in the thread palette |
+| Archive and delete | Durable archive status, deletion, sibling preservation, survivor in the thread palette after restart |
 | Preferences | Accessible Settings controls, saved settings, restart, rendered theme |
-| Workspace files | Actual files with spaces and Unicode, preview/list/rename/delete, traversal rejection |
+| Workspace files | Actual files with spaces and Unicode, preview/list/rename/delete, rejection of writes outside the workspace |
 | Isolated work | Actual Git worktree, checkout isolation, persisted worktree identity and file access after restart |
 | Model catalog | Custom model edits, restart, removal without altering existing models |
 | Terminal process | Actual shell process and file output in the selected workspace, resize and close |

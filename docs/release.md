@@ -43,7 +43,7 @@ Native Windows and Linux runners package NSIS x64 and AppImage x64 artifacts whi
 For a local candidate:
 
 1. Use Node.js 24 or newer on Windows 11 x64 for NSIS and x64 Linux for AppImage.
-2. Install with `npm ci`. For full local candidate validation, run `npm run knip`, `npm run check:fast`, and `npm test` once. The packaging command in the next step includes the desktop build. When using workflow artifacts, use the workflow's automated verdict instead of repeating these checks locally.
+2. Install with `npm ci`. For full local candidate validation, run `npm run knip`, `npm run check:fast`, `npm run build`, and then `npm test` once. The tests require the built Electron bundle; the packaging command in the next step also builds it. When using workflow artifacts, use the workflow's automated verdict instead of repeating these checks locally.
 3. Run `npm run package:win` on Windows or `npm run package:linux` on Linux.
 4. Inspect the repository-root `release` output. Confirm SQLite loads outside ASAR and no Claude Code native executable is packaged.
 5. Record hashes and complete the applicable manual matrix against those exact artifacts. Results from a local or `build-only` build apply only to that build; record any checks on the published installers separately.
