@@ -15,8 +15,8 @@
     "@astrojs/sitemap": "^3.7.4",
     "@fontsource-variable/mona-sans": "^5.3.0",
     "@fontsource/monaspace-neon": "^5.3.0",
-    "@iconify-icons/logos": "^2.0.1",
-    "@iconify-icons/simple-icons": "^2.0.4",
+    "@iconify-icons/logos": "^2.0.2",
+    "@iconify-icons/simple-icons": "^2.0.5",
     "@meldshell/contracts": "*",
     "@meldshell/ui": "*",
     "@tailwindcss/vite": "4.3.3",
@@ -33,6 +33,6 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "cookie": "2.0.1",
-    "wrangler": "4.142.0"
+    "wrangler": "4.146.0"
   }
 }
