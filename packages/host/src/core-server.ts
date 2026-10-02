@@ -79,9 +79,7 @@ export interface CorePort {
 export const startCore = (parentPort: CorePort, databasePath: string) => {
   const DatabaseLive = SqliteClient.layer({
     filename: databasePath,
-    // better-sqlite3 statements register native cleanup hooks. Keeping MeldShell's bounded set of
-    // prepared statements for the utility lifetime avoids evicting live native handles under a
-    // burst of concurrent turn events.
+    // Retain MeldShell's bounded set of prepared statements across bursts of turn events.
     prepareCacheSize: 1_024,
     prepareCacheTTL: "24 hours",
   })

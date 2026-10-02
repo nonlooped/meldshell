@@ -1,6 +1,6 @@
 # Contributing to MeldShell
 
-Use Node.js 24 or newer. `npm install` downloads Electron and rebuilds SQLite for its ABI; `npm run dev` starts the desktop app. Windows 11 x64 and Linux x64 are the configured packaging targets.
+Use Node.js 24 or newer. `npm install` downloads Electron and prepares the native terminal addon; `npm run dev` starts the desktop app. Windows 11 x64 and Linux x64 are the configured packaging targets.
 
 The Windows desktop can run natively on Windows or use a Linux host in WSL; switch in Settings → General → Execution environment. Windows development and production builds include that host's payload (other platforms build it only with `MELDSHELL_BUILD_WSL_HOST=1`); its first launch installs the locked Linux runtime dependencies inside WSL. See [Windows and WSL](docs/wsl.md) for prerequisites, data locations, and the bundled-host check.
 
@@ -35,7 +35,7 @@ Authenticated provider checks can consume account quota. UI and manual verificat
 
 Application tests use [TesterArmy e2e](https://tester.army/e2e). See [the journey suite](tests/e2e/README.md) for prerequisites, isolation, coverage, and focused commands. `npm test` runs all journeys. The desktop target uses Playwright's Electron driver through an e2e custom engine, so it exercises the built main process, sandboxed preload, renderer, worker processes, and durable SQLite database. The control target runs the real Cloudflare Worker with local D1 and Durable Objects. No model API key is required.
 
-Effect and its SQLite driver are pinned together at stable v4. SQL and RPC modules are imported from `effect/sql` and `effect/rpc`.
+Effect and its SQLite driver are pinned together at stable v4. The driver uses Node's built-in SQLite; no separate SQLite addon is installed. SQL and RPC modules are imported from `effect/sql` and `effect/rpc`.
 
 `electron-vite` 5 requires Vite 7, so the desktop and shared UI use Vite 7 and `@vitejs/plugin-react` 5 until Electron Vite supports Vite 8. `@astrojs/check` currently supports TypeScript through 6, so the workspace uses TypeScript 6. The Node type definitions follow the supported Node 24 runtime.
 

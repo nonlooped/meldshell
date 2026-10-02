@@ -29,7 +29,6 @@
     "@meldshell/provider-codex": "*",
     "@meldshell/provider-cursor": "*",
     "@meldshell/provider-runtime": "*",
-    "better-sqlite3": "13.0.3",
     "cross-spawn": "7.0.6",
     "effect": "4.0.0",
     "electron-context-menu": "5.1.0",

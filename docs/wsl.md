@@ -38,6 +38,6 @@ Closing MeldShell stops its Linux host, agents, and terminals. It does not shut 
 
 ## Development and verification
 
-On Windows, `npm run dev` and `npm run build` prepare the WSL host payload; other platforms skip it unless `MELDSHELL_BUILD_WSL_HOST=1` is set. `npm run build:wsl-host --workspace=@meldshell/desktop` rebuilds just that payload. Its three external runtime dependencies are pinned in `apps/host/runtime/package.json` and its lockfile; keep those versions aligned with the workspace dependencies when updating them.
+On Windows, `npm run dev` and `npm run build` prepare the WSL host payload; other platforms skip it unless `MELDSHELL_BUILD_WSL_HOST=1` is set. `npm run build:wsl-host --workspace=@meldshell/desktop` rebuilds just that payload. Its external runtime dependencies are pinned in `apps/host/runtime/package.json` and its lockfile; keep those versions aligned with the workspace dependencies when updating them.
 
 The [e2e suite](../tests/e2e/README.md) tests the native desktop on Linux and Windows. Bundled WSL host installation and switching still require manual validation. Manual Windows validation should still cover first launch, a project with spaces and non-ASCII characters, a real provider turn and interruption, an isolated worktree with setup/run scripts, terminal resize and Ctrl+C, attachments, Linux editor launch, WSL shutdown during work, app restart, and clean app shutdown. The native desktop journeys do not certify Windows/WSL integration.

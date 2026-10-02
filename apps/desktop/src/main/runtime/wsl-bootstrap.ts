@@ -17,7 +17,7 @@ if [ ! -f "$target/.ready" ]; then
   echo 'Preparing the Linux MeldShell host. First launch downloads dependencies and builds the terminal addon.' >&2
   npm ci --prefix "$stage" --ignore-scripts --omit=optional --no-audit --no-fund </dev/null
   npm rebuild --prefix "$stage" node-pty --ignore-scripts=false --no-audit --no-fund </dev/null || { echo 'The Linux terminal addon requires Python 3, make, and a C++ compiler. Install these in WSL, then retry.' >&2; exit 1; }
-  node -e 'const load = require("node:module").createRequire(process.argv[1] + "/package.json"); load("node-pty"); load("better-sqlite3")' "$stage"
+  node -e 'const load = require("node:module").createRequire(process.argv[1] + "/package.json"); load("node-pty"); load("node:sqlite")' "$stage"
   touch "$stage/.ready"
   if [ -d "$target" ]; then rm -rf "$stage"; else mv "$stage" "$target"; fi
   trap - EXIT
