@@ -31,7 +31,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       static: ${{ steps.scope.outputs.static }}
-      desktop: ${{ steps.scope.outputs.desktop }}
       e2e: ${{ steps.scope.outputs.e2e }}
       site: ${{ steps.scope.outputs.site }}
       test: ${{ steps.scope.outputs.test }}
@@ -70,7 +69,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      # Electron and native rebuilds are unnecessary here; better-sqlite3 ships N-API prebuilds.
+      # Static checks do not need Electron downloads or native addon rebuilds.
       - run: npm ci --ignore-scripts
       - name: Unused code
         run: npm run knip
@@ -85,9 +84,9 @@ jobs:
         run: node scripts/ci-scope.mjs typecheck
 
   build-test:
-    name: Build and test
+    name: Website build and tooling tests
     needs: changes
-    if: needs.changes.outputs.test == 'true' || needs.changes.outputs.desktop == 'true' || needs.changes.outputs.site == 'true'
+    if: needs.changes.outputs.test == 'true' || needs.changes.outputs.site == 'true'
     env:
       CI_SCOPE: ${{ needs.changes.outputs.scope }}
     runs-on: ubuntu-24.04
@@ -104,9 +103,6 @@ jobs:
       - name: Test
         if: needs.changes.outputs.test == 'true'
         run: node scripts/ci-scope.mjs test
-      - name: Build desktop
-        if: needs.changes.outputs.desktop == 'true'
-        run: npm run build
       - name: Build website
         if: needs.changes.outputs.site == 'true'
         run: npm run build --workspace=@meldshell/site

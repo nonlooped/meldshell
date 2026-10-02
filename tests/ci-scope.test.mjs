@@ -4,11 +4,17 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
-import { changedFiles, selectChecks, testFiles, workspaces } from "../scripts/ci-scope.mjs"
+import { changedFiles, selectChecks, workspaces } from "../scripts/ci-scope.mjs"
 
-test("release workflow edits only select release tests", () => {
-  const scope = selectChecks([".github/workflows/release.yml"])
-  assert.equal(scope.static, false)
+test("release-only edits select just the two release suites", () => {
+  const scope = selectChecks([
+    ".github/workflows/release.yml",
+    "scripts/release.mjs",
+    "tests/changelog.test.ts",
+    "tests/release-cli.test.mjs",
+    "CHANGELOG.md",
+  ])
+  assert.equal(scope.static, true)
   assert.equal(scope.desktop, false)
   assert.equal(scope.site, false)
   assert.equal(scope.e2e, false)
@@ -34,7 +40,8 @@ test("site and control changes stay in their workspace", () => {
     assert.equal(scope.desktop, false)
     assert.equal(scope.site, name === "site")
     assert.equal(scope.windows, false)
-    assert.deepEqual(scope.tests, [`apps/${name}`])
+    assert.equal(scope.test, false)
+    assert.deepEqual(scope.tests, [])
     assert.deepEqual(scope.typechecks, [`@meldshell/${name}`])
   }
 })
@@ -69,10 +76,14 @@ test("global inputs, CI machinery, and forced runs select every workspace", () =
     [],
   ]) {
     const scope = selectChecks(files, files.length === 0)
-    for (const key of ["static", "protocol", "desktop", "site", "test", "windows"])
+    for (const key of ["static", "protocol", "desktop", "site", "test", "windows", "e2e"])
       assert.equal(scope[key], true)
     assert.equal(scope.typechecks.length, workspaces().length)
-    assert(scope.tests.includes("packages/core"))
+    assert.deepEqual(scope.tests, [
+      "tests/ci-scope.test.mjs",
+      "tests/changelog.test.ts",
+      "tests/release-cli.test.mjs",
+    ])
   }
 })
 
@@ -154,16 +165,33 @@ test("CLI writes full fallback outputs when the push base is unavailable", () =>
   }
 })
 
-test("test discovery includes selected source tests and excludes build output", () => {
+test("tooling selection matches the explicit npm script", () => {
+  const { scripts } = JSON.parse(readFileSync("package.json", "utf8"))
+  const scope = selectChecks(["packages/host/src/host.ts"])
+  assert.deepEqual(scope.tests, scripts["test:tooling"].split(" --test ")[1].split(" "))
+})
+
+test("every desktop build selection is covered by e2e", () => {
+  for (const entry of workspaces()) {
+    const scope = selectChecks([`${entry.path}/src/index.ts`])
+    if (scope.desktop) assert.equal(scope.e2e, true, entry.path)
+  }
+})
+
+test("test CLI executes only explicit files and skips an empty selection", () => {
   const directory = mkdtempSync(join(tmpdir(), "ci-runner-"))
   try {
     const file = join(directory, "selected.test.mjs")
-    writeFileSync(file, "")
-    mkdirSync(join(directory, "out"))
-    writeFileSync(join(directory, "out", "built.test.mjs"), "")
-    writeFileSync(join(directory, "core.spec.ts"), "")
-    assert.deepEqual(testFiles(directory), [file])
-    assert.deepEqual(testFiles(file), [file])
+    writeFileSync(file, 'import test from "node:test"; test("selected tooling suite", () => {})')
+    writeFileSync(join(directory, "unselected.test.mjs"), 'throw new Error("must not run")')
+    for (const tests of [[file], []]) {
+      const output = execFileSync(process.execPath, ["scripts/ci-scope.mjs", "test"], {
+        env: { ...process.env, NODE_TEST_CONTEXT: undefined, CI_SCOPE: JSON.stringify({ tests }) },
+        encoding: "utf8",
+      })
+      if (tests.length) assert.match(output, /selected tooling suite/)
+      else assert.equal(output, "")
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }

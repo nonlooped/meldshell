@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process"
 import { appendFileSync, readFileSync, readdirSync } from "node:fs"
-import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
 export function workspaces() {
@@ -46,6 +45,7 @@ export function selectChecks(files, full = false, entries = workspaces()) {
     }
   } while (size !== affected.size)
   const selected = entries.filter((entry) => affected.has(entry.name))
+  const releaseTests = ["tests/changelog.test.ts", "tests/release-cli.test.mjs"]
   const release =
     global ||
     files.some((path) =>
@@ -63,10 +63,17 @@ export function selectChecks(files, full = false, entries = workspaces()) {
       (entry) =>
         entry.path.startsWith("packages/") || ["apps/desktop", "apps/host"].includes(entry.path),
     ) ||
-    source.some((path) => path.startsWith("tests/") || path.startsWith("scripts/"))
-  const tests = selected.map((entry) => entry.path)
-  if (rootTests) tests.push("tests")
-  else if (release) tests.push("tests/changelog.test.ts", "tests/release-cli.test.mjs")
+    source.some(
+      (path) =>
+        (path.startsWith("tests/") || path.startsWith("scripts/")) &&
+        path !== "scripts/release.mjs" &&
+        !releaseTests.includes(path),
+    )
+  const tests = rootTests
+    ? ["tests/ci-scope.test.mjs", ...releaseTests]
+    : release
+      ? releaseTests
+      : []
   const desktop = affected.has("@meldshell/desktop")
   const e2e = global || selected.length > 0 || source.some((path) => path.startsWith("tests/e2e/"))
   return {
@@ -101,20 +108,6 @@ export function changedFiles(event, eventName) {
     .filter(Boolean)
 }
 
-export function testFiles(path) {
-  if (/\.test\.(?:ts|mjs)$/.test(path)) return [path]
-  return readdirSync(path, { recursive: true, withFileTypes: true })
-    .filter(
-      (entry) =>
-        entry.isFile() &&
-        /\.test\.(?:ts|mjs)$/.test(entry.name) &&
-        !entry.parentPath
-          .split(/[\\/]/)
-          .some((part) => ["node_modules", "out", "dist"].includes(part)),
-    )
-    .map((entry) => join(entry.parentPath, entry.name))
-}
-
 function main() {
   const mode = process.argv[2]
   if (mode === "typecheck" || mode === "test") {
@@ -126,9 +119,8 @@ function main() {
       for (const workspace of scope.typechecks)
         runNpm(["run", "typecheck", `--workspace=${workspace}`])
     } else {
-      const files = [...new Set(scope.tests.flatMap(testFiles))]
-      if (files.length)
-        execFileSync(process.execPath, ["--import", "tsx", "--test", ...files], {
+      if (scope.tests.length)
+        execFileSync(process.execPath, ["--import", "tsx", "--test", ...scope.tests], {
           stdio: "inherit",
         })
     }
