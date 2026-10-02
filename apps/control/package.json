@@ -15,9 +15,9 @@
     "better-auth": "1.7.6"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260925.1",
+    "@cloudflare/workers-types": "5.20260928.1",
     "@types/ws": "^8.18.1",
-    "wrangler": "4.140.0",
-    "ws": "^8.21.3"
+    "wrangler": "4.142.0",
+    "ws": "^8.22.0"
   }
 }
