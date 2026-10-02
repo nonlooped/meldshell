@@ -22,6 +22,9 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     )
     expect(restored.threads.find((item) => item.id === thread.id)?.title).toBe("Repair login")
     await desktop.page
+      .getByRole("button", { name: "Search threads and messages", exact: true })
+      .click()
+    await desktop.page
       .getByText("Customer portal", { exact: true })
       .first()
       .waitFor({ state: "visible" })
@@ -50,6 +53,9 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     expect(remaining.threads.some((item) => item.id === archived.id)).toBe(false)
     expect(remaining.threads.find((item) => item.id === sibling.id)?.status).toBe("active")
     await desktop.page
+      .getByRole("button", { name: "Search threads and messages", exact: true })
+      .click()
+    await desktop.page
       .getByText("Keep this work", { exact: true })
       .first()
       .waitFor({ state: "visible" })
@@ -67,10 +73,12 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     await desktop.page.getByRole("tab", { name: "Appearance", exact: true }).click()
     await desktop.page.getByRole("combobox", { name: "Theme", exact: true }).click()
     await desktop.page.getByRole("option", { name: "Light", exact: true }).click()
-    await desktop.page.waitForFunction(async () => {
-      const snapshot = await window.meldshell.getSnapshot()
-      return snapshot.settings.theme === "light" && snapshot.settings.showSettled === false
-    })
+    await expect
+      .poll(async () => {
+        const snapshot = await desktop.call("getSnapshot")
+        return { theme: snapshot.settings.theme, showSettled: snapshot.settings.showSettled }
+      })
+      .toEqual({ theme: "light", showSettled: false })
     await desktop.restart()
     const restored = await desktop.call("getSnapshot")
     expect(restored.settings.theme).toBe("light")
@@ -109,13 +117,19 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     ).toBe(true)
     const outside = join(desktop.directory, "private.txt")
     await writeFile(outside, "outside workspace")
-    let rejected = false
-    try {
-      await desktop.call("readWorkspaceFile", { ...scope, path: "../private.txt" })
-    } catch {
-      rejected = true
-    }
-    expect(rejected).toBe(true)
+    const rejection = await desktop.page.evaluate(async (scope) => {
+      try {
+        await window.meldshell.workspaceFileAction({
+          ...scope,
+          path: "../private.txt",
+          action: "delete",
+        })
+        return null
+      } catch (error) {
+        return String(error)
+      }
+    }, scope)
+    expect(rejection).toContain("inside the workspace")
     expect(await readFile(outside, "utf8")).toBe("outside workspace")
     await desktop.call("workspaceFileAction", { ...scope, path: "résumé.md", action: "delete" })
     expect(
@@ -169,7 +183,7 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     desktop,
   }) => {
     const initial = await desktop.call("getSnapshot")
-    const provider = initial.providers.find((item) => item.key === "codex")!
+    const provider = initial.providers.find((item) => item.harness === "codex")!
     const created = await desktop.call("upsertModel", {
       providerId: provider.id,
       slug: "e2e-local-model",
@@ -235,24 +249,19 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     )
     try {
       expect(session.cwd).toBe(desktop.workspace)
-      await desktop.page.waitForFunction(
-        async ({ workspaceId, threadId }) => {
-          try {
-            const result = await window.meldshell.readWorkspaceFile({
-              workspaceId,
-              threadId,
-              path: "terminal-result.txt",
-            })
-            return result.content === "host-process"
-          } catch {
-            return false
-          }
-        },
-        { workspaceId: workspace.id, threadId: thread.id },
-      )
-      expect(await readFile(join(desktop.workspace, "terminal-result.txt"), "utf8")).toBe(
-        "host-process",
-      )
+      await expect
+        .poll(
+          async () => {
+            try {
+              return await readFile(join(desktop.workspace, "terminal-result.txt"), "utf8")
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code === "ENOENT") return null
+              throw error
+            }
+          },
+          { timeout: 10_000 },
+        )
+        .toBe("host-process")
     } finally {
       await desktop.page.evaluate(() => window.meldshell.terminal?.close("e2e-terminal"))
     }
