@@ -16,7 +16,7 @@ import { runCommand } from "@meldshell/provider-runtime/command"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
 import Ajv, { type ValidateFunction } from "ajv"
 import spawn from "cross-spawn"
-import { Effect, Either, Schema } from "effect"
+import { Effect, Result, Schema } from "effect"
 import semver from "semver"
 import which from "which"
 import { readCodexAccountEmail } from "./account"
@@ -57,7 +57,7 @@ export const probeCodex: Effect.Effect<CodexStatus> = Effect.gen(function* () {
   const executablePath = yield* Effect.tryPromise({
     try: () => which("codex", { nothrow: true }),
     catch: () => new Error("Codex could not be searched for on PATH."),
-  }).pipe(Effect.catchAll(() => Effect.succeed(null)))
+  }).pipe(Effect.catch(() => Effect.succeed(null)))
 
   if (executablePath === null) {
     return status("missing", "Codex is not installed or is not available on PATH.")
@@ -164,7 +164,7 @@ export async function requestCodex<M extends keyof Responses>(
   return value
 }
 export type MessageValidation = "validated" | "unknown" | "malformed"
-const decodeSchemaMethods = Schema.decodeUnknownEither(
+const decodeSchemaMethods = Schema.decodeUnknownResult(
   Schema.Struct({
     properties: Schema.optional(
       Schema.Struct({
@@ -184,9 +184,9 @@ const methods = (schema: unknown): Set<string> => {
   const visit = (value: unknown): void => {
     if (typeof value !== "object" || value === null) return
     const decoded = decodeSchemaMethods(value)
-    if (Either.isRight(decoded))
-      for (const name of decoded.right.properties?.method?.enum ?? [
-        decoded.right.properties?.method?.const,
+    if (Result.isSuccess(decoded))
+      for (const name of decoded.success.properties?.method?.enum ?? [
+        decoded.success.properties?.method?.const,
       ])
         if (typeof name === "string") result.add(name)
     const record = value
@@ -409,11 +409,11 @@ export class CodexAppServer {
       if (waiter === undefined) return
       this.pending.delete(record.id)
       if (record.error !== undefined) {
-        const error = Schema.decodeUnknownEither(RpcError)(record.error)
+        const error = Schema.decodeUnknownResult(RpcError)(record.error)
         waiter.reject(
-          Either.isRight(error)
-            ? rpcError(error.right)
-            : new Error(`Invalid RPC error: ${error.left.message}`),
+          Result.isSuccess(error)
+            ? rpcError(error.success)
+            : new Error(`Invalid RPC error: ${error.failure.message}`),
         )
       } else waiter.resolve(record.result)
       return

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { Either } from "effect"
+import { Result } from "effect"
 import { decodeNotification } from "./protocol"
 import { parseCursorQuestion } from "./extensions"
 
@@ -14,14 +14,14 @@ test("Cursor notifications validate nested fields and preserve native extensions
     },
   }
   const decoded = decodeNotification("session/update", native)!
-  assert.ok(Either.isRight(decoded))
-  assert.deepEqual(decoded.right, native)
+  assert.ok(Result.isSuccess(decoded))
+  assert.deepEqual(decoded.success, native)
   const malformed = decodeNotification("session/update", {
     ...native,
     update: { ...native.update, content: { type: "text", text: 4 } },
   })!
-  assert.ok(Either.isLeft(malformed))
-  assert.match(malformed.left.message, /text/)
+  assert.ok(Result.isFailure(malformed))
+  assert.match(malformed.failure.message, /text/)
   assert.equal(decodeNotification("cursor/future", { native: true }), undefined)
   assert.equal(
     decodeNotification("session/update", {

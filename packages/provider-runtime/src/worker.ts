@@ -4,7 +4,7 @@ import {
   type InputAttachment,
   type WorkerEvent,
 } from "@meldshell/contracts"
-import { Either, Schema } from "effect"
+import { Result, Schema } from "effect"
 import { isAbsolute } from "node:path"
 
 export interface WorkerPort {
@@ -18,7 +18,7 @@ export const eventPublisher =
   (event: WorkerEvent): void =>
     port.postMessage(event)
 
-const decode = Schema.decodeUnknownEither(WorkerCommand)
+const decode = Schema.decodeUnknownResult(WorkerCommand)
 
 /** Decode the shared envelope; each provider retains ownership of acknowledgment timing. */
 export function workerCommand(port: WorkerPort, data: unknown) {
@@ -29,7 +29,7 @@ export function workerCommand(port: WorkerPort, data: unknown) {
       publish({ type: "command-ack", commandId, ...(error === undefined ? {} : { error }) })
   }
   const decoded = decode(data)
-  return { input: Either.isRight(decoded) ? decoded.right : null, acknowledge }
+  return { input: Result.isSuccess(decoded) ? decoded.success : null, acknowledge }
 }
 
 /**

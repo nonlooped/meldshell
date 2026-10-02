@@ -1,5 +1,5 @@
-import * as Migrator from "@effect/sql/Migrator"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as Migrator from "effect/sql/Migrator"
+import * as SqlClient from "effect/sql/SqlClient"
 import { Effect } from "effect"
 import { repairWorkspacePaths } from "./workspace-paths"
 
@@ -323,7 +323,7 @@ export const runMigrations = Effect.gen(function* () {
     )
   )
     return yield* new Migrator.MigrationError({
-      reason: "bad-state",
+      kind: "BadState",
       message: "Unsupported or incomplete migration history",
     })
   if ((!converted || latest < migrations.at(-1)!.version) && has("threads")) {

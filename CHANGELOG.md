@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Changed
+
+- Upgrade the app to stable Effect v4, consolidating SQL and RPC modules, explicitly scoping callback fibers, and preserving native provider extensions with open schemas.
+
 ## [0.13.0] - 2026-10-02
 
 ### Changed

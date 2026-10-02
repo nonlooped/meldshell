@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { it } from "@effect/vitest"
 import { TestDatabase } from "./test/database"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { Effect } from "effect"
 import { runMigrations } from "./database/migrations"
 import { readAppSettings, setAppSettings } from "./settings"

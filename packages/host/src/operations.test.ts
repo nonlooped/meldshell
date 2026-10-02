@@ -40,14 +40,14 @@ test("competing approval responses deliver once and the second observes resoluti
         pending = false
         return approvalSnapshot(false)
       }),
-  } as unknown as CoreClient
+  } as unknown as typeof CoreClient.Service
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
       Layer.succeed(CoreClient, core),
       Layer.succeed(CodexProvider, provider),
       Layer.succeed(ClaudeProvider, provider),
       Layer.succeed(CursorProvider, provider),
-      HostEvents.Default,
+      HostEvents.layer,
     ),
   )
   try {
@@ -79,14 +79,14 @@ test("a failed approval delivery leaves the approval pending", async () => {
         resolved = true
         return approvalSnapshot(false)
       }),
-  } as unknown as CoreClient
+  } as unknown as typeof CoreClient.Service
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
       Layer.succeed(CoreClient, core),
       Layer.succeed(CodexProvider, provider),
       Layer.succeed(ClaudeProvider, provider),
       Layer.succeed(CursorProvider, provider),
-      HostEvents.Default,
+      HostEvents.layer,
     ),
   )
   try {
@@ -108,14 +108,14 @@ test("a host-queued prompt does not dispatch a second provider turn", async () =
         deliveries++
       }),
   } as unknown as ProviderService
-  const core = { SubmitTurn: () => Effect.succeed(result) } as unknown as CoreClient
+  const core = { SubmitTurn: () => Effect.succeed(result) } as unknown as typeof CoreClient.Service
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
       Layer.succeed(CoreClient, core),
       Layer.succeed(CodexProvider, provider),
       Layer.succeed(ClaudeProvider, provider),
       Layer.succeed(CursorProvider, provider),
-      HostEvents.Default,
+      HostEvents.layer,
     ),
   )
   try {
@@ -150,7 +150,7 @@ for (const scenario of ["running", "finished", "stale", "failed"] as const) {
           submitted = true
           return { disposition: "started", dispatch: null, titleRequest: null }
         }),
-    } as unknown as CoreClient
+    } as unknown as typeof CoreClient.Service
     const provider = {
       send: (message: unknown) =>
         Effect.suspend(() => {
@@ -164,7 +164,7 @@ for (const scenario of ["running", "finished", "stale", "failed"] as const) {
         Layer.succeed(CodexProvider, provider),
         Layer.succeed(ClaudeProvider, provider),
         Layer.succeed(CursorProvider, provider),
-        HostEvents.Default,
+        HostEvents.layer,
       ),
     )
     try {

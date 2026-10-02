@@ -41,7 +41,7 @@ export async function startHost(
             )
           : Effect.void,
       ),
-      Effect.catchAll(Effect.logError),
+      Effect.catch(Effect.logError),
     ),
   )
   const schedulerFiber = runtime.runFork(scheduleLoop)
@@ -125,7 +125,7 @@ export async function startHost(
     Effect.scoped(
       Effect.gen(function* () {
         const events = yield* HostEvents
-        yield* Stream.fromQueue(yield* events.subscribe).pipe(
+        yield* Stream.fromSubscription(yield* events.subscribe).pipe(
           Stream.groupedWithin(64, "32 millis"),
           Stream.runForEach((batch) =>
             Effect.sync(() => {

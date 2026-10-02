@@ -4,7 +4,7 @@ import { createWriteStream } from "node:fs"
 import { open, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { stripVTControlCharacters } from "node:util"
-import { Effect, Either, Schema } from "effect"
+import { Effect, Result, Schema } from "effect"
 import type { ThreadLocation } from "@meldshell/contracts"
 import type { RunScript, WorkspaceScripts, WorktreeSetupLog } from "@meldshell/contracts/ipc"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
@@ -33,7 +33,7 @@ const ScriptsFile = Schema.Struct({
     Schema.Struct({
       setup: Schema.optional(Schema.String),
       run: Schema.optional(
-        Schema.Union(Schema.String, Schema.Record({ key: Schema.String, value: Schema.String })),
+        Schema.Union([Schema.String, Schema.Record(Schema.String, Schema.String)]),
       ),
     }),
   ),
@@ -71,14 +71,14 @@ export async function readWorkspaceScripts(workspacePath: string): Promise<Works
   } catch (cause) {
     throw new Error(`${SCRIPTS_FILE} is not valid JSON: ${(cause as Error).message}`)
   }
-  const decoded = Schema.decodeUnknownEither(ScriptsFile)(parsed)
-  if (Either.isLeft(decoded))
+  const decoded = Schema.decodeUnknownResult(ScriptsFile)(parsed)
+  if (Result.isFailure(decoded))
     throw new Error(
       `In ${SCRIPTS_FILE}, "scripts.setup" must be a command, and "scripts.run" a command or an object of named commands.`,
     )
   return {
-    setup: script(decoded.right.scripts?.setup),
-    run: runScripts(decoded.right.scripts?.run),
+    setup: script(decoded.success.scripts?.setup),
+    run: runScripts(decoded.success.scripts?.run),
   }
 }
 
@@ -150,18 +150,18 @@ export const beginWorktreeSetup = (
     const record = (setup: "running" | "succeeded" | "failed" | "interrupted") =>
       core
         .SetWorktreeSetup({ threadId, setup })
-        .pipe(Effect.zipRight(events.publish({ _tag: "RuntimeChanged", threadId })))
+        .pipe(Effect.andThen(events.publish({ _tag: "RuntimeChanged", threadId })))
     const scripts = yield* attempt(() => readWorkspaceScripts(location.workspacePath)).pipe(
-      Effect.either,
+      Effect.result,
     )
-    if (Either.isLeft(scripts)) {
+    if (Result.isFailure(scripts)) {
       yield* attempt(async () => {
         const log = createWriteStream(logPath)
-        await new Promise<void>((resolve) => log.end(`${scripts.left.message}\n`, resolve))
-      }).pipe(Effect.catchAll(Effect.logError))
+        await new Promise<void>((resolve) => log.end(`${scripts.failure.message}\n`, resolve))
+      }).pipe(Effect.catch(Effect.logError))
       return yield* record("failed")
     }
-    const command = scripts.right.setup
+    const command = scripts.success.setup
     if (command === null) return
     const env = yield* attempt(() => scriptEnvironment(location))
     yield* record("running")
@@ -188,7 +188,7 @@ export const beginWorktreeSetup = (
         log.end(`\n${stopped ? "Stopped." : note}\n`, () => {
           running.delete(threadId)
           Effect.runPromise(
-            record(stopped ? "interrupted" : outcome).pipe(Effect.catchAll(Effect.logError)),
+            record(stopped ? "interrupted" : outcome).pipe(Effect.catch(Effect.logError)),
           ).finally(resolve)
         })
       }

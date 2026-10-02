@@ -1,7 +1,7 @@
 import { mkdir, realpath } from "node:fs/promises"
 import { dirname, join, basename } from "node:path"
 import { SqliteClient } from "@effect/sql-sqlite-node"
-import { SqlClient } from "@effect/sql/SqlClient"
+import { SqlClient } from "effect/sql/SqlClient"
 import { Effect, ManagedRuntime } from "effect"
 
 /** An OS-released SQLite exclusive lock, held by the sole database writer.

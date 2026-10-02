@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { SqliteClient } from "@effect/sql-sqlite-node"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { Effect, ManagedRuntime } from "effect"
 import { initializeDatabase } from "../packages/core/src/database/persistence.ts"
 import { createThread } from "../packages/core/src/threads.ts"

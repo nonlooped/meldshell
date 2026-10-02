@@ -34,7 +34,7 @@ Authenticated provider checks can consume account quota. UI and manual verificat
 
 Core tests use `@effect/vitest` and `.spec.ts` filenames. Provide the shared `TestDatabase` layer per test to keep SQLite state isolated. Use `TestClock` for Effect clock behavior; other packages continue to use Node’s test runner. The root `npm test` runs both runners.
 
-`@effect/vitest` currently requires Vitest 3. Its browser mocker has an [upstream advisory](https://github.com/vitest-dev/vitest/security/advisories/GHSA-82fw-gwwq-j7x9) whose fix is only available in newer majors. Core tests explicitly use Node with the API and browser modes disabled. Revisit the pin when Effect supports a patched Vitest major.
+Effect and its SQLite driver and Vitest adapter are pinned together at stable v4. SQL and RPC modules are imported from `effect/sql` and `effect/rpc`; `@effect/vitest` v4 uses Vitest 5.
 
 `electron-vite` 5 requires Vite 7, so the desktop and shared UI use Vite 7 and `@vitejs/plugin-react` 5 until Electron Vite supports Vite 8. `@astrojs/check` currently supports TypeScript through 6, so the workspace uses TypeScript 6. The Node type definitions follow the supported Node 24 runtime.
 

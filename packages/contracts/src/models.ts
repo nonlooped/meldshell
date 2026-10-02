@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Effect, Schema, Struct } from "effect"
 
 export const Workspace = Schema.Struct({
   id: Schema.String,
@@ -10,10 +10,10 @@ export const Workspace = Schema.Struct({
 
 export type Workspace = typeof Workspace.Type
 
-const ThreadStatus = Schema.Literal("active", "settled")
+const ThreadStatus = Schema.Literals(["active", "settled"])
 
 /** Progress of the workspace setup script in a thread's worktree. */
-export const WorktreeSetup = Schema.Literal("running", "succeeded", "failed", "interrupted")
+export const WorktreeSetup = Schema.Literals(["running", "succeeded", "failed", "interrupted"])
 
 export type WorktreeSetup = typeof WorktreeSetup.Type
 
@@ -24,7 +24,7 @@ export const ThreadWorktree = Schema.Struct({
   /** The branch the workspace had checked out when the thread began, or null when it was detached. */
   baseBranch: Schema.NullOr(Schema.String),
   /** `missing` means the folder disappeared outside MeldShell; `removed` means MeldShell removed it. */
-  state: Schema.Literal("ready", "missing", "removed"),
+  state: Schema.Literals(["ready", "missing", "removed"]),
   /**
    * The workspace setup script's last run in this worktree; absent when none has run. `interrupted`
    * means it was stopped, or MeldShell quit, before it finished.
@@ -42,7 +42,7 @@ export const Thread = Schema.Struct({
   pinned: Schema.optional(Schema.Boolean),
   createdAt: Schema.String,
   updatedAt: Schema.String,
-  activity: Schema.Literal(
+  activity: Schema.Literals([
     "idle",
     "running",
     "queued",
@@ -50,7 +50,7 @@ export const Thread = Schema.Struct({
     "failed",
     "completed",
     "interrupted",
-  ),
+  ]),
   queuedCount: Schema.Number,
   turnCount: Schema.Number,
   worktree: Schema.optional(ThreadWorktree),
@@ -58,7 +58,7 @@ export const Thread = Schema.Struct({
 
 export type Thread = typeof Thread.Type
 
-export const CanonicalEventKind = Schema.Literal(
+export const CanonicalEventKind = Schema.Literals([
   "user",
   "assistant",
   "reasoning",
@@ -71,7 +71,7 @@ export const CanonicalEventKind = Schema.Literal(
   "error",
   "status",
   "unknown",
-)
+])
 
 export type CanonicalEventKind = typeof CanonicalEventKind.Type
 
@@ -90,11 +90,11 @@ export const CanonicalEvent = Schema.Struct({
 export type CanonicalEvent = typeof CanonicalEvent.Type
 
 const InteractionFields = {
-  approvalScope: Schema.optional(Schema.Literal("turn", "session")),
+  approvalScope: Schema.optional(Schema.Literals(["turn", "session"])),
   id: Schema.String,
   threadId: Schema.String,
   turnId: Schema.String,
-  requestId: Schema.Union(Schema.String, Schema.Number),
+  requestId: Schema.Union([Schema.String, Schema.Number]),
   title: Schema.String,
   detail: Schema.String,
   createdAt: Schema.String,
@@ -122,7 +122,7 @@ const UserInputQuestion = Schema.Struct({
   ),
 })
 
-export const ApprovalRequest = Schema.Union(
+export const ApprovalRequest = Schema.Union([
   Schema.Struct({
     ...InteractionFields,
     kind: Schema.Literal("cursor-permission"),
@@ -136,7 +136,7 @@ export const ApprovalRequest = Schema.Union(
     ...InteractionFields,
     kind: Schema.Literal("plan"),
     /** Cursor's plan tool, or Claude Code's ExitPlanMode tool, asking to leave plan mode. */
-    method: Schema.Literal("cursor/create_plan", "claude/exit_plan_mode"),
+    method: Schema.Literals(["cursor/create_plan", "claude/exit_plan_mode"]),
     plan: Schema.String,
     params: Schema.Unknown,
   }),
@@ -156,11 +156,11 @@ export const ApprovalRequest = Schema.Union(
     ...InteractionFields,
     kind: Schema.Literal("user-input"),
     /** Codex's or Claude Code's question tool, Cursor's own, or MeldShell's tool offered to Cursor. */
-    method: Schema.Literal(
+    method: Schema.Literals([
       "item/tool/requestUserInput",
       "cursor/ask_question",
       "cursor/ask_user_question",
-    ),
+    ]),
     questions: Schema.Array(UserInputQuestion),
   }),
   Schema.Struct({
@@ -169,7 +169,7 @@ export const ApprovalRequest = Schema.Union(
     method: Schema.Literal("item/permissions/requestApproval"),
     permissions: Schema.Unknown,
   }),
-)
+])
 
 export type ApprovalRequest = typeof ApprovalRequest.Type
 
@@ -205,22 +205,22 @@ export const defaultReasoningEffort = (
 }
 
 /** Codex exposes a latency/throughput tier alongside reasoning effort. */
-const ModelSpeed = Schema.Literal("standard", "fast")
+const ModelSpeed = Schema.Literals(["standard", "fast"])
 
-export const CollaborationMode = Schema.Literal("default", "plan", "ask")
+export const CollaborationMode = Schema.Literals(["default", "plan", "ask"])
 
 export type CollaborationMode = typeof CollaborationMode.Type
 
-export const SandboxMode = Schema.Literal("read-only", "workspace-write", "danger-full-access")
+export const SandboxMode = Schema.Literals(["read-only", "workspace-write", "danger-full-access"])
 
 export type SandboxMode = typeof SandboxMode.Type
 
-export const ApprovalPolicy = Schema.Literal("untrusted", "on-request", "never")
+export const ApprovalPolicy = Schema.Literals(["untrusted", "on-request", "never"])
 
 export type ApprovalPolicy = typeof ApprovalPolicy.Type
 
 /** The coding agents MeldShell supervises, each in its own worker process. */
-export const Harness = Schema.Literal("codex", "claude-code", "cursor")
+export const Harness = Schema.Literals(["codex", "claude-code", "cursor"])
 
 export type Harness = typeof Harness.Type
 
@@ -258,7 +258,7 @@ export const supportsMode = (harness: string | undefined, mode: CollaborationMod
   mode === "default" || (isHarness(harness) && HARNESSES[harness].modes.includes(mode))
 
 /** Older dispatch payloads predate the other harnesses and name none. */
-const DispatchHarness = Schema.optionalWith(Harness, { default: () => "codex" as const })
+const DispatchHarness = Harness.pipe(Schema.withDecodingDefaultType(Effect.succeed("codex")))
 
 export const Provider = Schema.Struct({
   id: Schema.String,
@@ -339,11 +339,14 @@ export type ThreadSettings = typeof ThreadSettings.Type
  */
 export const CURRENT_TITLE_MODEL = "current"
 
-export const AppOpacity = Schema.Number.pipe(Schema.int(), Schema.between(20, 100))
+export const AppOpacity = Schema.Number.pipe(
+  Schema.check(Schema.isInt()),
+  Schema.check(Schema.isBetween({ minimum: 20, maximum: 100 })),
+)
 
-export const Theme = Schema.Literal("dark", "light", "system")
+export const Theme = Schema.Literals(["dark", "light", "system"])
 
-export const TranscriptSize = Schema.Literal("small", "medium", "large")
+export const TranscriptSize = Schema.Literals(["small", "medium", "large"])
 
 export const AppSettings = Schema.Struct({
   alwaysFullPermissions: Schema.optional(Schema.Boolean),
@@ -357,7 +360,7 @@ export const AppSettings = Schema.Struct({
   /** The external editor that opens a thread's folder; an `ExternalEditor` id. */
   editor: Schema.optional(Schema.String),
   /** Shortcut chords that differ from the defaults, by action; an empty chord removes one. */
-  keybindings: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
+  keybindings: Schema.optional(Schema.Record(Schema.String, Schema.String)),
 
   /** A `ProviderModel` id, or `CURRENT_TITLE_MODEL`. */
   titleModelId: Schema.String,
@@ -377,14 +380,14 @@ export const AppSnapshot = Schema.Struct({
 
 export type AppSnapshot = typeof AppSnapshot.Type
 
-const ProviderAvailability = Schema.Literal(
+const ProviderAvailability = Schema.Literals([
   "probing",
   "missing",
   "unauthenticated",
   "outdated",
   "ready",
   "error",
-)
+])
 
 export const CodexStatus = Schema.Struct({
   provider: Schema.Literal("openai"),
@@ -416,7 +419,7 @@ export const CursorStatus = Schema.Struct({
 
 export type CursorStatus = typeof CursorStatus.Type
 
-export const ProviderStatus = Schema.Union(CodexStatus, ClaudeStatus, CursorStatus)
+export const ProviderStatus = Schema.Union([CodexStatus, ClaudeStatus, CursorStatus])
 
 export type ProviderStatus = typeof ProviderStatus.Type
 
@@ -433,15 +436,14 @@ export const probingStatus = (harness: Harness): ProviderStatus =>
     checkedAt: new Date().toISOString(),
   }) as ProviderStatus
 
-const ProviderUpdateState = Schema.Literal(
-  /** No installed version to compare, or not checked yet. */
+const ProviderUpdateState = Schema.Literals([
   "unknown",
   "checking",
   "current",
   "available",
   "updating",
   "error",
-)
+])
 
 /** Whether a newer release of a harness exists, and how MeldShell would install it. */
 export const ProviderUpdateStatus = Schema.Struct({
@@ -472,9 +474,11 @@ export const unknownUpdateStatus = (harness: Harness): ProviderUpdateStatus => (
 
 export const UsageWindow = Schema.Struct({
   label: Schema.optional(Schema.String),
-  usedPercent: Schema.Number.pipe(Schema.finite()),
-  windowDurationMins: Schema.optional(Schema.NullOr(Schema.Number.pipe(Schema.finite()))),
-  resetsAt: Schema.optional(Schema.NullOr(Schema.Number.pipe(Schema.finite()))),
+  usedPercent: Schema.Number.pipe(Schema.check(Schema.isFinite())),
+  windowDurationMins: Schema.optional(
+    Schema.NullOr(Schema.Number.pipe(Schema.check(Schema.isFinite()))),
+  ),
+  resetsAt: Schema.optional(Schema.NullOr(Schema.Number.pipe(Schema.check(Schema.isFinite())))),
 })
 
 export type UsageWindow = typeof UsageWindow.Type
@@ -499,8 +503,8 @@ export const UsageLimit = Schema.Struct({
       Schema.Struct({
         limit: Schema.String,
         used: Schema.String,
-        remainingPercent: Schema.Number.pipe(Schema.finite()),
-        resetsAt: Schema.Number.pipe(Schema.finite()),
+        remainingPercent: Schema.Number.pipe(Schema.check(Schema.isFinite())),
+        resetsAt: Schema.Number.pipe(Schema.check(Schema.isFinite())),
       }),
     ),
   ),
@@ -513,7 +517,7 @@ export type UsageLimit = typeof UsageLimit.Type
 export const CodexUsage = Schema.Struct({
   checkedAt: Schema.String,
   limits: Schema.Array(Schema.Struct({ id: Schema.String, limit: UsageLimit })),
-  resetCredits: Schema.NullOr(Schema.Number.pipe(Schema.finite())),
+  resetCredits: Schema.NullOr(Schema.Number.pipe(Schema.check(Schema.isFinite()))),
 })
 
 export type CodexUsage = typeof CodexUsage.Type
@@ -531,7 +535,7 @@ export type CreateThreadInput = typeof CreateThreadInput.Type
 export const RecordThreadInput = Schema.Struct({
   workspaceId: Schema.String,
   title: Schema.optional(Schema.String),
-  worktree: Schema.optional(ThreadWorktree.pipe(Schema.omit("state", "setup"))),
+  worktree: Schema.optional(ThreadWorktree.mapFields(Struct.omit(["state", "setup"]))),
 })
 
 export type RecordThreadInput = typeof RecordThreadInput.Type
@@ -558,7 +562,10 @@ export type SetThreadTitleInput = typeof SetThreadTitleInput.Type
 
 export const RenameThreadInput = Schema.Struct({
   threadId: Schema.String,
-  title: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+  title: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(100)),
+  ),
 })
 
 export type RenameThreadInput = typeof RenameThreadInput.Type
@@ -617,13 +624,13 @@ export type SetThreadSettingsInput = typeof SetThreadSettingsInput.Type
 /** Every field is optional; free-text fields are bounded because they arrive from clients. */
 export const SetAppSettingsInput = Schema.Struct({
   ...AppSettings.fields,
-  editor: Schema.optional(Schema.String.pipe(Schema.maxLength(64))),
+  editor: Schema.optional(Schema.String.pipe(Schema.check(Schema.isMaxLength(64)))),
   /** Replaces every stored override. */
   keybindings: Schema.optional(
-    Schema.Record({
-      key: Schema.String.pipe(Schema.maxLength(64)),
-      value: Schema.String.pipe(Schema.maxLength(64)),
-    }),
+    Schema.Record(
+      Schema.String.pipe(Schema.check(Schema.isMaxLength(64))),
+      Schema.String.pipe(Schema.check(Schema.isMaxLength(64))),
+    ),
   ),
   titleModelId: Schema.optional(Schema.String),
 })
@@ -631,7 +638,7 @@ export const SetAppSettingsInput = Schema.Struct({
 export type SetAppSettingsInput = typeof SetAppSettingsInput.Type
 
 export const InputAttachment = Schema.Struct({
-  type: Schema.Literal("image", "localImage", "mention", "skill"),
+  type: Schema.Literals(["image", "localImage", "mention", "skill"]),
   value: Schema.String,
   name: Schema.optional(Schema.String),
 })
@@ -640,7 +647,7 @@ export type InputAttachment = typeof InputAttachment.Type
 
 /** A harness slash command or skill that the composer can offer while typing. */
 export const ComposerCommand = Schema.Struct({
-  kind: Schema.Literal("command", "skill"),
+  kind: Schema.Literals(["command", "skill"]),
   name: Schema.String,
   description: Schema.String,
   argumentHint: Schema.optional(Schema.String),
@@ -691,7 +698,7 @@ export const ThreadPage = Schema.Struct({
 
 export type ThreadPage = typeof ThreadPage.Type
 
-export const ApprovalDecision = Schema.Literal("accept", "acceptForSession", "decline", "cancel")
+export const ApprovalDecision = Schema.Literals(["accept", "acceptForSession", "decline", "cancel"])
 
 export type ApprovalDecision = typeof ApprovalDecision.Type
 
@@ -699,9 +706,7 @@ export const ResolveApprovalInput = Schema.Struct({
   approvalId: Schema.String,
   decision: ApprovalDecision,
   optionId: Schema.optional(Schema.String),
-  answers: Schema.optional(
-    Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
-  ),
+  answers: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
 })
 
 export type ResolveApprovalInput = typeof ResolveApprovalInput.Type
@@ -743,7 +748,7 @@ export type TitleRequest = typeof TitleRequest.Type
 
 export const SubmitTurnResult = Schema.Struct({
   snapshot: AppSnapshot,
-  disposition: Schema.Literal("started", "queued", "steered"),
+  disposition: Schema.Literals(["started", "queued", "steered"]),
   dispatch: Schema.NullOr(TurnDispatch),
   titleRequest: Schema.NullOr(TitleRequest),
 })
@@ -759,7 +764,7 @@ export const RuntimeEventInput = Schema.Struct({
   validated: Schema.optional(Schema.Boolean),
   promoteQueue: Schema.optional(Schema.Boolean),
   nativeTurnId: Schema.optional(Schema.String),
-  requestId: Schema.optional(Schema.Union(Schema.String, Schema.Number)),
+  requestId: Schema.optional(Schema.Union([Schema.String, Schema.Number])),
 })
 
 export type RuntimeEventInput = typeof RuntimeEventInput.Type
@@ -825,28 +830,38 @@ export type TranscriptSearchPage = typeof TranscriptSearchPage.Type
 
 /** An ISO 8601 timestamp. */
 const Instant = Schema.String.pipe(
-  Schema.filter((value) => Number.isFinite(Date.parse(value)) || "Expected an ISO timestamp"),
+  Schema.check(
+    Schema.makeFilter((value) => Number.isFinite(Date.parse(value)) || "Expected an ISO timestamp"),
+  ),
 )
 
 /** A local time of day, `HH:MM` on a 24-hour clock. */
-const TimeOfDay = Schema.String.pipe(Schema.pattern(/^([01]\d|2[0-3]):[0-5]\d$/))
+const TimeOfDay = Schema.String.pipe(Schema.check(Schema.isPattern(/^([01]\d|2[0-3]):[0-5]\d$/)))
 
 /**
  * When a scheduled prompt runs: once at a moment, every so many minutes, or daily at a local time
  * on the chosen weekdays (0 is Sunday; none chosen means every day).
  */
-export const ScheduleCadence = Schema.Union(
+export const ScheduleCadence = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("once"), at: Instant }),
   Schema.Struct({
     kind: Schema.Literal("interval"),
-    minutes: Schema.Number.pipe(Schema.int(), Schema.between(5, 7 * 24 * 60)),
+    minutes: Schema.Number.pipe(
+      Schema.check(Schema.isInt()),
+      Schema.check(Schema.isBetween({ minimum: 5, maximum: 7 * 24 * 60 })),
+    ),
   }),
   Schema.Struct({
     kind: Schema.Literal("daily"),
     time: TimeOfDay,
-    weekdays: Schema.Array(Schema.Number.pipe(Schema.int(), Schema.between(0, 6))),
+    weekdays: Schema.Array(
+      Schema.Number.pipe(
+        Schema.check(Schema.isInt()),
+        Schema.check(Schema.isBetween({ minimum: 0, maximum: 6 })),
+      ),
+    ),
   }),
-)
+])
 
 export type ScheduleCadence = typeof ScheduleCadence.Type
 
@@ -871,7 +886,7 @@ export const SaveScheduleInput = Schema.Struct({
   /** Omitted to create a schedule. */
   id: Schema.optional(Schema.String),
   threadId: Schema.String,
-  prompt: Schema.String.pipe(Schema.maxLength(20_000)),
+  prompt: Schema.String.pipe(Schema.check(Schema.isMaxLength(20_000))),
   cadence: ScheduleCadence,
   enabled: Schema.Boolean,
 })

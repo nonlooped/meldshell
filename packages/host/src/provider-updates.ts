@@ -7,7 +7,7 @@ import {
   type ProviderUpdateStatus,
 } from "@meldshell/contracts"
 import { runCommand, type CommandResult } from "@meldshell/provider-runtime/command"
-import { Context, Effect, Either, Layer, Runtime, Stream, type Scope } from "effect"
+import { FiberSet, Context, Effect, Result, Layer, Stream, type Scope } from "effect"
 import { attempt } from "./attempt"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
@@ -157,10 +157,9 @@ export interface ProviderUpdatesService {
   readonly install: (harness: Harness) => Effect.Effect<ProviderUpdateStatus, Error>
 }
 
-export class ProviderUpdates extends Context.Tag("MeldShell/ProviderUpdates")<
-  ProviderUpdates,
-  ProviderUpdatesService
->() {}
+export class ProviderUpdates extends Context.Service<ProviderUpdates, ProviderUpdatesService>()(
+  "MeldShell/ProviderUpdates",
+) {}
 
 /** The outside world the service touches, replaceable in tests. */
 export interface UpdateDependencies {
@@ -206,11 +205,7 @@ export const makeProviderUpdates = (
     const events = yield* HostEvents
     const core = yield* CoreClient
     const context = yield* Effect.context<Providers>()
-    const runtime = yield* Effect.runtime<Providers>()
-    const scope = yield* Effect.scope
-    const runFork = (effect: Effect.Effect<unknown, never, Providers>): void => {
-      Runtime.runFork(runtime)(effect.pipe(Effect.forkIn(scope)))
-    }
+    const runFork = yield* FiberSet.makeRuntime<Providers, unknown, never>()
 
     const statuses = new Map<Harness, ProviderUpdateStatus>()
     const latest = new Map<Harness, { readonly version: string; readonly at: number }>()
@@ -284,21 +279,21 @@ export const makeProviderUpdates = (
       resolution: UpdateResolution,
     ): Effect.Effect<ProviderUpdateStatus> =>
       Effect.gen(function* () {
-        const newest = yield* Effect.either(latestVersion(harness))
+        const newest = yield* Effect.result(latestVersion(harness))
         if (current(harness).state === "updating") return current(harness)
-        if (Either.isLeft(newest))
+        if (Result.isFailure(newest))
           return yield* publish({
             ...current(harness),
             state: "error",
-            message: newest.left.message,
+            message: newest.failure.message,
             checkedAt: timestamp(),
           })
-        const order = compareVersions(version, newest.right)
+        const order = compareVersions(version, newest.success)
         return yield* publish({
           ...current(harness),
           state: order === "behind" ? "available" : "current",
-          latestVersion: newest.right,
-          message: describe(harness, order, version, newest.right, resolution),
+          latestVersion: newest.success,
+          message: describe(harness, order, version, newest.success, resolution),
           checkedAt: timestamp(),
         })
       })
@@ -364,7 +359,7 @@ export const makeProviderUpdates = (
         const service = yield* providerFor(harness)
         yield* service.restart
       }).pipe(
-        Effect.catchAll((cause) =>
+        Effect.catch((cause) =>
           publish({
             ...current(harness),
             state: "error",
@@ -416,7 +411,7 @@ export const makeProviderUpdates = (
       if (version === null) return known.state !== "unknown"
       return known.state === "unknown" || known.installedVersion !== version
     }
-    yield* Stream.fromQueue(yield* events.subscribe).pipe(
+    yield* Stream.fromSubscription(yield* events.subscribe).pipe(
       Stream.runForEach((event) =>
         Effect.sync(() => {
           if (event._tag !== "ProviderStatusChanged" || event.status.availability === "probing")
@@ -435,8 +430,8 @@ export const makeProviderUpdates = (
 
     return {
       status: (harness) => Effect.sync(() => current(harness)),
-      check: (harness) => Effect.provide(check(harness), context),
-      install: (harness) => Effect.provide(install(harness), context),
+      check: (harness) => Effect.provideContext(check(harness), context),
+      install: (harness) => Effect.provideContext(install(harness), context),
     }
   })
 
@@ -444,4 +439,4 @@ export const providerUpdatesLive: Layer.Layer<
   ProviderUpdates,
   never,
   HostEvents | CoreClient | Providers
-> = Layer.scoped(ProviderUpdates, makeProviderUpdates(defaultDependencies))
+> = Layer.effect(ProviderUpdates, makeProviderUpdates(defaultDependencies))
