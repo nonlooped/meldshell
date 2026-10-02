@@ -155,11 +155,15 @@ export const ApprovalRequest = Schema.Union([
   Schema.Struct({
     ...InteractionFields,
     kind: Schema.Literal("user-input"),
-    /** Codex's or Claude Code's question tool, Cursor's own, or MeldShell's tool offered to Cursor. */
+    /**
+     * Codex's or Claude Code's question tool, Cursor's own, MeldShell's tool offered to Cursor, or
+     * a dialog a Pi extension opened.
+     */
     method: Schema.Literals([
       "item/tool/requestUserInput",
       "cursor/ask_question",
       "cursor/ask_user_question",
+      "pi/extension_ui_request",
     ]),
     questions: Schema.Array(UserInputQuestion),
   }),
@@ -220,7 +224,7 @@ export const ApprovalPolicy = Schema.Literals(["untrusted", "on-request", "never
 export type ApprovalPolicy = typeof ApprovalPolicy.Type
 
 /** The coding agents MeldShell supervises, each in its own worker process. */
-export const Harness = Schema.Literals(["codex", "claude-code", "cursor"])
+export const Harness = Schema.Literals(["codex", "claude-code", "cursor", "pi"])
 
 export type Harness = typeof Harness.Type
 
@@ -228,7 +232,7 @@ export const isHarness = Schema.is(Harness)
 
 interface HarnessInfo {
   /** The `Provider.key` of the vendor that ships the harness. */
-  readonly provider: "openai" | "anthropic" | "cursor"
+  readonly provider: "openai" | "anthropic" | "cursor" | "pi"
   /** The name a seeded provider starts with; the user can rename it. */
   readonly vendor: string
   /** The harness's own name, as statuses and notifications show it. */
@@ -251,6 +255,7 @@ export const HARNESSES: { readonly [Key in Harness]: HarnessInfo } = {
     label: "Cursor",
     modes: ["default", "plan", "ask"],
   },
+  pi: { provider: "pi", vendor: "Pi", label: "Pi", modes: ["default"] },
 }
 
 /** Whether a harness takes a mode; the default mode works everywhere. */
@@ -419,7 +424,15 @@ export const CursorStatus = Schema.Struct({
 
 export type CursorStatus = typeof CursorStatus.Type
 
-export const ProviderStatus = Schema.Union([CodexStatus, ClaudeStatus, CursorStatus])
+export const PiStatus = Schema.Struct({
+  ...CodexStatus.fields,
+  provider: Schema.Literal("pi"),
+  harness: Schema.Literal("pi"),
+})
+
+export type PiStatus = typeof PiStatus.Type
+
+export const ProviderStatus = Schema.Union([CodexStatus, ClaudeStatus, CursorStatus, PiStatus])
 
 export type ProviderStatus = typeof ProviderStatus.Type
 

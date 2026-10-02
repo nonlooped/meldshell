@@ -4,7 +4,7 @@
 
 <br />
 
-**One desktop for Codex, Claude Code and Cursor.**<br />
+**One desktop for Codex, Claude Code, Cursor and Pi.**<br />
 Run them in parallel across every project, each in its own native session.
 
 [**Download**](https://github.com/nonlooped/meldshell/releases/latest) &nbsp;·&nbsp; [Website](https://meldshell.nonlooped.xyz) &nbsp;·&nbsp; [Changelog](CHANGELOG.md)
@@ -37,13 +37,13 @@ MeldShell gives every agent conversation a home: a searchable inbox of threads a
 
 <br />
 
-### Three agents. One window.
+### Four agents. One window.
 
-Put Claude Code, Codex and Cursor next to each other in split panes and give each the job it's best at. Pick the model and reasoning effort per thread.
+Put Claude Code, Codex, Cursor and Pi next to each other in split panes and give each the job it's best at. Pick the model and reasoning effort per thread.
 
 ### Native, not wrapped
 
-MeldShell supervises the agents you already have installed, in separate processes, and keeps their native payloads and session behavior intact. Every thread keeps its own session for each harness, so switching back resumes exactly where that agent left off. MeldShell uses the Codex, Claude Code and Cursor runtimes you already have installed.
+MeldShell supervises the agents you already have installed, in separate processes, and keeps their native payloads and session behavior intact. Every thread keeps its own session for each harness, so switching back resumes exactly where that agent left off. MeldShell uses the Codex, Claude Code, Cursor and Pi runtimes you already have installed.
 
 ### Parallel work that doesn't collide
 

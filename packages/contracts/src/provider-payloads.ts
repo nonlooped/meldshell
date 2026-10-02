@@ -202,3 +202,48 @@ export const CursorSessionNotification = providerStruct({
     providerStruct({ ...update, sessionUpdate: Schema.Literal("session_info_update") }),
   ]),
 })
+
+/** The dialog methods of Pi's RPC extension UI; other methods expect no answer. */
+const PI_DIALOG_METHODS = ["select", "confirm", "input", "editor"] as const
+
+/** A dialog a Pi extension opened, as Pi's RPC mode sends it. */
+export const PiDialog = providerStruct({
+  type: Schema.Literal("extension_ui_request"),
+  id: Schema.String,
+  method: Schema.Literals(PI_DIALOG_METHODS),
+  title: Schema.String,
+  options: Schema.optional(Schema.Array(Schema.String)),
+  message: text,
+  placeholder: text,
+  prefill: text,
+  timeout: Schema.optional(Schema.Number),
+})
+export type PiDialog = typeof PiDialog.Type
+
+/** The single question a Pi dialog asks. A confirmation offers these two answers. */
+export const PI_DIALOG_QUESTION = "answer"
+export const PI_CONFIRM_ANSWERS = { yes: "Yes", no: "No" } as const
+
+/** A Pi dialog as the question MeldShell asks, split at the title's first line. */
+export const piDialogQuestion = (dialog: PiDialog) => {
+  const [header = "", ...rest] = dialog.title.split("\n")
+  const detail = rest.join("\n").trim()
+  const question =
+    dialog.method === "confirm" ? (dialog.message ?? "") || detail || header : detail || header
+  const choices =
+    dialog.method === "select"
+      ? (dialog.options ?? [])
+      : dialog.method === "confirm"
+        ? [PI_CONFIRM_ANSWERS.yes, PI_CONFIRM_ANSWERS.no]
+        : null
+  return {
+    id: PI_DIALOG_QUESTION,
+    header,
+    question,
+    multiSelect: false,
+    isOther: false,
+    multiline: dialog.method === "editor",
+    ...(dialog.method === "editor" && dialog.prefill ? { defaultValue: dialog.prefill } : {}),
+    options: choices?.map((label) => ({ label, description: "" })) ?? null,
+  }
+}

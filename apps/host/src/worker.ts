@@ -3,6 +3,7 @@ import { startCore } from "@meldshell/host/core-server"
 import { runCodexWorker } from "@meldshell/provider-codex/worker"
 import { runClaudeWorker } from "@meldshell/provider-claude/worker"
 import { runCursorWorker } from "@meldshell/provider-cursor/worker"
+import { runPiWorker } from "@meldshell/provider-pi/worker"
 
 if (!process.send) throw new Error("Host workers require a parent IPC channel.")
 const messages = new EventEmitter()
@@ -34,7 +35,9 @@ if (kind === "core-worker.js") {
         ? runClaudeWorker(port)
         : kind === "cursor-worker.js"
           ? runCursorWorker(port)
-          : null
+          : kind === "pi-worker.js"
+            ? runPiWorker(port)
+            : null
   if (!worker) throw new Error("Unknown host worker")
   shutdown = worker.shutdown
 }

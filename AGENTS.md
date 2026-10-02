@@ -1,6 +1,6 @@
 # Working in MeldShell
 
-MeldShell supervises Codex, Claude Code, and Cursor in separate processes. Preserve native provider payloads and session behavior, durable thread state, and renderer isolation.
+MeldShell supervises Codex, Claude Code, Cursor, and Pi in separate processes. Preserve native provider payloads and session behavior, durable thread state, and renderer isolation.
 
 ## Scope and completion
 

@@ -64,6 +64,10 @@ export class CursorProvider extends Context.Service<CursorProvider, ProviderServ
   "MeldShell/CursorProvider",
 ) {}
 
+export class PiProvider extends Context.Service<PiProvider, ProviderService>()(
+  "MeldShell/PiProvider",
+) {}
+
 type ProviderConfig = {
   readonly harness: Harness
   /** The worker bundle the platform forks for this harness. */
@@ -557,14 +561,23 @@ export const cursorProviderLive = providerLayer(CursorProvider, {
   worker: "cursor-worker.js",
 })
 
+export const piProviderLive = providerLayer(PiProvider, {
+  harness: "pi",
+  worker: "pi-worker.js",
+})
+
 const providerTags = {
   codex: CodexProvider,
   "claude-code": ClaudeProvider,
   cursor: CursorProvider,
+  pi: PiProvider,
 } as const
 
 /** The provider service for a harness; an unknown harness is routed to Codex, as it predates the others. */
 export const providerFor = (
   harness: string,
-): Effect.Effect<ProviderService, never, CodexProvider | ClaudeProvider | CursorProvider> =>
-  providerTags[isHarness(harness) ? harness : "codex"]
+): Effect.Effect<
+  ProviderService,
+  never,
+  CodexProvider | ClaudeProvider | CursorProvider | PiProvider
+> => providerTags[isHarness(harness) ? harness : "codex"]

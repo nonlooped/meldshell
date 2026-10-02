@@ -428,9 +428,40 @@ const harnessModes = (harness: string): readonly CollaborationMode[] => {
   return modes.length > 1 ? modes : []
 }
 
+/**
+ * Pi has no permission prompts of its own: MeldShell limits it to its read tools, or asks before
+ * any other tool through an extension, or lets it run everything.
+ */
+const PI_PERMISSIONS: ReadonlyArray<{
+  id: string
+  label: string
+  sandbox: SandboxMode
+  approvalPolicy: "on-request" | "never"
+}> = [
+  { id: "read", label: "Read tools only", sandbox: "read-only", approvalPolicy: "on-request" },
+  { id: "ask", label: "Ask Every Time", sandbox: "workspace-write", approvalPolicy: "on-request" },
+  { id: "full", label: "Run Everything", sandbox: "danger-full-access", approvalPolicy: "never" },
+]
+
+/** The Pi option a thread's settings run as, matching how the Pi worker reads them. */
+const piPermission = (selection: ModelSelection) =>
+  PI_PERMISSIONS.find(
+    (option) =>
+      option.id ===
+      (selection.sandbox === "read-only"
+        ? "read"
+        : selection.approvalPolicy === "never"
+          ? selection.sandbox === "danger-full-access"
+            ? "full"
+            : "read"
+          : "ask"),
+  )!
+
 function permissionOptions(selection: ModelSelection) {
   const isClaude = selection.provider.harness === "claude-code"
   const isCursor = selection.provider.harness === "cursor"
+  if (selection.provider.harness === "pi")
+    return { toolPermissions: true, options: PI_PERMISSIONS, selected: piPermission(selection) }
   const toolPermissions = isClaude || isCursor
   const permissionLabels = isClaude
     ? { ask: "Manual", deny: "Don’t ask", full: "Bypass permissions" }
@@ -506,7 +537,7 @@ function permissionOptions(selection: ModelSelection) {
         options.find((option) => option.sandbox === selection.sandbox) ??
         options.find((option) => option.id === "ask")!)
       : options.find((option) => option.sandbox === selection.sandbox)!
-  return { isClaude, toolPermissions, options, selected }
+  return { toolPermissions, options, selected }
 }
 
 function ComposerSettings({
@@ -523,7 +554,7 @@ function ComposerSettings({
         No model is enabled. Add one in Settings.
       </span>
     )
-  const { isClaude, toolPermissions, options, selected } = permissionOptions(selection)
+  const { toolPermissions, options, selected } = permissionOptions(selection)
   // Every harness lists its least guarded permission last; it stays visibly distinct when chosen.
   const riskiest = options[options.length - 1]!
   const fullPermissions = snapshot.settings.alwaysFullPermissions ?? false
@@ -556,7 +587,7 @@ function ComposerSettings({
                 fullPermissions
                   ? "Change mode"
                   : toolPermissions
-                    ? `Change ${isClaude ? "Claude" : "Cursor"} mode and permissions`
+                    ? `Change ${harnessName(selection.provider.harness)} mode and permissions`
                     : "Change sandbox access"
               }
             >
@@ -649,6 +680,8 @@ const harnessName = (harness: string | undefined): string => {
       return "Cursor"
     case "claude-code":
       return "Claude"
+    case "pi":
+      return "Pi"
     default:
       return "Codex"
   }
