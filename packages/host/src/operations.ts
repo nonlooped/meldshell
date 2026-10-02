@@ -1,5 +1,5 @@
 import type { ResolveApprovalInput, SubmitTurnInput } from "@meldshell/contracts"
-import { Effect } from "effect"
+import { Effect, Semaphore } from "effect"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
 import { providerFor } from "./worker-provider"
@@ -53,7 +53,7 @@ export const submitTurn = (input: SubmitTurnInput) =>
       const provider = yield* providerFor(result.titleRequest.harness)
       yield* provider
         .send({ type: "generate-title", request: result.titleRequest })
-        .pipe(Effect.catchAll(Effect.logError))
+        .pipe(Effect.catch(Effect.logError))
     }
     yield* publishChange(input.threadId)
     return result
@@ -72,7 +72,7 @@ export const interruptTurn = (threadId: string) =>
 // All clients of one host share this gate. The second response observes the removal
 // only after the first delivery completes, so a native approval cannot be answered twice.
 // The row is removed only after delivery, so a failed delivery leaves the approval answerable.
-const approvalGate = Effect.runSync(Effect.makeSemaphore(1))
+const approvalGate = Semaphore.makeUnsafe(1)
 export const resolveApproval = (input: ResolveApprovalInput) =>
   approvalGate.withPermits(1)(
     Effect.gen(function* () {

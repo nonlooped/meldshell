@@ -1,11 +1,15 @@
 import { Schema } from "effect"
 
+/** Provider schemas validate known fields while preserving native extensions at every depth. */
+const providerStruct = <const Fields extends Schema.Struct.Fields>(fields: Fields) =>
+  Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
+
 const text = Schema.optional(Schema.NullOr(Schema.String))
 const textParts = Schema.optional(
-  Schema.NullOr(Schema.Union(Schema.String, Schema.Array(Schema.Unknown))),
+  Schema.NullOr(Schema.Union([Schema.String, Schema.Array(Schema.Unknown)])),
 )
-export const PlanStep = Schema.Struct({ step: text, content: text, status: text })
-export const NativeItem = Schema.Struct({
+export const PlanStep = providerStruct({ step: text, content: text, status: text })
+export const NativeItem = providerStruct({
   id: text,
   type: text,
   phase: text,
@@ -21,9 +25,9 @@ export const NativeItem = Schema.Struct({
   aggregatedOutput: text,
   changes: Schema.optional(
     Schema.Array(
-      Schema.Struct({
+      providerStruct({
         path: Schema.String,
-        kind: Schema.Struct({ type: Schema.String }),
+        kind: providerStruct({ type: Schema.String }),
       }),
     ),
   ),
@@ -31,13 +35,13 @@ export const NativeItem = Schema.Struct({
 export type NativeItem = typeof NativeItem.Type
 
 /** Fields consumed by canonical projection. Provider-owned extensions stay in the native payload. */
-export const NativePayload = Schema.Struct({
+export const NativePayload = providerStruct({
   itemId: text,
   threadId: text,
   turnId: text,
-  thread: Schema.optional(Schema.Struct({ id: Schema.String })),
+  thread: Schema.optional(providerStruct({ id: Schema.String })),
   turn: Schema.optional(
-    Schema.Struct({
+    providerStruct({
       id: text,
       status: text,
       items: Schema.optional(Schema.Array(NativeItem)),
@@ -50,40 +54,44 @@ export const NativePayload = Schema.Struct({
   diff: text,
   /** Codex MCP startup, login, and sandbox setup notifications report a bare string. */
   error: Schema.optional(
-    Schema.NullOr(Schema.Union(Schema.String, Schema.Struct({ message: text }))),
+    Schema.NullOr(Schema.Union([Schema.String, providerStruct({ message: text })])),
   ),
-  plan: Schema.optional(Schema.Union(Schema.String, Schema.Array(PlanStep))),
+  plan: Schema.optional(Schema.Union([Schema.String, Schema.Array(PlanStep)])),
   toolName: text,
   command: textParts,
   reason: text,
 })
 export type NativePayload = typeof NativePayload.Type
 
-export const CursorContent = Schema.Struct({
+export const CursorContent = providerStruct({
   type: Schema.String,
   text,
   title: text,
   name: text,
   uri: text,
-  resource: Schema.optional(Schema.Struct({ text, uri: text })),
+  resource: Schema.optional(providerStruct({ text, uri: text })),
 })
 export type CursorContent = typeof CursorContent.Type
-export const CursorToolContent = Schema.Struct({
+export const CursorToolContent = providerStruct({
   type: Schema.String,
   content: Schema.optional(CursorContent),
   path: text,
   oldText: text,
   newText: text,
 })
-export const CursorTodo = Schema.Struct({ id: text, content: Schema.String, status: Schema.String })
-const CursorCommand = Schema.Struct({ name: Schema.String, description: Schema.String })
-export const CursorUpdate = Schema.Struct({
+export const CursorTodo = providerStruct({
+  id: text,
+  content: Schema.String,
+  status: Schema.String,
+})
+const CursorCommand = providerStruct({ name: Schema.String, description: Schema.String })
+export const CursorUpdate = providerStruct({
   sessionUpdate: Schema.String,
   toolCallId: text,
   kind: text,
   title: text,
   status: text,
-  content: Schema.optional(Schema.Union(CursorContent, Schema.Array(CursorToolContent))),
+  content: Schema.optional(Schema.Union([CursorContent, Schema.Array(CursorToolContent)])),
   rawInput: Schema.optional(Schema.Unknown),
   rawOutput: Schema.optional(Schema.Unknown),
   entries: Schema.optional(Schema.Array(CursorTodo)),
@@ -94,23 +102,28 @@ export const CursorUpdate = Schema.Struct({
   availableCommands: Schema.optional(Schema.Array(CursorCommand)),
   configOptions: Schema.optional(
     Schema.Array(
-      Schema.Struct({ name: Schema.String, currentValue: Schema.String, id: text, category: text }),
+      providerStruct({
+        name: Schema.String,
+        currentValue: Schema.String,
+        id: text,
+        category: text,
+      }),
     ),
   ),
 })
 export type CursorUpdate = typeof CursorUpdate.Type
-export const CursorQuestion = Schema.Struct({
+export const CursorQuestion = providerStruct({
   id: Schema.String,
   prompt: Schema.String,
   allowMultiple: Schema.optional(Schema.Boolean),
-  options: Schema.Array(Schema.Struct({ id: Schema.String, label: Schema.String })),
+  options: Schema.Array(providerStruct({ id: Schema.String, label: Schema.String })),
 })
-const CursorPermissionOption = Schema.Struct({
+const CursorPermissionOption = providerStruct({
   optionId: Schema.String,
   name: Schema.String,
   kind: Schema.String,
 })
-export const CursorPayload = Schema.Struct({
+export const CursorPayload = providerStruct({
   sessionId: text,
   toolCallId: text,
   message: text,
@@ -124,54 +137,50 @@ export const CursorPayload = Schema.Struct({
   merge: Schema.optional(Schema.Boolean),
   todos: Schema.optional(Schema.Array(CursorTodo)),
   update: Schema.optional(CursorUpdate),
-  toolCall: Schema.optional(Schema.Struct({ title: text })),
+  toolCall: Schema.optional(providerStruct({ title: text })),
   options: Schema.optional(Schema.Array(CursorPermissionOption)),
   questions: Schema.optional(Schema.Array(CursorQuestion)),
 })
 export type CursorPayload = typeof CursorPayload.Type
 
-/** Decoders expose ParseError paths; retaining excess fields never changes the stored native data. */
-export const decodeNativePayload = Schema.decodeUnknownEither(NativePayload, {
-  onExcessProperty: "preserve",
-})
-export const decodeCursorPayload = Schema.decodeUnknownEither(CursorPayload, {
-  onExcessProperty: "preserve",
-})
+/** Decoders expose SchemaError paths; retaining excess fields never changes the stored native data. */
+export const decodeNativePayload = Schema.decodeUnknownResult(NativePayload)
+export const decodeCursorPayload = Schema.decodeUnknownResult(CursorPayload)
 
-const update = CursorUpdate.fields
-export const CursorSessionNotification = Schema.Struct({
+const update = CursorUpdate.schema.fields
+export const CursorSessionNotification = providerStruct({
   sessionId: Schema.String,
-  update: Schema.Union(
-    Schema.Struct({
+  update: Schema.Union([
+    providerStruct({
       ...update,
-      sessionUpdate: Schema.Literal(
+      sessionUpdate: Schema.Literals([
         "agent_message_chunk",
         "agent_thought_chunk",
         "user_message_chunk",
-      ),
+      ]),
       content: CursorContent,
     }),
-    Schema.Struct({
+    providerStruct({
       ...update,
-      sessionUpdate: Schema.Literal("tool_call", "tool_call_update"),
+      sessionUpdate: Schema.Literals(["tool_call", "tool_call_update"]),
       toolCallId: Schema.String,
       content: Schema.optional(Schema.Array(CursorToolContent)),
     }),
-    Schema.Struct({
+    providerStruct({
       ...update,
       sessionUpdate: Schema.Literal("plan"),
       entries: Schema.Array(CursorTodo),
     }),
-    Schema.Struct({
+    providerStruct({
       ...update,
       sessionUpdate: Schema.Literal("available_commands_update"),
       availableCommands: Schema.Array(CursorCommand),
     }),
-    Schema.Struct({
+    providerStruct({
       ...update,
       sessionUpdate: Schema.Literal("config_option_update"),
       configOptions: Schema.Array(
-        Schema.Struct({
+        providerStruct({
           name: Schema.String,
           currentValue: Schema.String,
           id: text,
@@ -179,17 +188,17 @@ export const CursorSessionNotification = Schema.Struct({
         }),
       ),
     }),
-    Schema.Struct({
+    providerStruct({
       ...update,
       sessionUpdate: Schema.Literal("current_mode_update"),
       currentModeId: Schema.String,
     }),
-    Schema.Struct({
+    providerStruct({
       ...update,
       sessionUpdate: Schema.Literal("usage_update"),
       used: Schema.Number,
       size: Schema.Number,
     }),
-    Schema.Struct({ ...update, sessionUpdate: Schema.Literal("session_info_update") }),
-  ),
+    providerStruct({ ...update, sessionUpdate: Schema.Literal("session_info_update") }),
+  ]),
 })

@@ -9,7 +9,7 @@
   "dependencies": {
     "@meldshell/contracts": "*",
     "diff": "9.0.0",
-    "effect": "3.22.2"
+    "effect": "4.0.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"

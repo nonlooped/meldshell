@@ -22,21 +22,23 @@ export const interruptWithRecovery = (
     })
 
   return waitForCompletion(true).pipe(
-    Effect.timeoutFail({
+    Effect.timeoutOrElse({
       duration: "5 seconds",
-      onTimeout: () => new Error("The provider did not finish cancelling the turn."),
+      orElse: () => Effect.fail(new Error("The provider did not finish cancelling the turn.")),
     }),
-    Effect.catchAll(() =>
+    Effect.catch(() =>
       Effect.gen(function* () {
         const turn = yield* getTurn
         if (turn === null || turn.id !== turnId) return
         yield* stopWorker(turn)
         yield* waitForCompletion(false)
       }).pipe(
-        Effect.timeoutFail({
+        Effect.timeoutOrElse({
           duration: "15 seconds",
-          onTimeout: () =>
-            new Error("Could not stop the provider. Restart MeldShell to recover this turn."),
+          orElse: () =>
+            Effect.fail(
+              new Error("Could not stop the provider. Restart MeldShell to recover this turn."),
+            ),
         }),
       ),
     ),

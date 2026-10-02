@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect"
+import { Result, Schema } from "effect"
 import type { AvailableCommand } from "@agentclientprotocol/sdk"
 import { eventPublisher, workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
 import { randomUUID } from "node:crypto"
@@ -180,17 +180,17 @@ export const runCursorWorker = (
     })
   const onMessage = (session: Session, message: NativeMessage): void => {
     const decoded = decodeNotification(message.method, message.params)
-    if (decoded !== undefined && Either.isLeft(decoded)) {
+    if (decoded !== undefined && Result.isFailure(decoded)) {
       publish({
         type: "protocol-error",
-        message: `Invalid ${message.method}: ${decoded.left.message}`,
+        message: `Invalid ${message.method}: ${decoded.failure.message}`,
         raw: message.params,
       })
       session.emit?.(nativeMethod(message.method), message.params, false)
       return
     }
     const envelope = decodeSessionReference(message.params)
-    const params = Either.isRight(envelope) ? envelope.right : null
+    const params = Result.isSuccess(envelope) ? envelope.success : null
     if (
       typeof params?.sessionId === "string" &&
       session.sessionId &&
@@ -205,7 +205,7 @@ export const runCursorWorker = (
     session.emit?.(
       session.replaying ? "cursor/acp/session/replay" : nativeMethod(message.method),
       message.params,
-      decoded !== undefined && Either.isRight(decoded),
+      decoded !== undefined && Result.isSuccess(decoded),
     )
   }
   const createSession = async (
@@ -466,8 +466,8 @@ export const runCursorWorker = (
     try {
       session = await createSession(request.workspacePath, null, (method, params) => {
         const decoded = decodeCursorPayload(params)
-        if (Either.isLeft(decoded)) return
-        const update = decoded.right.update
+        if (Result.isFailure(decoded)) return
+        const update = decoded.success.update
         if (
           method === "cursor/acp/session/update" &&
           update?.sessionUpdate === "agent_message_chunk"
@@ -645,23 +645,24 @@ const Initialization = Schema.Struct({
   ),
 })
 const canResume = (value: unknown): boolean => {
-  const decoded = Schema.decodeUnknownEither(Initialization)(value)
-  if (Either.isLeft(decoded))
-    throw new Error(`Invalid Cursor initialization: ${decoded.left.message}`)
-  return decoded.right.agentCapabilities?.loadSession === true
+  const decoded = Schema.decodeUnknownResult(Initialization)(value)
+  if (Result.isFailure(decoded))
+    throw new Error(`Invalid Cursor initialization: ${decoded.failure.message}`)
+  return decoded.success.agentCapabilities?.loadSession === true
 }
 const sessionIdOf = (value: unknown): string => {
-  const decoded = Schema.decodeUnknownEither(Schema.Struct({ sessionId: Schema.String }))(value)
-  if (Either.isLeft(decoded)) throw new Error(`Invalid Cursor session: ${decoded.left.message}`)
-  return decoded.right.sessionId
+  const decoded = Schema.decodeUnknownResult(Schema.Struct({ sessionId: Schema.String }))(value)
+  if (Result.isFailure(decoded))
+    throw new Error(`Invalid Cursor session: ${decoded.failure.message}`)
+  return decoded.success.sessionId
 }
 const endedTurn = (value: unknown): boolean => {
-  const decoded = Schema.decodeUnknownEither(
+  const decoded = Schema.decodeUnknownResult(
     Schema.Struct({ cursor: Schema.Struct({ stopReason: Schema.String }) }),
   )(value)
-  return Either.isRight(decoded) && decoded.right.cursor.stopReason === "end_turn"
+  return Result.isSuccess(decoded) && decoded.success.cursor.stopReason === "end_turn"
 }
 
-const decodeSessionReference = Schema.decodeUnknownEither(
+const decodeSessionReference = Schema.decodeUnknownResult(
   Schema.Struct({ sessionId: Schema.optional(Schema.String) }),
 )

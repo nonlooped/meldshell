@@ -11,7 +11,7 @@
     "@agentclientprotocol/sdk": "1.5.1",
     "@meldshell/contracts": "*",
     "@meldshell/provider-runtime": "*",
-    "effect": "3.22.2",
+    "effect": "4.0.0",
     "mime": "4.1.0",
     "which": "7.0.0"
   },

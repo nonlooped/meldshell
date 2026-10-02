@@ -35,7 +35,7 @@ export const makeEventQueue = (options: {
     options.runFork(
       Effect.gen(function* () {
         while (tasks.length > 0)
-          yield* tasks.shift()!.effect.pipe(Effect.catchAllCause(Effect.logError))
+          yield* tasks.shift()!.effect.pipe(Effect.catchCause(Effect.logError))
       }).pipe(
         Effect.ensuring(
           Effect.sync(() => {

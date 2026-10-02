@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { Effect, Fiber, Layer, ManagedRuntime, Ref } from "effect"
+import { PubSub, Effect, Fiber, Layer, ManagedRuntime, Ref } from "effect"
 import type { ProviderStatus, ProviderUpdateStatus } from "@meldshell/contracts"
 import type { CommandResult } from "@meldshell/provider-runtime/command"
 import { CoreClient } from "./core-client"
@@ -138,16 +138,16 @@ const harness = async (world: {
   } as unknown as ProviderService
   const core = {
     GetActiveTurnCount: () => Effect.sync(() => activeTurns),
-  } as unknown as CoreClient
+  } as unknown as typeof CoreClient.Service
   const base = Layer.mergeAll(
     Layer.succeed(CodexProvider, provider),
     Layer.succeed(ClaudeProvider, provider),
     Layer.succeed(CursorProvider, provider),
     Layer.succeed(CoreClient, core),
-    HostEvents.Default,
+    HostEvents.layer,
   )
   const runtime = ManagedRuntime.make(
-    Layer.scoped(
+    Layer.effect(
       ProviderUpdates,
       makeProviderUpdates({
         fetchText: async () => JSON.stringify({ version: world.latest }),
@@ -168,7 +168,7 @@ const harness = async (world: {
       Effect.gen(function* () {
         const queue = yield* events!.subscribe
         yield* Effect.forever(
-          Effect.flatMap(queue.take, (event) =>
+          Effect.flatMap(PubSub.take(queue), (event) =>
             Effect.sync(() => {
               if (event._tag === "ProviderUpdateChanged") published.push(event.status)
             }),

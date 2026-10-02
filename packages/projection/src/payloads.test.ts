@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { decodeCursorPayload, decodeNativePayload, type CanonicalEvent } from "@meldshell/contracts"
-import { Either } from "effect"
+import { Result } from "effect"
 import { eventText } from "./normalization"
 import { prepareTranscriptEvents } from "./transcript"
 
@@ -23,15 +23,15 @@ test("native decoders retain extensions and report the nested path for malformed
     extension: [1, 2],
   }
   const decoded = decodeNativePayload(native)
-  assert.ok(Either.isRight(decoded))
-  assert.deepEqual(decoded.right, native)
+  assert.ok(Result.isSuccess(decoded))
+  assert.deepEqual(decoded.success, native)
   assert.deepEqual(prepareTranscriptEvents([event(native)])[0]?.payload, native)
   const invalid = decodeCursorPayload({
     update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: 42 } },
   })
-  assert.ok(Either.isLeft(invalid))
-  assert.match(invalid.left.message, /content/)
-  assert.match(invalid.left.message, /text/)
+  assert.ok(Result.isFailure(invalid))
+  assert.match(invalid.failure.message, /content/)
+  assert.match(invalid.failure.message, /text/)
 })
 
 test("Codex notifications with a string error decode and use it as their text", () => {
@@ -41,7 +41,7 @@ test("Codex notifications with a string error decode and use it as their text", 
     status: "failed",
     error: "MCP client for `playwright` failed to start",
   }
-  assert.ok(Either.isRight(decodeNativePayload(native)))
+  assert.ok(Result.isSuccess(decodeNativePayload(native)))
   assert.equal(eventText("account/login/completed", native), native.error)
   assert.equal(eventText("error", { error: { message: "Turn failed" } }), "Turn failed")
   const startup = (payload: unknown): CanonicalEvent => ({

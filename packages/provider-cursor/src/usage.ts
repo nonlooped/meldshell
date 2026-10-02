@@ -2,10 +2,13 @@ import { readFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { CodexUsage, UsageLimit, UsageWindow } from "@meldshell/contracts"
-import { Either, Schema } from "effect"
+import { Result, Schema } from "effect"
 
-const optional = <A, I, R>(schema: Schema.Schema<A, I, R>) => Schema.optional(Schema.NullOr(schema))
-const percent = Schema.Number.pipe(Schema.finite(), Schema.nonNegative())
+const optional = <A, I, R>(schema: Schema.Codec<A, I, R>) => Schema.optional(Schema.NullOr(schema))
+const percent = Schema.Number.pipe(
+  Schema.check(Schema.isFinite()),
+  Schema.check(Schema.isGreaterThanOrEqualTo(0)),
+)
 const UsageSummary = Schema.Struct({
   billingCycleEnd: optional(Schema.String),
   membershipType: optional(Schema.String),
@@ -22,14 +25,14 @@ const UsageSummary = Schema.Struct({
 const Auth = Schema.Struct({ accessToken: Schema.String })
 const Claims = Schema.Struct({
   sub: Schema.String,
-  exp: Schema.Number.pipe(Schema.finite()),
+  exp: Schema.Number.pipe(Schema.check(Schema.isFinite())),
 })
 const signInMessage = "Sign in again with Cursor CLI, then refresh subscription usage."
 
 function parseCursorUsage(response: unknown): CodexUsage {
-  const decoded = Schema.decodeUnknownEither(UsageSummary)(response)
-  if (Either.isLeft(decoded)) throw new Error("Cursor returned an invalid usage response.")
-  const summary = decoded.right
+  const decoded = Schema.decodeUnknownResult(UsageSummary)(response)
+  if (Result.isFailure(decoded)) throw new Error("Cursor returned an invalid usage response.")
+  const summary = decoded.success
   const plan = summary.individualUsage.plan
   const reset = summary.billingCycleEnd ? Date.parse(summary.billingCycleEnd) / 1000 : NaN
   const window = (usedPercent: number | null | undefined, label: string): UsageWindow | null =>

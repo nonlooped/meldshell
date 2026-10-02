@@ -1,4 +1,4 @@
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { stat } from "node:fs/promises"
 import { basename } from "node:path"
 import { Effect } from "effect"

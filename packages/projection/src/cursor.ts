@@ -8,7 +8,7 @@ import {
   type CanonicalEvent,
   type CanonicalEventKind,
 } from "@meldshell/contracts"
-import { Either, Schema } from "effect"
+import { Result, Schema } from "effect"
 import { createTwoFilesPatch, OMIT_HEADERS } from "diff"
 
 const contentText = (block: CursorContent | undefined): string => {
@@ -38,8 +38,8 @@ export const cursorEventKind = (method: string, params: unknown): CanonicalEvent
   if (method !== "cursor/acp/session/update")
     return method.includes("/session/") ? "status" : "unknown"
   const decoded = decodeCursorPayload(params)
-  if (Either.isLeft(decoded) || !decoded.right.update) return "unknown"
-  const update = decoded.right.update
+  if (Result.isFailure(decoded) || !decoded.success.update) return "unknown"
+  const update = decoded.success.update
   switch (update.sessionUpdate) {
     case "agent_message_chunk":
       return "assistant"
@@ -68,8 +68,8 @@ export const cursorEventText = (method: string, params: unknown): string | null 
   // MeldShell's question tool uses the shared interaction shape, not Cursor's native questions.
   if (method === "cursor/ask_user_question") return null
   const decoded = decodeCursorPayload(params)
-  if (Either.isLeft(decoded)) return `Invalid ${method} payload: ${decoded.left.message}`
-  const p = decoded.right
+  if (Result.isFailure(decoded)) return `Invalid ${method} payload: ${decoded.failure.message}`
+  const p = decoded.success
   if (method === "cursor/acp/error") return p.message ?? ""
   if (method === "cursor/create_plan") return p.plan ?? ""
   if (method === "cursor/task" || method === "cursor/generate_image") return p.description ?? ""
@@ -263,15 +263,15 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
     if (event.method === "cursor/acp/session/replay" || event.kind === "unknown") return
     const turn = event.turnId ?? event.threadId
     const decoded = decodeCursorPayload(event.payload)
-    if (Either.isLeft(decoded)) {
+    if (Result.isFailure(decoded)) {
       result.push({
         ...event,
         kind: "error",
-        text: `Invalid ${event.method} payload: ${decoded.left.message}`,
+        text: `Invalid ${event.method} payload: ${decoded.failure.message}`,
       })
       return
     }
-    const params = decoded.right
+    const params = decoded.success
     const update = params.update
     if (event.method === "cursor/update_todos") {
       appendPlan(event, turn, params, update)
@@ -335,8 +335,8 @@ const toolContent = (
 ): ReadonlyArray<typeof CursorToolContent.Type> =>
   Schema.is(Schema.Array(CursorToolContent))(value) ? value : []
 const rawCommand = (value: unknown): string => {
-  const decoded = Schema.decodeUnknownEither(
+  const decoded = Schema.decodeUnknownResult(
     Schema.Struct({ command: Schema.optional(Schema.String) }),
   )(value)
-  return Either.isRight(decoded) ? (decoded.right.command ?? "") : ""
+  return Result.isSuccess(decoded) ? (decoded.success.command ?? "") : ""
 }

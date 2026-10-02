@@ -1,4 +1,4 @@
-import { Either, Schema, type ParseResult } from "effect"
+import { Result, Schema } from "effect"
 import {
   asRecord,
   CursorPayload,
@@ -134,7 +134,7 @@ export const automaticPermission = (
 export const nativeMethod = (method: string): string =>
   method.startsWith("cursor/") ? method : `cursor/acp/${method}`
 
-const decodeUpdateKind = Schema.decodeUnknownEither(
+const decodeUpdateKind = Schema.decodeUnknownResult(
   Schema.Struct({ update: Schema.Struct({ sessionUpdate: Schema.String }) }),
 )
 
@@ -152,28 +152,25 @@ const SESSION_UPDATES = new Set([
   "session_info_update",
 ])
 
-const decodeSessionNotification = Schema.decodeUnknownEither(CursorSessionNotification, {
-  onExcessProperty: "preserve",
-})
-const decodeExtensionNotification = Schema.decodeUnknownEither(
-  Schema.Struct({
-    ...CursorPayload.fields,
-    toolCallId: Schema.String,
-  }),
-  { onExcessProperty: "preserve" },
+const decodeSessionNotification = Schema.decodeUnknownResult(CursorSessionNotification)
+const decodeExtensionNotification = Schema.decodeUnknownResult(
+  Schema.StructWithRest(
+    Schema.Struct({ ...CursorPayload.schema.fields, toolCallId: Schema.String }),
+    [Schema.Record(Schema.String, Schema.Unknown)],
+  ),
 )
 
-/** Undefined means an unknown extension; Left means a malformed known notification. */
+/** Undefined means an unknown extension; Failure means a malformed known notification. */
 export const decodeNotification = (
   method: string,
   params: unknown,
-): Either.Either<CursorPayload, ParseResult.ParseError> | undefined => {
+): Result.Result<CursorPayload, Schema.SchemaError> | undefined => {
   if (method === "session/update") {
     const envelope = decodeUpdateKind(params)
     if (
-      Either.isRight(envelope) &&
-      envelope.right.update &&
-      !SESSION_UPDATES.has(envelope.right.update.sessionUpdate)
+      Result.isSuccess(envelope) &&
+      envelope.success.update &&
+      !SESSION_UPDATES.has(envelope.success.update.sessionUpdate)
     )
       return undefined
     return decodeSessionNotification(params)

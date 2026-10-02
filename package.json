@@ -35,21 +35,19 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
     "@effect/language-service": "0.87.3",
-    "@effect/sql": "0.52.1",
-    "@effect/sql-sqlite-node": "0.53.0",
+    "@effect/sql-sqlite-node": "4.0.0",
     "@types/node": "26.6.3",
     "concurrently": "10.0.5",
-    "effect": "3.22.2",
+    "effect": "4.0.0",
     "knip": "6.38.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3"
   },
   "packageManager": "npm@12.0.2",
   "overrides": {
-    "@effect/platform": "0.97.2",
     "better-sqlite3": "13.0.3",
     "lodash-es": "4.18.0",
-    "vitest": "4.1.11"
+    "vitest": "5.0.0"
   },
   "allowScripts": {
     "better-sqlite3@13.0.3": true,

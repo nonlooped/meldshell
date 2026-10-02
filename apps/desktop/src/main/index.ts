@@ -58,7 +58,7 @@ const appListeners = Effect.acquireRelease(
     }),
 )
 
-const awaitQuitRequest = Effect.async<void>((resume) => {
+const awaitQuitRequest = Effect.callback<void>((resume) => {
   const onBeforeQuit = (event: Event): void => {
     if (installingUpdate) return
     event.preventDefault()
@@ -75,7 +75,7 @@ const disposeRuntime = Effect.tryPromise({
   try: () => runtime.dispose(),
   catch: toError,
 }).pipe(
-  Effect.catchAll((cause) =>
+  Effect.catch((cause) =>
     Effect.sync(() => console.error("MeldShell runtime cleanup failed.", cause)),
   ),
   Effect.andThen(
@@ -117,9 +117,7 @@ const desktopProgram = Effect.scoped(
     yield* stopProviders
   }),
 ).pipe(
-  Effect.tapErrorCause((cause) =>
-    Effect.sync(() => console.error("MeldShell failed to start.", cause)),
-  ),
+  Effect.tapCause((cause) => Effect.sync(() => console.error("MeldShell failed to start.", cause))),
   Effect.ensuring(Effect.sync(disposeContextMenu).pipe(Effect.andThen(disposeRuntime))),
 )
 

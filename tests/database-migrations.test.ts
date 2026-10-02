@@ -4,7 +4,7 @@ import { mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { SqliteClient } from "@effect/sql-sqlite-node"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { Effect, ManagedRuntime } from "effect"
 import { runMigrations } from "../packages/core/src/database/migrations"
 
@@ -65,9 +65,13 @@ test("failed schema migrations roll back their history and schema, then retry", 
   await runtime.runPromise(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      assert.deepEqual(yield* sql`SELECT migration_id FROM effect_sql_migrations`, [
-        { migration_id: 1 },
-      ])
+      const applied = yield* sql<{
+        migration_id: number
+      }>`SELECT migration_id FROM effect_sql_migrations`
+      assert.deepEqual(
+        applied.map((row) => row.migration_id),
+        [1],
+      )
       assert.equal((yield* sql`SELECT name FROM sqlite_master WHERE name = 'workspaces'`).length, 0)
       yield* sql`DROP TABLE threads`
     }),

@@ -1,5 +1,5 @@
 import { readRows } from "./database/rows"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
   type RecordThreadInput,
@@ -30,7 +30,7 @@ import { getSnapshot } from "./snapshots"
 const RecentSelectionRow = Schema.Struct({
   ...ProviderModelRow.fields,
   last_reasoning_effort: Schema.NullOr(Schema.String),
-  last_speed: Schema.Literal("standard", "fast"),
+  last_speed: Schema.Literals(["standard", "fast"]),
 })
 
 interface NewThreadSelection {
@@ -198,7 +198,7 @@ const LocationRow = Schema.Struct({
   id: Schema.String,
   workspace_id: Schema.String,
   workspace_path: Schema.String,
-  busy: Schema.Literal(0, 1),
+  busy: Schema.Literals([0, 1]),
 })
 type LocationRow = typeof LocationRow.Type
 

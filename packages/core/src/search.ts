@@ -1,5 +1,5 @@
 import { readRows } from "./database/rows"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { THREAD_SUMMARY } from "./thread-listing"
 import type { SearchTranscriptsInput } from "@meldshell/contracts"
 import { prepareTranscriptEvents } from "@meldshell/projection"

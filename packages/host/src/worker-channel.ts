@@ -9,7 +9,7 @@ import {
   type ProviderWorkerInput,
   type WorkerCommand,
 } from "@meldshell/contracts"
-import { Effect, Either, Schema } from "effect"
+import { Effect, Result, Schema } from "effect"
 import type { HostProcess } from "./platform"
 
 /*
@@ -26,7 +26,7 @@ const exchange = <A>(
   exited: string,
   cancel?: () => void,
 ): Effect.Effect<A, Error> =>
-  Effect.async<A, Error>((resume) => {
+  Effect.callback<A, Error>((resume) => {
     const cleanup = (): void => {
       child.off("message", onMessage)
       child.off("exit", onExit)
@@ -76,12 +76,14 @@ export const deliverCommand = (
     },
     `${label} worker exited before acknowledging delivery. Retry explicitly after reconciliation.`,
   ).pipe(
-    Effect.timeoutFail({
+    Effect.timeoutOrElse({
       duration: "8 seconds",
-      onTimeout: () => {
+      orElse: () => {
         child.kill()
-        return new Error(
-          `${label} delivery was not acknowledged. The worker was stopped; explicit retry is required.`,
+        return Effect.fail(
+          new Error(
+            `${label} delivery was not acknowledged. The worker was stopped; explicit retry is required.`,
+          ),
         )
       },
     }),
@@ -93,7 +95,7 @@ const replyFor =
   <R extends { readonly error?: string | undefined }, I, A>(
     type: string,
     requestId: string,
-    schema: Schema.Schema<R, I>,
+    schema: Schema.Codec<R, I>,
     read: (reply: R) => A | undefined,
     invalid: string,
   ): Reply<A> =>
@@ -101,8 +103,8 @@ const replyFor =
     const raw = asRecord(message)
     if (raw.type !== type || raw.requestId !== requestId) return undefined
     if (typeof raw.error === "string") return Effect.fail(new Error(raw.error))
-    const decoded = Schema.decodeUnknownEither(schema)(message)
-    const value = Either.isRight(decoded) ? read(decoded.right) : undefined
+    const decoded = Schema.decodeUnknownResult(schema)(message)
+    const value = Result.isSuccess(decoded) ? read(decoded.success) : undefined
     return value === undefined ? Effect.fail(new Error(invalid)) : Effect.succeed(value)
   }
 
@@ -126,9 +128,9 @@ export const requestUsage = (
     `${label} disconnected. Try again shortly.`,
     post(child, { type: "cancel-usage", requestId }),
   ).pipe(
-    Effect.timeoutFail({
+    Effect.timeoutOrElse({
       duration: "20 seconds",
-      onTimeout: () => new Error(`${label} usage took too long to load. Try again.`),
+      orElse: () => Effect.fail(new Error(`${label} usage took too long to load. Try again.`)),
     }),
   )
 }
@@ -151,9 +153,9 @@ export const requestCommands = (
     ),
     `${label} disconnected. Try again shortly.`,
   ).pipe(
-    Effect.timeoutFail({
+    Effect.timeoutOrElse({
       duration: "30 seconds",
-      onTimeout: () => new Error(`${label} commands took too long to load.`),
+      orElse: () => Effect.fail(new Error(`${label} commands took too long to load.`)),
     }),
   )
 }

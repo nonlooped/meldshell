@@ -1,4 +1,4 @@
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
   ProviderModelCatalogEntry,
@@ -18,7 +18,7 @@ import {
   supportsMode,
   TurnSubmissionError,
 } from "@meldshell/contracts"
-import { Effect, Schema } from "effect"
+import { Effect, Schema, Struct } from "effect"
 import { appendEvent } from "./database/persistence"
 import { transaction } from "./database/transaction"
 import {
@@ -90,8 +90,8 @@ const createDispatch = (
           message: "This mode is not supported by this provider integration.",
         }),
       )
-    const metadata = yield* Schema.decodeUnknown(
-      Schema.parseJson(Schema.partial(ProviderModelCatalogEntry)),
+    const metadata = yield* Schema.decodeUnknownEffect(
+      Schema.fromJsonString(ProviderModelCatalogEntry.mapFields(Struct.map(Schema.optional))),
     )(row.model_metadata)
     const fastServiceTier = metadata.fastServiceTier
     const serviceTier =
@@ -257,7 +257,9 @@ const promoteQueue = (threadId: string) =>
       .filter(Boolean)
       .join("\n\n")
     const decodedAttachments = yield* Effect.forEach(queued, (entry) =>
-      Schema.decodeUnknown(Schema.parseJson(Schema.Array(InputAttachment)))(entry.attachments),
+      Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Array(InputAttachment)))(
+        entry.attachments,
+      ),
     )
     const attachments = decodedAttachments.flat()
     const dispatch = yield* createDispatch(threadId, text, attachments)
@@ -424,7 +426,7 @@ const updateThreadName = (input: RuntimeEventInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (input.method === "thread/name/updated") {
-      const params = yield* Schema.decodeUnknown(
+      const params = yield* Schema.decodeUnknownEffect(
         Schema.Struct({ threadName: Schema.optional(Schema.String) }),
       )(input.params)
       if (typeof params.threadName === "string" && params.threadName.trim() !== "") {
@@ -441,7 +443,7 @@ const updateClaudeMode = (input: RuntimeEventInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (input.method !== CLAUDE_PERMISSION_MODE) return
-    const { permissionMode: mode } = yield* Schema.decodeUnknown(
+    const { permissionMode: mode } = yield* Schema.decodeUnknownEffect(
       Schema.Struct({ permissionMode: Schema.optional(Schema.String) }),
     )(input.params)
     if (typeof mode === "string" && mode !== "plan")
@@ -453,7 +455,7 @@ const updateCursorMode = (input: RuntimeEventInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (input.method === "cursor/acp/session/update") {
-      const { update } = yield* Schema.decodeUnknown(CursorPayload)(input.params)
+      const { update } = yield* Schema.decodeUnknownEffect(CursorPayload)(input.params)
       const nativeMode =
         update?.sessionUpdate === "current_mode_update"
           ? update.currentModeId
@@ -502,8 +504,8 @@ const clearApproval = (input: RuntimeEventInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (input.method === "serverRequest/resolved") {
-      const params = yield* Schema.decodeUnknown(
-        Schema.Struct({ requestId: Schema.optional(Schema.Union(Schema.String, Schema.Number)) }),
+      const params = yield* Schema.decodeUnknownEffect(
+        Schema.Struct({ requestId: Schema.optional(Schema.Union([Schema.String, Schema.Number])) }),
       )(input.params)
       if (typeof params.requestId === "string" || typeof params.requestId === "number")
         yield* sql`DELETE FROM approvals WHERE turn_id = ${input.turnId} AND request_id = ${String(params.requestId)}`
@@ -515,7 +517,7 @@ const finishTurn = (input: RuntimeEventInput) =>
     const sql = yield* SqlClient.SqlClient
     let nextDispatch: TurnDispatch | null = null
 
-    const params = yield* Schema.decodeUnknown(
+    const params = yield* Schema.decodeUnknownEffect(
       Schema.Struct({
         turn: Schema.optional(
           Schema.Struct({
@@ -542,7 +544,7 @@ const finishTurn = (input: RuntimeEventInput) =>
     if (input.promoteQueue !== false && status === "completed")
       nextDispatch = yield* promoteQueue(input.threadId).pipe(
         transaction,
-        Effect.catchAll((cause) =>
+        Effect.catch((cause) =>
           appendEvent(input.threadId, input.turnId, "error", "queue/error", cause.message, {
             error: { message: `Queued messages could not start: ${cause.message}` },
           }).pipe(Effect.as(null)),

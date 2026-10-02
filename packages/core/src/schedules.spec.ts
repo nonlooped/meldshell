@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { it } from "@effect/vitest"
 import { TestDatabase } from "./test/database"
-import * as SqlClient from "@effect/sql/SqlClient"
-import { Effect, Either, TestClock } from "effect"
+import * as SqlClient from "effect/sql/SqlClient"
+import { Effect, Result } from "effect"
 import { runMigrations } from "./database/migrations"
 import { firstRun, followingRun } from "@meldshell/contracts"
 import {
@@ -112,9 +112,9 @@ it.effect("schedules refuse empty prompts and past moments, and go with their th
       saveSchedule(
         { threadId: "t", prompt, cadence: { kind: "once", at }, enabled: true },
         now,
-      ).pipe(Effect.either)
-    assert.ok(Either.isLeft(yield* attempt(" ", "2026-09-25T00:00:00Z")))
-    assert.ok(Either.isLeft(yield* attempt("Later", "2026-09-23T00:00:00Z")))
+      ).pipe(Effect.result)
+    assert.ok(Result.isFailure(yield* attempt(" ", "2026-09-25T00:00:00Z")))
+    assert.ok(Result.isFailure(yield* attempt("Later", "2026-09-23T00:00:00Z")))
     // A paused schedule keeps any moment, since it will not run.
     yield* saveSchedule(
       {
@@ -133,7 +133,7 @@ it.effect("schedules refuse empty prompts and past moments, and go with their th
 it.effect("schedules use the Effect clock when no date is supplied", () =>
   Effect.gen(function* () {
     yield* database
-    yield* TestClock.setTime(new Date("2026-09-24T10:00:00Z"))
+    yield* TestClock.setTime(Date.parse("2026-09-24T10:00:00Z"))
     const schedule = yield* saveSchedule({
       threadId: "t",
       prompt: "Check",
@@ -151,3 +151,5 @@ it.effect("schedules use the Effect clock when no date is supplied", () =>
     assert.deepEqual(yield* claimDueSchedules(), [])
   }).pipe(Effect.provide(TestDatabase)),
 )
+
+import { TestClock } from "effect/testing"
