@@ -13,9 +13,9 @@ export const HEARTBEAT_INTERVAL_MS = 15_000
 export const HEARTBEAT_TIMEOUT_MS = 45_000
 const RemoteCommand = Schema.Struct({
   v: Schema.Literal(REMOTE_VERSION),
-  id: Schema.String.pipe(Schema.pattern(/^[a-zA-Z0-9_-]{16,80}$/)),
-  method: Schema.String.pipe(Schema.maxLength(80)),
-  args: Schema.Array(Schema.Unknown).pipe(Schema.maxItems(2)),
+  id: Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-zA-Z0-9_-]{16,80}$/))),
+  method: Schema.String.pipe(Schema.check(Schema.isMaxLength(80))),
+  args: Schema.Array(Schema.Unknown).pipe(Schema.check(Schema.isMaxLength(2))),
 })
 export type RemoteResult = {
   type: "result"

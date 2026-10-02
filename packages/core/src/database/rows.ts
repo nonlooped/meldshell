@@ -1,5 +1,5 @@
-import { SqlSchema } from "@effect/sql"
-import { Effect, Either, ParseResult, Schema } from "effect"
+import { SqlSchema } from "effect/sql"
+import { Effect, Result, SchemaGetter, Schema, Struct } from "effect"
 import {
   CursorQuestion,
   ApprovalPolicy,
@@ -20,8 +20,8 @@ import {
 
 const Text = Schema.String
 const NullableText = Schema.NullOr(Text)
-const Flag = Schema.Literal(0, 1)
-const Metadata = Schema.partial(ProviderModelCatalogEntry)
+const Flag = Schema.Literals([0, 1])
+const Metadata = ProviderModelCatalogEntry.mapFields(Struct.map(Schema.optional))
 
 const WorkspaceRow = Schema.Struct({
   id: Text,
@@ -37,7 +37,7 @@ export const WorktreeColumns = Schema.Struct({
   worktree_branch: NullableText,
   worktree_base: NullableText,
   worktree_state: Schema.NullOr(ThreadWorktree.fields.state),
-  worktree_setup: Schema.NullOr(Schema.Literal("running", "succeeded", "failed", "interrupted")),
+  worktree_setup: Schema.NullOr(Schema.Literals(["running", "succeeded", "failed", "interrupted"])),
 })
 export const ThreadRow = Schema.Struct({
   ...WorktreeColumns.fields,
@@ -67,12 +67,12 @@ const EventRow = Schema.Struct({
 })
 type EventRow = typeof EventRow.Type
 
-const ApprovalParams = Schema.Record({ key: Schema.String, value: Schema.Unknown })
+const ApprovalParams = Schema.Record(Schema.String, Schema.Unknown)
 export const ApprovalRow = Schema.Struct({
   id: Text,
   thread_id: Text,
   turn_id: Text,
-  request_data: Schema.parseJson(ApprovalParams),
+  request_data: Schema.fromJsonString(ApprovalParams),
   request_id: Text,
   method: Text,
   title: Text,
@@ -97,8 +97,8 @@ export const ProviderModelRow = Schema.Struct({
   provider_id: Text,
   slug: Text,
   display_name: Text,
-  reasoning_efforts: Schema.parseJson(Schema.Array(ReasoningEffort)),
-  metadata: Schema.parseJson(Metadata),
+  reasoning_efforts: Schema.fromJsonString(Schema.Array(ReasoningEffort)),
+  metadata: Schema.fromJsonString(Metadata),
   supports_fast: Flag,
   enabled: Flag,
   hidden: Flag,
@@ -121,29 +121,27 @@ export type ThreadSettingsRow = typeof ThreadSettingsRow.Type
 
 /** SQL results enter the application through a schema, including their column names and JSON. */
 export const readRows = <A, I, E, R>(
-  Result: Schema.Schema<A, I>,
+  Result: Schema.Codec<A, I>,
   query: Effect.Effect<ReadonlyArray<unknown>, E, R>,
 ) => SqlSchema.findAll({ Request: Schema.Void, Result, execute: () => query })(undefined)
 
 /** Read-only database projection; writes have separate input contracts. */
 const project = <A, I, B>(
-  row: Schema.Schema<A, I>,
-  result: Schema.Schema<B>,
-  decode: (value: A) => unknown | Effect.Effect<unknown, ParseResult.ParseError>,
+  row: Schema.Codec<A, I>,
+  result: Schema.Codec<B>,
+  decode: (value: A) => B | Effect.Effect<B, Schema.SchemaError>,
 ) =>
-  Schema.transformOrFail(row, result, {
-    strict: false,
-    decode: (value) => {
-      const decoded = decode(value)
-      return Effect.isEffect(decoded)
-        ? (decoded as Effect.Effect<unknown, ParseResult.ParseError>).pipe(
-            Effect.mapError((error) => error.issue),
-          )
-        : ParseResult.succeed(decoded)
-    },
-    encode: (value, _options, ast) =>
-      ParseResult.fail(new ParseResult.Forbidden(ast, value, "Use the write API")),
-  })
+  row.pipe(
+    Schema.decodeTo(result, {
+      decode: SchemaGetter.transformEffect((value) => {
+        const decoded = decode(value)
+        return (Effect.isEffect(decoded) ? decoded : Effect.succeed(decoded)).pipe(
+          Effect.mapError((error) => error.issue),
+        )
+      }),
+      encode: SchemaGetter.forbidden(() => "Use the write API"),
+    }),
+  )
 
 /** A column list for SQL, each column prefixed with the table alias when one is given. */
 const columnList =
@@ -240,9 +238,9 @@ export const fromWorktreeColumns = (row: WorktreeColumns): ThreadWorktree | null
       }
 
 const parseProviderData = (value: string): unknown => {
-  const decoded = Schema.decodeUnknownEither(Schema.parseJson())(value)
+  const decoded = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(value)
   // Legacy events may contain plain text. Keep it as the native payload.
-  return Either.isRight(decoded) ? decoded.right : value
+  return Result.isSuccess(decoded) ? decoded.success : value
 }
 
 const fromEventRow = (row: EventRow): CanonicalEvent => ({
@@ -293,7 +291,7 @@ const fromApprovalRow = (row: ApprovalRow) =>
           ...fields,
           kind: "user-input",
           method: row.method,
-          questions: (yield* Schema.decodeUnknown(Schema.Array(CursorQuestion))(
+          questions: (yield* Schema.decodeUnknownEffect(Schema.Array(CursorQuestion))(
             params.questions,
           )).map((question) => ({
             id: question.id,
@@ -333,7 +331,7 @@ const fromApprovalRow = (row: ApprovalRow) =>
           params,
         }
     }
-  })
+  }).pipe(Effect.flatMap(Schema.decodeUnknownEffect(ApprovalRequest)))
 
 const fromProviderRow = (row: ProviderRow): Provider => ({
   id: row.id,

@@ -35,6 +35,8 @@ Authenticated provider checks can consume account quota. UI and manual verificat
 
 Application tests use [TesterArmy e2e](https://tester.army/e2e). See [the journey suite](tests/e2e/README.md) for prerequisites, isolation, coverage, and focused commands. `npm test` runs all journeys. The desktop target uses Playwright's Electron driver through an e2e custom engine, so it exercises the built main process, sandboxed preload, renderer, worker processes, and durable SQLite database. The control target runs the real Cloudflare Worker with local D1 and Durable Objects. No model API key is required.
 
+Effect and its SQLite driver are pinned together at stable v4. SQL and RPC modules are imported from `effect/sql` and `effect/rpc`.
+
 `electron-vite` 5 requires Vite 7, so the desktop and shared UI use Vite 7 and `@vitejs/plugin-react` 5 until Electron Vite supports Vite 8. `@astrojs/check` currently supports TypeScript through 6, so the workspace uses TypeScript 6. The Node type definitions follow the supported Node 24 runtime.
 
 The shared renderer lives in `packages/ui`. Desktop and the remote site import `@meldshell/ui`; its package owns renderer dependencies. Each app passes its version information to `mount`.

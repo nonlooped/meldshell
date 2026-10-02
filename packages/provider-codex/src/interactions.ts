@@ -1,5 +1,5 @@
 import Ajv from "ajv"
-import { Schema, Either } from "effect"
+import { Schema, Result } from "effect"
 import type { ApprovalDecision } from "@meldshell/contracts"
 import commandSchema from "../schema/CommandExecutionRequestApprovalResponse.json"
 import fileSchema from "../schema/FileChangeRequestApprovalResponse.json"
@@ -53,15 +53,15 @@ export const encodeInteractionResponse = (
 }
 
 const interactionParams = (params: unknown) => {
-  const decoded = Schema.decodeUnknownEither(
+  const decoded = Schema.decodeUnknownResult(
     Schema.Struct({
       questions: Schema.optional(Schema.Array(Schema.Struct({ id: Schema.String }))),
       permissions: Schema.optional(Schema.Unknown),
     }),
   )(params)
-  if (Either.isLeft(decoded))
-    throw new Error(`Invalid interaction request: ${decoded.left.message}`)
-  return decoded.right
+  if (Result.isFailure(decoded))
+    throw new Error(`Invalid interaction request: ${decoded.failure.message}`)
+  return decoded.success
 }
 
 const userAnswers = (

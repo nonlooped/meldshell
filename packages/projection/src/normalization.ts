@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect"
+import { Result, Schema } from "effect"
 import {
   asRecord,
   decodeNativePayload,
@@ -47,9 +47,9 @@ const nativeEventKind = (method: string, params: unknown): CanonicalEventKind =>
 }
 
 export const planText = (value: unknown): string | null => {
-  const decoded = Schema.decodeUnknownEither(Schema.Array(PlanStep))(value)
-  if (Either.isLeft(decoded)) return null
-  const steps = decoded.right.flatMap((step) => {
+  const decoded = Schema.decodeUnknownResult(Schema.Array(PlanStep))(value)
+  if (Result.isFailure(decoded)) return null
+  const steps = decoded.success.flatMap((step) => {
     const text = nonEmptyText(step.step) ?? nonEmptyText(step.content)
     if (!text) return []
     const status =
@@ -66,8 +66,8 @@ export const planText = (value: unknown): string | null => {
 export const eventText = (method: string, params: unknown): string | null => {
   if (method.startsWith("cursor/")) return cursorEventText(method, params)
   const decoded = decodeNativePayload(params)
-  if (Either.isLeft(decoded)) return `Invalid ${method} payload: ${decoded.left.message}`
-  const record = decoded.right
+  if (Result.isFailure(decoded)) return `Invalid ${method} payload: ${decoded.failure.message}`
+  const record = decoded.success
   if (method === CLAUDE_EXIT_PLAN_MODE) return nonEmptyText(record.plan)
   const delta = nonEmptyText(record.delta)
   if (delta !== null) return delta
@@ -111,14 +111,14 @@ export const approvalCopy = (
     return questionCopy("Cursor", params)
   if (method.startsWith("cursor/")) {
     const decoded = decodeCursorPayload(params)
-    return Either.isRight(decoded)
-      ? cursorApprovalCopy(method, decoded.right)
-      : { title: "Invalid Cursor request", detail: decoded.left.message }
+    return Result.isSuccess(decoded)
+      ? cursorApprovalCopy(method, decoded.success)
+      : { title: "Invalid Cursor request", detail: decoded.failure.message }
   }
   const decoded = decodeNativePayload(params)
-  if (Either.isLeft(decoded))
-    return { title: "Invalid provider request", detail: decoded.left.message }
-  const record = decoded.right
+  if (Result.isFailure(decoded))
+    return { title: "Invalid provider request", detail: decoded.failure.message }
+  const record = decoded.success
   if (method === CLAUDE_EXIT_PLAN_MODE)
     return {
       title: "Approve Claude's plan?",
@@ -155,7 +155,7 @@ const cursorApprovalCopy = (method: string, record: CursorPayload) => {
 
 const nativeItemType = (params: unknown): string => {
   const decoded = decodeNativePayload(params)
-  return Either.isRight(decoded) ? (decoded.right.item?.type ?? "") : ""
+  return Result.isSuccess(decoded) ? (decoded.success.item?.type ?? "") : ""
 }
 
 const nativeItemText = (item: NativeItem | null | undefined): string | null | undefined => {

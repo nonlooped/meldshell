@@ -1,5 +1,5 @@
 import { readRows } from "./database/rows"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import type { TranscriptPage, TranscriptQuery } from "@meldshell/contracts"
 import { Effect } from "effect"
 import { EventFromRow } from "./database/rows"

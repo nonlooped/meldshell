@@ -20,7 +20,7 @@ export interface HostNotification {
   readonly threadId: string
 }
 
-export class HostPlatform extends Context.Tag("MeldShell/HostPlatform")<
+export class HostPlatform extends Context.Service<
   HostPlatform,
   {
     readonly desktop?: boolean
@@ -29,4 +29,4 @@ export class HostPlatform extends Context.Tag("MeldShell/HostPlatform")<
     readonly fork: (entry: string, label: string, env?: Record<string, string>) => HostProcess
     readonly notify: (notification: HostNotification) => void
   }
->() {}
+>()("MeldShell/HostPlatform") {}

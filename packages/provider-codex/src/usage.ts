@@ -3,18 +3,11 @@ import { Schema } from "effect"
 
 const UsageResponse = Schema.Struct({
   rateLimits: UsageLimit,
-  rateLimitsByLimitId: Schema.optional(
-    Schema.NullOr(
-      Schema.Record({
-        key: Schema.String,
-        value: UsageLimit,
-      }),
-    ),
-  ),
+  rateLimitsByLimitId: Schema.optional(Schema.NullOr(Schema.Record(Schema.String, UsageLimit))),
   rateLimitResetCredits: Schema.optional(
     Schema.NullOr(
       Schema.Struct({
-        availableCount: Schema.Number.pipe(Schema.finite()),
+        availableCount: Schema.Number.pipe(Schema.check(Schema.isFinite())),
       }),
     ),
   ),

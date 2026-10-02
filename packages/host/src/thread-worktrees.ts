@@ -75,7 +75,7 @@ const withNewWorktree = <A, E, R>(
       Effect.tapError(() =>
         attempt(() =>
           removeWorktree(workspacePath, worktree, { force: true, deleteBranch: true }),
-        ).pipe(Effect.catchAll(Effect.logError)),
+        ).pipe(Effect.catch(Effect.logError)),
       ),
     )
   })
@@ -85,7 +85,7 @@ const setUpWorktree = (threadId: string) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
     const location = yield* core.GetThreadLocation({ threadId })
-    yield* beginWorktreeSetup(location).pipe(Effect.catchAll(Effect.logError))
+    yield* beginWorktreeSetup(location).pipe(Effect.catch(Effect.logError))
     return yield* core.GetSnapshot()
   })
 
@@ -95,7 +95,7 @@ const setUpCreatedWorktree = (snapshot: AppSnapshot, worktreePath: string) => {
   return thread === undefined
     ? Effect.succeed(snapshot)
     : setUpWorktree(thread.id).pipe(
-        Effect.catchAll((cause) => Effect.as(Effect.logError(cause), snapshot)),
+        Effect.catch((cause) => Effect.as(Effect.logError(cause), snapshot)),
       )
 }
 
@@ -147,7 +147,7 @@ export const setDraftLocation = (input: {
     if (current !== null)
       yield* attempt(() =>
         removeWorktree(location.workspacePath, current, { force: false, deleteBranch: true }),
-      ).pipe(Effect.catchAll(Effect.logError))
+      ).pipe(Effect.catch(Effect.logError))
     return isolated ? yield* setUpWorktree(input.threadId) : snapshot
   })
 
@@ -168,7 +168,7 @@ export const deleteThread = (threadId: string) =>
     if (worktree !== null && worktree.state !== "removed")
       yield* attempt(() =>
         removeWorktree(location.workspacePath, worktree, { force: false, deleteBranch: false }),
-      ).pipe(Effect.catchAll(Effect.logError))
+      ).pipe(Effect.catch(Effect.logError))
     return snapshot
   })
 
@@ -191,7 +191,7 @@ export const removeWorkspace = (workspaceId: string) =>
           force: false,
           deleteBranch: false,
         }),
-      ).pipe(Effect.catchAll(Effect.logError))
+      ).pipe(Effect.catch(Effect.logError))
     return snapshot
   })
 

@@ -17,7 +17,18 @@ import {
   type TurnDispatch,
 } from "@meldshell/contracts"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
-import { Context, Effect, Either, Layer, Ref, Runtime, Schedule, Schema, type Scope } from "effect"
+import {
+  FiberSet,
+  Duration,
+  Context,
+  Effect,
+  Result,
+  Layer,
+  Ref,
+  Schedule,
+  Schema,
+  type Scope,
+} from "effect"
 import { attempt } from "./attempt"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
@@ -41,20 +52,17 @@ export interface ProviderService {
   readonly shutdown: Effect.Effect<void>
 }
 
-export class CodexProvider extends Context.Tag("MeldShell/CodexProvider")<
-  CodexProvider,
-  ProviderService
->() {}
+export class CodexProvider extends Context.Service<CodexProvider, ProviderService>()(
+  "MeldShell/CodexProvider",
+) {}
 
-export class ClaudeProvider extends Context.Tag("MeldShell/ClaudeProvider")<
-  ClaudeProvider,
-  ProviderService
->() {}
+export class ClaudeProvider extends Context.Service<ClaudeProvider, ProviderService>()(
+  "MeldShell/ClaudeProvider",
+) {}
 
-export class CursorProvider extends Context.Tag("MeldShell/CursorProvider")<
-  CursorProvider,
-  ProviderService
->() {}
+export class CursorProvider extends Context.Service<CursorProvider, ProviderService>()(
+  "MeldShell/CursorProvider",
+) {}
 
 type ProviderConfig = {
   readonly harness: Harness
@@ -62,12 +70,14 @@ type ProviderConfig = {
   readonly worker: string
 }
 
-const decodeEvent = Schema.decodeUnknownEither(WorkerEvent)
+const decodeEvent = Schema.decodeUnknownResult(WorkerEvent)
 
 const stopPid = (pid: number): Effect.Effect<void, Error> => attempt(() => stopProcessTree(pid))
 
 const restartSchedule = Schedule.exponential("1 second").pipe(
-  Schedule.union(Schedule.spaced("30 seconds")),
+  Schedule.modifyDelay(({ duration }) =>
+    Effect.succeed(Duration.min(duration, Duration.seconds(30))),
+  ),
 )
 
 const providerRuntime = (
@@ -79,11 +89,7 @@ const providerRuntime = (
     const platform = yield* HostPlatform
     const core = yield* CoreClient
     const hostEvents = yield* HostEvents
-    const runtime = yield* Effect.runtime<never>()
-    const scope = yield* Effect.scope
-    const runFork = (effect: Effect.Effect<void>): void => {
-      Runtime.runFork(runtime)(effect.pipe(Effect.forkIn(scope)))
-    }
+    const runFork = yield* FiberSet.makeRuntime<never, void, never>()
     const processRef = yield* Ref.make<HostProcess | null>(null)
     const statusRef = yield* Ref.make(probing())
     /** Harness processes each worker started, stopped with it if it dies first. */
@@ -104,7 +110,7 @@ const providerRuntime = (
     const stopDescendants = (child: HostProcess): Effect.Effect<void> =>
       Effect.forEach(
         [...(descendants.get(child) ?? [])],
-        (pid) => stopPid(pid).pipe(Effect.catchAll(Effect.logError)),
+        (pid) => stopPid(pid).pipe(Effect.catch(Effect.logError)),
         { discard: true },
       )
 
@@ -185,14 +191,14 @@ const providerRuntime = (
         if (input.method === "turn/completed" || input.requestId !== undefined)
           yield* core.GetSnapshot().pipe(
             Effect.flatMap((snapshot) => notifyForSnapshot(snapshot, input.threadId, input.method)),
-            Effect.catchAllCause(Effect.logError),
+            Effect.catchCause(Effect.logError),
           )
         if (nextDispatch !== null) yield* send({ type: "start-turn", dispatch: nextDispatch })
       })
 
     const persistRuntimeEvent = (input: RuntimeEventInput): Effect.Effect<void> =>
       core.RecordRuntimeEvent(input).pipe(
-        Effect.tapErrorCause(() =>
+        Effect.tapCause(() =>
           Effect.sync(() => {
             // An event the core cannot store leaves its turn unknowable; restart the worker.
             const child = currentChild()
@@ -203,7 +209,7 @@ const providerRuntime = (
           result.changed ? announce(input, result.nextDispatch) : Effect.void,
         ),
         Effect.asVoid,
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.sync(() => console.error(`Could not persist a ${label} event.`, cause)),
         ),
       )
@@ -228,7 +234,7 @@ const providerRuntime = (
       queue.enqueue(
         write.pipe(
           Effect.andThen(publishChange(threadId)),
-          Effect.catchAll((cause) => Effect.sync(() => console.error(failure, cause))),
+          Effect.catch((cause) => Effect.sync(() => console.error(failure, cause))),
         ),
       )
 
@@ -250,7 +256,7 @@ const providerRuntime = (
             Effect.tap(() => publishStatus(status)),
             Effect.tap(() => publishChange("")),
             Effect.asVoid,
-            Effect.catchAll((cause) =>
+            Effect.catch((cause) =>
               publishStatus({
                 ...status,
                 availability: "error",
@@ -283,11 +289,11 @@ const providerRuntime = (
 
     const handleWorkerMessage = (message: unknown, owner: HostProcess): void => {
       const decoded = decodeEvent(message)
-      if (Either.isLeft(decoded)) {
+      if (Result.isFailure(decoded)) {
         console.error(`${label} sent an invalid message.`, asRecord(message).type)
         return
       }
-      const event = decoded.right
+      const event = decoded.success
       switch (event.type) {
         case "process-started":
           descendants.get(owner)?.add(event.pid)
@@ -355,7 +361,7 @@ const providerRuntime = (
             stopping ? Effect.void : core.ReconcileWorker({ generation: generations.get(child)! }),
           ),
           Effect.andThen(publishChange("")),
-          Effect.catchAll(Effect.logError),
+          Effect.catch(Effect.logError),
         ),
         true,
       )
@@ -377,7 +383,7 @@ const providerRuntime = (
     const superviseWorker = (child: HostProcess) =>
       Ref.set(processRef, child).pipe(
         Effect.andThen(
-          Effect.async<void>((resume) => {
+          Effect.callback<void>((resume) => {
             const onExit = (code: number): void => {
               workerExited(child, code)
               resume(Effect.void)
@@ -416,7 +422,7 @@ const providerRuntime = (
           )
         }),
       ),
-      Effect.catchAll((cause) =>
+      Effect.catch((cause) =>
         publishStatus({
           ...probing(),
           availability: "error",
@@ -435,7 +441,7 @@ const providerRuntime = (
       queue.flush()
       const child = yield* Ref.get(processRef)
       if (child === null) return
-      yield* send({ type: "shutdown" }).pipe(Effect.catchAll(Effect.logError))
+      yield* send({ type: "shutdown" }).pipe(Effect.catch(Effect.logError))
       yield* stopDescendants(child)
       child.kill()
     })
@@ -443,7 +449,7 @@ const providerRuntime = (
 
     /** Waits for a worker to exit after stopping it; a worker that will not stop fails. */
     const killWorker = (child: HostProcess): Effect.Effect<void, Error> =>
-      Effect.async<void, Error>((resume) => {
+      Effect.callback<void, Error>((resume) => {
         if (child.pid === undefined) {
           resume(Effect.void)
           return
@@ -453,9 +459,9 @@ const providerRuntime = (
         if (!child.kill()) resume(Effect.fail(new Error(`Could not stop the ${label} worker.`)))
         return Effect.sync(() => child.off("exit", onExit))
       }).pipe(
-        Effect.timeoutFail({
+        Effect.timeoutOrElse({
           duration: "5 seconds",
-          onTimeout: () => new Error(`${label} worker did not exit after cancellation.`),
+          orElse: () => Effect.fail(new Error(`${label} worker did not exit after cancellation.`)),
         }),
       )
 
@@ -531,10 +537,10 @@ const providerRuntime = (
   })
 
 const providerLayer = <Id>(
-  tag: Context.Tag<Id, ProviderService>,
+  tag: Context.Key<Id, ProviderService>,
   config: ProviderConfig,
 ): Layer.Layer<Id, never, CoreClient | HostEvents | HostPlatform> =>
-  Layer.scoped(tag, providerRuntime(config))
+  Layer.effect(tag, providerRuntime(config))
 
 export const codexProviderLive = providerLayer(CodexProvider, {
   harness: "codex",

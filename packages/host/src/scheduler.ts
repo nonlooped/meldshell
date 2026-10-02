@@ -1,4 +1,4 @@
-import { Effect, Either, Schedule } from "effect"
+import { Effect, Result, Schedule } from "effect"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
 import { submitTurn } from "./operations"
@@ -18,11 +18,11 @@ const runDueSchedules = Effect.gen(function* () {
   if (due.length === 0) return
   for (const schedule of due) {
     const sent = yield* submitTurn({ threadId: schedule.threadId, text: schedule.prompt }).pipe(
-      Effect.either,
+      Effect.result,
     )
     yield* core.RecordScheduleRun({
       scheduleId: schedule.id,
-      error: Either.isLeft(sent) ? errorMessage(sent.left) : null,
+      error: Result.isFailure(sent) ? errorMessage(sent.failure) : null,
     })
   }
   const events = yield* HostEvents
@@ -31,6 +31,6 @@ const runDueSchedules = Effect.gen(function* () {
 
 /** Runs until interrupted; a failed check is logged and the next one still happens. */
 export const scheduleLoop = runDueSchedules.pipe(
-  Effect.catchAllCause(Effect.logError),
+  Effect.catchCause(Effect.logError),
   Effect.repeat(Schedule.spaced(CHECK_EVERY)),
 )

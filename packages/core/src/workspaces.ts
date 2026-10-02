@@ -1,4 +1,4 @@
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import { basename, normalize, parse, sep } from "node:path"
 import { CoreProtocolError } from "@meldshell/contracts"

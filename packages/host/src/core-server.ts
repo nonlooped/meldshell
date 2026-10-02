@@ -1,7 +1,7 @@
 import { acquireOwnership } from "./ownership"
 import { SqliteClient } from "@effect/sql-sqlite-node"
-import { RpcServer } from "@effect/rpc"
-import type { FromClientEncoded, FromServerEncoded } from "@effect/rpc/RpcMessage"
+import { RpcServer } from "effect/rpc"
+import type { FromClientEncoded, FromServerEncoded } from "effect/rpc/RpcMessage"
 import {
   errorMessage,
   CoreDatabaseError,
@@ -57,7 +57,18 @@ import {
   claimDueSchedules,
   recordScheduleRun,
 } from "@meldshell/core"
-import { Cause, Effect, Layer, Mailbox, ManagedRuntime, Option, Runtime, Schedule } from "effect"
+import {
+  FiberSet,
+  Schema,
+  Cause,
+  Effect,
+  Layer,
+  Queue,
+  ManagedRuntime,
+  Option,
+  Schedule,
+  Semaphore,
+} from "effect"
 
 export interface CorePort {
   postMessage(message: unknown): void
@@ -76,7 +87,7 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
   })
 
   const coreErrorFromCause = (cause: Cause.Cause<unknown>): CoreError => {
-    const failure = Option.getOrUndefined(Cause.failureOption(cause))
+    const failure = Option.getOrUndefined(Cause.findErrorOption(cause))
     if (
       failure instanceof TurnSubmissionError ||
       failure instanceof ProviderConfigurationError ||
@@ -85,7 +96,7 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
       return failure
     }
     if (typeof failure === "object" && failure !== null && "_tag" in failure) {
-      if (failure._tag === "ParseError") {
+      if (failure._tag === "SchemaError") {
         return new CoreProtocolError({ message: errorMessage(failure) })
       }
       if (failure._tag === "SqlError") {
@@ -98,7 +109,7 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
   // Serialize whole mutation handlers (including their post-commit snapshots). The SQLite
   // client also holds its connection semaphore for transactions, so reads cannot see
   // another fiber's uncommitted writes. Read RPCs need not wait on this writer gate.
-  const writer = Effect.runSync(Effect.makeSemaphore(1))
+  const writer = Semaphore.makeUnsafe(1)
 
   const exposeCoreRead = <A, E, R>(
     effect: Effect.Effect<A, E, R>,
@@ -166,9 +177,8 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
 
   const makeElectronProtocol = RpcServer.Protocol.make((writeRequest) =>
     Effect.gen(function* () {
-      const runtime = yield* Effect.runtime<never>()
-      const runFork = Runtime.runFork(runtime)
-      const disconnects = yield* Mailbox.make<number>()
+      const runFork = yield* FiberSet.makeRuntime<never>()
+      const disconnects = yield* Queue.make<number>()
       const clientIds = new Set([0])
       const onMessage = (event: { readonly data: unknown }): void => {
         runFork(writeRequest(0, event.data as FromClientEncoded))
@@ -196,17 +206,19 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
         supportsAck: false,
         supportsTransferables: false,
         supportsSpanPropagation: false,
+        supportsNotifications: false,
+        codecFor: Schema.toCodecJson,
       }
     }),
   )
 
-  const ProtocolLive = Layer.scoped(
+  const ProtocolLive = Layer.effect(
     RpcServer.Protocol,
     initializeDatabase.pipe(
       Effect.tap(() =>
         refreshTranscriptSearch.pipe(
           writer.withPermits(1),
-          Effect.catchAll(Effect.logError),
+          Effect.catch(Effect.logError),
           Effect.repeat(Schedule.spaced("1 second")),
           Effect.forkScoped,
         ),

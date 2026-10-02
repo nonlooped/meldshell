@@ -18,9 +18,6 @@
       // Imported through bundled workspace packages (host, providers); listing them keeps them
       // external and packaged. Core and provider-runtime are bundled workspace sources of the host.
       "ignoreDependencies": [
-        "@effect/experimental",
-        "@effect/platform",
-        "@effect/rpc",
         "@effect/sql-sqlite-node",
         "@meldshell/core",
         "@meldshell/provider-runtime",

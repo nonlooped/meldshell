@@ -18,7 +18,7 @@ export const createHostRuntime = (platform: typeof HostPlatform.Service) =>
   ManagedRuntime.make(
     providerUpdatesLive.pipe(
       Layer.provideMerge(Layer.mergeAll(codexProviderLive, claudeProviderLive, cursorProviderLive)),
-      Layer.provideMerge(Layer.merge(CoreClient.Default, HostEvents.Default)),
+      Layer.provideMerge(Layer.merge(CoreClient.layer, HostEvents.layer)),
       Layer.provideMerge(Layer.succeed(HostPlatform, platform)),
     ),
   )
@@ -33,10 +33,10 @@ export type HostServices =
   | ProviderUpdates
 export const stopHost = Effect.gen(function* () {
   const core = yield* CoreClient
-  yield* stopAllWorktreeSetups.pipe(Effect.catchAll(Effect.logError))
+  yield* stopAllWorktreeSetups.pipe(Effect.catch(Effect.logError))
   const turns = yield* core
     .BeginShutdown()
-    .pipe(Effect.catchAll((cause) => Effect.as(Effect.logError(cause), [])))
+    .pipe(Effect.catch((cause) => Effect.as(Effect.logError(cause), [])))
   yield* Effect.forEach(
     turns,
     (turn) =>
@@ -47,7 +47,7 @@ export const stopHost = Effect.gen(function* () {
               nativeThreadId: turn.nativeThreadId!,
               nativeTurnId: turn.nativeTurnId!,
             }),
-          ).pipe(Effect.catchAll(Effect.logError))
+          ).pipe(Effect.catch(Effect.logError))
         : Effect.void,
     { discard: true },
   )
@@ -56,5 +56,5 @@ export const stopHost = Effect.gen(function* () {
     providers.map((provider) => provider.shutdown),
     { concurrency: 3 },
   )
-  yield* core.FinishShutdown().pipe(Effect.catchAll(Effect.logError))
+  yield* core.FinishShutdown().pipe(Effect.catch(Effect.logError))
 })

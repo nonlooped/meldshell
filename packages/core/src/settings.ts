@@ -1,4 +1,4 @@
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import {
   AppOpacity,
   CURRENT_TITLE_MODEL,
@@ -26,12 +26,14 @@ const PREFERENCES = [
   "editor",
 ] as const
 
-const Keybindings = Schema.parseJson(Schema.Record({ key: Schema.String, value: Schema.String }))
-const Opacity = Schema.compose(Schema.NumberFromString, AppOpacity)
+const Keybindings = Schema.fromJsonString(Schema.Record(Schema.String, Schema.String))
+// Settings store literal strings; reject malformed booleans before applying defaults.
+const StoredBoolean = Schema.Literals(["true", "false"]).transform([true, false])
+const Opacity = Schema.NumberFromString.pipe(Schema.decodeTo(AppOpacity))
 
 /** A stored value that is missing or no longer decodes reads as undefined, so its default applies. */
 const stored = <A, I extends string>(
-  schema: Schema.Schema<A, I>,
+  schema: Schema.Codec<A, I>,
   value: string | undefined,
 ): A | undefined =>
   value === undefined ? undefined : Option.getOrUndefined(Schema.decodeUnknownOption(schema)(value))
@@ -50,15 +52,14 @@ export const readAppSettings = Effect.gen(function* () {
   `
   const values = new Map(rows.map((row) => [row.key, row.value]))
   return {
-    alwaysFullPermissions:
-      stored(Schema.BooleanFromString, values.get("alwaysFullPermissions")) ?? false,
+    alwaysFullPermissions: stored(StoredBoolean, values.get("alwaysFullPermissions")) ?? false,
     opacity: stored(Opacity, values.get("opacity")),
     titleModelId: values.get(TITLE_MODEL_SETTING) ?? CURRENT_TITLE_MODEL,
-    showSettled: stored(Schema.BooleanFromString, values.get("showSettled")) ?? true,
+    showSettled: stored(StoredBoolean, values.get("showSettled")) ?? true,
     theme: stored(Theme, values.get("theme")) ?? "dark",
     transcriptSize: stored(TranscriptSize, values.get("transcriptSize")) ?? "medium",
-    reduceMotion: stored(Schema.BooleanFromString, values.get("reduceMotion")) ?? false,
-    sounds: stored(Schema.BooleanFromString, values.get("sounds")) ?? true,
+    reduceMotion: stored(StoredBoolean, values.get("reduceMotion")) ?? false,
+    sounds: stored(StoredBoolean, values.get("sounds")) ?? true,
     editor: values.get("editor"),
     keybindings: stored(Keybindings, values.get(KEYBINDINGS_SETTING)),
   } satisfies AppSettings

@@ -47,16 +47,16 @@ type Operation = {
   execute: (input: unknown) => Effect.Effect<unknown, unknown, HostServices>
 }
 const operation = <A, I>(
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
   read: boolean,
   run: (input: A) => Effect.Effect<unknown, unknown, HostServices>,
 ): Operation => ({
   read,
-  execute: (input) => Schema.decodeUnknown(schema)(input).pipe(Effect.flatMap(run)),
+  execute: (input) => Schema.decodeUnknownEffect(schema)(input).pipe(Effect.flatMap(run)),
 })
 const noInput = Schema.Unknown
 const coreCall = <A, I>(
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
   read: boolean,
   run: (core: typeof CoreClient.Service, input: A) => Effect.Effect<unknown, unknown>,
 ) => operation(schema, read, (input) => Effect.flatMap(CoreClient, (core) => run(core, input)))
@@ -160,8 +160,13 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.searchWorkspacePaths]: operation(
     Schema.Struct({
       ...scopeFields,
-      query: Schema.String.pipe(Schema.maxLength(1024)),
-      limit: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.between(1, 200))),
+      query: Schema.String.pipe(Schema.check(Schema.isMaxLength(1024))),
+      limit: Schema.optional(
+        Schema.Number.pipe(
+          Schema.check(Schema.isInt()),
+          Schema.check(Schema.isBetween({ minimum: 1, maximum: 200 })),
+        ),
+      ),
     }),
     true,
     (input) => withWorkspace(input, (path) => searchWorkspacePaths(path, input.query, input.limit)),
@@ -189,7 +194,7 @@ export const hostOperations: Record<string, Operation> = {
     Schema.Struct({
       ...scopeFields,
       path: Schema.String,
-      action: Schema.Literal("create-file", "create-folder", "rename", "delete"),
+      action: Schema.Literals(["create-file", "create-folder", "rename", "delete"]),
       name: Schema.optional(Schema.String),
     }),
     false,
@@ -198,7 +203,10 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.getGitSnapshot]: operation(
     Schema.Struct({
       ...scopeFields,
-      limit: Schema.Number.pipe(Schema.int(), Schema.between(1, 2000)),
+      limit: Schema.Number.pipe(
+        Schema.check(Schema.isInt()),
+        Schema.check(Schema.isBetween({ minimum: 1, maximum: 2000 })),
+      ),
     }),
     true,
     (input) => withWorkspace(input, (path) => getGitSnapshot(path, input.limit)),
@@ -207,7 +215,7 @@ export const hostOperations: Record<string, Operation> = {
     Schema.Struct({
       ...scopeFields,
       path: Schema.String,
-      side: Schema.optional(Schema.Literal("staged", "unstaged")),
+      side: Schema.optional(Schema.Literals(["staged", "unstaged"])),
       context: Schema.optional(Schema.Literal("full")),
     }),
     true,
@@ -223,13 +231,13 @@ export const hostOperations: Record<string, Operation> = {
     Schema.Struct({
       ...scopeFields,
       path: Schema.String,
-      action: Schema.Literal("stage", "unstage", "restore"),
+      action: Schema.Literals(["stage", "unstage", "restore"]),
     }),
     false,
     (input) => withWorkspace(input, (path) => gitFileAction(path, input.path, input.action)),
   ),
   [C.IPC.gitBulkAction]: operation(
-    Schema.Struct({ ...scopeFields, action: Schema.Literal("stage", "unstage") }),
+    Schema.Struct({ ...scopeFields, action: Schema.Literals(["stage", "unstage"]) }),
     false,
     (input) => withWorkspace(input, (path) => gitBulkAction(path, input.action)),
   ),

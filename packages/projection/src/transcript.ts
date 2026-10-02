@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect"
+import { Result, Schema } from "effect"
 import { eventKind, eventText, planText } from "./normalization"
 import { prepareCursorEvents } from "./cursor"
 import {
@@ -54,7 +54,7 @@ export interface TranscriptTurn {
 /** The native item a payload carries, as Codex and the other harnesses nest it. */
 const readPayload = (payload: unknown): NativePayload | null => {
   const decoded = decodeNativePayload(payload)
-  return Either.isRight(decoded) ? decoded.right : null
+  return Result.isSuccess(decoded) ? decoded.success : null
 }
 const payloadItem = (payload: unknown): JsonRecord | null => readPayload(payload)?.item ?? null
 
@@ -222,11 +222,11 @@ export const prepareTranscriptEvents = (
 
   const append = (event: CanonicalEvent): void => {
     const decoded = decodeNativePayload(event.payload)
-    if (Either.isLeft(decoded)) {
+    if (Result.isFailure(decoded)) {
       standalone.push({
         ...event,
         kind: "error",
-        text: `Invalid ${event.method} payload: ${decoded.left.message}`,
+        text: `Invalid ${event.method} payload: ${decoded.failure.message}`,
       })
       return
     }
@@ -235,25 +235,25 @@ export const prepareTranscriptEvents = (
       return
     }
     if (event.method === "turn/diff/updated") {
-      updateDiff(diffs, event, decoded.right)
+      updateDiff(diffs, event, decoded.success)
       return
     }
 
-    const item = itemDetails(decoded.right)
+    const item = itemDetails(decoded.success)
     const kind = event.kind === "unknown" ? eventKind(event.method, event.payload) : event.kind
     if (kind === "user" && item.id !== null) {
       // Initial prompts already have a local user/message. Native replies to mid-turn
       // questions have no local duplicate and must survive transcript reloads.
-      appendReply(event, decoded.right, item.id)
+      appendReply(event, decoded.success, item.id)
       return
     }
 
     const groupKey = `${event.turnId ?? event.threadId}:${item.id}`
     const existing = groups.get(groupKey)
     if (item.id !== null && (existing !== undefined || groupable(kind))) {
-      const group = existing ?? newGroup(event, decoded.right, item.id, kind)
+      const group = existing ?? newGroup(event, decoded.success, item.id, kind)
       groups.set(groupKey, group)
-      updateGroup(group, event, decoded.right, item, kind)
+      updateGroup(group, event, decoded.success, item, kind)
       return
     }
 
@@ -278,7 +278,7 @@ export const prepareTranscriptEvents = (
 const assistantPhase = (event: CanonicalEvent): string | null =>
   nonEmptyText(payloadItem(event.payload)?.phase)
 
-const decodeAsyncQuestions = Schema.decodeUnknownEither(
+const decodeAsyncQuestions = Schema.decodeUnknownResult(
   Schema.Array(
     Schema.Struct({
       title: Schema.String,
@@ -295,8 +295,8 @@ const asyncQuestions = (event: CanonicalEvent): AsyncQuestion[] => {
   const item = asRecord(payloadItem(event.payload))
   if (item.delivery !== "async") return []
   const decoded = decodeAsyncQuestions(item.questions)
-  if (Either.isLeft(decoded)) return []
-  return decoded.right.flatMap((question) =>
+  if (Result.isFailure(decoded)) return []
+  return decoded.success.flatMap((question) =>
     question.title.trim()
       ? [{ title: question.title, options: (question.options ?? []).filter((o) => o.trim()) }]
       : [],
