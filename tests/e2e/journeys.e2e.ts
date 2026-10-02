@@ -21,6 +21,16 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
       "Customer portal",
     )
     expect(restored.threads.find((item) => item.id === thread.id)?.title).toBe("Repair login")
+    // The restarted core client still routes replies and round-trips typed core errors.
+    const rejection = await desktop.page.evaluate(async (threadId) => {
+      try {
+        await window.meldshell.submitTurn({ threadId, text: " " })
+        return null
+      } catch (error) {
+        return String(error)
+      }
+    }, thread.id)
+    expect(rejection).toContain("A turn needs text or an attachment.")
     await desktop.page
       .getByRole("button", { name: "Search threads and messages", exact: true })
       .click()
