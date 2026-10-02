@@ -11,6 +11,7 @@ test("release workflow edits only select release tests", () => {
   assert.equal(scope.static, false)
   assert.equal(scope.desktop, false)
   assert.equal(scope.site, false)
+  assert.equal(scope.e2e, false)
   assert.deepEqual(scope.typechecks, [])
   assert.deepEqual(scope.tests, ["tests/changelog.test.ts", "tests/release-cli.test.mjs"])
 })
@@ -19,6 +20,7 @@ test("documentation and unrelated automation do not select app checks", () => {
   const scope = selectChecks(["docs/release.md", "AGENTS.md", ".github/dependabot.yml"])
   assert.equal(scope.static, false)
   assert.equal(scope.test, false)
+  assert.equal(scope.e2e, false)
   assert.equal(scope.windows, false)
   assert.equal(scope.desktop, false)
   assert.equal(scope.site, false)
@@ -28,6 +30,7 @@ test("site and control changes stay in their workspace", () => {
   for (const name of ["site", "control"]) {
     const scope = selectChecks([`apps/${name}/src/index.ts`])
     assert.equal(scope.static, true)
+    assert.equal(scope.e2e, true)
     assert.equal(scope.desktop, false)
     assert.equal(scope.site, name === "site")
     assert.equal(scope.windows, false)
@@ -58,6 +61,7 @@ test("provider changes select desktop and headless but not site or control", () 
 test("global inputs, CI machinery, and forced runs select every workspace", () => {
   for (const files of [
     ["package-lock.json"],
+    ["e2e.config.ts"],
     ["tsconfig.base.json"],
     [".github/workflows/ci.yml"],
     ["scripts/ci-scope.mjs"],

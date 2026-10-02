@@ -34,7 +34,7 @@ async function readTranscriptPage(
 
 // Events are durable append-only records. Only touched turns are reprojected;
 // completed historical turns retain their object identity and native payloads.
-export function mergeTranscript(
+function mergeTranscript(
   previous: TranscriptWindow | undefined,
   events: readonly CanonicalEvent[],
 ): TranscriptWindow {

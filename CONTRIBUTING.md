@@ -14,8 +14,9 @@ Choose commands from the affected behavior, using exact paths:
 | --- | --- |
 | Markdown documentation | `git diff --check` and review changed links; no build or test |
 | Supported source files | `npx --no-install biome check path/to/file.ts path/to/file.tsx` |
-| One behavior | `node --import tsx --test path/to/affected.test.ts` (also accepts `.test.mjs` and multiple paths) |
-| Core database behavior | `npm run test --workspace=@meldshell/core -- src/affected.spec.ts` |
+| App behavior | Build the desktop, then `npm test -- tests/e2e/journeys.e2e.ts --target electron` (UI execution follows the repository verification policy) |
+| Remote account behavior | `npm test -- tests/e2e/remote.e2e.ts --target control` |
+| Test configuration and types | `npm run test:e2e:list` and `npm run typecheck:e2e` |
 | Shared renderer types | `npm run typecheck --workspace=@meldshell/ui` |
 | Desktop renderer types | `npm run typecheck:web --workspace=@meldshell/desktop` |
 | Desktop main/preload types | `npm run typecheck:node --workspace=@meldshell/desktop` |
@@ -24,17 +25,15 @@ Choose commands from the affected behavior, using exact paths:
 
 Find relevant tests with `rg --files <affected-directory> tests` and inspect their coverage. Shared contracts may require checks in their consumers. A build is appropriate for bundling, assets, or compiler behavior that tests and typechecks cannot cover; name that risk first. Installer artwork/configuration edits do not require a full candidate certification unless one was requested.
 
-`npm test -- path/to/test.ts` still includes the root script's entire test list; use the direct Node command above to select files. Likewise, appending a path to root `lint` or `format:check` retains their `.` scope. `check:fast` is a repository-wide aggregate despite its name. Stop after the selected checks pass; CI owns the full regression pass.
+`npm test -- tests/e2e/journeys.e2e.ts --target electron` selects one e2e file and target. `npm run test:tooling` runs the separate release and CI planner checks. Likewise, appending a path to root `lint` or `format:check` retains their `.` scope. `check:fast` is a repository-wide aggregate despite its name. Stop after the selected checks pass; CI owns the full regression pass.
 
 Biome handles supported source formatting and linting, including a cognitive-complexity limit of 20. It does not format Markdown or YAML. Generated Codex schemas and lockfiles are excluded. React Compiler diagnostics come from builds.
 
-`check:fast` combines lint, formatting, and workspace typechecks. `check` adds the desktop build and Knip; it does not run `npm test`. Choose these aggregate commands only under the repository verification policy. [CI](.github/workflows/ci.yml) selects checks for pull requests and `main` pushes using [the scope planner](scripts/ci-scope.mjs). Workspace changes select their transitive consumers for typechecks and tests, and only affected desktop/site builds run. Static analysis keeps repository scope because Knip checks cross-workspace usage. Windows tests run for desktop/headless dependencies and root/release tests; isolated site or control changes use Linux. Release-workflow edits run release tests without app builds. Documentation changes only run the selector (changelog edits also run release tests). Root dependency/configuration changes and CI planner/workflow edits run all checks. Manual CI runs and reusable release checks always run the full suite. The selector uses the PR merge base or the complete push range, includes deleted and renamed paths, and falls back to all checks if comparison is unavailable.
+`check:fast` combines lint, formatting, and workspace typechecks. `check` adds the desktop build and Knip; it does not run `npm test`. Choose these aggregate commands only under the repository verification policy. [CI](.github/workflows/ci.yml) selects checks for pull requests and `main` pushes using [the scope planner](scripts/ci-scope.mjs). Workspace changes select their transitive consumers for typechecks and tests, and only affected desktop/site builds run. Static analysis keeps repository scope because Knip checks cross-workspace usage. Tooling tests retain their platform selection. Application source or journey changes select the e2e job on Linux and Windows. Release-workflow edits run release tests without app builds. Documentation changes only run the selector (changelog edits also run release tests). Root dependency/configuration changes and CI planner/workflow edits run all checks. Manual CI runs and reusable release checks always run the full suite. The selector uses the PR merge base or the complete push range, includes deleted and renamed paths, and falls back to all checks if comparison is unavailable.
 
 Authenticated provider checks can consume account quota. UI and manual verification follow the repository policy; report unverified behavior explicitly.
 
-Core tests use `@effect/vitest` and `.spec.ts` filenames. Provide the shared `TestDatabase` layer per test to keep SQLite state isolated. Use `TestClock` for Effect clock behavior; other packages continue to use Node’s test runner. The root `npm test` runs both runners.
-
-`@effect/vitest` currently requires Vitest 3. Its browser mocker has an [upstream advisory](https://github.com/vitest-dev/vitest/security/advisories/GHSA-82fw-gwwq-j7x9) whose fix is only available in newer majors. Core tests explicitly use Node with the API and browser modes disabled. Revisit the pin when Effect supports a patched Vitest major.
+Application tests use [TesterArmy e2e](https://tester.army/e2e). See [the journey suite](tests/e2e/README.md) for prerequisites, isolation, coverage, and focused commands. `npm test` runs all journeys. The desktop target uses Playwright's Electron driver through an e2e custom engine, so it exercises the built main process, sandboxed preload, renderer, worker processes, and durable SQLite database. The control target runs the real Cloudflare Worker with local D1 and Durable Objects. No model API key is required.
 
 `electron-vite` 5 requires Vite 7, so the desktop and shared UI use Vite 7 and `@vitejs/plugin-react` 5 until Electron Vite supports Vite 8. `@astrojs/check` currently supports TypeScript through 6, so the workspace uses TypeScript 6. The Node type definitions follow the supported Node 24 runtime.
 

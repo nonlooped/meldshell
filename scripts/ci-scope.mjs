@@ -24,6 +24,7 @@ export function selectChecks(files, full = false, entries = workspaces()) {
         "package-lock.json",
         ".npmrc",
         "tsconfig.base.json",
+        "e2e.config.ts",
         ".github/workflows/ci.yml",
         "scripts/ci-scope.mjs",
         "tests/ci-scope.test.mjs",
@@ -67,6 +68,7 @@ export function selectChecks(files, full = false, entries = workspaces()) {
   if (rootTests) tests.push("tests")
   else if (release) tests.push("tests/changelog.test.ts", "tests/release-cli.test.mjs")
   const desktop = affected.has("@meldshell/desktop")
+  const e2e = global || selected.length > 0 || source.some((path) => path.startsWith("tests/e2e/"))
   return {
     static:
       global ||
@@ -75,6 +77,7 @@ export function selectChecks(files, full = false, entries = workspaces()) {
       source.includes(".editorconfig"),
     protocol: global || source.some((path) => path.startsWith("packages/provider-codex/")),
     desktop,
+    e2e,
     site: affected.has("@meldshell/site"),
     windows: global || desktop || affected.has("@meldshell/headless") || rootTests || release,
     test: tests.length > 0,
@@ -128,8 +131,6 @@ function main() {
         execFileSync(process.execPath, ["--import", "tsx", "--test", ...files], {
           stdio: "inherit",
         })
-      if (scope.tests.includes("packages/core"))
-        runNpm(["run", "test", "--workspace=@meldshell/core"])
     }
     return
   }

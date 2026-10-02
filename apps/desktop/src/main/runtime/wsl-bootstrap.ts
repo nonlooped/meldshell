@@ -1,5 +1,5 @@
 /** Fixed shell program. Paths and distribution names are always separate argv values. */
-export const WSL_BOOTSTRAP = String.raw`
+const WSL_BOOTSTRAP = String.raw`
 set -eu
 command -v node >/dev/null || { echo 'Install Linux Node.js 24 or newer and npm in this WSL distribution.' >&2; exit 1; }
 node -e 'if(process.platform !== "linux" || +process.versions.node.split(".")[0] < 24) process.exit(1)' || { echo 'MeldShell requires Linux Node.js 24 or newer.' >&2; exit 1; }

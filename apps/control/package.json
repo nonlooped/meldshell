@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "wrangler d1 migrations apply DB --local && wrangler dev",
     "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json",
-    "test": "node --import tsx --test test/*.test.ts"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@better-auth/api-key": "1.7.6",
@@ -16,8 +15,6 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260928.1",
-    "@types/ws": "^8.18.2",
-    "wrangler": "4.146.0",
-    "ws": "^8.22.0"
+    "wrangler": "4.146.0"
   }
 }

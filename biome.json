@@ -129,7 +129,7 @@
         "useNamespaceKeyword": "error"
       }
     },
-    "includes": ["apps/desktop/**", "packages/**"]
+    "includes": ["apps/desktop/**", "packages/**", "tests/e2e/**", "e2e.config.ts"]
   },
   "javascript": {
     "formatter": {
