@@ -119,8 +119,10 @@ function main() {
       for (const workspace of scope.typechecks)
         runNpm(["run", "typecheck", `--workspace=${workspace}`])
     } else {
+      // The selector's JavaScript-only checks run before dependencies are installed.
+      const loader = scope.tests.some((file) => file.endsWith(".ts")) ? ["--import", "tsx"] : []
       if (scope.tests.length)
-        execFileSync(process.execPath, ["--import", "tsx", "--test", ...scope.tests], {
+        execFileSync(process.execPath, [...loader, "--test", ...scope.tests], {
           stdio: "inherit",
         })
     }

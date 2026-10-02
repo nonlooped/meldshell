@@ -178,14 +178,17 @@ test("every desktop build selection is covered by e2e", () => {
   }
 })
 
-test("test CLI executes only explicit files and skips an empty selection", () => {
+test("test CLI runs explicit JavaScript files without installed dependencies and skips empty selections", () => {
   const directory = mkdtempSync(join(tmpdir(), "ci-runner-"))
   try {
+    const runner = join(directory, "ci-scope.mjs")
+    writeFileSync(runner, readFileSync("scripts/ci-scope.mjs"))
     const file = join(directory, "selected.test.mjs")
     writeFileSync(file, 'import test from "node:test"; test("selected tooling suite", () => {})')
     writeFileSync(join(directory, "unselected.test.mjs"), 'throw new Error("must not run")')
     for (const tests of [[file], []]) {
-      const output = execFileSync(process.execPath, ["scripts/ci-scope.mjs", "test"], {
+      const output = execFileSync(process.execPath, [runner, "test"], {
+        cwd: directory,
         env: { ...process.env, NODE_TEST_CONTEXT: undefined, CI_SCOPE: JSON.stringify({ tests }) },
         encoding: "utf8",
       })
