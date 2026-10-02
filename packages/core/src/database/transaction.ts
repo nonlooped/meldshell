@@ -1,4 +1,4 @@
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { Effect } from "effect"
 
 /** Runs an effect in one SQLite transaction. Kept free of other imports, so any module may use it. */

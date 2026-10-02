@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@meldshell/contracts": "*",
-    "effect": "3.22.2",
+    "effect": "4.0.0",
     "execa": "10.0.1",
     "tree-kill": "1.2.2"
   },

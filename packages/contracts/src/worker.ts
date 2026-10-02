@@ -10,7 +10,7 @@ import {
   TurnDispatch,
 } from "./models"
 
-export const WorkerCommand = Schema.Union(
+export const WorkerCommand = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("steer-turn"),
     nativeThreadId: Schema.String,
@@ -26,12 +26,10 @@ export const WorkerCommand = Schema.Union(
   }),
   Schema.Struct({
     type: Schema.Literal("resolve-approval"),
-    requestId: Schema.Union(Schema.String, Schema.Number),
+    requestId: Schema.Union([Schema.String, Schema.Number]),
     decision: ApprovalDecision,
     optionId: Schema.optional(Schema.String),
-    answers: Schema.optional(
-      Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
-    ),
+    answers: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
   }),
   Schema.Struct({ type: Schema.Literal("shutdown") }),
   Schema.Struct({ type: Schema.Literal("get-usage"), requestId: Schema.String }),
@@ -41,11 +39,11 @@ export const WorkerCommand = Schema.Union(
     requestId: Schema.String,
     workspacePath: Schema.String,
   }),
-)
+])
 export type WorkerCommand = typeof WorkerCommand.Type
 export type ProviderWorkerInput = WorkerCommand | "probe-now"
 
-const Pid = Schema.Number.pipe(Schema.int(), Schema.positive())
+const Pid = Schema.Number.pipe(Schema.check(Schema.isInt()), Schema.check(Schema.isGreaterThan(0)))
 
 /** A worker's answer to `get-usage`: the usage, or why it could not be read. */
 export const UsageResult = Schema.Struct({
@@ -67,15 +65,13 @@ export const CommandsResult = Schema.Struct({
  * Everything a provider worker reports to the host. Runtime events carry the harness's native
  * payload untouched; the host and core project it later.
  */
-export const WorkerEvent = Schema.Union(
-  /** Settles one command; `error` explains a command the worker refused or could not deliver. */
+export const WorkerEvent = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("command-ack"),
     commandId: Schema.String,
     error: Schema.optional(Schema.String),
   }),
   Schema.Struct({ type: Schema.Literal("provider-status"), status: ProviderStatus }),
-  /** The harness is usable, with the models it offers. */
   Schema.Struct({
     type: Schema.Literal("provider-ready"),
     status: ProviderStatus,
@@ -108,7 +104,6 @@ export const WorkerEvent = Schema.Union(
   }),
   UsageResult,
   CommandsResult,
-  /** A harness process the worker started; the host stops it if the worker dies first. */
   Schema.Struct({ type: Schema.Literal("process-started"), pid: Pid }),
   Schema.Struct({ type: Schema.Literal("process-stopped"), pid: Pid }),
   Schema.Struct({
@@ -116,6 +111,6 @@ export const WorkerEvent = Schema.Union(
     message: Schema.String,
     raw: Schema.optional(Schema.Unknown),
   }),
-)
+])
 
 export type WorkerEvent = typeof WorkerEvent.Type

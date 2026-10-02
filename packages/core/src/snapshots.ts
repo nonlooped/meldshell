@@ -1,5 +1,5 @@
 import { readRows } from "./database/rows"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import type { AppSnapshot, Thread } from "@meldshell/contracts"
 import { Effect } from "effect"
 import { transaction } from "./database/transaction"

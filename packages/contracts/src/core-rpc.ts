@@ -1,5 +1,5 @@
-import { Schema } from "effect"
-import { Rpc, RpcGroup } from "@effect/rpc"
+import { Schema, Struct } from "effect"
+import { Rpc, RpcGroup } from "effect/rpc"
 import {
   AppSnapshot,
   RecordThreadInput,
@@ -33,7 +33,7 @@ import {
 } from "./models"
 import { CoreError } from "./errors"
 
-const snapshotRpc = <const Tag extends string, Payload extends Schema.Schema.Any>(
+const snapshotRpc = <const Tag extends string, Payload extends Schema.Top>(
   tag: Tag,
   payload: Payload,
 ) => Rpc.make(tag, { payload, success: AppSnapshot, error: CoreError })
@@ -65,7 +65,7 @@ export class CoreRpcs extends RpcGroup.make(
     Schema.Struct({
       threadId: Schema.String,
       workspaceId: Schema.String,
-      worktree: Schema.NullOr(ThreadWorktree.pipe(Schema.omit("state", "setup"))),
+      worktree: Schema.NullOr(ThreadWorktree.mapFields(Struct.omit(["state", "setup"]))),
     }),
   ),
   snapshotRpc(

@@ -1,4 +1,4 @@
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
   CoreProtocolError,
@@ -23,7 +23,7 @@ interface ScheduleRow {
   readonly created_at: string
 }
 
-const decodeCadence = Schema.decodeUnknownOption(Schema.parseJson(ScheduleCadence))
+const decodeCadence = Schema.decodeUnknownOption(Schema.fromJsonString(ScheduleCadence))
 
 /** A row whose cadence no longer decodes is left out rather than failing every listing. */
 const fromScheduleRow = (row: ScheduleRow): ScheduledPrompt[] =>

@@ -1,5 +1,5 @@
 import { readRows } from "./database/rows"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/sql/SqlClient"
 import { randomUUID } from "node:crypto"
 import {
   defaultReasoningEffort,

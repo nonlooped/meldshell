@@ -1,19 +1,18 @@
 import { logStartupTiming } from "./startup-timing"
-import { RpcClient } from "@effect/rpc"
-import { RpcClientError } from "@effect/rpc/RpcClientError"
-import type { FromServerEncoded } from "@effect/rpc/RpcMessage"
+import { RpcClient } from "effect/rpc"
+import { RpcClientDefect, RpcClientError } from "effect/rpc/RpcClientError"
+import type { FromServerEncoded } from "effect/rpc/RpcMessage"
 import { asRecord, CoreRpcs } from "@meldshell/contracts"
 import { HostPlatform } from "./platform"
-import { Deferred, Effect, Layer, Runtime } from "effect"
+import { FiberSet, Schema, Context, Deferred, Effect, Layer } from "effect"
 
 const protocolError = (message: string, cause?: unknown): RpcClientError =>
-  new RpcClientError({ reason: "Protocol", message, cause })
+  new RpcClientError({ reason: new RpcClientDefect({ message, cause }) })
 
 const makeHostProtocol = RpcClient.Protocol.make((writeResponse) =>
   Effect.gen(function* () {
     const platform = yield* HostPlatform
-    const runtime = yield* Effect.runtime<never>()
-    const runFork = Runtime.runFork(runtime)
+    const runFork = yield* FiberSet.makeRuntime<never>()
     const ready = yield* Deferred.make<void, RpcClientError>()
     const { child } = yield* Effect.acquireRelease(
       Effect.try({
@@ -40,6 +39,9 @@ const makeHostProtocol = RpcClient.Protocol.make((writeResponse) =>
         }),
     )
 
+    // One RPC client owns this worker. Capture its ID before sending: v4 starts the
+    // receive fiber lazily, so an immediate reply must be buffered for that ID.
+    let clientId = 0
     let didBecomeReady = false
     const onMessage = (message: unknown): void => {
       if (asRecord(message).type === "ready") {
@@ -48,13 +50,13 @@ const makeHostProtocol = RpcClient.Protocol.make((writeResponse) =>
         runFork(Deferred.succeed(ready, undefined))
         return
       }
-      runFork(writeResponse(message as FromServerEncoded))
+      runFork(writeResponse(clientId, message as FromServerEncoded))
     }
     const onExit = (code: number): void => {
       const error = protocolError(`MeldShell core exited with code ${code}.`)
       platform.onCoreExit?.()
       if (!didBecomeReady) runFork(Deferred.fail(ready, error))
-      runFork(writeResponse({ _tag: "ClientProtocolError", error }))
+      runFork(writeResponse(clientId, { _tag: "ClientProtocolError", error }))
     }
 
     child.on("message", onMessage)
@@ -68,20 +70,25 @@ const makeHostProtocol = RpcClient.Protocol.make((writeResponse) =>
     yield* Deferred.await(ready)
 
     return {
-      send: (request: unknown) =>
+      send: (id: number, request: unknown) =>
         Effect.try({
-          try: () => child.postMessage(request),
+          try: () => {
+            clientId = id
+            child.postMessage(request)
+          },
           catch: (cause) => protocolError("Could not send a request to MeldShell core.", cause),
         }),
       supportsAck: false,
       supportsTransferables: false,
+      codecFor: Schema.toCodecJson,
     }
   }),
 )
 
-const HostProtocolLive = Layer.scoped(RpcClient.Protocol, makeHostProtocol)
+const HostProtocolLive = Layer.effect(RpcClient.Protocol, makeHostProtocol)
 
-export class CoreClient extends Effect.Service<CoreClient>()("MeldShell/CoreClient", {
-  scoped: RpcClient.make(CoreRpcs),
-  dependencies: [HostProtocolLive],
-}) {}
+export class CoreClient extends Context.Service<CoreClient>()("MeldShell/CoreClient", {
+  make: RpcClient.make(CoreRpcs),
+}) {
+  static readonly layer = Layer.effect(this, this.make).pipe(Layer.provide(HostProtocolLive))
+}

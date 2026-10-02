@@ -2,21 +2,27 @@ import { Schema } from "effect"
 import { IPC, type TerminalSession } from "@meldshell/contracts/ipc"
 import { createTerminals } from "./terminals"
 
-const key = Schema.String.pipe(Schema.minLength(16), Schema.maxLength(100))
+const key = Schema.String.pipe(
+  Schema.check(Schema.isMinLength(16)),
+  Schema.check(Schema.isMaxLength(100)),
+)
 const dimensions = { cols: Schema.Number, rows: Schema.Number }
 const input = Schema.Struct({
   session: key,
   offsets: Schema.optional(
-    Schema.Record({
-      key: Schema.String,
-      value: Schema.Number.pipe(Schema.nonNegative(), Schema.int()),
-    }),
+    Schema.Record(
+      Schema.String,
+      Schema.Number.pipe(
+        Schema.check(Schema.isGreaterThanOrEqualTo(0)),
+        Schema.check(Schema.isInt()),
+      ),
+    ),
   ),
   id: Schema.optional(key),
   workspaceId: Schema.optional(Schema.String),
   threadId: Schema.optional(Schema.String),
   run: Schema.optional(Schema.String),
-  data: Schema.optional(Schema.String.pipe(Schema.maxLength(64 * 1024))),
+  data: Schema.optional(Schema.String.pipe(Schema.check(Schema.isMaxLength(64 * 1024)))),
   cols: Schema.optional(dimensions.cols),
   rows: Schema.optional(dimensions.rows),
 })

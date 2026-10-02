@@ -385,7 +385,7 @@ export const runCodexWorker = (
       },
       catch: toError,
     }).pipe(
-      Effect.catchAll((cause) =>
+      Effect.catch((cause) =>
         Effect.sync(() =>
           publishStatus({
             ...status,
