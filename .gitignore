@@ -66,3 +66,6 @@ CLAUDE.local.md
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# TesterArmy e2e reports and local replay state
+.e2e/

@@ -42,7 +42,7 @@ async function walkFiles(root: string): Promise<string[]> {
   return files
 }
 
-export function buildIndex(files: readonly string[]): WorkspaceIndex {
+function buildIndex(files: readonly string[]): WorkspaceIndex {
   const directories = new Set<string>()
   for (const file of files) {
     for (let slash = file.indexOf("/"); slash !== -1; slash = file.indexOf("/", slash + 1))
@@ -101,11 +101,7 @@ function score(query: string, path: string): number | null {
   return value - path.split("/").length * 2 - path.length / 100
 }
 
-export function searchIndex(
-  index: WorkspaceIndex,
-  query: string,
-  limit: number,
-): WorkspacePathMatch[] {
+function searchIndex(index: WorkspaceIndex, query: string, limit: number): WorkspacePathMatch[] {
   const normalized = query.replaceAll("\\", "/").replace(/^\.\//, "")
   const entries = [
     ...index.directories.map((path) => ({ path, directory: true })),

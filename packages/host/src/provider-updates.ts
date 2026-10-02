@@ -33,7 +33,7 @@ const RECHECK_INTERVAL = "4 hours"
 const INSTALL_TIMEOUT_MS = 10 * 60_000
 
 /** The `version` of an npm registry `latest` document. */
-export const npmVersion = (text: string): string | null => {
+const npmVersion = (text: string): string | null => {
   try {
     const version: unknown = JSON.parse(text).version
     return typeof version === "string" && version !== "" ? version : null
@@ -43,7 +43,7 @@ export const npmVersion = (text: string): string | null => {
 }
 
 /** The release the Cursor CLI installer script downloads; Cursor publishes no other feed. */
-export const cursorInstallerVersion = (text: string): string | null =>
+const cursorInstallerVersion = (text: string): string | null =>
   text.match(/downloads\.cursor\.com\/lab\/([^/"'\s]+)\//)?.[1] ?? null
 
 const LATEST_SOURCES: {
@@ -60,14 +60,14 @@ const LATEST_SOURCES: {
   cursor: { url: "https://cursor.com/install", parse: cursorInstallerVersion },
 }
 
-export type VersionOrder = "behind" | "current" | "ahead"
+type VersionOrder = "behind" | "current" | "ahead"
 
 /**
  * Orders two versions by their numeric parts, so `0.9.1 < 0.10.0` and Cursor's dated
  * `2026.09.23-86fc751` builds compare by date. Equal numbers with different text, such as two
  * Cursor builds from one day, read as behind: the published one is the newer build.
  */
-export const compareVersions = (installed: string, latest: string): VersionOrder => {
+const compareVersions = (installed: string, latest: string): VersionOrder => {
   const numbers = (version: string): number[] =>
     version
       .split(/[.-]/)
@@ -83,7 +83,7 @@ export const compareVersions = (installed: string, latest: string): VersionOrder
   return installed === latest ? "current" : "behind"
 }
 
-export interface UpdatePlan {
+interface UpdatePlan {
   readonly file: string
   readonly args: readonly string[]
   /** The command as a person would type it. */
@@ -92,7 +92,7 @@ export interface UpdatePlan {
 }
 
 /** How an install is updated: a command MeldShell can run, or an instruction it cannot. */
-export type UpdateResolution = { readonly plan: UpdatePlan } | { readonly manual: string }
+type UpdateResolution = { readonly plan: UpdatePlan } | { readonly manual: string }
 
 const brewUpgrade = (kind: "--cask" | "--formula", name: string): UpdateResolution => ({
   plan: { file: "brew", args: ["upgrade", kind, name], display: `brew upgrade ${kind} ${name}` },
@@ -110,7 +110,7 @@ const SELF_UPDATE: { readonly [Key in Harness]: string } = {
  * system's package manager and its privileges; everything else has a built-in updater that knows
  * its own install method, such as npm or the vendor's standalone installer.
  */
-export const planUpdate = (
+const planUpdate = (
   harness: Harness,
   executablePath: string,
   resolvedPath: string,
@@ -142,7 +142,7 @@ export const planUpdate = (
 }
 
 /** The last line a command printed, which updaters use for their summary. */
-export const lastLine = (result: Pick<CommandResult, "stdout" | "stderr">): string =>
+const lastLine = (result: Pick<CommandResult, "stdout" | "stderr">): string =>
   stripVTControlCharacters(`${result.stdout}\n${result.stderr}`)
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -163,7 +163,7 @@ export class ProviderUpdates extends Context.Tag("MeldShell/ProviderUpdates")<
 >() {}
 
 /** The outside world the service touches, replaceable in tests. */
-export interface UpdateDependencies {
+interface UpdateDependencies {
   readonly fetchText: (url: string) => Promise<string>
   readonly run: (plan: UpdatePlan) => Promise<CommandResult>
   readonly resolvePath: (path: string) => Promise<string>
@@ -195,7 +195,7 @@ interface InstallOutcome {
   readonly output: string
 }
 
-export const makeProviderUpdates = (
+const makeProviderUpdates = (
   deps: UpdateDependencies,
 ): Effect.Effect<
   ProviderUpdatesService,

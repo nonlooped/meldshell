@@ -8,7 +8,7 @@ import { LRUCache } from "lru-cache"
 import pLimit from "p-limit"
 
 // Only literal host addresses reach this policy; DNS answers and every redirect use it.
-export function publicAddress(address: string): boolean {
+function publicAddress(address: string): boolean {
   const family = isIP(address)
   if (family === 4) return new Address4(address).isGlobal()
   if (family === 6) return new Address6(address).isGlobal()
@@ -27,7 +27,7 @@ function pageUrl(value: string): URL | null {
   }
 }
 
-export function titleParser(onTitle: (title: string) => void): Parser {
+function titleParser(onTitle: (title: string) => void): Parser {
   let inside = false
   let title = ""
   let found = false

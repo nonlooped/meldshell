@@ -15,7 +15,7 @@ const { autoUpdater } = electronUpdater
 
 type StatusListener = (status: AppUpdateStatus) => void
 
-export class UpdateService {
+class UpdateService {
   readonly #updater: AppUpdater
   readonly #enabled: boolean
   readonly #currentVersion: string

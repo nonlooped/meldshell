@@ -28,7 +28,7 @@ export function providers(env: Env) {
   return { ...(google ? { google } : {}), ...(discord ? { discord } : {}) }
 }
 
-export function authOptions(env: Env) {
+function authOptions(env: Env) {
   const origin = env.BETTER_AUTH_URL
   const url = new URL(origin)
   if (url.origin !== origin)

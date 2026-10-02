@@ -8,8 +8,12 @@
   // pins cookie so Astro's prerender entry resolves its own major instead of the hoisted one.
   "ignoreDependencies": ["babel-plugin-react-compiler", "better-sqlite3", "cookie", "semver"],
   "workspaces": {
+    ".": {
+      "includeEntryExports": false,
+      "entry": ["e2e.config.ts", "tests/e2e/**/*.e2e.ts", "tests/*.test.*"]
+    },
     "apps/desktop": {
-      "entry": ["src/main/index.ts", "src/main/workers/*.ts", "src/**/*.test.mjs"],
+      "entry": ["src/main/index.ts", "src/main/workers/*.ts"],
       "project": ["src/**/*.{ts,tsx,mjs,css}"],
       // Imported through bundled workspace packages (host, providers); listing them keeps them
       // external and packaged. Core and provider-runtime are bundled workspace sources of the host.
@@ -21,7 +25,6 @@
         "@meldshell/core",
         "@meldshell/provider-runtime",
         "node-pty",
-        "cross-spawn",
         "which",
         "ws"
       ]
@@ -30,7 +33,6 @@
       "entry": ["src/index.ts", "src/desktop.ts", "src/worker.ts"]
     },
     "apps/control": {
-      "entry": ["test/*.test.ts"],
       // `cloudflare:workers` is a Workers runtime module, not a package.
       "ignoreDependencies": ["cloudflare"]
     },
@@ -39,7 +41,6 @@
       "entry": ["functions/**/*.ts"]
     },
     "packages/ui": {
-      "entry": ["src/**/*.test.mjs"],
       "project": ["src/**/*.{ts,tsx,mjs,css}"]
     },
     "packages/*": {

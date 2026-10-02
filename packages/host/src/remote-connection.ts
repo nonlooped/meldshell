@@ -12,7 +12,7 @@ import {
 import { readCredential, type DeviceCredential } from "./identity"
 
 /** Serializes a frame; results over the frame limit become an error for the same request. */
-export function frameText(frame: { type: string; id?: string; clientId?: string }) {
+function frameText(frame: { type: string; id?: string; clientId?: string }) {
   const text = JSON.stringify(frame)
   if (Buffer.byteLength(text) <= MAX_FRAME_BYTES) return text
   return JSON.stringify({

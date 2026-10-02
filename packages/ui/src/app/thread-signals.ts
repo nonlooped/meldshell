@@ -16,7 +16,7 @@ function chimeFor(before: Activity, activity: Activity): Chime | null {
 }
 
 /** Activity changes worth a signal. The first observation of a thread only seeds its state. */
-export function threadTransitions(
+function threadTransitions(
   previous: ReadonlyMap<string, Activity>,
   threads: ReadonlyArray<Pick<Thread, "id" | "activity">>,
 ): ReadonlyArray<{ readonly threadId: string; readonly chime: Chime }> {

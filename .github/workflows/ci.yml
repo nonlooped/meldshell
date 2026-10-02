@@ -32,6 +32,7 @@ jobs:
     outputs:
       static: ${{ steps.scope.outputs.static }}
       desktop: ${{ steps.scope.outputs.desktop }}
+      e2e: ${{ steps.scope.outputs.e2e }}
       site: ${{ steps.scope.outputs.site }}
       test: ${{ steps.scope.outputs.test }}
       windows: ${{ steps.scope.outputs.windows }}
@@ -106,15 +107,6 @@ jobs:
       - name: Build desktop
         if: needs.changes.outputs.desktop == 'true'
         run: npm run build
-      # Installs the payload the way the WSL bootstrap does, then drives the bundled host over its pipe.
-      - name: Test the bundled WSL host
-        if: needs.changes.outputs.desktop == 'true'
-        run: |
-          MELDSHELL_BUILD_WSL_HOST=1 npm run build:wsl-host --workspace=@meldshell/desktop
-          cp -R apps/desktop/out/wsl-host "$RUNNER_TEMP/wsl-host"
-          npm ci --prefix "$RUNNER_TEMP/wsl-host" --ignore-scripts --omit=optional
-          npm rebuild --prefix "$RUNNER_TEMP/wsl-host" node-pty --ignore-scripts=false
-          MELDSHELL_TEST_WSL_BUNDLE="$RUNNER_TEMP/wsl-host/desktop.js" node --import tsx --test tests/wsl-host.test.ts
       - name: Build website
         if: needs.changes.outputs.site == 'true'
         run: npm run build --workspace=@meldshell/site
@@ -139,3 +131,43 @@ jobs:
       - name: Test
         if: needs.changes.outputs.test == 'true'
         run: node scripts/ci-scope.mjs test
+
+  e2e:
+    name: End-to-end (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      E2E_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run install:electron
+      - run: npm run rebuild:native
+      - run: npm run typecheck:e2e
+      - run: npm run build
+      - name: Run journeys (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm test
+      - name: Run journeys (Windows)
+        if: runner.os == 'Windows'
+        run: npm test
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-${{ runner.os }}
+          path: .e2e/
+          if-no-files-found: ignore
+          retention-days: 7

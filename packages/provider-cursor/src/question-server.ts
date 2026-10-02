@@ -8,7 +8,7 @@ import { asRecord, asRecords, asText, type UnknownRecord } from "@meldshell/cont
  * equivalent over MCP. Each session gets an unguessable path on a loopback-only HTTP server that
  * speaks just enough of MCP's Streamable HTTP transport: JSON responses, no event stream.
  */
-export const QUESTION_TOOL = "ask_user_question"
+const QUESTION_TOOL = "ask_user_question"
 
 /** A question in the shape every MeldShell user-input request shares. */
 export interface ToolQuestion {
@@ -75,7 +75,7 @@ const toolDefinition = {
 } as const
 
 /** Reads the tool's arguments leniently: models sometimes send bare option strings. */
-export const toolQuestions = (args: unknown): ToolQuestion[] =>
+const toolQuestions = (args: unknown): ToolQuestion[] =>
   asRecords(asRecord(args).questions).flatMap((value, index) => {
     const question = asText(value.question).trim()
     if (!question) return []

@@ -59,9 +59,7 @@ export type Keybindings = Readonly<Record<ShortcutAction, string>>
 const isAction = (id: string): id is ShortcutAction => SHORTCUTS.some((entry) => entry.id === id)
 
 /** The chord for every action: its override when it has one, otherwise its default. */
-export function resolveKeybindings(
-  overrides: Readonly<Record<string, string>> | undefined,
-): Keybindings {
+function resolveKeybindings(overrides: Readonly<Record<string, string>> | undefined): Keybindings {
   const bindings = Object.fromEntries(SHORTCUTS.map((entry) => [entry.id, entry.chord])) as Record<
     ShortcutAction,
     string
@@ -145,7 +143,7 @@ export function chordFromEvent(event: ChordEvent): string | null {
 }
 
 /** Canonical spelling of a stored chord; null when it cannot be a chord. */
-export function normalizeChord(chord: string): string | null {
+function normalizeChord(chord: string): string | null {
   const trimmed = chord.trim()
   if (trimmed === "") return null
   // `Ctrl++` ends in the plus key, so split the key off before reading the modifiers.

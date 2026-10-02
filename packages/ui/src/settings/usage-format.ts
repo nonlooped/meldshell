@@ -27,7 +27,7 @@ export function windowLabel(minutes: number | null | undefined, fallback: string
 }
 
 /** Compact span such as "2h 14m" or "1d 4h", truncated toward zero. */
-export function durationLabel(ms: number): string {
+function durationLabel(ms: number): string {
   if (ms < MINUTE) return "<1m"
   const days = Math.floor(ms / DAY)
   const hours = Math.floor((ms % DAY) / HOUR)
