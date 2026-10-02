@@ -33,6 +33,6 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "cookie": "2.0.1",
-    "wrangler": "4.142.0"
+    "wrangler": "4.146.0"
   }
 }
