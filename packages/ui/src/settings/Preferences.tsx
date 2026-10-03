@@ -7,11 +7,10 @@ import { Toggle } from "@base-ui-components/react/toggle"
 import { ToggleGroup } from "@base-ui-components/react/toggle-group"
 import { CornerDownRight, ListPlus, ShieldAlert } from "lucide-react"
 import type { ReactNode } from "react"
-import { Button, Switch } from "../ui/controls"
+import { Switch } from "../ui/controls"
 import { cx, segmentClasses, segmentGroupClasses } from "../ui/styles"
 import { TEXT_SIZES, THEMES, ThemePreview } from "../ui/ThemePreview"
-import { useViewStore } from "../app/view-store"
-import { Environment } from "./Environment"
+import { SettingsGroup } from "./SettingsGroup"
 import { SettingRow } from "./SettingRow"
 
 type FollowUpMode = NonNullable<AppSettings["followUpMode"]>
@@ -185,7 +184,7 @@ export function Preferences({
   onChange,
   pending,
 }: {
-  readonly section: "general" | "appearance"
+  readonly section: "threads" | "appearance"
   readonly settings: AppSettings
   readonly onChange: (input: SetAppSettingsInput) => void
   readonly pending: boolean
@@ -201,72 +200,82 @@ export function Preferences({
       : 88)
   return (
     <section
-      className="settings-group m-0 border-t-[1px] border-t-[color:var(--line-subtle)] border-b-[1px] border-b-[color:var(--line-subtle)] [&_+_.settings-group]:border-t-0"
-      aria-label={section === "general" ? "General preferences" : "Appearance preferences"}
+      className="settings-group m-0"
+      aria-label={section === "threads" ? "Thread and agent preferences" : "Appearance preferences"}
     >
-      {section === "general" ? (
+      {section === "threads" ? (
         <>
-          <Environment />
-          <SettingRow
-            label="Always full permissions"
-            description={
-              fullPermissions ? (
-                <span className="inline-flex items-start gap-[6px] text-[var(--color-modified)]">
-                  <ShieldAlert
-                    size={13}
-                    strokeWidth={1.9}
-                    aria-hidden="true"
-                    className="flex-none mt-[3px]"
-                  />
-                  Every agent runs every tool without asking, and the composer hides its permission
-                  controls.
-                </span>
-              ) : (
-                "Skip every permission prompt for all agents, starting with the next turn."
-              )
-            }
-          >
-            <Switch
+          <SettingsGroup title="Permissions">
+            <SettingRow
               label="Always full permissions"
-              checked={fullPermissions}
-              disabled={pending}
-              onCheckedChange={(alwaysFullPermissions) => onChange({ alwaysFullPermissions })}
-            />
-          </SettingRow>
-          <SettingRow
-            label="Follow-ups while the agent works"
-            description={`${FOLLOW_UPS[followUpMode].detail} Ctrl or Cmd with Enter does the other.`}
-          >
-            <Segments<FollowUpMode>
+              description={
+                fullPermissions ? (
+                  <span className="inline-flex items-start gap-[6px] text-[var(--color-modified)]">
+                    <ShieldAlert
+                      size={13}
+                      strokeWidth={1.9}
+                      aria-hidden="true"
+                      className="flex-none mt-[3px]"
+                    />
+                    Every agent runs every tool without asking, and the composer hides its
+                    permission controls.
+                  </span>
+                ) : (
+                  "Skip every permission prompt for all agents, starting with the next turn."
+                )
+              }
+            >
+              <Switch
+                label="Always full permissions"
+                checked={fullPermissions}
+                disabled={pending}
+                onCheckedChange={(alwaysFullPermissions) => onChange({ alwaysFullPermissions })}
+              />
+            </SettingRow>
+          </SettingsGroup>
+          <SettingsGroup title="Sending messages">
+            <SettingRow
               label="Follow-ups while the agent works"
-              value={followUpMode}
-              disabled={pending}
-              options={FOLLOW_UP_OPTIONS}
-              onValueChange={(next) => onChange({ followUpMode: next })}
-            />
-          </SettingRow>
-          <SettingRow
-            label="Show archived threads"
-            description="Keep archived threads visible in the inbox. Search always includes them."
-          >
-            <Switch
+              description={`${FOLLOW_UPS[followUpMode].detail} Ctrl or Cmd with Enter does the other.`}
+            >
+              <Segments<FollowUpMode>
+                label="Follow-ups while the agent works"
+                value={followUpMode}
+                disabled={pending}
+                options={FOLLOW_UP_OPTIONS}
+                onValueChange={(next) => onChange({ followUpMode: next })}
+              />
+            </SettingRow>
+          </SettingsGroup>
+          <SettingsGroup title="Inbox">
+            <SettingRow
               label="Show archived threads"
-              checked={settings.showSettled ?? true}
-              disabled={pending}
-              onCheckedChange={(showSettled) => onChange({ showSettled })}
-            />
-          </SettingRow>
-          <SettingRow
-            label="Setup guide"
-            description="Check your agents, pick a project, and revisit the basics."
-          >
-            <Button onClick={() => useViewStore.getState().openOnboarding()}>
-              Run setup again
-            </Button>
-          </SettingRow>
+              description="Keep archived threads visible in the inbox. Search always includes them."
+            >
+              <Switch
+                label="Show archived threads"
+                checked={settings.showSettled ?? true}
+                disabled={pending}
+                onCheckedChange={(showSettled) => onChange({ showSettled })}
+              />
+            </SettingRow>
+          </SettingsGroup>
+          <SettingsGroup title="Notifications">
+            <SettingRow
+              label="Notification sounds"
+              description="Play a soft chime when a thread you aren't watching finishes or needs your attention."
+            >
+              <Switch
+                label="Notification sounds"
+                checked={settings.sounds ?? true}
+                disabled={pending}
+                onCheckedChange={(sounds) => onChange({ sounds })}
+              />
+            </SettingRow>
+          </SettingsGroup>
         </>
       ) : (
-        <>
+        <div className="border-t-[1px] border-t-[color:var(--line-subtle)] border-b-[1px] border-b-[color:var(--line-subtle)]">
           <SettingRow label="Theme" description="Choose a look, or follow your system." stacked>
             <RadioGroup
               aria-label="Theme"
@@ -329,18 +338,7 @@ export function Preferences({
               onCheckedChange={(reduceMotion) => onChange({ reduceMotion })}
             />
           </SettingRow>
-          <SettingRow
-            label="Sounds"
-            description="Play a soft chime when a thread you aren't watching finishes or needs your attention."
-          >
-            <Switch
-              label="Sounds"
-              checked={settings.sounds ?? true}
-              disabled={pending}
-              onCheckedChange={(sounds) => onChange({ sounds })}
-            />
-          </SettingRow>
-        </>
+        </div>
       )}
     </section>
   )

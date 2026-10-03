@@ -14,7 +14,7 @@ import {
 } from "../app/keybindings"
 import { Button, ChordKeys, ContextMenu, IconButton, MenuAction } from "../ui/controls"
 
-const GROUPS = ["Navigation", "Tabs", "Panels", "Workspace"] as const
+const GROUPS = ["Navigation", "Tabs", "Panels", "Workspace", "Input"] as const
 
 /** A message about one shortcut, shown under its row. `undo` restores the chords before a change. */
 interface RowNotice {
@@ -182,6 +182,8 @@ export function KeyboardSettings({
                   trigger={
                     <div
                       key={entry.id}
+                      data-setting-label={entry.label}
+                      tabIndex={-1}
                       className="group/shortcut [padding:8px_0] border-b-[1px] border-b-[color:var(--line-subtle)]"
                     >
                       <div className="flex min-h-[32px] items-center justify-between gap-[24px]">

@@ -22,7 +22,11 @@ export function SettingRow({
 }): React.JSX.Element {
   if (stacked)
     return (
-      <div className={cx(rowClasses, "flex-col gap-[14px]")}>
+      <div
+        data-setting-label={label}
+        tabIndex={-1}
+        className={cx(rowClasses, "flex-col gap-[14px]")}
+      >
         <div className="flex min-w-0 flex-col gap-[4px]">
           <span className={labelClasses}>{label}</span>
           <p className={descriptionClasses}>{description}</p>
@@ -32,6 +36,8 @@ export function SettingRow({
     )
   return (
     <Field.Root
+      data-setting-label={label}
+      tabIndex={-1}
       className={cx(
         rowClasses,
         "items-center gap-[32px] [@container(max-width:_540px)]:items-start [@container(max-width:_540px)]:flex-col [@container(max-width:_540px)]:gap-[12px]",

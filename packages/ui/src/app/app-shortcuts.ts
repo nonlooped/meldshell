@@ -38,7 +38,7 @@ export function handleAppShortcut(
   }
   const action = actionForEvent(event, bindings)
   if (action === null) return
-  if (action === "closeTab" && actions.selectedThreadId === null) return
+  if (action === "closeTab" && (actions.settingsOpen || actions.selectedThreadId === null)) return
   if (action === "archiveThread" && actions.toggleArchived === null) return
   if (action === "dictate" && actions.dictate === null) return
   event.preventDefault()

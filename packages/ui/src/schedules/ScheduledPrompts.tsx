@@ -3,13 +3,13 @@ import { AlarmClock, ArrowUpRight } from "lucide-react"
 import { useTabStore } from "../app/tab-store"
 import { useViewStore } from "../app/view-store"
 import { Button } from "../ui/controls"
-import { ScheduleList } from "../schedules/ScheduleList"
-import { useSchedules } from "../schedules/schedule-queries"
+import { ScheduleList } from "./ScheduleList"
+import { useSchedules } from "./schedule-queries"
 
 /** Every scheduled prompt, grouped by thread; the thread with the soonest run comes first. */
-export function ScheduleSettings({ snapshot }: { snapshot: AppSnapshot }): React.JSX.Element {
+export function ScheduledPrompts({ snapshot }: { snapshot: AppSnapshot }): React.JSX.Element {
   const query = useSchedules()
-  const closeSettings = useViewStore((state) => state.closeSettings)
+  const closeSchedules = useViewStore((state) => state.closeSchedules)
   const openThread = useTabStore((state) => state.openThread)
   const schedules = query.data ?? []
   const titles = new Map(snapshot.threads.map((thread) => [thread.id, thread.title]))
@@ -49,7 +49,7 @@ export function ScheduleSettings({ snapshot }: { snapshot: AppSnapshot }): React
                 variant="ghost"
                 icon={<ArrowUpRight size={13} />}
                 onClick={() => {
-                  closeSettings()
+                  closeSchedules()
                   openThread(threadId)
                 }}
               >

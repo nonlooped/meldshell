@@ -8,7 +8,7 @@ import { useMinuteClock, useSchedules } from "./schedule-queries"
 
 /**
  * The thread's scheduled prompts, folded into one line above its composer that opens into the full
- * list. One-time prompts that were sent leave the thread; Settings still lists them. Shows nothing
+ * list. One-time prompts that were sent leave the thread; the Scheduled prompts view still lists them. Shows nothing
  * while the thread has none.
  */
 export function ThreadSchedules({ threadId }: { threadId: string }): React.JSX.Element | null {
