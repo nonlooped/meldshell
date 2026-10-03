@@ -2,6 +2,7 @@ import { Tabs } from "@base-ui-components/react/tabs"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Collapsible } from "@base-ui-components/react/collapsible"
 import { CollapsiblePanel } from "../ui/motion"
+import { TreeSkeleton } from "../ui/Skeleton"
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import type { Thread, Workspace } from "@meldshell/contracts"
@@ -381,11 +382,12 @@ function Directory({
     staleTime: 5000,
     retry: false,
   })
-  if (query.isPending) return <PanelNote role="status">Loading files…</PanelNote>
+  if (query.isPending)
+    return <TreeSkeleton label="Loading files…" rows={depth === 0 ? undefined : 3} depth={depth} />
   if (query.isError) return <QueryError query={query} />
   return (
     <ul
-      className="shrink-0 [list-style:none] p-0 m-0"
+      className="motion-enter shrink-0 [list-style:none] p-0 m-0"
       role={depth === 0 ? "tree" : "group"}
       aria-label={path || "Workspace files"}
       onKeyDown={depth === 0 ? moveInTree : undefined}
