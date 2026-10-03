@@ -110,7 +110,10 @@ function FileChanges({
               tokens={tokens}
               widgets={notes?.widgets}
               gutterEvents={notes?.gutterEvents}
+              codeEvents={notes?.codeEvents}
               renderGutter={notes?.renderGutter}
+              selectedChanges={notes?.selectedChanges}
+              generateLineClassName={notes?.generateLineClassName}
               className={notes ? reviewableClasses : undefined}
             >
               {() => rendered}
@@ -184,8 +187,15 @@ export function ChangeDiff({
   )
 }
 
-// Line numbers take notes, so they read as clickable.
-const reviewableClasses = "[&_.diff-gutter]:cursor-pointer"
+// Line numbers take notes, so they read as clickable. Lines picked for a note take the accent, and
+// lines that already carry one keep an accent number.
+const reviewableClasses = [
+  "[&_.diff-gutter]:cursor-pointer [&_.diff-gutter]:select-none",
+  "[--diff-code-selected-background-color:color-mix(in_srgb,_var(--accent)_16%,_transparent)]",
+  "[--diff-gutter-selected-background-color:var(--diff-code-selected-background-color)]",
+  "[--diff-code-selected-text-color:var(--text-primary)] [--diff-gutter-selected-text-color:var(--accent)]",
+  "[&_.diff-noted_.diff-gutter]:text-[var(--accent)]! [&_.diff-noted_.diff-gutter]:font-semibold",
+].join(" ")
 
 const unchangedLines = (lines: number): string =>
   `${lines.toLocaleString()} unchanged ${lines === 1 ? "line" : "lines"}`

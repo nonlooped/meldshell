@@ -10,11 +10,11 @@ const note = (patch: Partial<ReviewNote>): ReviewNote => ({
   id: "note",
   anchor: "patch",
   path: "src/app.ts",
-  changeKey: "I3",
+  changeKeys: ["I3"],
+  startLine: 3,
   line: 3,
   side: "new",
-  kind: "insert",
-  code: "const answer = 42",
+  snippet: "+const answer = 42",
   body: "Name this after what it holds.",
   ...patch,
 })
@@ -31,17 +31,24 @@ test("one note becomes a follow-up that quotes its line", () => {
 
 test("notes are ordered by file and line, and removed lines say so", () => {
   const message = reviewNotesMessage([
-    note({ id: "b", path: "src/z.ts", line: 1, body: "Third" }),
+    note({ id: "b", path: "src/z.ts", startLine: 1, line: 1, body: "Third" }),
     note({
       id: "a",
+      startLine: 9,
       line: 9,
       side: "old",
-      kind: "delete",
-      changeKey: "D9",
-      code: "legacy()",
+      changeKeys: ["D9"],
+      snippet: "-legacy()",
       body: "Second",
     }),
-    note({ id: "c", line: 2, kind: "normal", changeKey: "N2", code: "keep()", body: "First" }),
+    note({
+      id: "c",
+      startLine: 2,
+      line: 2,
+      changeKeys: ["N2"],
+      snippet: " keep()",
+      body: "First",
+    }),
   ])
   assert.match(message, /^I left 3 review notes on your changes\. Please address each one\./)
   assert.ok(message.indexOf("First") < message.indexOf("Second"))
@@ -50,8 +57,27 @@ test("notes are ordered by file and line, and removed lines say so", () => {
   assert.match(message, /```diff\n keep\(\)\n```/)
 })
 
+test("a run of lines names its range and quotes every line", () => {
+  const message = reviewNotesMessage([
+    note({
+      startLine: 4,
+      line: 6,
+      changeKeys: ["D4", "I4", "N5", "I6"],
+      snippet: "-old()\n+fresh()\n keep()\n+more()",
+    }),
+  ])
+  assert.match(
+    message,
+    /\*\*src\/app\.ts:4-6\*\*\n```diff\n-old\(\)\n\+fresh\(\)\n keep\(\)\n\+more\(\)\n```/,
+  )
+  const removed = reviewNotesMessage([
+    note({ startLine: 7, line: 8, side: "old", snippet: "-a\n-b" }),
+  ])
+  assert.match(removed, /\*\*src\/app\.ts:7-8 \(removed lines\)\*\*/)
+})
+
 test("quoted code with backticks gets a longer fence", () => {
-  const message = reviewNotesMessage([note({ code: "const fence = '```'" })])
+  const message = reviewNotesMessage([note({ snippet: "+const fence = '```'" })])
   assert.match(message, /````diff\n\+const fence = '```'\n````/)
 })
 

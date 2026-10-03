@@ -3,7 +3,14 @@ import { MessageSquareText, SendHorizontal, X } from "lucide-react"
 import { useState } from "react"
 import { IconButton } from "../ui/controls"
 import { useMotionPreference } from "../ui/motion"
-import { noteLocation, useReviewNotes, useThreadReviewNotes, type ReviewNote } from "./review-notes"
+import { revealNote } from "../ui/DiffNotes"
+import {
+  noteLines,
+  noteLocation,
+  useReviewNotes,
+  useThreadReviewNotes,
+  type ReviewNote,
+} from "./review-notes"
 
 const rowButtonClasses =
   "grid w-[22px] h-[22px] flex-none p-0 border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover:not(:disabled)]:bg-[var(--surface-active)] [&:hover:not(:disabled)]:text-[var(--text-primary)] disabled:opacity-40"
@@ -17,12 +24,12 @@ const headerButtonClasses =
  */
 export function ReviewNotes({
   threadId,
-  disabled,
+  blocked,
   onSend,
 }: {
   threadId: string
-  /** Set while the agent cannot take a message. */
-  disabled: boolean
+  /** Why the agent cannot take a message right now, or null when it can. */
+  blocked: string | null
   /** Resolves once the follow-up is accepted; the notes stay if it fails. */
   onSend: (notes: ReadonlyArray<ReviewNote>) => Promise<void>
 }): React.JSX.Element | null {
@@ -71,7 +78,10 @@ export function ReviewNotes({
         <button
           type="button"
           className="motion-colors inline-flex items-center gap-[5px] h-[22px] [padding:0_8px] border-0 rounded-[var(--radius-sm)] bg-[var(--accent)] text-[var(--accent-foreground)] text-[11px] font-medium cursor-default [&:hover:not(:disabled)]:bg-[var(--accent-hover)] disabled:opacity-50"
-          disabled={disabled || sending}
+          disabled={blocked !== null || sending}
+          title={
+            blocked ?? `Send ${notes.length === 1 ? "this note" : "these notes"} as one message`
+          }
           onClick={() => void send()}
         >
           <SendHorizontal size={11} strokeWidth={2} aria-hidden="true" />
@@ -100,6 +110,7 @@ function NoteRow({
 }): React.JSX.Element {
   const reduced = useMotionPreference()
   const slash = note.path.lastIndexOf("/")
+  const [missing, setMissing] = useState(false)
   return (
     <motion.li
       layout={reduced ? false : "position"}
@@ -107,17 +118,22 @@ function NoteRow({
       animate={{ opacity: 1, height: "auto" }}
       exit={{ opacity: 0, height: reduced ? "auto" : 0 }}
       transition={{ duration: reduced ? 0 : 0.16 }}
+      aria-label={`Note on ${noteLocation(note)}`}
       className="flex min-w-0 items-center gap-[8px] [padding:3px_4px_3px_6px] rounded-[var(--radius)] overflow-hidden text-[12.5px] [&:hover]:bg-[var(--surface-active)]"
     >
-      <span
-        className="flex-none max-w-[40%] overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-secondary)] text-[11.5px] [font-family:var(--font-mono)]"
-        title={noteLocation(note)}
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-[8px] p-0 border-0 bg-transparent text-left cursor-default"
+        title={missing ? "Open the diff this note is on to see it there" : "Show this note"}
+        onClick={() => setMissing(!revealNote(note.id, reduced))}
       >
-        {note.path.slice(slash + 1)}:{note.line}
-      </span>
-      <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-primary)]">
-        {note.body.replace(/\s+/g, " ")}
-      </span>
+        <span className="flex-none max-w-[40%] overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-secondary)] text-[11.5px] [font-family:var(--font-mono)]">
+          {note.path.slice(slash + 1)}:{noteLines(note)}
+        </span>
+        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-primary)]">
+          {note.body.replace(/\s+/g, " ")}
+        </span>
+      </button>
       <IconButton
         unstyled
         className={rowButtonClasses}

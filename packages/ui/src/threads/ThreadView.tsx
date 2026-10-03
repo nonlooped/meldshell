@@ -168,7 +168,13 @@ export function ThreadView({
             <>
               <ReviewNotes
                 threadId={thread.id}
-                disabled={!providerReady || thread.worktree?.setup === "running"}
+                blocked={
+                  !providerReady
+                    ? "The agent is unavailable, so notes cannot be sent yet"
+                    : thread.worktree?.setup === "running"
+                      ? "Notes can be sent once the worktree is set up"
+                      : null
+                }
                 onSend={sendNotes}
               />
               <QueuedMessages

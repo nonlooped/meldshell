@@ -10,7 +10,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Queued messages are listed above the composer, where each can be edited, sent now to steer the running turn, or removed, with a Clear all for the lot. Each queued message now starts as its own turn instead of being merged into one, and a queue left behind by an interrupted or failed turn waits for you to send it rather than showing only a count.
 
-- Notes on diff lines. Click a line number in a turn's changes, a diff in the transcript, or a Changes tab diff to leave a note under that line, or right-click a line and choose Add note on this line. Notes collect above the thread's composer, where Send to agent turns them into one follow-up that quotes each line with its file and line number, following the usual queue or steer setting while the agent works. Notes can be edited or deleted in place, and a Changes tab diff shows how many are waiting and opens their thread.
+- Notes on diff lines. Click a line number in a turn's changes, a diff in the transcript, or a Changes tab diff to leave a note under that line, drag down the line numbers or Shift-click to cover several lines, or right-click a line and choose Add note on this line. Lines with a note keep an accent line number. Notes collect above the thread's composer, where clicking one scrolls to it and Send to agent turns them all into one follow-up that quotes each line or range with its file and line numbers, following the usual queue or steer setting while the agent works. Notes can be edited or deleted in place, and a Changes tab diff shows how many are waiting and opens their thread.
 
 ### Changed
 
