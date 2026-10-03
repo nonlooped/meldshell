@@ -106,7 +106,10 @@ test("a Claude Code transcript splits into turns at each message the user typed"
   )
   assert.match(JSON.stringify(edit?.params), /@@ -1,1 \+1,1 @@\\n-1\\n\+2/)
   const reply = command?.events.find((event) => event.method === "item/completed")
-  assert.equal((reply?.params as { item: { text: string } } | undefined)?.item.text, "Set model to opus")
+  assert.equal(
+    (reply?.params as { item: { text: string } } | undefined)?.item.text,
+    "Set model to opus",
+  )
   assert.deepEqual(
     turns.map((turn) => turn.events.at(-1)?.method),
     ["turn/completed", "turn/completed", "turn/completed"],
