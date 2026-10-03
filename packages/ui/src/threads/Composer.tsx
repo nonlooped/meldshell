@@ -6,6 +6,7 @@ import { Notice } from "../ui/Notice"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { ComposerAttachment } from "@meldshell/contracts/ipc"
 import {
+  HARNESSES,
   type AppSnapshot,
   type CollaborationMode,
   type FollowUpDelivery,
@@ -13,12 +14,16 @@ import {
   type SandboxMode,
   type SetThreadSettingsInput,
 } from "@meldshell/contracts"
+import { knownHarness } from "../data/providers"
 import {
   AlarmClock,
   ChevronDown,
   Eye,
   ImageIcon,
   FolderPen,
+  Hammer,
+  ListChecks,
+  MessageCircleQuestion,
   MicOff,
   Paperclip,
   RefreshCw,
@@ -31,12 +36,10 @@ import {
   type LucideProps,
 } from "lucide-react"
 import { effortLabel, resolveSelection, selectableModels } from "../data/catalog"
-import { harnessModes, MODES, permissionOptions } from "./composer-options"
 import { workspaceScope } from "../data/workspace-scope"
 import { FileIcon } from "../ui/FileIcon"
 import { ImageLightbox } from "../ui/MarkdownBlocks"
-import { ModelPicker } from "./ModelPicker"
-import { LoadoutMenu } from "./LoadoutMenu"
+import { ModelPickerWithLoadouts } from "./LoadoutPicker"
 import { useComposerCompletion } from "./ComposerCompletion"
 import type { ComposerToken } from "./composer-completion"
 import { dropText, launchFromText } from "../ui/flight"
@@ -104,6 +107,17 @@ const otherDelivery = (delivery: FollowUpDelivery): FollowUpDelivery =>
 const MODIFIER_KEY = window.meldshell.platform === "darwin" ? "⌘" : "Ctrl"
 
 const SPEED_LABEL = { standard: "Standard", fast: "Fast" } as const
+const SANDBOX_LABEL: Readonly<Record<SandboxMode, string>> = {
+  "read-only": "Read only",
+  "workspace-write": "Workspace write",
+  "danger-full-access": "Full access",
+}
+
+const SANDBOX_HINT: Readonly<Record<SandboxMode, string>> = {
+  "read-only": "Reads anything; asks before changing files",
+  "workspace-write": "Edits this workspace; asks to go further",
+  "danger-full-access": "No sandbox: any file, any command, network",
+}
 
 const LevelIcon = ({ index, count }: { index: number; count: number }): React.JSX.Element => {
   const activeBars = count <= 1 ? 2 : 1 + Math.round((index / (count - 1)) * 3)
@@ -441,6 +455,114 @@ function ReasoningSettings({
 
 type ModelSelection = NonNullable<ReturnType<typeof resolveSelection>>
 
+const MODES: Readonly<
+  Record<CollaborationMode, { label: string; hint: string; icon: typeof Hammer }>
+> = {
+  default: { label: "Agent", hint: "Works through the task and makes changes", icon: Hammer },
+  plan: { label: "Plan", hint: "Proposes a plan before changing anything", icon: ListChecks },
+  ask: {
+    label: "Ask",
+    hint: "Answers questions without making changes",
+    icon: MessageCircleQuestion,
+  },
+}
+
+/** The modes a harness offers; one with only the default mode offers no choice. */
+const harnessModes = (harness: string): readonly CollaborationMode[] => {
+  const { modes } = HARNESSES[knownHarness(harness)]
+  return modes.length > 1 ? modes : []
+}
+
+function permissionOptions(selection: ModelSelection) {
+  const isClaude = selection.provider.harness === "claude-code"
+  const isCursor = selection.provider.harness === "cursor"
+  const toolPermissions = isClaude || isCursor
+  const permissionLabels = isClaude
+    ? { ask: "Manual", deny: "Don’t ask", full: "Bypass permissions" }
+    : { ask: "Ask Every Time", deny: "Deny requests (custom)", full: "Run Everything" }
+  const options: Array<{
+    id: string
+    label: string
+    hint: string
+    sandbox: SandboxMode
+    approvalPolicy: "on-request" | "never"
+  }> = toolPermissions
+    ? [
+        ...(isClaude
+          ? [
+              {
+                id: "read",
+                label: "Read tools only (custom)",
+                hint: "Reads, searches, and browses; never edits or runs commands",
+                sandbox: "read-only" as const,
+                approvalPolicy: "on-request" as const,
+              },
+            ]
+          : []),
+        {
+          id: "ask",
+          label: permissionLabels.ask,
+          hint: isClaude ? "Asks before edits and commands" : "Asks before each tool runs",
+          sandbox: "workspace-write",
+          approvalPolicy: "on-request",
+        },
+        ...(isClaude
+          ? [
+              {
+                id: "edits",
+                label: "Accept edits",
+                hint: "Edits files freely; asks before commands",
+                sandbox: "danger-full-access" as const,
+                approvalPolicy: "on-request" as const,
+              },
+            ]
+          : []),
+        {
+          id: "deny",
+          label: permissionLabels.deny,
+          hint: isClaude
+            ? "Runs only tools you already allowed; never asks"
+            : "Declines anything that needs approval",
+          sandbox: "workspace-write",
+          approvalPolicy: "never",
+        },
+        {
+          id: "full",
+          label: permissionLabels.full,
+          hint: "Runs everything without asking",
+          sandbox: "danger-full-access",
+          approvalPolicy: "never",
+        },
+      ]
+    : (Object.keys(SANDBOX_LABEL) as SandboxMode[]).map((sandbox) => ({
+        id: sandbox,
+        label: SANDBOX_LABEL[sandbox],
+        hint: SANDBOX_HINT[sandbox],
+        sandbox,
+        approvalPolicy: "on-request",
+      }))
+  const selected = isCursor
+    ? options.find(
+        (option) =>
+          option.id ===
+          (selection.approvalPolicy === "never"
+            ? selection.sandbox === "danger-full-access"
+              ? "full"
+              : "deny"
+            : "ask"),
+      )!
+    : toolPermissions
+      ? (options.find(
+          (option) =>
+            option.sandbox === selection.sandbox &&
+            option.approvalPolicy === selection.approvalPolicy,
+        ) ??
+        options.find((option) => option.sandbox === selection.sandbox) ??
+        options.find((option) => option.id === "ask")!)
+      : options.find((option) => option.sandbox === selection.sandbox)!
+  return { isClaude, toolPermissions, options, selected }
+}
+
 function ComposerSettings({
   snapshot,
   threadId,
@@ -465,18 +587,12 @@ function ComposerSettings({
   const visible = selectableModels(snapshot).filter((model) => !model.hidden)
   return (
     <>
-      <LoadoutMenu
+      <ModelPickerWithLoadouts
         snapshot={snapshot}
         threadId={threadId}
         selection={selection}
-        onChangeSettings={onChangeSettings}
-      />
-
-      <ModelPicker
-        providers={snapshot.providers}
         models={visible}
-        selected={selection.model}
-        onSelect={(modelId) => onChangeSettings({ threadId, modelId })}
+        onChangeSettings={onChangeSettings}
       />
 
       <ReasoningSettings

@@ -397,8 +397,8 @@ export type FollowUpDelivery = typeof FollowUpDelivery.Type
 export const MAX_LOADOUTS = 5
 
 /**
- * A saved composer setup: the agent (through its model), reasoning effort, speed, mode, and
- * permissions. Applying one sets all of them on a thread at once.
+ * A saved composer setup: the agent (through its model), reasoning effort, and speed. Applying one
+ * sets all of them on a thread at once and leaves its mode and permissions alone.
  */
 export const Loadout = Schema.Struct({
   id: Schema.String.pipe(Schema.check(Schema.isMaxLength(64))),
@@ -406,9 +406,6 @@ export const Loadout = Schema.Struct({
   modelId: Schema.String.pipe(Schema.check(Schema.isMaxLength(256))),
   reasoningEffort: Schema.NullOr(ReasoningEffort.pipe(Schema.check(Schema.isMaxLength(32)))),
   speed: ModelSpeed,
-  mode: CollaborationMode,
-  sandbox: SandboxMode,
-  approvalPolicy: ApprovalPolicy,
 })
 
 export type Loadout = typeof Loadout.Type

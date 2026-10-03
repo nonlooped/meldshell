@@ -4,7 +4,7 @@ import type { AppSnapshot, Loadout, SetAppSettingsInput } from "@meldshell/contr
 import { LOADOUT_ACTIONS, useKeybindings } from "../app/keybindings"
 import { Button, ChordKeys, IconButton, PanelNote, TextField } from "../ui/controls"
 import {
-  describeSelection,
+  describeLoadout,
   loadoutSelection,
   moveLoadout,
   renameLoadout,
@@ -59,7 +59,6 @@ export function LoadoutSettings({
   readonly onChange: (input: SetAppSettingsInput) => void
 }): React.JSX.Element {
   const loadouts = snapshot.settings.loadouts ?? []
-  const fullPermissions = snapshot.settings.alwaysFullPermissions ?? false
   const bindings = useKeybindings((state) => state.bindings)
   const [removed, setRemoved] = useState<{
     readonly name: string
@@ -70,9 +69,10 @@ export function LoadoutSettings({
   return (
     <section className="max-w-[720px]">
       <p className="[margin:0_0_20px] text-[var(--text-secondary)] text-[12px] leading-[1.6]">
-        A loadout remembers an agent, model, reasoning effort, and permissions together. Save one
-        from the loadout menu at the start of the composer, then switch a thread to it from that
-        menu or with its shortcut. The order here sets which shortcut each one uses.
+        A loadout remembers an agent, model, and reasoning effort together. Save one from the foot
+        of the composer's model picker, then switch a thread to it from there or with its shortcut.
+        A thread keeps its own mode and permissions. The order here sets which shortcut each one
+        uses.
       </p>
       {loadouts.length === 0 ? (
         <PanelNote>
@@ -104,7 +104,7 @@ export function LoadoutSettings({
                   >
                     {selection === null
                       ? "Its model is turned off or removed. Turn it back on in Providers to use this loadout."
-                      : describeSelection(selection, fullPermissions)}
+                      : describeLoadout(selection)}
                   </span>
                 </span>
                 <span className="flex flex-none items-center gap-[2px]">

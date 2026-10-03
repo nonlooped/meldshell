@@ -13,7 +13,7 @@ import { handleAppShortcut } from "../packages/ui/src/app/app-shortcuts.ts"
 import { actionForEvent, useKeybindings } from "../packages/ui/src/app/keybindings.ts"
 import {
   activeLoadout,
-  describeSelection,
+  describeLoadout,
   loadoutFromSelection,
   loadoutSelection,
   loadoutSettings,
@@ -81,37 +81,27 @@ const loadout = (id: string, patch: Partial<Loadout> = {}): Loadout => ({
   ...patch,
 })
 
-test("a loadout saves the composer setup and applies all of it", () => {
-  const saved = loadoutFromSelection(selection(), "  Careful plan  ", "one")
-  assert.equal(saved.name, "Careful plan")
+test("a loadout saves the model and effort and applies only those", () => {
+  const saved = loadoutFromSelection(selection(), "  Deep work  ", "one")
+  assert.equal(saved.name, "Deep work")
+  // Mode and permissions stay as each thread has them.
   assert.deepEqual(loadoutSettings(saved, "other"), {
     threadId: "other",
     modelId: "opus",
     reasoningEffort: "high",
     speed: "standard",
-    mode: "plan",
-    sandbox: "danger-full-access",
-    approvalPolicy: "on-request",
   })
 })
 
-test("the active loadout is the one that matches every setting", () => {
+test("the active loadout is the one that matches model, effort, and speed", () => {
   const matching = loadout("match")
   const otherEffort = loadout("effort", { reasoningEffort: "low" })
   assert.equal(activeLoadout([otherEffort, matching], selection())?.id, "match")
   assert.equal(activeLoadout([otherEffort], selection()), undefined)
 })
 
-test("a loadout reads in the composer's words", () => {
-  assert.equal(
-    describeSelection(selection(), false),
-    "Claude · Claude Opus 4.5 · High effort · Plan · Accept edits",
-  )
-  // The always-full setting replaces every permission choice, so the line leaves it out.
-  assert.equal(
-    describeSelection(selection(), true),
-    "Claude · Claude Opus 4.5 · High effort · Plan",
-  )
+test("a loadout reads as its agent, model, and effort", () => {
+  assert.equal(describeLoadout(selection()), "Claude · Claude Opus 4.5 · High effort")
 })
 
 test("a loadout whose model was turned off cannot be applied", () => {

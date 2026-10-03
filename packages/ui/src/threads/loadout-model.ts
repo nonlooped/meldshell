@@ -6,37 +6,34 @@ import {
 } from "@meldshell/contracts"
 import { effortLabel, selectableModels, type Selection } from "../data/catalog"
 import { modelLabel } from "../data/model-label"
-import { harnessModes, MODES, permissionOptions } from "./composer-options"
 
 /*
- * Loadouts save a thread's composer setup so one shortcut can bring it back. The agent follows from
- * the model, so a loadout names the model and everything the composer offers beside it.
+ * Loadouts save which agent and model a thread uses, with its reasoning effort and speed, so one
+ * shortcut can bring them back. The agent follows from the model. Mode and permissions stay as the
+ * thread has them.
  */
 
-const LOADOUT_FIELDS = [
-  "modelId",
-  "reasoningEffort",
-  "speed",
-  "mode",
-  "sandbox",
-  "approvalPolicy",
-] as const
+const LOADOUT_FIELDS = ["modelId", "reasoningEffort", "speed"] as const
 
-export const loadoutFromSelection = (selection: Selection, name: string, id: string): Loadout => ({
+/** The part of a composer selection a loadout saves. */
+export type LoadoutChoice = Pick<Selection, "provider" | "model" | "reasoningEffort" | "speed">
+
+export const loadoutFromSelection = (
+  selection: LoadoutChoice,
+  name: string,
+  id: string,
+): Loadout => ({
   id,
   name: name.trim().slice(0, 48),
   modelId: selection.model.id,
   reasoningEffort: selection.reasoningEffort,
   speed: selection.speed,
-  mode: selection.mode,
-  sandbox: selection.sandbox,
-  approvalPolicy: selection.approvalPolicy,
 })
 
 /** The loadout the composer is set to, if any. */
 export const activeLoadout = (
   loadouts: ReadonlyArray<Loadout>,
-  selection: Selection,
+  selection: LoadoutChoice,
 ): Loadout | undefined => {
   const current = loadoutFromSelection(selection, "", "")
   return loadouts.find((loadout) => LOADOUT_FIELDS.every((key) => loadout[key] === current[key]))
@@ -47,13 +44,10 @@ export const loadoutSettings = (loadout: Loadout, threadId: string): SetThreadSe
   modelId: loadout.modelId,
   reasoningEffort: loadout.reasoningEffort,
   speed: loadout.speed,
-  mode: loadout.mode,
-  sandbox: loadout.sandbox,
-  approvalPolicy: loadout.approvalPolicy,
 })
 
 /** The composer setup a loadout describes, or null once its model can no longer run turns. */
-export const loadoutSelection = (snapshot: AppSnapshot, loadout: Loadout): Selection | null => {
+export const loadoutSelection = (snapshot: AppSnapshot, loadout: Loadout): LoadoutChoice | null => {
   const model = selectableModels(snapshot).find((candidate) => candidate.id === loadout.modelId)
   const provider = snapshot.providers.find((entry) => entry.id === model?.providerId)
   if (model === undefined || provider === undefined) return null
@@ -62,34 +56,22 @@ export const loadoutSelection = (snapshot: AppSnapshot, loadout: Loadout): Selec
     model,
     reasoningEffort: loadout.reasoningEffort,
     speed: loadout.speed,
-    mode: loadout.mode,
-    sandbox: loadout.sandbox,
-    approvalPolicy: loadout.approvalPolicy,
   }
 }
 
-/** One line naming what a loadout sets, as in `Claude · Opus 4.5 · High effort · Accept edits`. */
-export const describeSelection = (selection: Selection, fullPermissions: boolean): string => {
-  const { model, provider } = selection
+/** One line naming what a loadout sets, as in `Claude · Opus 4.5 · High effort`. */
+export const describeLoadout = ({ model, provider, reasoningEffort, speed }: LoadoutChoice) => {
   const parts = [provider.displayName, modelLabel(model.displayName)]
-  if (
-    selection.reasoningEffort !== null &&
-    model.reasoningEfforts.includes(selection.reasoningEffort)
-  )
-    parts.push(`${effortLabel(selection.reasoningEffort)} effort`)
-  if (selection.speed === "fast" && model.supportsFast) parts.push("Fast")
-  if (selection.mode !== "default" && harnessModes(provider.harness).includes(selection.mode))
-    parts.push(MODES[selection.mode].label)
-  // Pi has no permission system, and the always-full setting overrides every loadout's choice.
-  if (!fullPermissions && provider.harness !== "pi")
-    parts.push(permissionOptions(selection).selected.label)
+  if (reasoningEffort !== null && model.reasoningEfforts.includes(reasoningEffort))
+    parts.push(`${effortLabel(reasoningEffort)} effort`)
+  if (speed === "fast" && model.supportsFast) parts.push("Fast")
   return parts.join(" · ")
 }
 
 /** A first name for a new loadout: its model and effort, numbered if that name is taken. */
 export const suggestedLoadoutName = (
   loadouts: ReadonlyArray<Loadout>,
-  selection: Selection,
+  selection: LoadoutChoice,
 ): string => {
   const effort =
     selection.reasoningEffort === null ? "" : ` ${effortLabel(selection.reasoningEffort)}`

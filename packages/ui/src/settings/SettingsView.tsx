@@ -116,7 +116,7 @@ const SECTIONS: ReadonlyArray<{
     label: "Loadouts",
     icon: <Layers size={16} strokeWidth={1.75} />,
     title: "Loadouts",
-    caption: "Switch agent, model, effort, and permissions together with one shortcut.",
+    caption: "Switch agent, model, and effort together with one shortcut.",
   },
   {
     id: "schedules",
