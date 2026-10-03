@@ -3,7 +3,6 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk"
 import { SqliteClient } from "@effect/sql-sqlite-node"
 import * as SqlClient from "effect/sql/SqlClient"
 import { Effect, Schema } from "effect"
@@ -30,7 +29,8 @@ test("Claude tool, task, and compaction events survive the core JSON codec", () 
     encodeEvent(runtimeEvent(method, params))
     emitted.push({ method, params })
   })
-  const accept = (message: unknown) => events.accept(message as SDKMessage)
+  const accept = (message: unknown) =>
+    events.accept(message as Parameters<ClaudeEvents["accept"]>[0])
   for (const [name, input] of [
     ["Bash", { command: "printf probe" }],
     ["PowerShell", { command: "Write-Output probe", cwd: "C:/workspace" }],
