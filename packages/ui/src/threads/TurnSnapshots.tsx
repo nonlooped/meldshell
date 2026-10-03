@@ -1,10 +1,10 @@
-import { createContext, useContext, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { History, Undo2, X } from "lucide-react"
+import { Check, CircleAlert, History, Undo2, X } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { TurnSnapshot } from "@meldshell/contracts/ipc"
-import { AppDialog, Button, IconButton, MenuAction } from "../ui/controls"
-import { PopPresence } from "../ui/motion"
+import { IconButton, MenuAction } from "../ui/controls"
+import { GradientSpinner, PopPresence, Swap } from "../ui/motion"
 import { queryKeys } from "../data/cache"
 
 type SnapshotPoint = "before" | "after"
@@ -12,16 +12,16 @@ type SnapshotPoint = "before" | "after"
 interface Restore {
   readonly turnId: string
   readonly point: SnapshotPoint
-  /** The turn's first prompt, so the dialog and the result can say which turn it was. */
-  readonly prompt: string
 }
 
 interface SnapshotScope {
   readonly workspaceId: string
   readonly threadId: string
-  /** The thread's latest turn is still running, so its folder cannot be restored. */
-  readonly running: boolean
-  readonly request: (restore: Restore) => void
+  /** A turn is running or a restore is in flight, so the folder cannot be restored now. */
+  readonly busy: boolean
+  /** The snapshot the folder was last restored to, while that restore can still be undone. */
+  readonly restored: Restore | null
+  readonly restore: (restore: Restore) => void
 }
 
 const SnapshotContext = createContext<SnapshotScope | null>(null)
@@ -48,29 +48,26 @@ export function useTurnSnapshot(turnId: string, complete: boolean): TurnSnapshot
   return query.data
 }
 
-const excerpt = (text: string) => {
-  const line = text.trim().split("\n")[0] ?? ""
-  return line.length > 60 ? `${line.slice(0, 57).trimEnd()}…` : line
-}
-
-/** The hover action on a turn's prompt that returns the files to just before it was sent. */
+/** Rewinds the thread's files to just before a turn. Restores are undoable, so nothing asks first. */
 export function RestoreBeforeButton({
   turnId,
-  prompt,
   snapshot,
+  className,
 }: {
   readonly turnId: string
-  readonly prompt: string
   readonly snapshot: TurnSnapshot | undefined
+  /** Standard icon-button styling when absent; the message actions row styles its own. */
+  readonly className?: string
 }): React.JSX.Element | null {
   const scope = useContext(SnapshotContext)
   if (scope === null || snapshot?.before !== true) return null
   return (
     <IconButton
-      unstyled
-      label="Restore files to before this message"
-      disabled={scope.running}
-      onClick={() => scope.request({ turnId, point: "before", prompt })}
+      unstyled={className === undefined}
+      className={className}
+      label="Restore files to before this turn"
+      disabled={scope.busy}
+      onClick={() => scope.restore({ turnId, point: "before" })}
     >
       <History size={13} />
     </IconButton>
@@ -80,24 +77,22 @@ export function RestoreBeforeButton({
 /** Context menu entries for a turn's snapshots. */
 export function SnapshotMenuActions({
   turnId,
-  prompt,
   snapshot,
 }: {
   readonly turnId: string
-  readonly prompt: string
   readonly snapshot: TurnSnapshot | undefined
 }): React.JSX.Element | null {
   const scope = useContext(SnapshotContext)
-  if (scope === null || snapshot === undefined || scope.running) return null
+  if (scope === null || snapshot === undefined || scope.busy) return null
   return (
     <>
       {snapshot.before && (
-        <MenuAction onClick={() => scope.request({ turnId, point: "before", prompt })}>
+        <MenuAction onClick={() => scope.restore({ turnId, point: "before" })}>
           Restore files to before this turn
         </MenuAction>
       )}
       {snapshot.after && (
-        <MenuAction onClick={() => scope.request({ turnId, point: "after", prompt })}>
+        <MenuAction onClick={() => scope.restore({ turnId, point: "after" })}>
           Restore files to the end of this turn
         </MenuAction>
       )}
@@ -105,9 +100,79 @@ export function SnapshotMenuActions({
   )
 }
 
+const markerClasses = [
+  "flex items-center gap-[8px] text-[var(--accent)] text-[11px] font-medium",
+  "[&::before]:content-[''] [&::before]:flex-1 [&::before]:h-[1px] [&::before]:bg-[var(--accent)] [&::before]:opacity-[0.35]",
+  "[&::after]:content-[''] [&::after]:flex-1 [&::after]:h-[1px] [&::after]:bg-[var(--accent)] [&::after]:opacity-[0.35]",
+].join(" ")
+
+/** A line across the transcript where the files now stand, so a restore shows where it landed. */
+export function RestoredMarker({
+  turnId,
+  point,
+}: {
+  readonly turnId: string
+  readonly point: SnapshotPoint
+}): React.JSX.Element | null {
+  const restored = useContext(SnapshotContext)?.restored
+  if (restored?.turnId !== turnId || restored.point !== point) return null
+  return (
+    <div className={markerClasses} role="note">
+      <History size={12} aria-hidden="true" />
+      Files restored to here
+    </div>
+  )
+}
+
+const pillClasses = [
+  "pointer-events-auto flex items-center gap-[8px] max-w-full [padding:4px_4px_4px_12px]",
+  "[box-shadow:var(--shadow-raised)] border-[1px] border-[color:var(--line-strong)] rounded-[999px]",
+  "bg-[var(--surface-menu)] text-[var(--text-primary)] text-[12px]",
+].join(" ")
+const pillButtonClasses = [
+  "motion-colors inline-flex items-center gap-[5px] shrink-0 h-[24px] [padding:0_10px] border-0",
+  "rounded-[999px] bg-[var(--surface-hover)] text-[var(--text-primary)] text-[12px] cursor-pointer",
+  "[&:hover]:bg-[var(--surface-active)] [&:disabled]:opacity-[0.5]",
+].join(" ")
+const dismissClasses = [
+  "motion-colors grid place-items-center w-[24px] h-[24px] shrink-0 border-0 rounded-[999px]",
+  "bg-transparent text-[var(--text-tertiary)] cursor-pointer",
+  "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]",
+].join(" ")
+
+type Status =
+  | { readonly state: "restoring" }
+  | { readonly state: "restored"; readonly restore: Restore }
+  | { readonly state: "undone" }
+  | { readonly state: "failed"; readonly message: string }
+
+const statusText = (status: Status) =>
+  status.state === "restoring"
+    ? "Restoring files…"
+    : status.state === "undone"
+      ? "Restore undone"
+      : status.state === "failed"
+        ? status.message
+        : "Files restored"
+
+function StatusIcon({ status }: { readonly status: Status }): React.JSX.Element {
+  return (
+    <Swap id={status.state}>
+      {status.state === "restoring" ? (
+        <GradientSpinner size={12} />
+      ) : status.state === "failed" ? (
+        <CircleAlert size={14} className="text-[var(--color-deleted)]" aria-hidden="true" />
+      ) : (
+        <Check size={14} className="text-[var(--color-added)]" aria-hidden="true" />
+      )}
+    </Swap>
+  )
+}
+
 /**
- * Owns restoring a thread's files to a turn snapshot: it confirms the restore, runs it, and then
- * offers to undo it until the next restore, a new turn, or a dismissal.
+ * Owns restoring a thread's files to a turn snapshot. A restore runs at once, because the current
+ * files are saved first, and a pill reports it with an Undo until the next restore, a new turn, or
+ * a dismissal.
  */
 export function TurnSnapshots({
   workspaceId,
@@ -122,126 +187,84 @@ export function TurnSnapshots({
   readonly children: ReactNode
 }): React.JSX.Element {
   const client = useQueryClient()
-  const [pending, setPending] = useState<Restore | null>(null)
-  const [restored, setRestored] = useState<Restore | null>(null)
+  const [status, setStatus] = useState<Status | null>(null)
   const refresh = () => client.invalidateQueries({ queryKey: queryKeys.turnSnapshots(threadId) })
+  const fail = (cause: Error) => setStatus({ state: "failed", message: cause.message })
   const restore = useMutation({
     mutationFn: (input: Restore) =>
-      window.meldshell.restoreTurnSnapshot({
-        workspaceId: workspaceId!,
-        threadId,
-        turnId: input.turnId,
-        point: input.point,
-      }),
-    onSuccess: (_, input) => {
-      setPending(null)
-      setRestored(input)
-    },
+      window.meldshell.restoreTurnSnapshot({ workspaceId: workspaceId!, threadId, ...input }),
+    onMutate: () => setStatus({ state: "restoring" }),
+    onSuccess: (_, input) => setStatus({ state: "restored", restore: input }),
+    onError: fail,
     onSettled: refresh,
   })
   const undo = useMutation({
     mutationFn: () => window.meldshell.undoSnapshotRestore({ workspaceId: workspaceId!, threadId }),
-    onSuccess: () => setRestored(null),
+    onSuccess: () => setStatus({ state: "undone" }),
+    onError: fail,
     onSettled: refresh,
   })
   // A new turn changes the files again, so the restore it followed is no longer the latest state.
   const [wasRunning, setWasRunning] = useState(running)
   if (running !== wasRunning) {
     setWasRunning(running)
-    if (running) setRestored(null)
+    if (running) setStatus(null)
   }
-  const before = pending?.point === "before"
+  // A finished undo fades on its own; a restore waits for its Undo and a failure for its reader.
+  useEffect(() => {
+    if (status?.state !== "undone") return
+    const timer = window.setTimeout(() => setStatus(null), 2400)
+    return () => window.clearTimeout(timer)
+  }, [status])
   if (workspaceId === undefined) return <>{children}</>
+  const pending = restore.isPending || undo.isPending
   return (
     <SnapshotContext
       value={{
         workspaceId,
         threadId,
-        running,
-        request: (input) => {
-          restore.reset()
-          setPending(input)
-        },
+        busy: running || pending,
+        restored: status?.state === "restored" ? status.restore : null,
+        restore: (input) => restore.mutate(input),
       }}
     >
       {children}
       <div className="absolute z-[2] bottom-[52px] inset-x-[16px] flex justify-center pointer-events-none">
-        <PopPresence show={restored !== null && !running}>
-          <div
-            role="status"
-            className="pointer-events-auto flex items-center gap-[10px] max-w-full [box-shadow:var(--shadow-raised)] [padding:5px_6px_5px_12px] border-[1px] border-[color:var(--line-strong)] rounded-[999px] bg-[var(--surface-menu)] text-[var(--text-secondary)] text-[12px]"
-          >
-            <History size={14} aria-hidden="true" className="shrink-0" />
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-              {restored?.point === "after"
-                ? "Files restored to the end of "
-                : "Files restored to before "}
-              <span className="text-[var(--text-primary)]">
-                “{excerpt(restored?.prompt ?? "")}”
+        <PopPresence show={status !== null}>
+          {status !== null && (
+            <div role="status" className={pillClasses}>
+              <StatusIcon status={status} />
+              <span
+                className="min-w-0 max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap"
+                title={status.state === "failed" ? status.message : undefined}
+              >
+                {statusText(status)}
               </span>
-            </span>
-            {undo.isError && (
-              <span className="text-[var(--color-deleted)]" title={undo.error.message}>
-                Undo failed
-              </span>
-            )}
-            <BaseButton
-              type="button"
-              disabled={undo.isPending}
-              onClick={() => undo.mutate()}
-              className="motion-colors inline-flex items-center gap-[5px] shrink-0 [padding:3px_9px] border-0 rounded-[999px] bg-[var(--surface-hover)] text-[var(--text-primary)] text-[12px] cursor-pointer [&:hover]:bg-[var(--surface-active)] [&:disabled]:opacity-[0.5]"
-            >
-              <Undo2 size={13} aria-hidden="true" />
-              Undo
-            </BaseButton>
-            <IconButton
-              unstyled
-              label="Dismiss"
-              onClick={() => setRestored(null)}
-              className="motion-colors grid place-items-center w-[22px] h-[22px] shrink-0 border-0 rounded-[999px] bg-transparent text-[var(--text-tertiary)] cursor-pointer [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
-            >
-              <X size={13} />
-            </IconButton>
-          </div>
+              {status.state === "restored" && (
+                <BaseButton
+                  type="button"
+                  disabled={pending}
+                  onClick={() => undo.mutate()}
+                  className={pillButtonClasses}
+                >
+                  <Undo2 size={13} aria-hidden="true" />
+                  Undo
+                </BaseButton>
+              )}
+              {status.state !== "restoring" && (
+                <IconButton
+                  unstyled
+                  label="Dismiss"
+                  onClick={() => setStatus(null)}
+                  className={dismissClasses}
+                >
+                  <X size={13} />
+                </IconButton>
+              )}
+            </div>
+          )}
         </PopPresence>
       </div>
-      <AppDialog
-        alert
-        open={pending !== null}
-        onOpenChange={(open) => {
-          if (!open && !restore.isPending) setPending(null)
-        }}
-        title={
-          before ? "Restore files to before this turn?" : "Restore files to the end of this turn?"
-        }
-        actions={
-          <>
-            <Button disabled={restore.isPending} onClick={() => setPending(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              disabled={restore.isPending}
-              onClick={() => pending && restore.mutate(pending)}
-            >
-              {restore.isPending ? "Restoring…" : "Restore files"}
-            </Button>
-          </>
-        }
-      >
-        <p>
-          {before
-            ? "The thread's folder returns to how it was when you sent "
-            : "The thread's folder returns to how it was when the agent finished "}
-          <span className="text-[var(--text-primary)]">“{excerpt(pending?.prompt ?? "")}”</span>.
-          {before ? " This turn's changes and every later one are undone." : ""}
-        </p>
-        <p>
-          Your current files are saved first, so you can undo this. The conversation stays as it is,
-          and ignored files are left alone.
-        </p>
-        {restore.isError && <p role="alert">{restore.error.message}</p>}
-      </AppDialog>
     </SnapshotContext>
   )
 }

@@ -29,6 +29,7 @@ import { ChangeDiff } from "../ui/ChangeDiff"
 import { TurnChanges } from "./TurnChanges"
 import {
   RestoreBeforeButton,
+  RestoredMarker,
   SnapshotMenuActions,
   TurnSnapshots,
   useTurnSnapshot,
@@ -617,10 +618,19 @@ function TurnRow({
 }): React.JSX.Element {
   const reduced = useMotionPreference()
   const snapshot = useTurnSnapshot(turn.id, turn.complete)
-  const prompt = turn.userMessages[0] ? fallbackText(turn.userMessages[0]) : ""
-  const snapshotMenu = <SnapshotMenuActions turnId={turn.id} prompt={prompt} snapshot={snapshot} />
+  const snapshotMenu = <SnapshotMenuActions turnId={turn.id} snapshot={snapshot} />
   const changes = turn.complete && (
-    <TurnChanges events={turn.workingEvents} patch={snapshot?.patch ?? null} />
+    <TurnChanges
+      events={turn.workingEvents}
+      patch={snapshot?.patch ?? null}
+      action={
+        <RestoreBeforeButton
+          turnId={turn.id}
+          snapshot={snapshot}
+          className={turnChangesActionClasses}
+        />
+      }
+    />
   )
   const sources = sourceTitles([
     ...turn.workingEvents.map((event) => event.payload),
@@ -635,6 +645,7 @@ function TurnRow({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: settle }}
         >
+          <RestoredMarker turnId={turn.id} point="before" />
           {turn.userMessages.map((event, index) => (
             <Message
               key={event.id}
@@ -642,11 +653,7 @@ function TurnRow({
               arrivingIn={entering && !reduced && index === 0 ? threadId : undefined}
               flash={index === 0 ? flash : undefined}
               onQuote={onQuote}
-              actions={
-                index === 0 && (
-                  <RestoreBeforeButton turnId={turn.id} prompt={prompt} snapshot={snapshot} />
-                )
-              }
+              actions={index === 0 && <RestoreBeforeButton turnId={turn.id} snapshot={snapshot} />}
               menu={index === 0 && snapshotMenu}
               className={
                 "[&_>_.message-actions]:justify-end [&_>_.event-markdown]:[padding:12px_16px] [&_>_.event-markdown]:border-[1px] [&_>_.event-markdown]:border-[color:var(--line-subtle)] [&_>_.event-markdown]:rounded-[var(--radius-lg)] [&_>_.event-markdown]:bg-[var(--surface-hover)] [&_>_.event-markdown]:text-[var(--text-primary)] w-[fit-content] max-w-[min(78%,_680px)] ml-[auto] relative [&_>_.message-actions]:absolute [&_>_.message-actions]:bottom-[0] [&_>_.message-actions]:right-[calc(100%_+_4px)] [&_>_.message-actions]:mt-[0] [&_>_.message-actions]:flex-row-reverse [&_>_.message-actions]:flex-nowrap [&_>_.message-actions]:whitespace-nowrap"
@@ -682,6 +689,7 @@ function TurnRow({
               onAnswer={onAnswer}
             />
           )}
+          <RestoredMarker turnId={turn.id} point="after" />
         </motion.article>
       </MarkdownStreaming>
     </MarkdownSources>
@@ -879,6 +887,12 @@ export function Transcript({
     </MarkdownWorkspace>
   )
 }
+
+const turnChangesActionClasses = [
+  "motion-colors grid place-items-center w-[24px] h-[24px] ml-[auto] border-0 rounded-[var(--radius-sm)]",
+  "bg-transparent text-[var(--text-tertiary)] cursor-pointer",
+  "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)] [&:disabled]:opacity-[0.4]",
+].join(" ")
 
 const workingSectionClasses = [
   "message-actions select-none flex items-center flex-wrap gap-[4px] min-h-[28px] mt-[4px] opacity-[0]",
