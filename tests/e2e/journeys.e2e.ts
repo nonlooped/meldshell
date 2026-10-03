@@ -104,6 +104,7 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     const workspace = await desktop.addWorkspace()
     const page = desktop.page
     await page.getByRole("button", { name: /^Settings/ }).click()
+    await page.getByRole("tab", { name: "App & updates", exact: true }).click()
     await page.getByRole("button", { name: "Run setup again", exact: true }).click()
     const guide = page.getByRole("main", { name: "Set up MeldShell", exact: true })
     await guide.getByRole("button", { name: "Get started", exact: true }).click()
@@ -129,6 +130,7 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     // The app stays inert behind the guide, so reaching Settings after a restart proves it stayed away.
     await desktop.restart()
     await desktop.page.getByRole("button", { name: /^Settings/ }).click({ timeout: 30_000 })
+    await desktop.page.getByRole("tab", { name: "App & updates", exact: true }).click()
     await desktop.page.getByRole("button", { name: "Run setup again", exact: true }).waitFor()
     expect(await desktop.page.getByRole("main", { name: "Set up MeldShell" }).count()).toBe(0)
   })

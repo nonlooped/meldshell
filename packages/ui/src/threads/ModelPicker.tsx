@@ -131,7 +131,9 @@ export function ModelPicker({
                 )}
               </Combobox.List>
               <Combobox.Empty className="[margin:8px_12px] text-[11px] text-[var(--text-secondary)]">
-                {search ? "No matching models." : "Enable a model in Settings > Providers."}
+                {search
+                  ? "No matching models."
+                  : "Enable a model in Settings > Providers & models."}
               </Combobox.Empty>
             </div>
           </Combobox.Popup>

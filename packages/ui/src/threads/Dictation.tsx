@@ -196,7 +196,14 @@ export function DictationButton({
   const shortcut = useKeybindings((state) => state.bindings.dictate)
   const client = useQueryClient()
   const reduced = useMotionPreference()
-  const [phase, setPhase] = useState<Phase>("idle")
+  const [phase, setPhaseState] = useState<Phase>("idle")
+  // Read synchronously, so a second click or shortcut before the next render cannot start another
+  // recording and leave the first one holding the microphone.
+  const phaseRef = useRef<Phase>("idle")
+  const setPhase = (next: Phase) => {
+    phaseRef.current = next
+    setPhaseState(next)
+  }
   const [recording, setRecording] = useState<Recording | null>(null)
   // Callbacks outlive renders while audio is in flight, so they read the latest draft here.
   const latest = useRef({ draft, onDraftChange, onError })
@@ -252,14 +259,14 @@ export function DictationButton({
   }
 
   const start = async () => {
-    if (phase !== "idle" || disabled) return
+    if (phaseRef.current !== "idle" || disabled) return
     onError(null)
-    // The first recording also fetches the model, so it is ready by the time speech ends.
-    if (status.data !== undefined && status.data.state !== "ready")
-      void window.meldshell
-        .prepareDictation()
-        .then((next) => client.setQueryData(statusQuery.queryKey, next))
-        .catch(() => undefined)
+    // The host loads the model while the person speaks, and fetches it on first use, so it is
+    // ready by the time speech ends.
+    void window.meldshell
+      .prepareDictation()
+      .then((next) => client.setQueryData(statusQuery.queryKey, next))
+      .catch(() => undefined)
     setPhase("starting")
     try {
       const next = await startRecording(() => void finish(true))
@@ -273,7 +280,7 @@ export function DictationButton({
   }
 
   const toggle = () => {
-    if (phase === "recording") void finish(true)
+    if (phaseRef.current === "recording") void finish(true)
     else void start()
   }
   const toggleRef = useRef(toggle)

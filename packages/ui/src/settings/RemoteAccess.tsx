@@ -158,7 +158,7 @@ function LinkedComputer({
           Open devices page
         </Button>
       </SettingRow>
-      <SettingRow label="Account" description={state.account?.email ?? "Signed in"}>
+      <SettingRow label="MeldShell account" description={state.account?.email ?? "Signed in"}>
         {signOut}
       </SettingRow>
     </>
@@ -230,7 +230,7 @@ export function RemoteAccess() {
             {signIn("Sign in again")}
           </Controls>
         </SettingRow>
-        <SettingRow label="Account" description={state.account?.email ?? "Signed in"}>
+        <SettingRow label="MeldShell account" description={state.account?.email ?? "Signed in"}>
           {signOut}
         </SettingRow>
       </>
@@ -240,33 +240,6 @@ export function RemoteAccess() {
     <>
       <section className={groupClasses} aria-label="Account and devices">
         {rows}
-        {window.meldshell.hostControl && (
-          <SettingRow
-            label="Host process"
-            description="Restart or shut down MeldShell on this computer. Running work will be interrupted."
-          >
-            <Controls>
-              <Button
-                onClick={() => {
-                  void window.meldshell
-                    .hostControl!.restart()
-                    .catch((cause) => window.alert(messageFor(cause)))
-                }}
-              >
-                Restart host
-              </Button>
-              <Button
-                onClick={() => {
-                  void window.meldshell
-                    .hostControl!.shutdown()
-                    .catch((cause) => window.alert(messageFor(cause)))
-                }}
-              >
-                Shut down host
-              </Button>
-            </Controls>
-          </SettingRow>
-        )}
       </section>
       {error && (
         <p

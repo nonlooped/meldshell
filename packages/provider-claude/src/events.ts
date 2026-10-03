@@ -22,10 +22,22 @@ type TaskMessage = Extract<
 /** What started a task. A shell task belongs to the main agent; only subagents nest under their call. */
 const taskOrigin = (message: TaskMessage, previous: Record<string, unknown> | undefined) => {
   const taskType = ("task_type" in message ? message.task_type : undefined) ?? previous?.taskType
-  return "tool_use_id" in message && taskType !== "local_bash"
-    ? { taskType, parentToolUseId: message.tool_use_id }
-    : { taskType }
+  return {
+    ...(taskType === undefined ? {} : { taskType }),
+    ...("tool_use_id" in message && message.tool_use_id !== undefined && taskType !== "local_bash"
+      ? { parentToolUseId: message.tool_use_id }
+      : {}),
+  }
 }
+
+const compactionOutcome = (
+  message: Extract<SystemMessage, { subtype: "status" | "compact_boundary" }>,
+) =>
+  message.subtype === "status"
+    ? message.compact_error === undefined
+      ? {}
+      : { error: message.compact_error }
+    : { result: message.compact_metadata }
 
 export class ClaudeEvents {
   private readonly messages = new Map<string, string>()
@@ -179,7 +191,7 @@ export class ClaudeEvents {
       Object.assign(item, {
         type: "commandExecution",
         command: display(input.command),
-        cwd: input.cwd,
+        ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
       })
     if (["Edit", "Write", "NotebookEdit"].includes(block.name))
       Object.assign(item, {
@@ -218,8 +230,8 @@ export class ClaudeEvents {
         status: block.is_error ? "failed" : "completed",
         text: `${item?.tool ?? "Tool"}\n${output}`,
         aggregatedOutput: output,
-        result: message.tool_use_result,
-        contentItems: block.content,
+        ...(message.tool_use_result === undefined ? {} : { result: message.tool_use_result }),
+        ...(block.content === undefined ? {} : { contentItems: block.content }),
       },
     })
 
@@ -354,9 +366,7 @@ export class ClaudeEvents {
           type: "contextCompaction",
           text: failed ? "Context compaction failed" : "Context compacted",
           status: failed ? "failed" : "completed",
-          ...(message.subtype === "status"
-            ? { error: message.compact_error }
-            : { result: message.compact_metadata }),
+          ...compactionOutcome(message),
         },
       })
       // The status and boundary messages can both describe the same compaction.

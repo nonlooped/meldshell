@@ -4,9 +4,17 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+
+- Dictation warms a downloaded speech model when recording starts and prevents repeated clicks from starting overlapping recordings. The stop control remains clickable during its transition.
+
+- Claude Code turns no longer stop after tool calls or fail to finish in WSL because absent optional event fields were rejected by the host's JSON protocol. Tool results, approvals, and turn completion now omit those fields while preserving native data.
+
 ### Added
 
 - Search file contents across the workspace with Ctrl+Shift+F. It opens a Search tab in the files sidebar (starting from any selected text), with toggles to match case and to use a regular expression. Results are grouped by file with each match highlighted, and clicking a line opens the file there. The search covers the thread's own worktree when it has one, skips ignored, binary, and very large files, and runs in the background so the app stays responsive.
+
+- Settings search finds preferences, shortcuts, and providers and opens their location. A Default editor selector makes the existing Open in editor preference explicit.
 
 - Source Control can open a pull request once a branch has commits. Create pull request shows the base and branch with the commits it carries, pushes anything unpushed, and writes a title and description from the branch's commits and diff (following the repository's pull request template when it has one). You can edit both, preview the description as Markdown, and create it as a draft with Ctrl or Cmd and Enter. The pull request then shows above the composer and in Source Control with a bar of its checks, its review state, and merge conflicts, refreshing while checks run. Expanding it lists each check with a link to its run and each reviewer, and a draft can be marked ready for review from there. This uses the GitHub CLI (gh) signed in on the computer running MeldShell.
 
@@ -20,7 +28,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Messages sent while the agent is working can now queue or steer. Enter follows a new default in Settings (queue), Ctrl or Cmd with Enter does the other, and a menu beside the send button picks either for one message or changes the default. Steering goes into the same turn on Codex, and stops the turn and continues with your message on Claude Code and Cursor.
 
-- Dictate into the composer. The microphone beside the send button, or Ctrl+Shift+D, records while a live level meter and timer run; stop and what you said is written at the caret, or press Escape to throw it away. It works the same on a phone through remote access, because the host transcribes. Speech becomes text with a Whisper model that runs on the host computer, so dictation is free, needs no account or key, and recordings never leave it. The model downloads once from Hugging Face the first time you dictate (Fast is 77 MB; Accurate, 250 MB, catches more technical words), and Settings > Dictation picks it or fetches it ahead of time.
+- Dictate into the composer. The microphone beside the send button, or Ctrl+Shift+D, records while a live level meter and timer run; stop and what you said is written at the caret, or press Escape to throw it away. It works the same on a phone through remote access, because the host transcribes. Speech becomes text with a Whisper model that runs on the host computer, so dictation is free, needs no account or key, and recordings never leave it. The model downloads once from Hugging Face the first time you dictate (Fast is 77 MB; Accurate, 250 MB, catches more technical words), and Settings > Keyboard & dictation > Dictation picks it or fetches it ahead of time.
 
 - Queued messages are listed above the composer, where each can be edited, sent now to steer the running turn, or removed, with a Clear all for the lot. Each queued message now starts as its own turn instead of being merged into one, and a queue left behind by an interrupted or failed turn waits for you to send it rather than showing only a count.
 
@@ -29,6 +37,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Agents can use the browser preview. Claude Code, Codex, and Cursor threads get browser tools to open pages, read them, click, type, press keys, scroll, wait for text, run JavaScript, and take screenshots, all in the thread's own preview so you can watch. While an agent works there, the preview is framed in the accent color, a label names its last action, and each click ripples where it landed. A thread that is not on screen keeps working in a hidden page that the preview picks up when you open the thread. Read-only threads, WSL, and remote hosts go without these tools.
 
 ### Changed
+
+- Settings now has six categories: Threads & agents, Appearance, Keyboard & dictation, Providers & models, Account & devices, and App & updates. Thread behavior and notification sounds are grouped together; dictation and subscription usage have dedicated views within their related categories. Runtime, setup, host controls, and app updates share App & updates, with a Stable/Nightly release-channel selector. Scheduled prompts has its own workspace view beside Settings in the inbox.
 
 - Choices show instead of tell. Settings picks a theme from small previews of each look, sets transcript text size with a row of Aa samples, and switches follow-ups between Queue and Steer with the explanation for only the chosen one. The composer's mode and permission menus say in one line what each choice does, and a turn's changed files each carry a small added/removed bar, with long lists folding after the first five files. Provider cards name their version and how many models are shown while closed, and each model's visibility is three icons instead of a menu. The schedule dialog previews the next few runs, a turn's working log folds runs of reads or searches into one line, and Always full permissions turns its description into a warning while it is on.
 

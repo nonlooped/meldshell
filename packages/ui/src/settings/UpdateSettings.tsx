@@ -1,6 +1,6 @@
 import { errorMessage, type AppUpdateStatus } from "@meldshell/contracts"
 import { useEffect, useState } from "react"
-import { Button, Switch } from "../ui/controls"
+import { Button, SelectField } from "../ui/controls"
 
 const buttonLabel = (status: AppUpdateStatus | null): string => {
   if (status === null) return "Loading..."
@@ -55,10 +55,10 @@ export function UpdateSettings(): React.JSX.Element {
     }
   }
 
-  const setNightly = async (nightly: boolean): Promise<void> => {
+  const setChannel = async (channel: "stable" | "nightly"): Promise<void> => {
     setActionError(null)
     try {
-      setStatus(await window.meldshell.setUpdateChannel(nightly ? "nightly" : "stable"))
+      setStatus(await window.meldshell.setUpdateChannel(channel))
     } catch (cause) {
       setActionError(errorMessage(cause, "Could not change the update channel."))
     }
@@ -66,7 +66,11 @@ export function UpdateSettings(): React.JSX.Element {
 
   return (
     <>
-      <div className="mt-[22px] flex items-start justify-between gap-[32px]">
+      <div
+        data-setting-label="MeldShell updates"
+        tabIndex={-1}
+        className="flex flex-wrap items-start justify-between gap-[16px]"
+      >
         <div className="min-w-0">
           <h3 className="m-0 text-[13px] font-medium text-[var(--text-primary)]">Updates</h3>
           <p
@@ -94,22 +98,32 @@ export function UpdateSettings(): React.JSX.Element {
         </Button>
       </div>
       {status !== null && !unavailable && (
-        <div className="mt-[18px] flex items-start justify-between gap-[32px]">
+        <div
+          data-setting-label="Release channel"
+          tabIndex={-1}
+          className="mt-[18px] flex flex-wrap items-start justify-between gap-[16px]"
+        >
           <div className="min-w-0">
             <h3 className="m-0 text-[13px] font-medium text-[var(--text-primary)]">
-              Nightly builds
+              Release channel
             </h3>
             <p className="[margin:5px_0_0] text-[12px] text-[var(--text-tertiary)]">
-              Get an early build of new changes every hour. Nightlies are less tested than the daily
-              stable releases. Turning this off returns to the latest stable release.
+              Stable releases arrive daily. Nightly builds include new changes every hour and are
+              less tested. Choosing Stable returns to the latest stable release.
             </p>
           </div>
-          <Switch
-            label="Nightly builds"
-            checked={status.channel === "nightly"}
-            disabled={busy}
-            onCheckedChange={(nightly) => void setNightly(nightly)}
-          />
+          <div className="w-[220px] shrink-0">
+            <SelectField
+              label="Release channel"
+              value={status.channel}
+              options={[
+                { value: "stable", label: "Stable" },
+                { value: "nightly", label: "Nightly" },
+              ]}
+              disabled={busy}
+              onValueChange={(channel) => void setChannel(channel)}
+            />
+          </div>
         </div>
       )}
     </>
