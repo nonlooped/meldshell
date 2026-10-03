@@ -37,6 +37,7 @@ import {
   useTurnSnapshot,
 } from "./TurnSnapshots"
 import { HandoffMarker } from "./Handoff"
+import { TurnScreenshots } from "./TurnScreenshots"
 import { ToolOutput } from "./ToolOutput"
 import { fileChangePatches } from "./file-change-diffs"
 import { toolDetails } from "./tool-details"
@@ -623,17 +624,20 @@ function TurnRow({
   const snapshot = useTurnSnapshot(turn.id, turn.complete)
   const snapshotMenu = <SnapshotMenuActions turnId={turn.id} snapshot={snapshot} />
   const changes = turn.complete && (
-    <TurnChanges
-      events={turn.workingEvents}
-      patch={snapshot?.patch ?? null}
-      action={
-        <RestoreBeforeButton
-          turnId={turn.id}
-          snapshot={snapshot}
-          className={turnChangesActionClasses}
-        />
-      }
-    />
+    <>
+      <TurnScreenshots events={turn.workingEvents} />
+      <TurnChanges
+        events={turn.workingEvents}
+        patch={snapshot?.patch ?? null}
+        action={
+          <RestoreBeforeButton
+            turnId={turn.id}
+            snapshot={snapshot}
+            className={turnChangesActionClasses}
+          />
+        }
+      />
+    </>
   )
   const sources = sourceTitles([
     ...turn.workingEvents.map((event) => event.payload),

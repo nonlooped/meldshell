@@ -73,6 +73,7 @@ export function selectChecks(files, full = false, entries = workspaces()) {
     ? [
         "tests/ci-scope.test.mjs",
         "tests/markdown-blocks.test.ts",
+        "tests/file-previews.test.ts",
         "tests/onboarding.test.ts",
         "tests/dictation.test.ts",
         "tests/claude-provider.test.mts",
@@ -80,6 +81,7 @@ export function selectChecks(files, full = false, entries = workspaces()) {
         "tests/pull-requests.test.ts",
         "tests/issues.test.ts",
         "tests/review-notes.test.ts",
+        "tests/loadouts.test.ts",
         ...releaseTests,
       ]
     : release

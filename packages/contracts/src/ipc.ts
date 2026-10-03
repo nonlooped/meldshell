@@ -96,7 +96,7 @@ export interface WorkspacePathMatch {
   readonly directory: boolean
 }
 export interface FilePreview {
-  readonly kind: "text" | "markdown" | "html" | "image" | "unsupported"
+  readonly kind: "text" | "markdown" | "html" | "image" | "video" | "unsupported"
   readonly content: string
 }
 

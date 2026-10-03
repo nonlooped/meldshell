@@ -2,14 +2,21 @@ import { SourceCode } from "../ui/SourceCode"
 import { useQuery } from "@tanstack/react-query"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import type { FilePreview } from "@meldshell/contracts/ipc"
 import type { FileTab } from "../app/tab-store"
 import { useTabStore } from "../app/tab-store"
 import { FileIcon } from "../ui/FileIcon"
 import { Button, ContextMenu, MenuAction, PanelNote } from "../ui/controls"
 import { cx, markdownProseClasses, syntaxTokenClasses } from "../ui/styles"
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Toggle } from "@base-ui-components/react/toggle"
+import { ToggleGroup } from "@base-ui-components/react/toggle-group"
 import { RevealFileAction } from "../ui/FileContextActions"
 import { ImageContextMenu } from "../ui/ImageContextMenu"
+import { segmentClasses, segmentGroupClasses } from "../ui/styles"
+import { DelimitedTable } from "./DelimitedTable"
+import { JsonTree } from "./JsonTree"
+import { isJsonPath, parseDelimited, tableSeparator } from "./preview-model"
 
 function localPath(file: FileTab, source: string): string | null {
   if (!source || /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(source)) return null
@@ -90,6 +97,127 @@ function HtmlPreview({ file, content }: { file: FileTab; content: string }) {
   )
 }
 
+/** Turns the host's base64 data URL into a blob, which plays and seeks without a size limit. */
+function videoBlob(content: string): Blob {
+  const comma = content.indexOf(",")
+  const type = content.slice(5, content.indexOf(";"))
+  const binary = atob(content.slice(comma + 1))
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
+  return new Blob([bytes], { type })
+}
+
+/** Plays a video file from a blob URL that lives as long as the preview shows it. */
+function VideoPreview({ file, content }: { file: FileTab; content: string }) {
+  const source = useMemo(() => URL.createObjectURL(videoBlob(content)), [content])
+  const [failed, setFailed] = useState<string | null>(null)
+  useEffect(() => () => URL.revokeObjectURL(source), [source])
+  if (failed === source)
+    return <PanelNote role="alert">This video's format cannot be played here.</PanelNote>
+  return (
+    <div className="flex flex-1 min-h-0 items-center justify-center p-[24px]">
+      <video
+        key={source}
+        src={source}
+        controls
+        playsInline
+        preload="metadata"
+        aria-label={`Video: ${file.path}`}
+        className="block max-w-full max-h-full rounded-[var(--radius)] bg-black shadow-[0_8px_30px_rgb(0_0_0_/_0.25)]"
+        onError={() => setFailed(source)}
+      />
+    </div>
+  )
+}
+
+type Structured =
+  | { readonly kind: "table"; readonly rows: string[][] }
+  | { readonly kind: "tree"; readonly value: unknown }
+
+/** Reads a text file as a table or JSON tree when its extension says it holds one. */
+function structuredPreview(path: string, content: string): Structured | null {
+  const separator = tableSeparator(path)
+  if (separator !== null) {
+    const rows = parseDelimited(content, separator)
+    return rows.length > 0 ? { kind: "table", rows } : null
+  }
+  if (!isJsonPath(path)) return null
+  try {
+    return { kind: "tree", value: JSON.parse(content) }
+  } catch {
+    return null
+  }
+}
+
+function structuredSummary(structured: Structured): string | null {
+  if (structured.kind !== "table") return null
+  const rows = Math.max(0, structured.rows.length - 1)
+  const columns = structured.rows.reduce((widest, row) => Math.max(widest, row.length), 0)
+  return `${rows.toLocaleString()} row${rows === 1 ? "" : "s"} · ${columns} column${columns === 1 ? "" : "s"}`
+}
+
+/** The table or tree view of a structured file, with a switch back to its source. */
+function PreviewMode({
+  structured,
+  showSource,
+  onShowSource,
+}: {
+  structured: Structured
+  showSource: boolean
+  onShowSource: (showSource: boolean) => void
+}) {
+  const summary = structuredSummary(structured)
+  return (
+    <>
+      {!showSource && summary && (
+        <small className="flex-none text-[var(--text-tertiary)] text-[11.5px] [font-variant-numeric:tabular-nums]">
+          {summary}
+        </small>
+      )}
+      <ToggleGroup
+        aria-label="Preview mode"
+        value={[showSource ? "source" : "rich"]}
+        onValueChange={(value) => {
+          if (value[0]) onShowSource(value[0] === "source")
+        }}
+        className={`${segmentGroupClasses} flex-none`}
+      >
+        <Toggle value="rich" className={segmentClasses}>
+          {structured.kind === "table" ? "Table" : "Tree"}
+        </Toggle>
+        <Toggle value="source" className={segmentClasses}>
+          Source
+        </Toggle>
+      </ToggleGroup>
+    </>
+  )
+}
+
+function StructuredView({ structured }: { structured: Structured }) {
+  return structured.kind === "table" ? (
+    <DelimitedTable rows={structured.rows} />
+  ) : (
+    <JsonTree value={structured.value} />
+  )
+}
+
+/** A text file's table or tree, and whether the reader switched it to show the source. */
+function useStructured(path: string, preview: FilePreview | undefined) {
+  const structured = useMemo(
+    () => (preview?.kind === "text" ? structuredPreview(path, preview.content) : null),
+    [path, preview],
+  )
+  const [showSource, setShowSource] = useState(false)
+  const [shownPath, setShownPath] = useState(path)
+  if (shownPath !== path) {
+    setShownPath(path)
+    setShowSource(false)
+  }
+  return { structured, showSource, setShowSource }
+}
+
+const TEXT_KINDS = new Set<FilePreview["kind"]>(["text", "markdown", "html"])
+
 export function FileViewer({ file }: { file: FileTab }) {
   const lineRef = useRef<HTMLSpanElement>(null)
   const openFile = useTabStore((state) => state.openFile)
@@ -100,6 +228,9 @@ export function FileViewer({ file }: { file: FileTab }) {
     gcTime: 60000,
   })
   const preview = query.data
+  const { structured, showSource, setShowSource } = useStructured(file.path, preview)
+  // A line reference points into the source, so it always shows as text.
+  const rich = structured !== null && !showSource && !file.line
   const lineCount = file.line && preview ? preview.content.split("\n").length : 0
   useEffect(() => {
     if (file.line && preview && lineRef.current?.dataset.path === file.path)
@@ -118,6 +249,13 @@ export function FileViewer({ file }: { file: FileTab }) {
               {file.path}
               {file.line ? ` · L${file.line}` : ""}
             </span>
+            {structured && !file.line && (
+              <PreviewMode
+                structured={structured}
+                showSource={showSource}
+                onShowSource={setShowSource}
+              />
+            )}
             {file.line && (
               <Button size="sm" onClick={() => openFile(file, file.path)}>
                 Clear line reference
@@ -133,7 +271,7 @@ export function FileViewer({ file }: { file: FileTab }) {
           Copy file path
         </MenuAction>
         <RevealFileAction scope={file} path={file.path} />
-        {preview && preview.kind !== "unsupported" && preview.kind !== "image" && (
+        {preview && TEXT_KINDS.has(preview.kind) && (
           <MenuAction onClick={() => void navigator.clipboard.writeText(preview.content)}>
             Copy file contents
           </MenuAction>
@@ -144,6 +282,8 @@ export function FileViewer({ file }: { file: FileTab }) {
       {query.isError && <PanelNote role="alert">{query.error.message}</PanelNote>}
       {preview?.kind === "unsupported" && <PanelNote>{preview.content}</PanelNote>}
       {preview?.kind === "html" && <HtmlPreview file={file} content={preview.content} />}
+      {preview?.kind === "video" && <VideoPreview file={file} content={preview.content} />}
+      {rich && <StructuredView structured={structured} />}
       {preview?.kind === "image" && (
         <div className="flex-1 overflow-auto p-[24px] text-center [&_img]:max-w-full [&_img]:h-auto overflow-y-auto [scrollbar-gutter:stable]">
           <ImageContextMenu
@@ -153,7 +293,7 @@ export function FileViewer({ file }: { file: FileTab }) {
           />
         </div>
       )}
-      {preview?.kind === "text" && (
+      {preview?.kind === "text" && !rich && (
         <ContextMenu
           trigger={
             <pre
