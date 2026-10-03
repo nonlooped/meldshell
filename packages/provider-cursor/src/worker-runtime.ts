@@ -1,6 +1,7 @@
 import { Result, Schema } from "effect"
-import type { AvailableCommand } from "@agentclientprotocol/sdk"
+import type { AvailableCommand, McpServer } from "@agentclientprotocol/sdk"
 import { eventPublisher, workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
+import { BROWSER_SERVER, browserUrl } from "@meldshell/provider-runtime/browser"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { RequestError } from "@agentclientprotocol/sdk"
@@ -208,12 +209,22 @@ export const runCursorWorker = (
       decoded !== undefined && Result.isSuccess(decoded),
     )
   }
+  /** MeldShell's own tools: questions for interactive sessions, and the thread's browser. */
+  const sessionServers = (
+    questions: McpServer | undefined,
+    browser: string | null | undefined,
+  ): McpServer[] => [
+    ...(questions ? [questions] : []),
+    ...(browser
+      ? [{ type: "http" as const, name: BROWSER_SERVER, url: browser, headers: [] }]
+      : []),
+  ]
   const createSession = async (
     cwd: string,
     nativeId: string | null,
     emit: Emit | null,
     onCreated?: (session: Session) => void,
-    options: { catalogOnly?: boolean } = {},
+    options: { catalogOnly?: boolean; browser?: string | null } = {},
   ): Promise<Session> => {
     command ??= await dependencies.discover()
     if (stopping) throw new Error("Cursor is shutting down.")
@@ -269,7 +280,7 @@ export const runCursorWorker = (
         ? await questionServer.register((asked, signal) => askQuestions(session, asked, signal))
         : null
       if (questions) session.releaseQuestions = questions.release
-      const mcpServers = questions ? [questions.entry] : []
+      const mcpServers = sessionServers(questions?.entry, options.browser)
       if (nativeId && !canResume(session.init))
         throw new Error("This Cursor release cannot resume the saved conversation.")
       session.configuration = await session.client.run((agent) =>
@@ -365,6 +376,9 @@ export const runCursorWorker = (
         (created) => {
           turn.session = created
           if (turn.interrupted) void created.client.close()
+        },
+        {
+          browser: dispatch.sandbox === "read-only" ? null : browserUrl(dispatch.threadId),
         },
       )
       sessions.set(dispatch.threadId, session)

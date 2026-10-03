@@ -106,17 +106,16 @@ export async function readTurnSnapshot(
   threadId: string,
   turnId: string,
 ): Promise<TurnSnapshot> {
-  const [before, after, undo] = await Promise.all([
+  const [before, after] = await Promise.all([
     resolveCommit(cwd, turnSnapshotRef(threadId, turnId, "before")),
     resolveCommit(cwd, turnSnapshotRef(threadId, turnId, "after")),
-    resolveCommit(cwd, undoRef(threadId)),
   ])
   // A diff too large to read still leaves the snapshots restorable.
   const patch =
     before !== null && after !== null
       ? await snapshotDiff(cwd, before, after).catch(() => null)
       : null
-  return { before: before !== null, after: after !== null, patch, undoable: undo !== null }
+  return { before: before !== null, after: after !== null, patch }
 }
 
 /**

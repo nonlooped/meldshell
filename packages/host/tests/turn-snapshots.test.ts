@@ -48,7 +48,6 @@ test("a turn's snapshots show every change it made and leave the index alone", a
     const snapshot = await readTurnSnapshot(root, "thread", "turn-1")
     assert.equal(snapshot.before, true)
     assert.equal(snapshot.after, true)
-    assert.equal(snapshot.undoable, false)
     assert.match(snapshot.patch ?? "", /\+two/)
     assert.match(snapshot.patch ?? "", /b\/created\.txt/)
     assert.doesNotMatch(snapshot.patch ?? "", /ignored\.log|staged\.txt/)
@@ -80,7 +79,6 @@ test("restoring before a turn undoes it and later turns, and the restore can be 
     assert.equal(existsSync(join(root, "later.txt")), false)
     assert.equal(await readFile(join(root, "ignored.log"), "utf8"), "keep\n")
     assert.equal(run(root, "status", "--porcelain"), "")
-    assert.equal((await readTurnSnapshot(root, "thread", "turn-1")).undoable, true)
 
     await restoreTurnSnapshot(root, "thread", "turn-1", "after")
     assert.equal(await readFile(join(root, "tracked.txt"), "utf8"), "two\n")
@@ -106,7 +104,7 @@ test("snapshots skip folders outside Git and are removed with their thread", asy
     const left = run(root, "for-each-ref", "--format=%(refname)", "refs/meldshell/")
     assert.equal(left, turnSnapshotRef("other", "turn-1", "before"))
     const snapshot = await readTurnSnapshot(root, "thread", "turn-1")
-    assert.deepEqual(snapshot, { before: false, after: false, patch: null, undoable: false })
+    assert.deepEqual(snapshot, { before: false, after: false, patch: null })
   } finally {
     await rm(plain, { recursive: true, force: true })
     await rm(root, { recursive: true, force: true })

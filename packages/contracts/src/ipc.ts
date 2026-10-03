@@ -125,8 +125,6 @@ export interface TurnSnapshot {
   readonly after: boolean
   /** Every change between the two snapshots, including edits made by shell commands. */
   readonly patch: string | null
-  /** A restore can be undone because the files were snapshotted just before it. */
-  readonly undoable: boolean
 }
 
 type AppUpdateState =
@@ -239,6 +237,24 @@ interface DesktopApi {
   readonly threadPort: (threadId: string) => Promise<number>
   /** Opens an http or https address in the system browser. */
   readonly openExternal: (url: string) => Promise<void>
+  /** Agents driving a thread's browser preview, on desktops whose host runs locally. */
+  readonly agentBrowser?: AgentBrowserApi
+}
+
+/** What an agent is doing in a thread's preview, and where on the page when it points somewhere. */
+export interface AgentBrowserActivity {
+  readonly label: string
+  readonly point?: { readonly x: number; readonly y: number }
+}
+
+interface AgentBrowserApi {
+  /** Names the page a thread's preview shows, so agents act on what the user sees. */
+  readonly attach: (threadId: string, webContentsId: number) => void
+  /** An agent opened an address in a thread's preview. */
+  readonly onShow: (listener: (threadId: string, url: string) => void) => () => void
+  readonly onActivity: (
+    listener: (threadId: string, activity: AgentBrowserActivity) => void,
+  ) => () => void
 }
 
 interface Request<Invoke> {
@@ -470,6 +486,9 @@ export const IPC = {
   revealFile: "meldshell:reveal-file",
   threadPort: "meldshell:thread-port",
   openExternal: "meldshell:open-external",
+  agentBrowserAttach: "meldshell:agent-browser-attach",
+  agentBrowserShow: "meldshell:agent-browser-show",
+  agentBrowserActivity: "meldshell:agent-browser-activity",
 } as const
 
 export type MeldShellApi = InvokeApi & {

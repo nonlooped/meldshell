@@ -12,6 +12,7 @@ import { desktopPlatform } from "./platform"
 import { createConnectionManager, type Connection } from "./connection"
 import { startWsl, WslCancelled } from "./wsl"
 import { getMainWindow } from "../window"
+import { startAgentBrowser, stopAgentBrowser } from "../agent-browser"
 
 let selectedMode: Promise<DesktopMode> | undefined
 const mode = () =>
@@ -48,6 +49,8 @@ function publish(channel: string, args: readonly unknown[]): void {
 }
 
 async function connectLocal(): Promise<Connection> {
+  // Provider workers receive the browser tools' address when they start, so it listens first.
+  await startAgentBrowser()
   const host = await startHost(
     process.env.MELDSHELL_DATA_DIR ?? app.getPath("userData"),
     { ...desktopPlatform(publish), desktop: true },
@@ -134,6 +137,9 @@ export const desktopHost = {
       .current()
       ?.request("activeTurns")
       .catch(() => 0) ?? Promise.resolve(0),
-  stop: manager.stop,
+  stop: async () => {
+    await manager.stop()
+    stopAgentBrowser()
+  },
 }
 export const runtime = { runPromise: Effect.runPromise, dispose: desktopHost.stop }
