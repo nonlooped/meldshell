@@ -388,7 +388,12 @@ export const openProviderTurn = (input: OpenProviderTurnInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (yield* isShuttingDown) return false
-    const threads = yield* sql`SELECT id FROM threads WHERE id = ${input.threadId}`
+    const threads = yield* sql`
+      SELECT t.id FROM threads t
+      JOIN thread_settings s ON s.thread_id = t.id
+      JOIN providers p ON p.id = s.provider_id
+      WHERE t.id = ${input.threadId} AND p.harness = ${input.harness} AND p.enabled = 1
+    `
     const running = yield* sql`
       SELECT id FROM turns WHERE thread_id = ${input.threadId} AND status = 'running' LIMIT 1
     `

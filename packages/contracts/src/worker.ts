@@ -31,6 +31,7 @@ export const WorkerCommand = Schema.Union([
     optionId: Schema.optional(Schema.String),
     answers: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
   }),
+  Schema.Struct({ type: Schema.Literal("close-thread-session"), threadId: Schema.String }),
   Schema.Struct({ type: Schema.Literal("shutdown") }),
   Schema.Struct({ type: Schema.Literal("get-usage"), requestId: Schema.String }),
   Schema.Struct({ type: Schema.Literal("cancel-usage"), requestId: Schema.String }),

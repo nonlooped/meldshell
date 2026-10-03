@@ -428,6 +428,13 @@ export const PiStatus = Schema.Struct({
   ...CodexStatus.fields,
   provider: Schema.Literal("pi"),
   harness: Schema.Literal("pi"),
+  /** The discovered launcher, including Node and its entrypoint on npm/Windows installs. */
+  launcher: Schema.optional(
+    Schema.Struct({
+      command: Schema.String,
+      args: Schema.Array(Schema.String),
+    }),
+  ),
 })
 
 export type PiStatus = typeof PiStatus.Type

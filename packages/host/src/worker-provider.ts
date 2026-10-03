@@ -287,10 +287,22 @@ const providerRuntime = (
             generation: generations.get(owner)!,
           })
           .pipe(
-            Effect.tap((opened) => (opened ? publishChange(event.threadId) : Effect.void)),
+            Effect.tap((opened) => {
+              if (opened) return publishChange(event.threadId)
+              // Rejected work must stop, rather than continue invisibly in a retained Pi.
+              return config.harness === "pi" && currentChild() === owner
+                ? send({ type: "close-thread-session", threadId: event.threadId }).pipe(
+                    Effect.tapError(() => Effect.sync(() => owner.kill())),
+                  )
+                : Effect.void
+            }),
             Effect.asVoid,
             Effect.catch((cause) =>
-              Effect.sync(() => console.error(`Could not open a ${label} turn.`, cause)),
+              Effect.sync(() => {
+                console.error(`Could not open a ${label} turn.`, cause)
+                // Failed admission cannot leave a harness doing unrecorded work.
+                owner.kill()
+              }),
             ),
           ),
       )

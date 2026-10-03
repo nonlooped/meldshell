@@ -5,7 +5,7 @@ import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { attempt } from "./attempt"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
-import { submitTurn, interruptTurn, resolveApproval } from "./operations"
+import { submitTurn, interruptTurn, resolveApproval, setThreadSettings } from "./operations"
 import { providerFor } from "./worker-provider"
 import { ProviderUpdates } from "./provider-updates"
 import type { HostRuntime, HostServices } from "./runtime"
@@ -131,9 +131,7 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.deleteModel]: coreCall(Schema.String, false, (core, modelId) =>
     core.DeleteModel({ modelId }),
   ),
-  [C.IPC.setThreadSettings]: coreCall(C.SetThreadSettingsInput, false, (core, input) =>
-    core.SetThreadSettings(input),
-  ),
+  [C.IPC.setThreadSettings]: operation(C.SetThreadSettingsInput, false, setThreadSettings),
   [C.IPC.setAppSettings]: coreCall(C.SetAppSettingsInput, false, (core, input) =>
     core.SetAppSettings(input),
   ),

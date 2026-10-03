@@ -32,6 +32,7 @@ interface Session {
   model: string
   /** Pi is between `agent_start` and `agent_settled`, however the run began. */
   running: boolean
+  closing: boolean
   /** Reports to the running turn; null between turns, when Pi's records belong to no turn. */
   emit: Emit | null
   /** Ends the running turn's wait once Pi will not continue on its own. */
@@ -87,6 +88,7 @@ export const runPiWorker = (
     availability,
     detail,
     executablePath: discovered?.executablePath ?? null,
+    ...(discovered ? { launcher: { command: discovered.command, args: discovered.args } } : {}),
     version: discovered?.version ?? null,
     accountEmail: null,
     checkedAt: new Date().toISOString(),
@@ -243,6 +245,7 @@ export const runPiWorker = (
 
   /** Forwards Pi's records unchanged. */
   const onRecord = (session: Session, record: UnknownRecord): void => {
+    if (session.closing) return
     trackRun(session, record)
     const dialog = record.type === "extension_ui_request" ? decodeDialog(record) : null
     if (dialog !== null) return openDialog(session, dialog, record)
@@ -257,10 +260,21 @@ export const runPiWorker = (
   }
 
   const closeSession = async (session: Session): Promise<void> => {
+    session.closing = true
     cancelDialogs(session)
     session.emit = null
     session.settle = null
     await session.rpc.close()
+  }
+
+  const closeThreadSession = async (threadId: string) => {
+    const session = sessions.get(threadId)
+    if (!session) return
+    sessions.delete(threadId)
+    await closeSession(session)
+    await Promise.all(
+      [...turns.values()].filter((turn) => turn.threadId === threadId).map((turn) => turn.task),
+    )
   }
 
   /** The thread's running Pi, or a new one that opens the thread's saved Pi session. */
@@ -277,6 +291,7 @@ export const runPiWorker = (
       rpc: undefined as unknown as PiRpc,
       model: dispatch.model,
       running: false,
+      closing: false,
       emit: null,
       settle: null,
       stopReason: null,
@@ -501,7 +516,7 @@ export const runPiWorker = (
           if (!name) return []
           return [
             {
-              kind: command.source === "skill" ? "skill" : "command",
+              kind: "command",
               name,
               description: asText(command.description),
             },
@@ -568,6 +583,12 @@ export const runPiWorker = (
           break
         case "steer-turn":
           ack("Pi turns are not steered from MeldShell.")
+          break
+        case "close-thread-session":
+          void closeThreadSession(message.threadId).then(
+            () => ack(),
+            (cause: unknown) => ack(errorMessage(cause)),
+          )
           break
         case "shutdown":
           void shutdown().then(

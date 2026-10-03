@@ -10,6 +10,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Upgrade the app to stable Effect v4, consolidating SQL and RPC modules, explicitly scoping callback fibers, and preserving native provider extensions with open schemas.
 
+### Fixed
+
+- Stop retained Pi sessions when switching providers, invoke selected Pi skills through their native slash commands, and reuse Pi’s discovered launcher when updating JavaScript and Windows installs.
+
 ### Added
 
 - Pi (pi.dev) is the fourth native provider. MeldShell drives your installed Pi through its RPC mode in a separate worker, keeps one Pi session per thread and resumes it from Pi's own session file, and offers every model Pi has credentials for with its thinking levels. Pi's tools run as they do in Pi itself. Work your Pi extensions start on their own, such as after one of their commands or from a timer, appears as its own turn, and their dialogs appear as questions. Pi can be updated from Settings.
