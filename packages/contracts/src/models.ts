@@ -155,11 +155,15 @@ export const ApprovalRequest = Schema.Union([
   Schema.Struct({
     ...InteractionFields,
     kind: Schema.Literal("user-input"),
-    /** Codex's or Claude Code's question tool, Cursor's own, or MeldShell's tool offered to Cursor. */
+    /**
+     * Codex's or Claude Code's question tool, Cursor's own, MeldShell's tool offered to Cursor, or
+     * a dialog a Pi extension opened.
+     */
     method: Schema.Literals([
       "item/tool/requestUserInput",
       "cursor/ask_question",
       "cursor/ask_user_question",
+      "pi/extension_ui_request",
     ]),
     questions: Schema.Array(UserInputQuestion),
   }),
@@ -220,7 +224,7 @@ export const ApprovalPolicy = Schema.Literals(["untrusted", "on-request", "never
 export type ApprovalPolicy = typeof ApprovalPolicy.Type
 
 /** The coding agents MeldShell supervises, each in its own worker process. */
-export const Harness = Schema.Literals(["codex", "claude-code", "cursor"])
+export const Harness = Schema.Literals(["codex", "claude-code", "cursor", "pi"])
 
 export type Harness = typeof Harness.Type
 
@@ -228,7 +232,7 @@ export const isHarness = Schema.is(Harness)
 
 interface HarnessInfo {
   /** The `Provider.key` of the vendor that ships the harness. */
-  readonly provider: "openai" | "anthropic" | "cursor"
+  readonly provider: "openai" | "anthropic" | "cursor" | "pi"
   /** The name a seeded provider starts with; the user can rename it. */
   readonly vendor: string
   /** The harness's own name, as statuses and notifications show it. */
@@ -251,6 +255,7 @@ export const HARNESSES: { readonly [Key in Harness]: HarnessInfo } = {
     label: "Cursor",
     modes: ["default", "plan", "ask"],
   },
+  pi: { provider: "pi", vendor: "Pi", label: "Pi", modes: ["default"] },
 }
 
 /** Whether a harness takes a mode; the default mode works everywhere. */
@@ -419,7 +424,22 @@ export const CursorStatus = Schema.Struct({
 
 export type CursorStatus = typeof CursorStatus.Type
 
-export const ProviderStatus = Schema.Union([CodexStatus, ClaudeStatus, CursorStatus])
+export const PiStatus = Schema.Struct({
+  ...CodexStatus.fields,
+  provider: Schema.Literal("pi"),
+  harness: Schema.Literal("pi"),
+  /** The discovered launcher, including Node and its entrypoint on npm/Windows installs. */
+  launcher: Schema.optional(
+    Schema.Struct({
+      command: Schema.String,
+      args: Schema.Array(Schema.String),
+    }),
+  ),
+})
+
+export type PiStatus = typeof PiStatus.Type
+
+export const ProviderStatus = Schema.Union([CodexStatus, ClaudeStatus, CursorStatus, PiStatus])
 
 export type ProviderStatus = typeof ProviderStatus.Type
 
@@ -775,6 +795,21 @@ export const RuntimeEventResult = Schema.Struct({
 })
 
 export type RuntimeEventResult = typeof RuntimeEventResult.Type
+
+/**
+ * A turn the harness started on its own, such as a run a Pi extension began. The worker that
+ * reported it owns it, so its events land in the turn and its exit settles it.
+ */
+export const OpenProviderTurnInput = Schema.Struct({
+  harness: Harness,
+  threadId: Schema.String,
+  turnId: Schema.String,
+  /** The model the harness is running, in the harness's own catalog form. */
+  model: Schema.String,
+  generation: Schema.String,
+})
+
+export type OpenProviderTurnInput = typeof OpenProviderTurnInput.Type
 
 export const ProviderSessionInput = Schema.Struct({
   harness: DispatchHarness,

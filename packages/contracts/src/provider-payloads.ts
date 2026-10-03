@@ -202,3 +202,110 @@ export const CursorSessionNotification = providerStruct({
     providerStruct({ ...update, sessionUpdate: Schema.Literal("session_info_update") }),
   ]),
 })
+
+/** A content block of a Pi message: text, thinking, an image, or a tool call. */
+export const PiContent = providerStruct({
+  type: Schema.String,
+  text,
+  thinking: text,
+  id: text,
+  name: text,
+  arguments: Schema.optional(Schema.Unknown),
+})
+export type PiContent = typeof PiContent.Type
+
+/** A Pi `AgentMessage`; its role decides which fields are present. */
+export const PiMessage = providerStruct({
+  role: Schema.String,
+  content: Schema.optional(Schema.Union([Schema.String, Schema.Array(PiContent)])),
+  stopReason: text,
+  errorMessage: text,
+  toolCallId: text,
+  toolName: text,
+  isError: Schema.optional(Schema.Boolean),
+  details: Schema.optional(Schema.Unknown),
+  usage: Schema.optional(Schema.Unknown),
+  command: text,
+  output: text,
+  summary: text,
+})
+export type PiMessage = typeof PiMessage.Type
+
+/** The delta a streaming assistant message emitted, as Pi's RPC mode sends it. */
+const PiAssistantMessageEvent = providerStruct({
+  type: Schema.String,
+  contentIndex: Schema.optional(Schema.Number),
+  delta: text,
+  content: Schema.optional(Schema.Unknown),
+  toolCall: Schema.optional(PiContent),
+})
+
+/**
+ * One record of Pi's RPC event stream: a session event or an extension UI request. Extension
+ * notifications carry `message` as text; message events carry the message itself.
+ */
+export const PiPayload = providerStruct({
+  type: Schema.String,
+  message: Schema.optional(Schema.Union([Schema.String, PiMessage])),
+  assistantMessageEvent: Schema.optional(PiAssistantMessageEvent),
+  toolCallId: text,
+  toolName: text,
+  args: Schema.optional(Schema.Unknown),
+  partialResult: Schema.optional(Schema.Unknown),
+  result: Schema.optional(Schema.Unknown),
+  isError: Schema.optional(Schema.Boolean),
+  reason: text,
+  aborted: Schema.optional(Schema.Boolean),
+  errorMessage: text,
+  finalError: text,
+  attempt: Schema.optional(Schema.Number),
+  maxAttempts: Schema.optional(Schema.Number),
+  success: Schema.optional(Schema.Boolean),
+  id: text,
+  method: text,
+  title: text,
+  notifyType: text,
+})
+export type PiPayload = typeof PiPayload.Type
+export const decodePiPayload = Schema.decodeUnknownResult(PiPayload)
+
+/** The dialog methods of Pi's RPC extension UI; its other methods expect no answer. */
+const PI_DIALOG_METHODS = ["select", "confirm", "input", "editor"] as const
+
+/** A dialog a Pi extension opened, as Pi's RPC mode sends it. */
+export const PiDialog = providerStruct({
+  type: Schema.Literal("extension_ui_request"),
+  id: Schema.String,
+  method: Schema.Literals(PI_DIALOG_METHODS),
+  title: Schema.String,
+  options: Schema.optional(Schema.Array(Schema.String)),
+  message: text,
+  placeholder: text,
+  prefill: text,
+  timeout: Schema.optional(Schema.Number),
+})
+export type PiDialog = typeof PiDialog.Type
+
+/** The single question a Pi dialog asks. A confirmation offers these two answers. */
+export const PI_DIALOG_QUESTION = "answer"
+export const PI_CONFIRM_ANSWERS = { yes: "Yes", no: "No" } as const
+
+/** A Pi dialog as the question it asks: its title, a confirmation's message, and its options. */
+export const piDialogQuestion = (dialog: PiDialog) => {
+  const choices =
+    dialog.method === "select"
+      ? (dialog.options ?? [])
+      : dialog.method === "confirm"
+        ? [PI_CONFIRM_ANSWERS.yes, PI_CONFIRM_ANSWERS.no]
+        : null
+  return {
+    id: PI_DIALOG_QUESTION,
+    header: dialog.title,
+    question: dialog.method === "confirm" ? (dialog.message ?? "") || dialog.title : dialog.title,
+    multiSelect: false,
+    isOther: false,
+    multiline: dialog.method === "editor",
+    ...(dialog.method === "editor" && dialog.prefill ? { defaultValue: dialog.prefill } : {}),
+    options: choices?.map((label) => ({ label, description: "" })) ?? null,
+  }
+}

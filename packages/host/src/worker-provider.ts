@@ -64,6 +64,10 @@ export class CursorProvider extends Context.Service<CursorProvider, ProviderServ
   "MeldShell/CursorProvider",
 ) {}
 
+export class PiProvider extends Context.Service<PiProvider, ProviderService>()(
+  "MeldShell/PiProvider",
+) {}
+
 type ProviderConfig = {
   readonly harness: Harness
   /** The worker bundle the platform forks for this harness. */
@@ -267,6 +271,43 @@ const providerRuntime = (
       )
     }
 
+    /** The harness started work on its own; open its turn before the events that follow it. */
+    const handleTurnOpened = (
+      event: Extract<WorkerEvent, { type: "turn-opened" }>,
+      owner: HostProcess,
+    ) => {
+      queue.flush()
+      queue.enqueue(
+        core
+          .OpenProviderTurn({
+            harness: config.harness,
+            threadId: event.threadId,
+            turnId: event.turnId,
+            model: event.model,
+            generation: generations.get(owner)!,
+          })
+          .pipe(
+            Effect.tap((opened) => {
+              if (opened) return publishChange(event.threadId)
+              // Rejected work must stop, rather than continue invisibly in a retained Pi.
+              return config.harness === "pi" && currentChild() === owner
+                ? send({ type: "close-thread-session", threadId: event.threadId }).pipe(
+                    Effect.tapError(() => Effect.sync(() => owner.kill())),
+                  )
+                : Effect.void
+            }),
+            Effect.asVoid,
+            Effect.catch((cause) =>
+              Effect.sync(() => {
+                console.error(`Could not open a ${label} turn.`, cause)
+                // Failed admission cannot leave a harness doing unrecorded work.
+                owner.kill()
+              }),
+            ),
+          ),
+      )
+    }
+
     const handleTurnStartFailure = (event: Extract<WorkerEvent, { type: "turn-start-failed" }>) => {
       const failure = { threadId: event.threadId, turnId: event.turnId }
       queue.enqueue(
@@ -333,6 +374,8 @@ const providerRuntime = (
             event.threadId,
             `Could not store the ${label} thread id.`,
           )
+        case "turn-opened":
+          return handleTurnOpened(event, owner)
         case "turn-start-failed":
           return handleTurnStartFailure(event)
         case "protocol-error":
@@ -557,14 +600,23 @@ export const cursorProviderLive = providerLayer(CursorProvider, {
   worker: "cursor-worker.js",
 })
 
+export const piProviderLive = providerLayer(PiProvider, {
+  harness: "pi",
+  worker: "pi-worker.js",
+})
+
 const providerTags = {
   codex: CodexProvider,
   "claude-code": ClaudeProvider,
   cursor: CursorProvider,
+  pi: PiProvider,
 } as const
 
 /** The provider service for a harness; an unknown harness is routed to Codex, as it predates the others. */
 export const providerFor = (
   harness: string,
-): Effect.Effect<ProviderService, never, CodexProvider | ClaudeProvider | CursorProvider> =>
-  providerTags[isHarness(harness) ? harness : "codex"]
+): Effect.Effect<
+  ProviderService,
+  never,
+  CodexProvider | ClaudeProvider | CursorProvider | PiProvider
+> => providerTags[isHarness(harness) ? harness : "codex"]

@@ -1,4 +1,8 @@
-import type { ResolveApprovalInput, SubmitTurnInput } from "@meldshell/contracts"
+import type {
+  ResolveApprovalInput,
+  SetThreadSettingsInput,
+  SubmitTurnInput,
+} from "@meldshell/contracts"
 import { Effect, Semaphore } from "effect"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
@@ -57,6 +61,24 @@ export const submitTurn = (input: SubmitTurnInput) =>
     }
     yield* publishChange(input.threadId)
     return result
+  })
+
+/** Stop Pi before deselecting it, so idle extensions cannot keep using the workspace. */
+export const setThreadSettings = (input: SetThreadSettingsInput) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const snapshot = yield* core.GetSnapshot()
+    const current = snapshot.threadSettings.find((settings) => settings.threadId === input.threadId)
+    const previous = snapshot.providers.find((provider) => provider.id === current?.providerId)
+    const model = snapshot.models.find((model) => model.id === input.modelId)
+    const next = snapshot.providers.find((provider) => provider.id === model?.providerId)
+    if (previous?.harness === "pi" && next && next.harness !== "pi") {
+      if (yield* core.InterruptTurn({ threadId: input.threadId }))
+        return yield* Effect.fail(new Error("Stop the running turn before switching providers."))
+      const provider = yield* providerFor("pi")
+      yield* provider.send({ type: "close-thread-session", threadId: input.threadId })
+    }
+    return yield* core.SetThreadSettings(input)
   })
 
 export const interruptTurn = (threadId: string) =>

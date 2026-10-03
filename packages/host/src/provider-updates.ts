@@ -5,6 +5,8 @@ import {
   unknownUpdateStatus,
   type Harness,
   type ProviderUpdateStatus,
+  type PiStatus,
+  type ProviderStatus,
 } from "@meldshell/contracts"
 import { runCommand, type CommandResult } from "@meldshell/provider-runtime/command"
 import { FiberSet, Context, Effect, Result, Layer, Stream, type Scope } from "effect"
@@ -16,6 +18,7 @@ import {
   type ClaudeProvider,
   type CodexProvider,
   type CursorProvider,
+  type PiProvider,
 } from "./worker-provider"
 
 /*
@@ -58,6 +61,10 @@ const LATEST_SOURCES: {
     parse: npmVersion,
   },
   cursor: { url: "https://cursor.com/install", parse: cursorInstallerVersion },
+  pi: {
+    url: "https://registry.npmjs.org/@earendil-works/pi-coding-agent/latest",
+    parse: npmVersion,
+  },
 }
 
 type VersionOrder = "behind" | "current" | "ahead"
@@ -102,6 +109,7 @@ const SELF_UPDATE: { readonly [Key in Harness]: string } = {
   codex: "codex update",
   "claude-code": "claude update",
   cursor: "agent update",
+  pi: "pi update self",
 }
 
 /**
@@ -110,10 +118,11 @@ const SELF_UPDATE: { readonly [Key in Harness]: string } = {
  * system's package manager and its privileges; everything else has a built-in updater that knows
  * its own install method, such as npm or the vendor's standalone installer.
  */
-const planUpdate = (
+export const planUpdate = (
   harness: Harness,
   executablePath: string,
   resolvedPath: string,
+  launcher?: PiStatus["launcher"],
 ): UpdateResolution => {
   const segments = resolvedPath.split(/[\\/]/)
   const caskroom = segments.indexOf("Caskroom")
@@ -126,6 +135,17 @@ const planUpdate = (
     return {
       manual: `${HARNESSES[harness].label} was installed by a system package manager. Update it with that package manager.`,
     }
+  if (harness === "pi") {
+    if (!launcher && /\.(?:[cm]?js|cmd|bat|ps1)$/i.test(executablePath))
+      return { manual: "Reconnect Pi to discover its Node launcher before updating." }
+    return {
+      plan: {
+        file: launcher?.command ?? executablePath,
+        args: [...(launcher?.args ?? []), "update", "self"],
+        display: SELF_UPDATE.pi,
+      },
+    }
+  }
   if (harness === "cursor") {
     // The Windows distribution is Node running the CLI's entry file, so `update` follows the file.
     const windows = /[\\/]node\.exe$/i.test(executablePath)
@@ -187,7 +207,7 @@ const defaultDependencies: UpdateDependencies = {
   now: Date.now,
 }
 
-type Providers = CodexProvider | ClaudeProvider | CursorProvider
+type Providers = CodexProvider | ClaudeProvider | CursorProvider | PiProvider
 
 /** What an updater run left behind, reported by the version check that follows it. */
 interface InstallOutcome {
@@ -220,9 +240,16 @@ const makeProviderUpdates = (
     }
     const providerStatus = (harness: Harness) =>
       Effect.flatMap(providerFor(harness), (service) => service.status)
-    const resolve = (harness: Harness, executablePath: string) =>
+    const resolve = (harness: Harness, executablePath: string, status: ProviderStatus) =>
       Effect.promise(() => deps.resolvePath(executablePath)).pipe(
-        Effect.map((resolved) => planUpdate(harness, executablePath, resolved)),
+        Effect.map((resolved) =>
+          planUpdate(
+            harness,
+            executablePath,
+            resolved,
+            status.harness === "pi" ? status.launcher : undefined,
+          ),
+        ),
       )
     const timestamp = (): string => new Date(deps.now()).toISOString()
 
@@ -307,7 +334,7 @@ const makeProviderUpdates = (
           outcomes.delete(harness)
           return yield* publish(unknownUpdateStatus(harness))
         }
-        const resolution = yield* resolve(harness, status.executablePath)
+        const resolution = yield* resolve(harness, status.executablePath, status)
         if (current(harness).state === "updating") return current(harness)
         yield* publish({
           ...known,
@@ -380,7 +407,7 @@ const makeProviderUpdates = (
           const status = yield* providerStatus(harness)
           if (status.executablePath === null)
             return yield* Effect.fail(new Error(`${HARNESSES[harness].label} is not installed.`))
-          const resolution = yield* resolve(harness, status.executablePath)
+          const resolution = yield* resolve(harness, status.executablePath, status)
           if ("manual" in resolution) return yield* Effect.fail(new Error(resolution.manual))
           const started = yield* publish({
             ...known,

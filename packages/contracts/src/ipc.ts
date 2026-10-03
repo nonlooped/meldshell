@@ -7,6 +7,7 @@ import type {
   CodexStatus,
   ClaudeStatus,
   CursorStatus,
+  PiStatus,
   ProviderStatus,
   CodexUsage,
   Harness,
@@ -364,6 +365,9 @@ export const requests = {
   getCodexUsage: request<() => Promise<CodexUsage>>("meldshell:get-codex-usage"),
   getClaudeUsage: request<() => Promise<CodexUsage>>("meldshell:get-claude-usage"),
   getCursorUsage: request<() => Promise<CodexUsage>>("meldshell:get-cursor-usage"),
+  getPiStatus: request<() => Promise<PiStatus>>("meldshell:get-pi-status"),
+  refreshPiStatus: request<() => Promise<void>>("meldshell:refresh-pi-status"),
+  getPiUsage: request<() => Promise<CodexUsage>>("meldshell:get-pi-usage"),
   refreshCodexStatus: request<() => Promise<void>>("meldshell:refresh-codex-status"),
   getProviderUpdate: request<(harness: Harness) => Promise<ProviderUpdateStatus>>(
     "meldshell:get-provider-update",

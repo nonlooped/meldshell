@@ -35,6 +35,7 @@ export {
   getActiveTurnCount,
   beginShutdown,
   bindTurnWorker,
+  openProviderTurn,
   reconcileWorker,
   finishShutdown,
 } from "./turns"

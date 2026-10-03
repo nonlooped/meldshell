@@ -31,6 +31,7 @@ export const WorkerCommand = Schema.Union([
     optionId: Schema.optional(Schema.String),
     answers: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
   }),
+  Schema.Struct({ type: Schema.Literal("close-thread-session"), threadId: Schema.String }),
   Schema.Struct({ type: Schema.Literal("shutdown") }),
   Schema.Struct({ type: Schema.Literal("get-usage"), requestId: Schema.String }),
   Schema.Struct({ type: Schema.Literal("cancel-usage"), requestId: Schema.String }),
@@ -85,6 +86,13 @@ export const WorkerEvent = Schema.Union([
     type: Schema.Literal("provider-session"),
     threadId: Schema.String,
     nativeThreadId: Schema.String,
+  }),
+  /** The harness started work on its own; its runtime events follow under this turn. */
+  Schema.Struct({
+    type: Schema.Literal("turn-opened"),
+    threadId: Schema.String,
+    turnId: Schema.String,
+    model: Schema.String,
   }),
   Schema.Struct({
     type: Schema.Literal("turn-start-failed"),

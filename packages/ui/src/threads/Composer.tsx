@@ -527,6 +527,8 @@ function ComposerSettings({
   // Every harness lists its least guarded permission last; it stays visibly distinct when chosen.
   const riskiest = options[options.length - 1]!
   const fullPermissions = snapshot.settings.alwaysFullPermissions ?? false
+  // Pi has no permission system; it runs its tools as it does on its own.
+  const permissions = !fullPermissions && selection.provider.harness !== "pi"
   const modes = harnessModes(selection.provider.harness)
   const visible = selectableModels(snapshot).filter((model) => !model.hidden)
   return (
@@ -544,7 +546,7 @@ function ComposerSettings({
         onChangeSettings={onChangeSettings}
       />
 
-      {(!fullPermissions || modes.length > 0) && (
+      {(permissions || modes.length > 0) && (
         <DropdownMenu
           trigger={
             <BaseButton
@@ -649,6 +651,8 @@ const harnessName = (harness: string | undefined): string => {
       return "Cursor"
     case "claude-code":
       return "Claude"
+    case "pi":
+      return "Pi"
     default:
       return "Codex"
   }

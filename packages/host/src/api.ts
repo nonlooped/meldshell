@@ -5,7 +5,7 @@ import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { attempt } from "./attempt"
 import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
-import { submitTurn, interruptTurn, resolveApproval } from "./operations"
+import { submitTurn, interruptTurn, resolveApproval, setThreadSettings } from "./operations"
 import { providerFor } from "./worker-provider"
 import { ProviderUpdates } from "./provider-updates"
 import type { HostRuntime, HostServices } from "./runtime"
@@ -131,9 +131,7 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.deleteModel]: coreCall(Schema.String, false, (core, modelId) =>
     core.DeleteModel({ modelId }),
   ),
-  [C.IPC.setThreadSettings]: coreCall(C.SetThreadSettingsInput, false, (core, input) =>
-    core.SetThreadSettings(input),
-  ),
+  [C.IPC.setThreadSettings]: operation(C.SetThreadSettingsInput, false, setThreadSettings),
   [C.IPC.setAppSettings]: coreCall(C.SetAppSettingsInput, false, (core, input) =>
     core.SetAppSettings(input),
   ),
@@ -305,6 +303,7 @@ for (const [harness, status, refresh, usage] of [
   ["codex", C.IPC.getCodexStatus, C.IPC.refreshCodexStatus, C.IPC.getCodexUsage],
   ["claude-code", C.IPC.getClaudeStatus, C.IPC.refreshClaudeStatus, C.IPC.getClaudeUsage],
   ["cursor", C.IPC.getCursorStatus, C.IPC.refreshCursorStatus, C.IPC.getCursorUsage],
+  ["pi", C.IPC.getPiStatus, C.IPC.refreshPiStatus, C.IPC.getPiUsage],
 ] as const) {
   hostOperations[status] = operation(noInput, true, () =>
     Effect.flatMap(providerFor(harness), (service) => service.status),

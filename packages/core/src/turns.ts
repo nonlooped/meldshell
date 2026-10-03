@@ -12,7 +12,9 @@ import {
   type RuntimeEventInput,
   type RuntimeEventResult,
   type TurnDispatch,
+  type OpenProviderTurnInput,
   CoreProtocolError,
+  HARNESSES,
   isHarness,
   ProviderConfigurationError,
   supportsMode,
@@ -31,6 +33,7 @@ import { getSnapshot } from "./snapshots"
 import { isShuttingDown, markShuttingDown, readAppSettings } from "./settings"
 import {
   CLAUDE_EXIT_PLAN_MODE,
+  PI_EXTENSION_UI_REQUEST,
   CLAUDE_PERMISSION_MODE,
   eventKind,
   eventText,
@@ -346,7 +349,7 @@ export const interruptTurn = (threadId: string) =>
       readonly native_thread_id: string | null
     }>`
       SELECT t.id, t.harness, t.worker_generation, t.native_turn_id,
-             COALESCE(ps.native_thread_id, CASE WHEN t.harness IN ('claude-code', 'cursor') THEN t.id END) AS native_thread_id
+             COALESCE(ps.native_thread_id, CASE WHEN t.harness IN ('claude-code', 'cursor', 'pi') THEN t.id END) AS native_thread_id
       FROM turns t
       LEFT JOIN provider_sessions ps ON ps.thread_id = t.thread_id AND ps.harness = t.harness
       WHERE t.thread_id = ${threadId} AND t.status = 'running' LIMIT 1
@@ -372,9 +375,48 @@ export const beginShutdown = Effect.gen(function* () {
     nativeThreadId: string | null
     nativeTurnId: string | null
   }>`
-    SELECT t.thread_id AS threadId, t.id AS turnId, t.harness, COALESCE(ps.native_thread_id, CASE WHEN t.harness IN ('claude-code', 'cursor') THEN t.id END) AS nativeThreadId, t.native_turn_id AS nativeTurnId
+    SELECT t.thread_id AS threadId, t.id AS turnId, t.harness, COALESCE(ps.native_thread_id, CASE WHEN t.harness IN ('claude-code', 'cursor', 'pi') THEN t.id END) AS nativeThreadId, t.native_turn_id AS nativeTurnId
     FROM turns t LEFT JOIN provider_sessions ps ON ps.thread_id = t.thread_id AND ps.harness = t.harness WHERE t.status = 'running'`
 }).pipe(transaction)
+
+/**
+ * Records a turn the harness started on its own, such as a run a Pi extension began. It is bound
+ * to the reporting worker from the start, so that worker's events land in it and its exit
+ * settles it. A thread that is already running keeps its turn; the harness's work is not recorded.
+ */
+export const openProviderTurn = (input: OpenProviderTurnInput) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    if (yield* isShuttingDown) return false
+    const threads = yield* sql`
+      SELECT t.id FROM threads t
+      JOIN thread_settings s ON s.thread_id = t.id
+      JOIN providers p ON p.id = s.provider_id
+      WHERE t.id = ${input.threadId} AND p.harness = ${input.harness} AND p.enabled = 1
+    `
+    const running = yield* sql`
+      SELECT id FROM turns WHERE thread_id = ${input.threadId} AND status = 'running' LIMIT 1
+    `
+    if (threads.length === 0 || running.length > 0) return false
+    const timestamp = new Date().toISOString()
+    yield* sql`
+      INSERT INTO turns (
+        id, thread_id, provider, harness, model, reasoning_effort, speed,
+        status, native_turn_id, worker_generation, started_at, completed_at, error
+      ) VALUES (
+        ${input.turnId}, ${input.threadId}, ${HARNESSES[input.harness].provider}, ${input.harness},
+        ${input.model}, NULL, 'standard', 'running', ${input.turnId}, ${input.generation},
+        ${timestamp}, NULL, NULL
+      )
+    `
+    // New work returns an archived thread to the inbox, as a submitted turn does.
+    yield* sql`
+      UPDATE threads SET updated_at = ${timestamp},
+        status = CASE WHEN status = 'settled' THEN 'active' ELSE status END
+      WHERE id = ${input.threadId}
+    `
+    return true
+  }).pipe(transaction)
 
 export const bindTurnWorker = (turnId: string, generation: string) =>
   Effect.gen(function* () {
@@ -485,6 +527,7 @@ const persistApproval = (input: RuntimeEventInput) =>
         "cursor/ask_question",
         "cursor/ask_user_question",
         "cursor/create_plan",
+        PI_EXTENSION_UI_REQUEST,
         CLAUDE_EXIT_PLAN_MODE,
       ].includes(input.method)
     ) {

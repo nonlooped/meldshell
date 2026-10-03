@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/worker.ts",
     "./process-tree": "./src/process-tree.ts",
-    "./command": "./src/command.ts"
+    "./command": "./src/command.ts",
+    "./line-framer": "./src/line-framer.ts"
   },
   "dependencies": {
     "@meldshell/contracts": "*",

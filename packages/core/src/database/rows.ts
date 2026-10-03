@@ -2,6 +2,8 @@ import { SqlSchema } from "effect/sql"
 import { Effect, Result, SchemaGetter, Schema, Struct } from "effect"
 import {
   CursorQuestion,
+  PiDialog,
+  piDialogQuestion,
   ApprovalPolicy,
   ApprovalRequest,
   CanonicalEvent,
@@ -313,6 +315,13 @@ const fromApprovalRow = (row: ApprovalRow) =>
           kind: "user-input",
           method: row.method,
           questions: params.questions,
+        }
+      case "pi/extension_ui_request":
+        return {
+          ...fields,
+          kind: "user-input",
+          method: row.method,
+          questions: [piDialogQuestion(yield* Schema.decodeUnknownEffect(PiDialog)(params))],
         }
       case "item/permissions/requestApproval":
         return {

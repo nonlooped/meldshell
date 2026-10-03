@@ -12,6 +12,7 @@
     "@meldshell/provider-codex": "*",
     "@meldshell/provider-claude": "*",
     "@meldshell/provider-cursor": "*",
+    "@meldshell/provider-pi": "*",
     "tsx": "4.23.15"
   }
 }
