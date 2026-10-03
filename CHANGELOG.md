@@ -10,6 +10,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Queued messages are listed above the composer, where each can be edited, sent now to steer the running turn, or removed, with a Clear all for the lot. Each queued message now starts as its own turn instead of being merged into one, and a queue left behind by an interrupted or failed turn waits for you to send it rather than showing only a count.
 
+- Notes on diff lines. Click a line number in a turn's changes, a diff in the transcript, or a Changes tab diff to leave a note under that line, or right-click a line and choose Add note on this line. Notes collect above the thread's composer, where Send to agent turns them into one follow-up that quotes each line with its file and line number, following the usual queue or steer setting while the agent works. Notes can be edited or deleted in place, and a Changes tab diff shows how many are waiting and opens their thread.
+
 ### Changed
 
 - Choices show instead of tell. Settings picks a theme from small previews of each look, sets transcript text size with a row of Aa samples, and switches follow-ups between Queue and Steer with the explanation for only the chosen one. The composer's mode and permission menus say in one line what each choice does, and a turn's changed files each carry a small added/removed bar, with long lists folding after the first five files. Provider cards name their version and how many models are shown while closed, and each model's visibility is three icons instead of a menu. The schedule dialog previews the next few runs, a turn's working log folds runs of reads or searches into one line, and Always full permissions turns its description into a warning while it is on.

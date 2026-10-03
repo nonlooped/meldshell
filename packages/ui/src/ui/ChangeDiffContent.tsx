@@ -7,6 +7,7 @@ import { diffTokens, visibleDiffHunks } from "./diff-highlighting"
 import { FileIcon } from "./FileIcon"
 import { Button, ContextMenu, MenuAction } from "./controls"
 import { PlainPatch } from "./ChangeDiff"
+import { useDiffNotes } from "./DiffNotes"
 
 const pageSize = 400
 
@@ -23,8 +24,10 @@ function FileChanges({
 }) {
   const [limit, setLimit] = useState(pageSize)
   const [selectedHunk, setSelectedHunk] = useState<string | null>(null)
+  const [selectedLine, setSelectedLine] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
   const name = file.type === "delete" ? file.oldPath : file.newPath
+  const notes = useDiffNotes(name, file.patch, file.hunks)
   const segments = useMemo(() => foldDiff(file.hunks, expanded), [file.hunks, expanded])
   const folded = useMemo(
     () => segments.flatMap((segment) => (segment.kind === "hunk" ? [segment.hunk] : [])),
@@ -75,6 +78,7 @@ function FileChanges({
                   candidate.changes.some((change) => getChangeKey(change) === key),
                 )
               : undefined
+            setSelectedLine(key ?? null)
             setSelectedHunk(
               hunk
                 ? [hunk.content, ...hunk.changes.map((change) => change.content)].join("\n")
@@ -99,7 +103,16 @@ function FileChanges({
               {file.patch}
             </pre>
           ) : (
-            <Diff viewType={viewType} diffType={file.type} hunks={hunks} tokens={tokens}>
+            <Diff
+              viewType={viewType}
+              diffType={file.type}
+              hunks={hunks}
+              tokens={tokens}
+              widgets={notes?.widgets}
+              gutterEvents={notes?.gutterEvents}
+              renderGutter={notes?.renderGutter}
+              className={notes ? reviewableClasses : undefined}
+            >
               {() => rendered}
             </Diff>
           )}
@@ -124,6 +137,9 @@ function FileChanges({
         </section>
       }
     >
+      {notes && selectedLine && (
+        <MenuAction onClick={() => notes.open(selectedLine)}>Add note on this line</MenuAction>
+      )}
       {selectedHunk && (
         <MenuAction onClick={() => void navigator.clipboard.writeText(selectedHunk)}>
           Copy hunk
@@ -167,6 +183,9 @@ export function ChangeDiff({
     </ErrorBoundary>
   )
 }
+
+// Line numbers take notes, so they read as clickable.
+const reviewableClasses = "[&_.diff-gutter]:cursor-pointer"
 
 const unchangedLines = (lines: number): string =>
   `${lines.toLocaleString()} unchanged ${lines === 1 ? "line" : "lines"}`
