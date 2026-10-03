@@ -30,6 +30,7 @@ import { SettingsGroup } from "./SettingsGroup"
 import { searchSettings, type SettingsSearchEntry } from "./settings-search"
 
 import { KeyboardSettings } from "./KeyboardSettings"
+import { LoadoutSettings } from "./LoadoutSettings"
 import { Preferences } from "./Preferences"
 import { DictationSettings } from "./DictationSettings"
 
@@ -441,6 +442,13 @@ function SettingsContent({
             onChange={onChangeAppSettings}
             pending={settingsPending}
           />
+          <SettingsGroup title="Loadouts">
+            <LoadoutSettings
+              snapshot={snapshot}
+              pending={settingsPending}
+              onChange={onChangeAppSettings}
+            />
+          </SettingsGroup>
           <SettingsGroup title="Thread titles">
             <ThreadTitleCard
               snapshot={snapshot}

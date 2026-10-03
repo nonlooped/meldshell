@@ -393,6 +393,25 @@ export const FollowUpDelivery = Schema.Literals(["queue", "steer"])
 
 export type FollowUpDelivery = typeof FollowUpDelivery.Type
 
+/** How many loadouts can be saved: one for each of the Ctrl+1 to Ctrl+5 shortcuts. */
+export const MAX_LOADOUTS = 5
+
+/**
+ * A saved composer setup: the agent (through its model), reasoning effort, and speed. Applying one
+ * sets all of them on a thread at once and leaves its mode and permissions alone.
+ */
+export const Loadout = Schema.Struct({
+  id: Schema.String.pipe(Schema.check(Schema.isMaxLength(64))),
+  name: Schema.String.pipe(Schema.check(Schema.isMaxLength(48))),
+  modelId: Schema.String.pipe(Schema.check(Schema.isMaxLength(256))),
+  reasoningEffort: Schema.NullOr(ReasoningEffort.pipe(Schema.check(Schema.isMaxLength(32)))),
+  speed: ModelSpeed,
+})
+
+export type Loadout = typeof Loadout.Type
+
+export const Loadouts = Schema.Array(Loadout).pipe(Schema.check(Schema.isMaxLength(MAX_LOADOUTS)))
+
 export const AppSettings = Schema.Struct({
   alwaysFullPermissions: Schema.optional(Schema.Boolean),
   /** What Enter does while a turn runs; the opposite is one modifier away. Queues by default. */
@@ -410,6 +429,8 @@ export const AppSettings = Schema.Struct({
   editor: Schema.optional(Schema.String),
   /** Shortcut chords that differ from the defaults, by action; an empty chord removes one. */
   keybindings: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /** Saved composer setups, in shortcut order: the first is Ctrl+1. */
+  loadouts: Schema.optional(Loadouts),
   /** Whether the first-run guide has been finished or skipped. */
   onboarded: Schema.optional(Schema.Boolean),
 

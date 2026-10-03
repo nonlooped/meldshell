@@ -12,6 +12,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
+- Loadouts save an agent, model, and reasoning effort so a thread can switch to them in one step, keeping its own mode and permissions. They sit at the foot of the composer's model picker, which marks the one the thread is on and saves the current setup under a name; Ctrl+1 to Ctrl+5 switch the thread in front to the first five. Settings > Threads & agents > Loadouts renames, reorders (which changes their shortcuts), and deletes them, and Settings > Keyboard & dictation > Keyboard shortcuts can change the keys.
+
 - Settings search finds preferences, shortcuts, and providers and opens their location. A Default editor selector makes the existing Open in editor preference explicit.
 
 - Source Control can open a pull request once a branch has commits. Create pull request shows the base and branch with the commits it carries, pushes anything unpushed, and writes a title and description from the branch's commits and diff (following the repository's pull request template when it has one). You can edit both, preview the description as Markdown, and create it as a draft with Ctrl or Cmd and Enter. The pull request then shows above the composer and in Source Control with a bar of its checks, its review state, and merge conflicts, refreshing while checks run. Expanding it lists each check with a link to its run and each reviewer, and a draft can be marked ready for review from there. This uses the GitHub CLI (gh) signed in on the computer running MeldShell.

@@ -14,7 +14,7 @@ import {
 } from "../app/keybindings"
 import { Button, ChordKeys, ContextMenu, IconButton, MenuAction } from "../ui/controls"
 
-const GROUPS = ["Navigation", "Tabs", "Panels", "Workspace", "Input"] as const
+const GROUPS = ["Navigation", "Tabs", "Panels", "Workspace", "Input", "Loadouts"] as const
 
 /** A message about one shortcut, shown under its row. `undo` restores the chords before a change. */
 interface RowNotice {

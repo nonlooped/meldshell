@@ -36,6 +36,7 @@ import { ActionToast, ErrorToast } from "../ui/Notice"
 import { handleAppShortcut } from "./app-shortcuts"
 import { useKeybindings } from "./keybindings"
 import { useDictationRequests } from "../threads/dictation-recorder"
+import { useLoadoutSwitch } from "../threads/loadout-switch"
 import { useTabStore, type FileTab } from "./tab-store"
 import { visibleThreads } from "./thread-layout"
 import { useViewportTier, type ViewportTier } from "./viewport"
@@ -73,6 +74,20 @@ function MutationErrors({
       }}
     />
   )
+}
+
+/** The shortcuts that act on the thread in front, or none of them when no thread is. */
+function threadShortcuts(
+  thread: Thread | null,
+  toggleArchived: (thread: Thread) => void,
+  applyLoadout: (threadId: string, slot: number) => void,
+): Pick<Parameters<typeof handleAppShortcut>[2], "toggleArchived" | "dictate" | "applyLoadout"> {
+  if (thread === null) return { toggleArchived: null, dictate: null, applyLoadout: null }
+  return {
+    toggleArchived: () => toggleArchived(thread),
+    dictate: () => useDictationRequests.getState().toggle(thread.id),
+    applyLoadout: (slot) => applyLoadout(thread.id, slot),
+  }
 }
 
 function ThreadPane({
@@ -572,6 +587,7 @@ export function App(): React.JSX.Element {
   const { updateProviderMutation, upsertModelMutation, deleteModelMutation, resetCatalogMutation } =
     useCatalogActions()
   const appSettingsMutation = useAppSettingsMutation()
+  const loadoutSwitch = useLoadoutSwitch(snapshot)
 
   useAppAppearance(snapshot.settings)
 
@@ -687,6 +703,8 @@ export function App(): React.JSX.Element {
   // The listener stays registered; each render hands it the current actions.
   const shortcutActions = useRef<Parameters<typeof handleAppShortcut>[2] | null>(null)
   useEffect(() => {
+    // The thread a thread shortcut acts on: none while settings or a file is in front.
+    const frontThread = workbenchCovered || selectedFile !== undefined ? null : selectedThread
     shortcutActions.current = {
       settingsOpen: workbenchCovered,
       closeSettings: closeWorkbenchViews,
@@ -696,10 +714,6 @@ export function App(): React.JSX.Element {
       openSettings: () => openSettings(),
       selectedThreadId: selectedTabId,
       closeThread,
-      toggleArchived:
-        workbenchCovered || selectedFile !== undefined || selectedThread === null
-          ? null
-          : () => toggleArchived(selectedThread),
       cycleTabs: (direction) => {
         closeWorkbenchViews()
         cycleTabs(direction)
@@ -709,10 +723,8 @@ export function App(): React.JSX.Element {
       toggleTerminal: terminal.toggle,
       togglePreview: preview.toggle,
       openInEditor: () => editor.open(),
-      dictate:
-        workbenchCovered || selectedFile !== undefined || selectedThread === null
-          ? null
-          : () => useDictationRequests.getState().toggle(selectedThread.id),
+      ...threadShortcuts(frontThread, toggleArchived, loadoutSwitch.apply),
+      loadoutCount: loadoutSwitch.count,
     }
   })
   useEffect(() => {
@@ -926,6 +938,7 @@ export function App(): React.JSX.Element {
                 addWorkspaceMutation,
                 createThreadMutation,
                 editor.mutation,
+                ...loadoutSwitch.errors,
               ]}
             />
             <AppDialog
