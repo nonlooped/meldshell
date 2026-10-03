@@ -52,8 +52,8 @@ export const createWindow = (onClose: (event: Event) => void): void => {
     icon: join(app.getAppPath(), "resources/icon.png"),
     width: 1440,
     height: 920,
-    minWidth: 960,
-    minHeight: 640,
+    minWidth: 720,
+    minHeight: 520,
     show: false,
     // Linux has no acrylic backdrop; keep its backing opaque even before the renderer loads.
     backgroundColor: process.platform === "linux" ? "#161617" : "#00000000",

@@ -1,6 +1,7 @@
 import { textInputClasses, iconButtonClasses, paneSeparatorClasses } from "../ui/styles"
 import { Pressable, useMotionPreference } from "../ui/motion"
 import { useLayoutEffect, useRef, useState } from "react"
+import { useElementWidth } from "./viewport"
 import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import { Columns2, Globe, Maximize2, MoreHorizontal, Rows2, SquareTerminal, X } from "lucide-react"
@@ -313,7 +314,10 @@ function ConversationAndTerminal({
       }}
     >
       <Panel id={`conversation:${thread.id}`} minSize="160px">
-        <ThreadView snapshot={snapshot} thread={thread} searchTarget={searchTarget} />
+        {/* The conversation's gutters follow its own width, not the window's. */}
+        <div className="h-full min-w-0 [container-type:inline-size]">
+          <ThreadView snapshot={snapshot} thread={thread} searchTarget={searchTarget} />
+        </div>
       </Panel>
       <Separator
         className={`motion-colors ${paneSeparatorClasses} ${drawer.shown ? "" : "invisible"}`}
@@ -337,6 +341,12 @@ function ConversationAndTerminal({
   )
 }
 
+/** Narrower than this, a thread pane cannot fit its conversation and a preview side by side. */
+const PREVIEW_BESIDE_MIN = 620
+
+/** Narrower than this, a split of panes stacks them vertically instead of side by side. */
+const SPLIT_BESIDE_MIN = 640
+
 /** The conversation and terminal, with the thread's browser preview beside them while it is shown. */
 function ThreadBody(
   props: Omit<WorkbenchProps, "threads"> & { thread: Thread },
@@ -345,18 +355,21 @@ function ThreadBody(
   const preview = usePreviewStore((state) => state.threads[thread.id])
   const drawer = useDrawer(preview?.open === true, preview?.size ?? 0)
   const previewPanelId = `preview:${thread.id}`
+  // A pane too narrow for the conversation and a preview side by side stacks them instead.
+  const width = useElementWidth(drawer.groupRef)
+  const stacked = width !== undefined && width < PREVIEW_BESIDE_MIN
   return (
     <Group
       elementRef={drawer.groupRef}
       className="motion-panels motion-duration-220 w-full h-full min-w-0 min-h-0"
-      orientation="horizontal"
+      orientation={stacked ? "vertical" : "horizontal"}
       onLayoutChanged={(layout, meta) => {
         const size = layout[previewPanelId]
         if (meta.isUserInteraction && size !== undefined && preview?.open)
           usePreviewStore.getState().resize(thread.id, size)
       }}
     >
-      <Panel id={`work:${thread.id}`} minSize="280px">
+      <Panel id={`work:${thread.id}`} minSize={stacked ? "160px" : "280px"}>
         <ConversationAndTerminal {...props} />
       </Panel>
       <Separator
@@ -368,7 +381,7 @@ function ThreadBody(
         id={previewPanelId}
         panelRef={drawer.panelRef}
         defaultSize={drawer.defaultSize}
-        minSize="240px"
+        minSize={stacked ? "120px" : "240px"}
         collapsible
         collapsedSize={0}
         disabled={!preview?.open}
@@ -418,6 +431,8 @@ function LayoutNode({
   split,
   ...props
 }: WorkbenchProps & { node: ThreadLayout; split: boolean }): React.JSX.Element {
+  const groupRef = useRef<HTMLDivElement>(null)
+  const width = useElementWidth(groupRef)
   if (node.kind === "thread") {
     const thread = props.threads.find((candidate) => candidate.id === node.threadId)
     return thread === undefined ? (
@@ -428,8 +443,13 @@ function LayoutNode({
   }
   return (
     <Group
+      elementRef={groupRef}
       className="w-full h-full min-w-0 min-h-0"
-      orientation={node.orientation}
+      orientation={
+        node.orientation === "horizontal" && width !== undefined && width < SPLIT_BESIDE_MIN
+          ? "vertical"
+          : node.orientation
+      }
       onLayoutChanged={(layout, meta) => {
         const ratio = layout[node.first.id]
         // Non-interactive callbacks report the sizes this tree already holds; only drags and the
@@ -483,14 +503,8 @@ export function ThreadWorkbench(props: WorkbenchProps): React.JSX.Element | null
 const threadTileClasses = [
   "relative grid w-full h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)] overflow-hidden",
   "[&:has(>_.thread-tile-header)]:grid-rows-[auto_minmax(0,_1fr)]",
-  "[&:has(>_.thread-tile-header)]:[container-type:inline-size]",
   "[&[data-focused]_>_.thread-tile-header]:[border-bottom-color:var(--line)]",
   "[&[data-focused]_>_.thread-tile-header]:text-[var(--text-primary)]",
-  "[&:has(>_.thread-tile-header)_.transcript]:px-[clamp(16px,_7cqi,_104px)]",
-  "[&:has(>_.thread-tile-header)_.transcript-loading]:px-[clamp(16px,_7cqi,_104px)]",
-  "[&:has(>_.thread-tile-header)_.transcript-origin]:px-[clamp(16px,_7cqi,_104px)]",
-  "[&:has(>_.thread-tile-header)_.composer-zone]:px-[clamp(16px,_7cqi,_104px)]",
-  "[&:has(>_.thread-tile-header)_.thread-branch-toggle]:px-[clamp(16px,_7cqi,_104px)]",
 ].join(" ")
 
 const dropPreviewPaneClasses = [

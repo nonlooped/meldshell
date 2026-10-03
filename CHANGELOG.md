@@ -4,6 +4,22 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- Messages sent while the agent is working can now queue or steer. Enter follows a new default in Settings (queue), Ctrl or Cmd with Enter does the other, and a menu beside the send button picks either for one message or changes the default. Steering goes into the same turn on Codex, and stops the turn and continues with your message on Claude Code and Cursor.
+
+- Queued messages are listed above the composer, where each can be edited, sent now to steer the running turn, or removed, with a Clear all for the lot. Each queued message now starts as its own turn instead of being merged into one, and a queue left behind by an interrupted or failed turn waits for you to send it rather than showing only a count.
+
+### Changed
+
+- Internal catalog, session, setup, title, queue-priority, and approval writes now complete without rebuilding an unused application snapshot.
+
+- In narrow windows the title bar keeps only the sidebar toggles and tabs: the editor, run, preview, and terminal buttons move into one Thread tools menu, and on phones the tab strip becomes a single button that names the open tab and lists the others.
+
+- The composer's model, effort, and permission controls stay on one row at any width: they truncate first, then drop their chevrons, then show only their icons in narrow panes.
+
+- The app adapts to narrow windows and phone screens. Below 960px the inbox and files sidebars take turns instead of crowding the thread, and below 640px they stack above it. Thread panes size their margins to their own width, split panes and the browser preview stack when a pane is too narrow for them side by side, and Settings turns its section list into a scrolling bar on phones. Dialogs, palettes, and toasts fit the window at any app scale, touch screens get larger tap targets, and the minimum window size is now 720×520.
+
 ## [0.14.0] - 2026-10-03
 
 ### Changed

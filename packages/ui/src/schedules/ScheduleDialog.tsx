@@ -142,7 +142,7 @@ function CadenceFields({
           <span className={labelClasses}>Date and time</span>
           <input
             type="datetime-local"
-            className={`${fieldClasses} w-[240px]!`}
+            className={`${fieldClasses} w-[min(240px,_100%)]!`}
             value={form.at}
             onChange={(event) => update({ at: event.target.value })}
           />
@@ -306,7 +306,7 @@ export function ScheduleDialog({
         <label className="block">
           <span className={labelClasses}>Prompt</span>
           <textarea
-            className={`${fieldClasses} h-auto! min-h-[96px] max-h-[40vh] [padding:8px_10px]! leading-[1.5] resize-y`}
+            className={`${fieldClasses} h-auto! min-h-[96px] max-h-[calc(var(--viewport-h)_*_0.4)] [padding:8px_10px]! leading-[1.5] resize-y`}
             placeholder="What should the agent do each time?"
             autoFocus={form.prompt === ""}
             value={form.prompt}

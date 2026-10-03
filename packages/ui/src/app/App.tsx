@@ -8,7 +8,7 @@ import { FadeDiv, MotionPreferences } from "../ui/motion"
 import { useAppData } from "../data/queries"
 import {
   useWorkspaceActions,
-  useThreadActions,
+  useThreadManagementActions,
   useCatalogActions,
   useAppSettingsMutation,
 } from "../data/mutations"
@@ -37,6 +37,7 @@ import { handleAppShortcut } from "./app-shortcuts"
 import { useKeybindings } from "./keybindings"
 import { useTabStore, type FileTab } from "./tab-store"
 import { visibleThreads } from "./thread-layout"
+import { useViewportTier, type ViewportTier } from "./viewport"
 import { useViewStore } from "./view-store"
 import { ThreadWorkbench } from "./ThreadWorkbench"
 import { LaunchReveal, LaunchScreen, useLaunch } from "./LaunchScreen"
@@ -109,17 +110,23 @@ function ThreadPane({
   return <>{children}</>
 }
 
-function useRemotePhone() {
-  const [phone, setPhone] = useState(
-    () => window.meldshell.platform === "web" && window.innerWidth < 640,
-  )
+/**
+ * Narrow windows cannot hold the sidebars beside the thread. Entering one folds the files sidebar
+ * away, and on a phone the inbox too, so the thread keeps the screen.
+ */
+function useNarrowPanels(
+  tier: ViewportTier,
+  inbox: ReturnType<typeof usePanelRef>,
+  files: ReturnType<typeof usePanelRef>,
+  animate: (change: () => void) => void,
+) {
   useEffect(() => {
-    const query = window.matchMedia("(max-width: 639px)")
-    const update = () => setPhone(window.meldshell.platform === "web" && query.matches)
-    query.addEventListener("change", update)
-    return () => query.removeEventListener("change", update)
-  }, [])
-  return phone
+    if (tier === "regular") return
+    animate(() => {
+      files.current?.collapse()
+      if (tier === "phone") inbox.current?.collapse()
+    })
+  }, [tier, inbox, files, animate])
 }
 
 function usePhonePanels(
@@ -163,26 +170,55 @@ function usePanelMotion() {
   return { groupRef, animate }
 }
 
+/** Where the sidebars cannot share the window, opening one folds the other away. */
 function toggleSidebar(
-  phone: boolean,
+  tier: ViewportTier,
   other: ReturnType<typeof usePanelRef>,
   toggle: () => void,
   animate: (change: () => void) => void,
 ) {
   animate(() => {
-    if (phone) other.current?.collapse()
+    if (tier !== "regular") other.current?.collapse()
     toggle()
   })
 }
 
-function remoteLayout(phone: boolean, inboxWidth: number, filesWidth: number) {
-  return {
-    orientation: phone ? ("vertical" as const) : ("horizontal" as const),
-    inboxMin: phone ? "160px" : "252px",
-    inboxMax: phone ? "45%" : "420px",
-    threadMin: phone ? "0px" : "400px",
-    inboxWidth: phone ? "100%" : inboxWidth,
-    filesWidth: phone ? "100%" : filesWidth,
+/** Panel bounds per tier. A phone stacks the sidebars above the thread instead of beside it. */
+function panelLayout(tier: ViewportTier, inboxWidth: number, filesWidth: number) {
+  switch (tier) {
+    case "phone":
+      return {
+        orientation: "vertical" as const,
+        inboxMin: "160px",
+        inboxMax: "45%",
+        filesMin: "160px",
+        filesMax: "70%",
+        threadMin: "0px",
+        inboxWidth: "100%",
+        filesWidth: "100%",
+      }
+    case "compact":
+      return {
+        orientation: "horizontal" as const,
+        inboxMin: "208px",
+        inboxMax: "320px",
+        filesMin: "220px",
+        filesMax: "360px",
+        threadMin: "320px",
+        inboxWidth: Math.min(inboxWidth, 320),
+        filesWidth: Math.min(filesWidth, 360),
+      }
+    case "regular":
+      return {
+        orientation: "horizontal" as const,
+        inboxMin: "252px",
+        inboxMax: "420px",
+        filesMin: "240px",
+        filesMax: "480px",
+        threadMin: "400px",
+        inboxWidth,
+        filesWidth,
+      }
   }
 }
 
@@ -425,13 +461,15 @@ export function App(): React.JSX.Element {
   const [renameTarget, setRenameTarget] = useState<Thread | null>(null)
   const [renameTitle, setRenameTitle] = useState("")
   const [filePaletteOpen, setFilePaletteOpen] = useState(false)
-  const remotePhone = useRemotePhone()
-  const inbox = useInboxSidebar(remotePhone)
+  const tier = useViewportTier()
+  const phone = tier === "phone"
+  const inbox = useInboxSidebar(phone)
   // Source control opens on request: the thread pane owns the window until the operator asks.
   const sourceControl = useSidebar(300, true)
   const panelMotion = usePanelMotion()
-  usePhonePanels(remotePhone, inbox.panelRef, sourceControl.panelRef, panelMotion.animate)
-  const layout = remoteLayout(remotePhone, inbox.width, sourceControl.width)
+  useNarrowPanels(tier, inbox.panelRef, sourceControl.panelRef, panelMotion.animate)
+  usePhonePanels(phone, inbox.panelRef, sourceControl.panelRef, panelMotion.animate)
+  const layout = panelLayout(tier, inbox.width, sourceControl.width)
 
   const { snapshotQuery, threadPagesQuery, snapshot } = useAppData()
   const launch = useLaunch(!snapshotQuery.isPending, snapshot.providers)
@@ -444,7 +482,7 @@ export function App(): React.JSX.Element {
     renameThreadMutation,
     deleteThreadMutation,
     resolveApprovalMutation,
-  } = useThreadActions(snapshot, {
+  } = useThreadManagementActions(snapshot, {
     created: (threadId) => {
       if (threadId !== undefined) openThread(threadId)
     },
@@ -455,9 +493,6 @@ export function App(): React.JSX.Element {
       useThreadDrafts.getState().forget(threadId)
       setSearchThreads((threads) => threads.filter((thread) => thread.id !== threadId))
       setDeleteTarget(null)
-    },
-    submitted: () => {
-      // ThreadView handles submitted drafts.
     },
   })
   const {
@@ -585,9 +620,9 @@ export function App(): React.JSX.Element {
     )
   }
   const toggleInbox = () =>
-    toggleSidebar(remotePhone, sourceControl.panelRef, inbox.toggle, panelMotion.animate)
+    toggleSidebar(tier, sourceControl.panelRef, inbox.toggle, panelMotion.animate)
   const toggleSourceControl = () =>
-    toggleSidebar(remotePhone, inbox.panelRef, sourceControl.toggle, panelMotion.animate)
+    toggleSidebar(tier, inbox.panelRef, sourceControl.toggle, panelMotion.animate)
 
   const keybindingOverrides = snapshot.settings.keybindings
   useEffect(() => {
@@ -654,6 +689,10 @@ export function App(): React.JSX.Element {
               providersByThreadId={providersByThreadId}
               selectedTabId={selectedTabId}
               onCloseTab={closeThread}
+              onSelectTab={(tabId) => {
+                closeSettings()
+                selectThread(tabId)
+              }}
               sidebarsVisible={!settingsOpen}
               inboxCollapsed={inbox.collapsed}
               sourceControlCollapsed={sourceControl.collapsed}
@@ -777,8 +816,8 @@ export function App(): React.JSX.Element {
                   collapsedSize={0}
                   inert={sourceControl.collapsed}
                   defaultSize={sourceControl.defaultSize}
-                  minSize="240px"
-                  maxSize="480px"
+                  minSize={layout.filesMin}
+                  maxSize={layout.filesMax}
                   groupResizeBehavior="preserve-pixel-size"
                   onResize={sourceControl.onResize}
                 >
@@ -826,7 +865,7 @@ export function App(): React.JSX.Element {
               title="Manage workspaces"
               actions={<Button onClick={() => setWorkspacesOpen(false)}>Done</Button>}
             >
-              <div className="workspace-manager max-h-[60vh] [padding:0_20px] overflow-y-auto [scrollbar-gutter:stable]">
+              <div className="workspace-manager max-h-[calc(var(--viewport-h)_*_0.6)] [padding:0_20px] overflow-y-auto [scrollbar-gutter:stable]">
                 <WorkspaceManager
                   workspaces={snapshot.workspaces}
                   onAdd={() => manageAddWorkspaceMutation.mutateAsync()}

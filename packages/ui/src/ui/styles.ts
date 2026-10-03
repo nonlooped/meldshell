@@ -23,6 +23,7 @@ export const railLabelClasses =
 /** One row in a menu or select list, highlighted by Base UI's roving focus. */
 export const menuItemClasses = [
   "menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)]",
+  "[@media(pointer:coarse)]:h-[38px]",
   "text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none",
   "[&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)]",
   "[&[data-disabled]]:text-[var(--text-disabled)]",
@@ -133,6 +134,7 @@ export const textInputClasses = [
 
 export const iconButtonClasses = [
   "icon-button [display:inline-grid] w-[28px] h-[28px] flex-[0_0_28px] border-[1px] border-[color:transparent]",
+  "[@media(pointer:coarse)]:w-[36px] [@media(pointer:coarse)]:h-[36px] [@media(pointer:coarse)]:flex-[0_0_36px]",
   "rounded-[var(--radius-sm)] bg-transparent text-[var(--text-secondary)] cursor-default",
   "place-items-center [&:hover:not(:disabled)]:bg-[var(--surface-hover)]",
   "[&:hover:not(:disabled)]:text-[var(--text-primary)] [&[data-popup-open]]:bg-[var(--surface-hover)]",
@@ -141,6 +143,7 @@ export const iconButtonClasses = [
 
 export const chipClasses = [
   "chip inline-flex h-[27px] max-w-[240px] items-center gap-[6px] [padding:0_8px]",
+  "[@media(pointer:coarse)]:h-[36px]",
   "border-[1px] border-[color:transparent] rounded-[var(--radius)] bg-transparent text-[var(--text-secondary)]",
   "cursor-default text-[12px] whitespace-nowrap [&:hover:not(:disabled)]:[border-color:var(--line)]",
   "[&:hover:not(:disabled)]:bg-[var(--surface-hover)]",
@@ -153,6 +156,7 @@ export const chipClasses = [
 
 export const buttonClasses = [
   "button inline-flex h-[30px] items-center justify-center gap-[7px] [padding:0_11px]",
+  "[@media(pointer:coarse)]:h-[38px]",
   "border-[1px] border-[color:var(--line)] rounded-[var(--radius)] [background:rgba(255,_255,_255,_0.027)]",
   "text-[var(--text-primary)] cursor-default text-[12.5px] font-medium whitespace-nowrap",
   "[&:hover:not(:disabled)]:bg-[var(--surface-hover)]",
@@ -239,3 +243,20 @@ export const questionHeaderClasses =
 /** The question itself. */
 export const questionTextClasses =
   "block m-0 text-[var(--text-primary)] text-[13.5px] font-medium leading-[1.45] [overflow-wrap:anywhere]"
+
+/** Syntax token colours shared by code, diffs, and reference previews. */
+export const syntaxTokenClasses = [
+  "[&_.token.comment]:text-[var(--text-tertiary)]",
+  "[&_.token.prolog]:text-[var(--text-tertiary)]",
+  "[&_.token.doctype]:text-[var(--text-tertiary)]",
+  "[&_.token.keyword]:text-[var(--color-renamed)]",
+  "[&_.token.tag]:text-[var(--color-renamed)]",
+  "[&_.token.boolean]:text-[var(--color-renamed)]",
+  "[&_.token.string]:text-[var(--color-added)]",
+  "[&_.token.attr-value]:text-[var(--color-added)]",
+  "[&_.token.number]:text-[var(--color-modified)]",
+  "[&_.token.function]:text-[var(--color-modified)]",
+  "[&_.token.class-name]:text-[var(--color-modified)]",
+  "[&_.token.property]:text-[var(--color-info)]",
+  "[&_.token.attr-name]:text-[var(--color-info)]",
+].join(" ")
