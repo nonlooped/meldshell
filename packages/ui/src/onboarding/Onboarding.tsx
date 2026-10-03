@@ -5,35 +5,25 @@ import { errorMessage, type AppSnapshot, type Provider } from "@meldshell/contra
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { queryKeys, replaceSnapshot } from "../data/cache"
 import { providerStatusQuery, refreshProviderStatus } from "../data/providers"
-import { Button } from "../ui/controls"
+import { Button, IconButton } from "../ui/controls"
 import { useMotionPreference } from "../ui/motion"
 import { cx } from "../ui/styles"
 import { useViewStore } from "../app/view-store"
 import {
-  defaultModelId,
-  modelChoices,
   ONBOARDING_STEPS,
   onboardingProviders,
+  starterModelId,
   type OnboardingStep,
 } from "./onboarding-model"
-import {
-  AgentsStep,
-  ModelStep,
-  PreferencesStep,
-  ReadyStep,
-  WelcomeStep,
-  WorkspaceStep,
-} from "./OnboardingSteps"
+import { AgentsStep, LookStep, WelcomeStep, WorkspaceStep } from "./OnboardingSteps"
 
 const ease = [0.2, 0.7, 0.2, 1] as const
 
 const STEP_LABELS: Record<OnboardingStep, string> = {
   welcome: "Welcome",
   agents: "Agents",
-  model: "Model",
-  workspace: "Workspace",
-  preferences: "Preferences",
-  ready: "Ready",
+  workspace: "Project",
+  look: "Appearance",
 }
 
 /** Each agent's live status, keyed by provider id. */
@@ -80,8 +70,8 @@ function StepDots({ index }: { index: number }) {
           aria-label={STEP_LABELS[step]}
           aria-current={position === index ? "step" : undefined}
           className={cx(
-            "motion-width motion-duration-280 h-[6px] rounded-[999px]",
-            position === index ? "w-[22px] bg-[var(--accent)]" : "w-[6px]",
+            "motion-width motion-duration-280 h-[5px] rounded-[999px]",
+            position === index ? "w-[28px] bg-[var(--accent)]" : "w-[12px]",
             position < index && "bg-[var(--text-tertiary)]",
             position > index && "bg-[var(--line-strong)]",
           )}
@@ -92,8 +82,8 @@ function StepDots({ index }: { index: number }) {
 }
 
 /**
- * The first-run guide: it checks the installed agents, picks a starting model and workspace, sets
- * a few preferences, then opens a new thread with its composer focused.
+ * The first-run guide fills the window: it checks the installed agents, picks a workspace, sets the
+ * look, then opens a new thread on a ready agent with its composer focused.
  */
 function Onboarding({
   snapshot,
@@ -111,7 +101,6 @@ function Onboarding({
   const [index, setIndex] = useState(0)
   const [direction, setDirection] = useState(1)
   const step = ONBOARDING_STEPS[index] ?? "welcome"
-  const [pickedModelId, setPickedModelId] = useState<string | null>(null)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -129,13 +118,7 @@ function Onboarding({
       .filter((provider) => agents.statuses.get(provider.id)?.availability === "ready")
       .map((provider) => provider.id),
   )
-  const anyReady = providers.some((provider) => provider.enabled && readyIds.has(provider.id))
-  const offeredIds = anyReady
-    ? readyIds
-    : new Set(snapshot.providers.filter((provider) => provider.enabled).map(({ id }) => id))
-  const groups = modelChoices(snapshot, offeredIds)
-  const modelId = defaultModelId(groups, pickedModelId)
-  const model = snapshot.models.find((entry) => entry.id === modelId)
+  const modelId = starterModelId(snapshot, readyIds)
   // Until a folder is picked, the most recently used workspace is preselected.
   const workspace =
     snapshot.workspaces.find((entry) => entry.id === workspaceId) ?? snapshot.workspaces[0]
@@ -211,14 +194,13 @@ function Onboarding({
     }
   }
 
-  const canContinue =
-    (step !== "model" || modelId !== null || groups.length === 0) &&
-    (step !== "workspace" || workspace !== undefined)
+  const canContinue = step !== "workspace" || workspace !== undefined
+  const last = step === "look"
 
   const body = (() => {
     switch (step) {
       case "welcome":
-        return <WelcomeStep />
+        return <WelcomeStep providers={providers} />
       case "agents":
         return (
           <AgentsStep
@@ -227,15 +209,6 @@ function Onboarding({
             checking={agents.checking}
             onCheckAgain={agents.checkAgain}
             onToggleProvider={toggleProvider}
-          />
-        )
-      case "model":
-        return (
-          <ModelStep
-            groups={groups}
-            anyReady={anyReady}
-            modelId={modelId}
-            onSelect={setPickedModelId}
           />
         )
       case "workspace":
@@ -248,103 +221,82 @@ function Onboarding({
             onAdd={addWorkspace}
           />
         )
-      case "preferences":
-        return <PreferencesStep settings={snapshot.settings} onChange={changeSettings} />
-      case "ready":
-        return (
-          <ReadyStep
-            provider={snapshot.providers.find((entry) => entry.id === model?.providerId)}
-            modelName={model?.displayName ?? null}
-            workspaceName={workspace?.name ?? null}
-            theme={snapshot.settings.theme ?? "dark"}
-          />
-        )
+      case "look":
+        return <LookStep settings={snapshot.settings} onChange={changeSettings} />
     }
   })()
 
   const primary = (() => {
     if (step === "welcome") return "Get started"
-    if (step === "ready") return busy ? "Opening…" : "Start your first thread"
+    if (last) return busy ? "Opening…" : "Start your first thread"
     return "Continue"
   })()
 
   return (
-    <motion.div
-      role="dialog"
-      aria-modal="true"
+    <motion.main
       aria-label="Set up MeldShell"
-      className="absolute inset-0 z-[40] grid place-items-center overflow-y-auto [padding:calc(var(--titlebar-height)_+_8px)_24px_32px] text-[var(--text-primary)] text-[13px] leading-[1.45]"
+      className="absolute inset-0 z-[40] grid grid-rows-[var(--titlebar-height)_minmax(0,_1fr)_auto] text-[var(--text-primary)] text-[13px] leading-[1.45]"
       initial={reduced ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: reduced ? 0 : 0.3, ease } }}
       transition={{ duration: reduced ? 0 : 0.4, ease }}
     >
       {/* The window stays draggable above the guide, as it is above the launch screen. */}
-      <div className="absolute top-0 inset-x-0 h-[var(--titlebar-height)] [-webkit-app-region:drag]" />
+      <div className="[-webkit-app-region:drag]" />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute left-[50%] top-[42%] w-[520px] h-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[90px] opacity-[0.13] [background:conic-gradient(from_200deg,var(--spin-top),var(--spin-middle),var(--spin-bottom),var(--spin-top))]"
+        className="pointer-events-none absolute left-[50%] top-[46%] w-[760px] h-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[110px] opacity-[0.1] [background:conic-gradient(from_200deg,var(--spin-top),var(--spin-middle),var(--spin-bottom),var(--spin-top))]"
       />
-      <section className="relative grid w-[min(580px,_100%)] grid-rows-[auto_minmax(0,_1fr)_auto_auto] overflow-hidden border-[1px] border-[color:var(--line)] rounded-[var(--radius-xl)] bg-[var(--surface-overlay)] [backdrop-filter:blur(32px)_saturate(120%)] [box-shadow:var(--shadow-raised),_inset_0_1px_0_var(--edge-highlight)] [@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]">
-        <div className="flex items-center justify-between [padding:16px_24px_0]">
-          <StepDots index={index} />
-          <span className="text-[var(--text-tertiary)] text-[11.5px] tabular-nums">
-            {index + 1} of {ONBOARDING_STEPS.length}
-          </span>
-        </div>
-        <div className="relative min-h-[392px] overflow-hidden">
-          <AnimatePresence initial={false} mode="popLayout" custom={direction}>
-            <motion.div
-              key={step}
-              className="[padding:22px_24px_8px]"
-              initial={reduced ? false : { opacity: 0, x: 18 * direction }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{
-                opacity: 0,
-                x: reduced ? 0 : -18 * direction,
-                transition: { duration: reduced ? 0 : 0.16, ease },
-              }}
-              transition={{ duration: reduced ? 0 : 0.28, ease }}
-            >
-              {body}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-        {error !== null && (
-          <p
-            role="alert"
-            className="m-0 [padding:0_24px_12px] text-[var(--color-deleted)] text-[12px]"
+      <div className="relative grid min-h-0 overflow-y-auto overflow-x-hidden [padding:16px_32px]">
+        <AnimatePresence initial={false} mode="wait" custom={direction}>
+          <motion.div
+            key={step}
+            className="w-[min(760px,_100%)] [margin:auto]"
+            initial={reduced ? false : { opacity: 0, x: 28 * direction, filter: "blur(4px)" }}
+            animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+            exit={{
+              opacity: 0,
+              x: reduced ? 0 : -28 * direction,
+              filter: reduced ? "blur(0px)" : "blur(4px)",
+              transition: { duration: reduced ? 0 : 0.18, ease },
+            }}
+            transition={{ duration: reduced ? 0 : 0.34, ease }}
           >
-            {error}
-          </p>
-        )}
-        <footer className="flex items-center justify-between gap-[8px] [padding:14px_24px] border-t-[1px] border-t-[color:var(--line-subtle)] bg-[var(--surface-hover)]">
+            {body}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+      <footer className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-[16px] [padding:18px_32px_26px]">
+        <div>
           <Button variant="ghost" size="sm" disabled={busy} onClick={skip}>
-            Skip setup
+            Skip
           </Button>
-          <div className="flex items-center gap-[8px] [&_.button]:h-[32px]">
-            {index > 0 && (
-              <Button
-                disabled={busy}
-                icon={<ArrowLeft size={14} strokeWidth={1.75} />}
-                onClick={() => go(-1)}
-              >
-                Back
-              </Button>
-            )}
-            <Button
-              variant="primary"
-              autoFocus
-              disabled={!canContinue || busy}
-              onClick={() => (step === "ready" ? void finish() : go(1))}
-            >
-              {primary}
-              {step !== "ready" && <ArrowRight size={14} strokeWidth={2} />}
-            </Button>
-          </div>
-        </footer>
-      </section>
-    </motion.div>
+        </div>
+        <StepDots index={index} />
+        <div className="flex items-center justify-end gap-[8px]">
+          {error !== null && (
+            <span role="alert" className="mr-[8px] text-[var(--color-deleted)] text-[12px]">
+              {error}
+            </span>
+          )}
+          {index > 0 && (
+            <IconButton label="Back" disabled={busy} onClick={() => go(-1)}>
+              <ArrowLeft size={16} strokeWidth={1.75} />
+            </IconButton>
+          )}
+          <Button
+            variant="primary"
+            autoFocus
+            className="h-[36px]! [padding:0_18px]! rounded-[999px]!"
+            disabled={!canContinue || busy}
+            onClick={() => (last ? void finish() : go(1))}
+          >
+            {primary}
+            <ArrowRight size={14} strokeWidth={2} />
+          </Button>
+        </div>
+      </footer>
+    </motion.main>
   )
 }
 

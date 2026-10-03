@@ -110,7 +110,7 @@ export function Preferences({
           </SettingRow>
           <SettingRow
             label="Setup guide"
-            description="Check your agents, pick a starting model and workspace, and revisit the basics."
+            description="Check your agents, pick a project, and revisit the basics."
           >
             <Button onClick={() => useViewStore.getState().openOnboarding()}>
               Run setup again

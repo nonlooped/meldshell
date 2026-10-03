@@ -1,14 +1,7 @@
-import type { AppSnapshot, Provider, ProviderModel, ProviderStatus } from "@meldshell/contracts"
+import type { AppSnapshot, Provider, ProviderStatus } from "@meldshell/contracts"
 
 /** The first-run guide's steps, in order. */
-export const ONBOARDING_STEPS = [
-  "welcome",
-  "agents",
-  "model",
-  "workspace",
-  "preferences",
-  "ready",
-] as const
+export const ONBOARDING_STEPS = ["welcome", "agents", "workspace", "look"] as const
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number]
 
@@ -77,33 +70,22 @@ export const onboardingProviders = (providers: readonly Provider[]): readonly Pr
     .filter((provider) => provider.builtIn)
     .toSorted((left, right) => left.sortOrder - right.sortOrder)
 
-/** Models offered as the first thread's default: enabled, shown, and on an enabled provider. */
-export function modelChoices(
+/**
+ * The model the first thread starts on, so it opens on an agent that can actually run: the first
+ * ready provider's advertised default, otherwise its first shown model. Null when no agent is ready,
+ * which leaves the catalog's own default in place.
+ */
+export function starterModelId(
   snapshot: AppSnapshot,
   readyProviderIds: ReadonlySet<string>,
-): ReadonlyArray<{ readonly provider: Provider; readonly models: readonly ProviderModel[] }> {
-  return snapshot.providers
-    .filter((provider) => provider.enabled && readyProviderIds.has(provider.id))
-    .toSorted((left, right) => left.sortOrder - right.sortOrder)
-    .map((provider) => ({
-      provider,
-      models: snapshot.models
-        .filter((model) => model.providerId === provider.id && model.enabled && !model.hidden)
-        .toSorted((left, right) => left.sortOrder - right.sortOrder),
-    }))
-    .filter((group) => group.models.length > 0)
-}
-
-/**
- * The model the guide preselects: the current pick while it is still offered, otherwise the first
- * ready provider's advertised default, otherwise its first model.
- */
-export function defaultModelId(
-  groups: ReturnType<typeof modelChoices>,
-  current: string | null,
 ): string | null {
-  const models = groups.flatMap((group) => group.models)
-  if (current !== null && models.some((model) => model.id === current)) return current
-  const first = groups[0]?.models
-  return (first?.find((model) => model.isDefault) ?? first?.[0])?.id ?? null
+  for (const provider of snapshot.providers.toSorted((a, b) => a.sortOrder - b.sortOrder)) {
+    if (!provider.enabled || !readyProviderIds.has(provider.id)) continue
+    const models = snapshot.models
+      .filter((model) => model.providerId === provider.id && model.enabled && !model.hidden)
+      .toSorted((left, right) => left.sortOrder - right.sortOrder)
+    const model = models.find((entry) => entry.isDefault) ?? models[0]
+    if (model !== undefined) return model.id
+  }
+  return null
 }

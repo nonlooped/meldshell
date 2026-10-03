@@ -103,17 +103,14 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     const page = desktop.page
     await page.getByRole("button", { name: /^Settings/ }).click()
     await page.getByRole("button", { name: "Run setup again", exact: true }).click()
-    const guide = page.getByRole("dialog", { name: "Set up MeldShell", exact: true })
+    const guide = page.getByRole("main", { name: "Set up MeldShell", exact: true })
     await guide.getByRole("button", { name: "Get started", exact: true }).click()
     await guide.getByRole("switch", { name: "Use OpenAI", exact: true }).waitFor()
-    await guide.getByRole("button", { name: "Continue", exact: true }).click()
-    await guide.getByRole("heading", { name: "Pick a starting model", exact: true }).waitFor()
     await guide.getByRole("button", { name: "Continue", exact: true }).click()
     await guide.getByRole("radio", { name: /workspace with spaces/ }).click()
     await guide.getByRole("button", { name: "Continue", exact: true }).click()
     await guide.getByRole("radio", { name: "Light", exact: true }).click()
     await page.waitForFunction(() => document.documentElement.dataset.theme === "light")
-    await guide.getByRole("button", { name: "Continue", exact: true }).click()
     await guide.getByRole("button", { name: "Start your first thread", exact: true }).click()
     await guide.waitFor({ state: "detached" })
     await expect
@@ -131,7 +128,7 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     await desktop.restart()
     await desktop.page.getByRole("button", { name: /^Settings/ }).click({ timeout: 30_000 })
     await desktop.page.getByRole("button", { name: "Run setup again", exact: true }).waitFor()
-    expect(await desktop.page.getByRole("dialog", { name: "Set up MeldShell" }).count()).toBe(0)
+    expect(await desktop.page.getByRole("main", { name: "Set up MeldShell" }).count()).toBe(0)
   })
 
   test("workspace file operations round trip Unicode names and reject escaping the workspace", async ({

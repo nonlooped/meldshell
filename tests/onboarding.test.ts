@@ -2,10 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { AppSnapshot, Provider, ProviderModel } from "@meldshell/contracts"
 import {
-  defaultModelId,
-  modelChoices,
   needsOnboarding,
   onboardingProviders,
+  starterModelId,
 } from "../packages/ui/src/onboarding/onboarding-model.ts"
 
 const provider = (id: string, sortOrder: number, patch: Partial<Provider> = {}): Provider => ({
@@ -65,7 +64,7 @@ test("agent rows list built-in providers in catalog order", () => {
   )
 })
 
-test("model choices skip disabled, hidden, and unready entries", () => {
+test("the first thread starts on a ready agent's default model", () => {
   const state = snapshot({
     providers: [
       provider("codex", 0),
@@ -73,32 +72,16 @@ test("model choices skip disabled, hidden, and unready entries", () => {
       provider("cursor", 2, { enabled: false }),
     ],
     models: [
-      model("gpt", "codex", { sortOrder: 1 }),
-      model("gpt-mini", "codex", { sortOrder: 0, hidden: true }),
-      model("gpt-off", "codex", { enabled: false }),
-      model("opus", "claude"),
+      model("gpt", "codex"),
+      model("sonnet", "claude", { sortOrder: 0, hidden: true }),
+      model("opus", "claude", { sortOrder: 1 }),
+      model("haiku", "claude", { sortOrder: 2, isDefault: true }),
+      model("haiku-off", "claude", { enabled: false, isDefault: true }),
       model("composer", "cursor"),
     ],
   })
-  const groups = modelChoices(state, new Set(["codex", "cursor"]))
-  assert.deepEqual(
-    groups.map((group) => [group.provider.id, group.models.map((entry) => entry.id)]),
-    [["codex", ["gpt"]]],
-  )
-})
-
-test("the preselected model keeps a valid pick, then prefers the advertised default", () => {
-  const state = snapshot({
-    providers: [provider("codex", 0), provider("claude", 1)],
-    models: [
-      model("a", "codex", { sortOrder: 0 }),
-      model("b", "codex", { sortOrder: 1, isDefault: true }),
-      model("c", "claude"),
-    ],
-  })
-  const groups = modelChoices(state, new Set(["codex", "claude"]))
-  assert.equal(defaultModelId(groups, null), "b")
-  assert.equal(defaultModelId(groups, "c"), "c")
-  assert.equal(defaultModelId(groups, "gone"), "b")
-  assert.equal(defaultModelId([], null), null)
+  assert.equal(starterModelId(state, new Set(["claude", "cursor"])), "haiku")
+  assert.equal(starterModelId(state, new Set(["codex", "claude"])), "gpt")
+  assert.equal(starterModelId(state, new Set(["cursor"])), null)
+  assert.equal(starterModelId(state, new Set()), null)
 })
