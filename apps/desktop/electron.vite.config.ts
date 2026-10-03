@@ -12,6 +12,7 @@ const bundledMainPackages = [
   "@meldshell/provider-codex",
   "@meldshell/provider-claude",
   "@meldshell/provider-cursor",
+  "@meldshell/provider-pi",
   // ESM-only. Externalizing it would turn the default import into a CommonJS module object.
   "electron-context-menu",
   "htmlparser2",
@@ -30,6 +31,7 @@ export default defineConfig({
           "codex-worker": resolve("src/main/workers/codex.ts"),
           "claude-worker": resolve("src/main/workers/claude.ts"),
           "cursor-worker": resolve("src/main/workers/cursor.ts"),
+          "pi-worker": resolve("src/main/workers/pi.ts"),
         },
       },
     },

@@ -31,6 +31,7 @@ import { getSnapshot } from "./snapshots"
 import { isShuttingDown, markShuttingDown, readAppSettings } from "./settings"
 import {
   CLAUDE_EXIT_PLAN_MODE,
+  PI_EXTENSION_UI_REQUEST,
   CLAUDE_PERMISSION_MODE,
   eventKind,
   eventText,
@@ -346,7 +347,7 @@ export const interruptTurn = (threadId: string) =>
       readonly native_thread_id: string | null
     }>`
       SELECT t.id, t.harness, t.worker_generation, t.native_turn_id,
-             COALESCE(ps.native_thread_id, CASE WHEN t.harness IN ('claude-code', 'cursor') THEN t.id END) AS native_thread_id
+             COALESCE(ps.native_thread_id, CASE WHEN t.harness IN ('claude-code', 'cursor', 'pi') THEN t.id END) AS native_thread_id
       FROM turns t
       LEFT JOIN provider_sessions ps ON ps.thread_id = t.thread_id AND ps.harness = t.harness
       WHERE t.thread_id = ${threadId} AND t.status = 'running' LIMIT 1
@@ -372,7 +373,7 @@ export const beginShutdown = Effect.gen(function* () {
     nativeThreadId: string | null
     nativeTurnId: string | null
   }>`
-    SELECT t.thread_id AS threadId, t.id AS turnId, t.harness, COALESCE(ps.native_thread_id, CASE WHEN t.harness IN ('claude-code', 'cursor') THEN t.id END) AS nativeThreadId, t.native_turn_id AS nativeTurnId
+    SELECT t.thread_id AS threadId, t.id AS turnId, t.harness, COALESCE(ps.native_thread_id, CASE WHEN t.harness IN ('claude-code', 'cursor', 'pi') THEN t.id END) AS nativeThreadId, t.native_turn_id AS nativeTurnId
     FROM turns t LEFT JOIN provider_sessions ps ON ps.thread_id = t.thread_id AND ps.harness = t.harness WHERE t.status = 'running'`
 }).pipe(transaction)
 
@@ -485,6 +486,7 @@ const persistApproval = (input: RuntimeEventInput) =>
         "cursor/ask_question",
         "cursor/ask_user_question",
         "cursor/create_plan",
+        PI_EXTENSION_UI_REQUEST,
         CLAUDE_EXIT_PLAN_MODE,
       ].includes(input.method)
     ) {

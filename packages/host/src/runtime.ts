@@ -6,9 +6,11 @@ import {
   codexProviderLive,
   claudeProviderLive,
   cursorProviderLive,
+  piProviderLive,
   CodexProvider,
   ClaudeProvider,
   CursorProvider,
+  PiProvider,
   providerFor,
 } from "./worker-provider"
 import { ProviderUpdates, providerUpdatesLive } from "./provider-updates"
@@ -17,7 +19,9 @@ import { stopAllWorktreeSetups } from "./workspace-scripts"
 export const createHostRuntime = (platform: typeof HostPlatform.Service) =>
   ManagedRuntime.make(
     providerUpdatesLive.pipe(
-      Layer.provideMerge(Layer.mergeAll(codexProviderLive, claudeProviderLive, cursorProviderLive)),
+      Layer.provideMerge(
+        Layer.mergeAll(codexProviderLive, claudeProviderLive, cursorProviderLive, piProviderLive),
+      ),
       Layer.provideMerge(Layer.merge(CoreClient.layer, HostEvents.layer)),
       Layer.provideMerge(Layer.succeed(HostPlatform, platform)),
     ),
@@ -30,6 +34,7 @@ export type HostServices =
   | CodexProvider
   | ClaudeProvider
   | CursorProvider
+  | PiProvider
   | ProviderUpdates
 export const stopHost = Effect.gen(function* () {
   const core = yield* CoreClient
@@ -51,10 +56,15 @@ export const stopHost = Effect.gen(function* () {
         : Effect.void,
     { discard: true },
   )
-  const providers = [yield* CodexProvider, yield* ClaudeProvider, yield* CursorProvider]
+  const providers = [
+    yield* CodexProvider,
+    yield* ClaudeProvider,
+    yield* CursorProvider,
+    yield* PiProvider,
+  ]
   yield* Effect.all(
     providers.map((provider) => provider.shutdown),
-    { concurrency: 3 },
+    { concurrency: providers.length },
   )
   yield* core.FinishShutdown().pipe(Effect.catch(Effect.logError))
 })

@@ -4,7 +4,7 @@ The Windows MeldShell app offers **Windows (native)** and **WSL (Linux)** modes 
 
 New installations default to Windows mode, where agents, tools, Git, editors, and terminals run directly on Windows without WSL. Native terminals use PowerShell (with Command Prompt as a fallback). Existing installations with a saved WSL distribution or `MELDSHELL_WSL_DISTRO` retain WSL mode until you choose otherwise. The mode is saved in `environment.json` in the Windows user-data directory; an explicit Windows choice takes precedence over the distribution environment variable.
 
-In WSL mode, MeldShell runs its host in one selected WSL distribution. Codex, Claude Code, Cursor CLI, their tools and MCP servers, Git, worktrees, setup scripts, terminals, and development servers run there. MeldShell does not automatically fall back to Windows tools when WSL is unavailable. The Linux desktop continues to run its host locally.
+In WSL mode, MeldShell runs its host in one selected WSL distribution. Codex, Claude Code, Cursor CLI, Pi, their tools and MCP servers, Git, worktrees, setup scripts, terminals, and development servers run there. MeldShell does not automatically fall back to Windows tools when WSL is unavailable. The Linux desktop continues to run its host locally.
 
 ## Set up the distribution
 

@@ -305,6 +305,7 @@ for (const [harness, status, refresh, usage] of [
   ["codex", C.IPC.getCodexStatus, C.IPC.refreshCodexStatus, C.IPC.getCodexUsage],
   ["claude-code", C.IPC.getClaudeStatus, C.IPC.refreshClaudeStatus, C.IPC.getClaudeUsage],
   ["cursor", C.IPC.getCursorStatus, C.IPC.refreshCursorStatus, C.IPC.getCursorUsage],
+  ["pi", C.IPC.getPiStatus, C.IPC.refreshPiStatus, C.IPC.getPiUsage],
 ] as const) {
   hostOperations[status] = operation(noInput, true, () =>
     Effect.flatMap(providerFor(harness), (service) => service.status),

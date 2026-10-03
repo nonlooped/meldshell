@@ -16,6 +16,7 @@ import {
   type ClaudeProvider,
   type CodexProvider,
   type CursorProvider,
+  type PiProvider,
 } from "./worker-provider"
 
 /*
@@ -58,6 +59,10 @@ const LATEST_SOURCES: {
     parse: npmVersion,
   },
   cursor: { url: "https://cursor.com/install", parse: cursorInstallerVersion },
+  pi: {
+    url: "https://registry.npmjs.org/@earendil-works/pi-coding-agent/latest",
+    parse: npmVersion,
+  },
 }
 
 type VersionOrder = "behind" | "current" | "ahead"
@@ -102,6 +107,7 @@ const SELF_UPDATE: { readonly [Key in Harness]: string } = {
   codex: "codex update",
   "claude-code": "claude update",
   cursor: "agent update",
+  pi: "pi update",
 }
 
 /**
@@ -187,7 +193,7 @@ const defaultDependencies: UpdateDependencies = {
   now: Date.now,
 }
 
-type Providers = CodexProvider | ClaudeProvider | CursorProvider
+type Providers = CodexProvider | ClaudeProvider | CursorProvider | PiProvider
 
 /** What an updater run left behind, reported by the version check that follows it. */
 interface InstallOutcome {

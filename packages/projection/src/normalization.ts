@@ -10,16 +10,20 @@ import {
   type CanonicalEventKind,
 } from "@meldshell/contracts"
 import { cursorEventKind, cursorEventText } from "./cursor"
+import { piEventKind, piEventText } from "./pi"
 
 /** Claude Code asks to leave plan mode with the plan it wrote; approving it starts the work. */
 export const CLAUDE_EXIT_PLAN_MODE = "claude/exit_plan_mode"
 /** Claude Code left plan mode, so the thread's next turn should not start in it again. */
 export const CLAUDE_PERMISSION_MODE = "claude/permission_mode"
+/** A Pi extension opened a dialog that waits for the user's answer. */
+export const PI_EXTENSION_UI_REQUEST = "pi/extension_ui_request"
 
 export const eventKind = (method: string, params: unknown): CanonicalEventKind => {
   if (method.startsWith("cursor/")) return cursorEventKind(method, params)
   if (method === CLAUDE_EXIT_PLAN_MODE) return "approval"
   if (method === CLAUDE_PERMISSION_MODE) return "status"
+  if (method.startsWith("pi/")) return piEventKind(method, params)
   return nativeEventKind(method, params)
 }
 
@@ -65,6 +69,7 @@ export const planText = (value: unknown): string | null => {
 
 export const eventText = (method: string, params: unknown): string | null => {
   if (method.startsWith("cursor/")) return cursorEventText(method, params)
+  if (method.startsWith("pi/")) return piEventText(method, params)
   const decoded = decodeNativePayload(params)
   if (Result.isFailure(decoded)) return `Invalid ${method} payload: ${decoded.failure.message}`
   const record = decoded.success
@@ -109,6 +114,7 @@ export const approvalCopy = (
 ): { title: string; detail: string } => {
   if (method === "cursor/ask_question" || method === "cursor/ask_user_question")
     return questionCopy("Cursor", params)
+  if (method === PI_EXTENSION_UI_REQUEST) return questionCopy("Pi", params)
   if (method.startsWith("cursor/")) {
     const decoded = decodeCursorPayload(params)
     return Result.isSuccess(decoded)

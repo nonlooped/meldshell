@@ -11,7 +11,7 @@ import {
   type Provider,
   type UsageLimit,
 } from "@meldshell/contracts"
-import { harnessApi, knownHarness } from "../data/providers"
+import { harnessApi } from "../data/providers"
 import { RefreshCw, TriangleAlert } from "lucide-react"
 import { ProviderIcon } from "../ui/ProviderIcon"
 import { Button } from "../ui/controls"
@@ -29,10 +29,17 @@ import {
   windowLabel,
 } from "./usage-format"
 
-export const hasSubscriptionUsage = (provider: Provider): boolean => isHarness(provider.harness)
+/** Pi reaches models through the user's own provider accounts, so it has no subscription to show. */
+type SubscriptionHarness = Exclude<Harness, "pi">
+
+const isSubscriptionHarness = (harness: string): harness is SubscriptionHarness =>
+  isHarness(harness) && harness !== "pi"
+
+export const hasSubscriptionUsage = (provider: Provider): boolean =>
+  isSubscriptionHarness(provider.harness)
 
 const SUBSCRIPTIONS: {
-  readonly [Key in Harness]: {
+  readonly [Key in SubscriptionHarness]: {
     readonly name: string
     readonly account: string
     readonly usageHint: string
@@ -59,7 +66,7 @@ const SUBSCRIPTIONS: {
 }
 
 function subscriptionProvider(provider: string) {
-  const harness = knownHarness(provider)
+  const harness = isSubscriptionHarness(provider) ? provider : "codex"
   return { harness, ...SUBSCRIPTIONS[harness], ...harnessApi(harness) }
 }
 

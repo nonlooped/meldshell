@@ -72,6 +72,7 @@ const SIGN_IN_HINTS: Readonly<Record<string, string>> = {
   codex: "Run codex login in a terminal, then check again.",
   "claude-code": "Sign in to Claude Code in a terminal, then check again.",
   cursor: "Sign in with Cursor CLI, then check again.",
+  pi: "Run pi and use /login, or set a provider API key, then check again.",
 }
 
 /** Problems a person has to fix outside MeldShell open the card so the next step is visible. */

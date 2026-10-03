@@ -35,6 +35,11 @@ const harnessApis: { readonly [Key in Harness]: HarnessApi } = {
     refreshStatus: () => window.meldshell.refreshCursorStatus(),
     getUsage: () => window.meldshell.getCursorUsage(),
   },
+  pi: {
+    getStatus: () => window.meldshell.getPiStatus(),
+    refreshStatus: () => window.meldshell.refreshPiStatus(),
+    getUsage: () => window.meldshell.getPiUsage(),
+  },
 }
 
 /** A provider's harness; an unknown one reads as Codex, as the host routes it. */
