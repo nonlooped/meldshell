@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { copyFile, mkdtemp, rm } from "node:fs/promises"
+import { copyFile, mkdtemp, rm, stat, utimes } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { ThreadLocation } from "@meldshell/contracts"
@@ -56,7 +56,14 @@ export async function captureSnapshot(cwd: string, ref: string): Promise<boolean
   try {
     // A copy of the real index keeps Git's file stat cache, so unchanged files are not re-read.
     // A repository without commits may have no index yet; staging then starts from nothing.
-    await copyFile(index, temporary).catch(() => undefined)
+    const original = await stat(index).catch(() => null)
+    if (original !== null) {
+      await copyFile(index, temporary)
+      // Git rehashes entries written no earlier than the index itself, since a same-size edit in
+      // that instant leaves the stat cache unchanged. A fresh copy would look newer than every
+      // entry and hide such edits, so the copy keeps the index's own time.
+      await utimes(temporary, original.atime, original.mtime)
+    }
     const env = { ...identity, GIT_INDEX_FILE: temporary }
     await git(cwd, ["add", "--all", "--", "."], CAPTURE_TIMEOUT, undefined, env)
     const tree = (await git(cwd, ["write-tree"], CAPTURE_TIMEOUT, undefined, env)).trim()

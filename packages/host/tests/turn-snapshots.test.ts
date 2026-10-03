@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -109,6 +109,27 @@ test("snapshots skip folders outside Git and are removed with their thread", asy
     assert.deepEqual(snapshot, { before: false, after: false, patch: null, undoable: false })
   } finally {
     await rm(plain, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("a same-size edit in the instant the index was written still reaches the snapshot", async () => {
+  const root = await repository()
+  try {
+    // Compare only what a coarse filesystem clock would: whole-second times and sizes.
+    run(root, "config", "core.checkStat", "minimal")
+    run(root, "config", "core.trustctime", "false")
+    const instant = new Date(Math.floor(Date.now() / 1000 - 5) * 1000)
+    const file = join(root, "tracked.txt")
+    await utimes(file, instant, instant)
+    run(root, "add", "tracked.txt")
+    await utimes(join(root, ".git", "index"), instant, instant)
+    await writeFile(file, "two\n")
+    await utimes(file, instant, instant)
+    const ref = turnSnapshotRef("thread", "turn", "after")
+    assert.equal(await captureSnapshot(root, ref), true)
+    assert.equal(run(root, "show", `${ref}:tracked.txt`), "two")
+  } finally {
     await rm(root, { recursive: true, force: true })
   }
 })
