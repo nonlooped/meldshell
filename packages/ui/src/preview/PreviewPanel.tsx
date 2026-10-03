@@ -563,7 +563,7 @@ function AgentActivityOverlay({ threadId }: { threadId: string }): React.JSX.Ele
 /** Says how design mode works while it waits for a click. */
 function DesignModeHint(): React.JSX.Element {
   return (
-    <div className="pointer-events-none absolute top-[10px] left-[50%] [transform:translateX(-50%)] flex max-w-[calc(100%_-_20px)] items-center gap-[6px] h-[28px] [padding:0_12px_0_9px] rounded-full border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-menu)] text-[var(--text-secondary)] text-[11.5px] whitespace-nowrap [box-shadow:0_4px_14px_rgba(0,_0,_0,_0.25)]">
+    <div className="pointer-events-none absolute bottom-[12px] left-[50%] [transform:translateX(-50%)] flex max-w-[calc(100%_-_20px)] items-center gap-[6px] h-[28px] [padding:0_12px_0_9px] rounded-full border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-menu)] text-[var(--text-secondary)] text-[11.5px] whitespace-nowrap [box-shadow:0_4px_14px_rgba(0,_0,_0,_0.25)]">
       <MousePointerClick size={13} strokeWidth={1.75} className="flex-none text-[var(--accent)]" />
       <span role="status" className="min-w-0 overflow-hidden text-ellipsis">
         <span className="font-[550] text-[var(--text-primary)]">Click an element</span> to add it to

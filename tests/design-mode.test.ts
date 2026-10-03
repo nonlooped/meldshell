@@ -46,7 +46,8 @@ test("HTML holding a code fence gets a longer fence", () => {
 test("the screenshot becomes an image attachment carrying the element's details", () => {
   const attachment = elementAttachment(element())
   assert.equal(attachment?.type, "image")
-  assert.equal(attachment?.name, "<button.cta>")
+  assert.equal(attachment?.name, "<button.cta> Start free")
+  assert.equal(elementAttachment(element({ text: "" }))?.name, "<button.cta>")
   assert.equal(attachment?.context, elementContext(element()))
   assert.equal(elementAttachment(element({ screenshot: null })), null)
 })

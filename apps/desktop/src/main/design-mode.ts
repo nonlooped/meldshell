@@ -96,6 +96,7 @@ const pickScript = (accent: string): string => `(() => {
           break;
         }
         let part = node.localName;
+        for (const name of Array.from(node.classList).slice(0, 2)) part += "." + CSS.escape(name);
         const parent = node.parentElement;
         if (parent) {
           const same = Array.from(parent.children).filter((child) => child.localName === node.localName);
@@ -107,7 +108,7 @@ const pickScript = (accent: string): string => `(() => {
       return parts.join(" > ");
     };
     const usual = (property, value, styles) => {
-      if (["none", "normal", "auto", "0px", "rgba(0, 0, 0, 0)", "static", "visible", "start", ""].includes(value)) return true;
+      if (["none", "normal", "auto", "0px", "rgba(0, 0, 0, 0)", "static", "visible", "start", "row", "nowrap", "all", ""].includes(value)) return true;
       if (["top", "right", "bottom", "left", "z-index"].includes(property)) return styles.position === "static";
       if (["flex-direction", "flex-wrap", "justify-content", "align-items"].includes(property))
         return !styles.display.includes("flex");

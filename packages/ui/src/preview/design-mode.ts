@@ -11,6 +11,9 @@ const block = (language: string, body: string): string => {
   return `${marks}${language}\n${body}\n${marks}`
 }
 
+const shorten = (text: string, limit: number): string =>
+  text.length > limit ? `${text.slice(0, limit - 1)}…` : text
+
 /** What the agent reads about an element picked in the preview. */
 export function elementContext(element: PickedElement): string {
   const lines = [
@@ -33,7 +36,7 @@ export function elementAttachment(element: PickedElement): ComposerAttachment | 
   return {
     type: "image",
     value: element.screenshot,
-    name: `<${element.label}>`,
+    name: element.text ? `<${element.label}> ${shorten(element.text, 32)}` : `<${element.label}>`,
     context: elementContext(element),
   }
 }
