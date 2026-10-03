@@ -90,7 +90,8 @@ export function HandoffNotice({
 }): React.JSX.Element | null {
   const previous = thread.lastHarness
   const moving = previous !== undefined && previous !== harness
-  if (!moving && thread.rewound !== true) return null
+  // A rewind past the first turn leaves nothing to summarize.
+  if (!moving && (thread.rewound !== true || previous === undefined)) return null
   return (
     <div
       role="status"

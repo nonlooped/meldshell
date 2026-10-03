@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, type ReactNode } from "react"
+import { create } from "zustand"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, CircleAlert, History, Rewind, Undo2, X } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
@@ -185,6 +186,22 @@ type Status =
   | { readonly state: "undone"; readonly rewind: boolean }
   | { readonly state: "failed"; readonly message: string }
 
+/**
+ * Each thread's pill outlives the transcript that showed it: rewinding every turn swaps the
+ * transcript for the empty thread's view, and the Undo has to survive that.
+ */
+const useStatuses = create<{
+  readonly statuses: Readonly<Record<string, Status>>
+  readonly set: (threadId: string, status: Status | null) => void
+}>((set) => ({
+  statuses: {},
+  set: (threadId, status) =>
+    set(({ statuses }) => {
+      const { [threadId]: _, ...rest } = statuses
+      return { statuses: status === null ? rest : { ...rest, [threadId]: status } }
+    }),
+}))
+
 const turns = (count: number) => `${count} ${count === 1 ? "turn" : "turns"}`
 
 const statusText = (status: Status) => {
@@ -231,8 +248,11 @@ export function TurnSnapshots({
   running,
   onRewound,
   onRewindUndone,
+  inline = false,
   children,
 }: {
+  /** Shows the pill below the content instead of floating over the transcript's foot. */
+  readonly inline?: boolean
   /** Absent when the transcript has no folder to restore, such as a remote preview. */
   readonly workspaceId: string | undefined
   readonly threadId: string
@@ -244,7 +264,8 @@ export function TurnSnapshots({
   readonly children: ReactNode
 }): React.JSX.Element {
   const client = useQueryClient()
-  const [status, setStatus] = useState<Status | null>(null)
+  const status = useStatuses((state) => state.statuses[threadId] ?? null)
+  const setStatus = (next: Status | null) => useStatuses.getState().set(threadId, next)
   const refresh = () => client.invalidateQueries({ queryKey: queryKeys.turnSnapshots(threadId) })
   const fail = (cause: Error) => setStatus({ state: "failed", message: cause.message })
   const restore = useMutation({
@@ -282,17 +303,15 @@ export function TurnSnapshots({
     onSettled: refresh,
   })
   // A new turn changes the files again, so the restore it followed is no longer the latest state.
-  const [wasRunning, setWasRunning] = useState(running)
-  if (running !== wasRunning) {
-    setWasRunning(running)
-    if (running) setStatus(null)
-  }
+  useEffect(() => {
+    if (running) useStatuses.getState().set(threadId, null)
+  }, [running, threadId])
   // A finished undo fades on its own; a restore waits for its Undo and a failure for its reader.
   useEffect(() => {
     if (status?.state !== "undone") return
-    const timer = window.setTimeout(() => setStatus(null), 2400)
+    const timer = window.setTimeout(() => useStatuses.getState().set(threadId, null), 2400)
     return () => window.clearTimeout(timer)
-  }, [status])
+  }, [status, threadId])
   if (workspaceId === undefined) return <>{children}</>
   const pending = restore.isPending || rewind.isPending || undo.isPending
   return (
@@ -307,7 +326,13 @@ export function TurnSnapshots({
       }}
     >
       {children}
-      <div className="absolute z-[2] bottom-[52px] inset-x-[16px] flex justify-center pointer-events-none">
+      <div
+        className={
+          inline
+            ? "flex justify-center mt-[16px] empty:hidden"
+            : "absolute z-[2] bottom-[52px] inset-x-[16px] flex justify-center pointer-events-none"
+        }
+      >
         <PopPresence show={status !== null}>
           {status !== null && (
             <div role="status" className={pillClasses}>

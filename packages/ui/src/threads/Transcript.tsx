@@ -820,7 +820,17 @@ export function Transcript({
   if (turns.length === 0)
     return (
       <div className="transcript-origin [padding:0_var(--pane-gutter)_24px]">
-        <FadeDiv className="w-full max-w-[680px] [margin:0_auto]">{origin}</FadeDiv>
+        {/* A rewind past the first turn lands here, and its Undo still has to show. */}
+        <TurnSnapshots
+          inline
+          workspaceId={scope?.workspaceId}
+          threadId={threadId}
+          running={running}
+          onRewound={onRewound}
+          onRewindUndone={onRewindUndone}
+        >
+          <FadeDiv className="w-full max-w-[680px] [margin:0_auto]">{origin}</FadeDiv>
+        </TurnSnapshots>
       </div>
     )
 
