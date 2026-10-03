@@ -17,6 +17,8 @@ interface ShortcutActions {
   toggleTerminal: () => void
   togglePreview: () => void
   openInEditor: () => void
+  /** Starts or stops dictation in the thread in front; null when no thread is. */
+  dictate: (() => void) | null
 }
 
 export function handleAppShortcut(
@@ -38,6 +40,7 @@ export function handleAppShortcut(
   if (action === null) return
   if (action === "closeTab" && actions.selectedThreadId === null) return
   if (action === "archiveThread" && actions.toggleArchived === null) return
+  if (action === "dictate" && actions.dictate === null) return
   event.preventDefault()
   const run: Record<ShortcutAction, () => void> = {
     newThread: actions.requestNewThread,
@@ -55,6 +58,7 @@ export function handleAppShortcut(
     toggleTerminal: actions.toggleTerminal,
     togglePreview: actions.togglePreview,
     openInEditor: actions.openInEditor,
+    dictate: () => actions.dictate?.(),
   }
   run[action]()
 }

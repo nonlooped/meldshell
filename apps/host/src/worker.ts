@@ -4,6 +4,7 @@ import { runCodexWorker } from "@meldshell/provider-codex/worker"
 import { runClaudeWorker } from "@meldshell/provider-claude/worker"
 import { runCursorWorker } from "@meldshell/provider-cursor/worker"
 import { runPiWorker } from "@meldshell/provider-pi/worker"
+import { runDictationWorker } from "@meldshell/host/dictation-worker"
 
 if (!process.send) throw new Error("Host workers require a parent IPC channel.")
 const messages = new EventEmitter()
@@ -37,7 +38,9 @@ if (kind === "core-worker.js") {
           ? runCursorWorker(port)
           : kind === "pi-worker.js"
             ? runPiWorker(port)
-            : null
+            : kind === "dictation-worker.js" && process.env.MELDSHELL_DICTATION_CACHE
+              ? runDictationWorker(port, process.env.MELDSHELL_DICTATION_CACHE)
+              : null
   if (!worker) throw new Error("Unknown host worker")
   shutdown = worker.shutdown
 }

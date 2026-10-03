@@ -41,6 +41,8 @@ import {
   undoSnapshotRestore,
 } from "./turn-snapshots"
 import { requestGeneratedText } from "./generated-text"
+import { HostPlatform } from "./platform"
+import { hostDictation, type Dictation } from "./dictation"
 import {
   createPullRequest,
   getPullRequestStatus,
@@ -372,6 +374,23 @@ hostOperations[C.IPC.generatePullRequest] = operation(C.WorkspaceScope, false, (
     const text = yield* generateText(input, (path) => pullRequestPrompt(path, base))
     return yield* attempt(async () => parsePullRequestDraft(text))
   }),
+)
+const withDictation = <A>(run: (dictation: Dictation, model: C.DictationModel) => Promise<A>) =>
+  Effect.gen(function* () {
+    const platform = yield* HostPlatform
+    const snapshot = yield* Effect.flatMap(CoreClient, (core) => core.GetSnapshot())
+    const dictation = hostDictation(platform.fork, platform.databasePath)
+    return yield* attempt(() => run(dictation, snapshot.settings.dictationModel ?? "fast"))
+  })
+// Dictation changes no stored state, so other clients have nothing to reload.
+hostOperations[C.IPC.getDictationStatus] = operation(noInput, true, () =>
+  withDictation((dictation, model) => dictation.status(model)),
+)
+hostOperations[C.IPC.prepareDictation] = operation(noInput, true, () =>
+  withDictation((dictation, model) => dictation.prepare(model)),
+)
+hostOperations[C.IPC.transcribeAudio] = operation(C.TranscribeAudioInput, true, (input) =>
+  withDictation((dictation, model) => dictation.transcribe(model, input)),
 )
 hostOperations[C.IPC.createPullRequest] = operation(C.CreatePullRequestInput, false, (input) =>
   Effect.flatMap(preferredBase(input), (base) =>

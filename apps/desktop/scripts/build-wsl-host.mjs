@@ -29,6 +29,7 @@ await build({
   configFile: false,
   publicDir: false,
   ssr: { noExternal: true, external },
+  resolve: { alias: { sharp: join(root, "apps/desktop/scripts/no-sharp.mjs") } },
   build: {
     ssr: true,
     target: "node24",

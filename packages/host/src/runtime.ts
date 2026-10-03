@@ -15,6 +15,7 @@ import {
 } from "./worker-provider"
 import { ProviderUpdates, providerUpdatesLive } from "./provider-updates"
 import { stopAllWorktreeSetups } from "./workspace-scripts"
+import { stopDictation } from "./dictation"
 
 export const createHostRuntime = (platform: typeof HostPlatform.Service) =>
   ManagedRuntime.make(
@@ -39,6 +40,7 @@ export type HostServices =
 export const stopHost = Effect.gen(function* () {
   const core = yield* CoreClient
   yield* stopAllWorktreeSetups.pipe(Effect.catch(Effect.logError))
+  stopDictation()
   const turns = yield* core
     .BeginShutdown()
     .pipe(Effect.catch((cause) => Effect.as(Effect.logError(cause), [])))

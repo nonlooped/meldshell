@@ -5,6 +5,7 @@ export * from "./worker"
 export * from "./ipc"
 export * from "./remote"
 export * from "./schedule-times"
+export * from "./dictation"
 export * from "./unknown"
 export * from "./provider-payloads"
 export {

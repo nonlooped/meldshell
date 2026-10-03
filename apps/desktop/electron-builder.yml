@@ -18,12 +18,23 @@ files:
   - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
   # Claude Code is discovered on the user's machine; never ship the SDK's native CLI.
   - "!node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+  # Dictation bundles transformers.js into its worker and runs it on ONNX Runtime's native
+  # binding; the web runtime and the image library it would otherwise pull in stay out.
+  - "!node_modules/@huggingface/**"
+  - "!node_modules/onnxruntime-web/**"
+  - "!node_modules/sharp/**"
+  - "!node_modules/@img/**"
 asar: true
 asarUnpack:
   # Terminals: the native addon and, on Windows, the ConPTY helpers it launches as programs.
   - node_modules/node-pty/**
+  # ONNX Runtime loads its shared libraries from disk.
+  - node_modules/onnxruntime-node/**
   - resources/**
 win:
+  files:
+    - "!node_modules/onnxruntime-node/bin/napi-v6/{darwin,linux}/**"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/win32/arm64/**"
   extraResources:
     - from: out/wsl-host
       to: wsl-host
@@ -34,6 +45,9 @@ win:
       arch:
         - x64
 linux:
+  files:
+    - "!node_modules/onnxruntime-node/bin/napi-v6/{darwin,win32}/**"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/linux/arm64/**"
   category: Development
   executableName: meldshell
   icon: build/icon.png

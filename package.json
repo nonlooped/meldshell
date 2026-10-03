@@ -31,7 +31,7 @@
     "control": "npm run dev --workspace=@meldshell/control",
     "dev:all": "node scripts/dev-all.mjs",
     "dev:host": "node scripts/dev-host.mjs",
-    "test:tooling": "node --import tsx --test tests/ci-scope.test.mjs tests/markdown-blocks.test.ts tests/onboarding.test.ts tests/pull-requests.test.ts tests/review-notes.test.ts tests/changelog.test.ts tests/release-cli.test.mjs",
+    "test:tooling": "node --import tsx --test tests/ci-scope.test.mjs tests/markdown-blocks.test.ts tests/onboarding.test.ts tests/dictation.test.ts tests/pull-requests.test.ts tests/review-notes.test.ts tests/changelog.test.ts tests/release-cli.test.mjs",
     "test:e2e:list": "e2e list",
     "typecheck:e2e": "tsc --noEmit -p tests/e2e/tsconfig.json"
   },

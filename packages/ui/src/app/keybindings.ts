@@ -20,6 +20,7 @@ export type ShortcutAction =
   | "toggleTerminal"
   | "togglePreview"
   | "openInEditor"
+  | "dictate"
 
 export interface ShortcutDefinition {
   readonly id: ShortcutAction
@@ -52,6 +53,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     chord: "Ctrl+Shift+B",
   },
   { id: "openInEditor", label: "Open in editor", group: "Workspace", chord: "Ctrl+Shift+E" },
+  { id: "dictate", label: "Start or stop dictation", group: "Workspace", chord: "Ctrl+Shift+D" },
 ]
 
 export type Keybindings = Readonly<Record<ShortcutAction, string>>

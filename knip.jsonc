@@ -22,6 +22,9 @@
         "@meldshell/core",
         "@meldshell/provider-runtime",
         "node-pty",
+        // Dictation's worker bundles transformers.js, which loads ONNX Runtime's native binding.
+        "onnxruntime-common",
+        "onnxruntime-node",
         "which",
         "ws"
       ]
