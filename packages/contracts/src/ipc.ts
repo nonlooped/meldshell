@@ -10,6 +10,9 @@ import type {
   GitCommitDiffInput,
   GitSnapshotInput,
   GitDiffInput,
+  TurnSnapshotInput,
+  RestoreTurnSnapshotInput,
+  UndoSnapshotRestoreInput,
 } from "./workspace-inputs"
 export type {
   WorkspaceScope,
@@ -25,6 +28,9 @@ export type {
   GitDiffInput,
   GitFileAction,
   GitDiffSide,
+  TurnSnapshotInput,
+  RestoreTurnSnapshotInput,
+  UndoSnapshotRestoreInput,
 } from "./workspace-inputs"
 
 import type { RemotePreviewInput, RemotePreviewFrame } from "./remote-preview"
@@ -106,6 +112,16 @@ export interface GitSnapshot {
   readonly changes: readonly GitChange[]
   readonly commits: readonly GitCommit[]
   readonly hasMore: boolean
+}
+
+/** What a turn's snapshots hold; a folder outside Git, or a turn from before snapshots, has none. */
+export interface TurnSnapshot {
+  /** The files were snapshotted when the turn started, so they can be restored to that point. */
+  readonly before: boolean
+  /** The files were snapshotted when the turn finished. */
+  readonly after: boolean
+  /** Every change between the two snapshots, including edits made by shell commands. */
+  readonly patch: string | null
 }
 
 type AppUpdateState =
@@ -301,6 +317,15 @@ export const requests = {
     "meldshell:get-git-snapshot",
   ),
   getGitDiff: request<(input: GitDiffInput) => Promise<string>>("meldshell:get-git-diff"),
+  getTurnSnapshot: request<(input: TurnSnapshotInput) => Promise<TurnSnapshot>>(
+    "meldshell:get-turn-snapshot",
+  ),
+  restoreTurnSnapshot: request<(input: RestoreTurnSnapshotInput) => Promise<void>>(
+    "meldshell:restore-turn-snapshot",
+  ),
+  undoSnapshotRestore: request<(input: UndoSnapshotRestoreInput) => Promise<void>>(
+    "meldshell:undo-snapshot-restore",
+  ),
   renameWorkspace: request<(input: { workspaceId: string; name: string }) => Promise<AppSnapshot>>(
     "meldshell:rename-workspace",
   ),

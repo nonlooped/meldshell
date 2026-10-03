@@ -7,6 +7,8 @@ export const queryKeys = {
   search: ["transcript-search"] as const,
   schedules: ["schedules"] as const,
   transcript: (threadId: string) => ["transcript", threadId] as const,
+  turnSnapshots: (threadId: string) => ["turn-snapshot", threadId] as const,
+  turnSnapshot: (threadId: string, turnId: string) => ["turn-snapshot", threadId, turnId] as const,
   providerStatus: (harness: string) => ["provider-status", harness] as const,
   providerUpdate: (harness: string) => ["provider-update", harness] as const,
   providerUsage: (harness: string) => ["provider-usage", harness] as const,

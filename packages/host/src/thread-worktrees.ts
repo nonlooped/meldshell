@@ -6,6 +6,7 @@ import { attempt } from "./attempt"
 import { CoreClient } from "./core-client"
 import { HostPlatform } from "./platform"
 import { statusAt } from "./git"
+import { deleteThreadSnapshots } from "./turn-snapshots"
 import {
   createWorktree,
   mergeWorktree,
@@ -164,6 +165,10 @@ export const deleteThread = (threadId: string) =>
       )
     yield* stopWorktreeSetup(threadId)
     const snapshot = yield* core.DeleteThread({ threadId })
+    // Snapshot refs live in the shared repository, so they outlast the thread's worktree.
+    yield* attempt(() => deleteThreadSnapshots(location.workspacePath, threadId)).pipe(
+      Effect.catch(Effect.logError),
+    )
     const worktree = location.worktree
     if (worktree !== null && worktree.state !== "removed")
       yield* attempt(() =>
