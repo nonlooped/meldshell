@@ -10,9 +10,10 @@ import { Radio } from "@base-ui-components/react/radio"
 import { RadioGroup } from "@base-ui-components/react/radio-group"
 import { Check, Download, Gauge, Sparkles } from "lucide-react"
 import { ActivitySpinner } from "../ui/motion"
-import { Button } from "../ui/controls"
+import { Button, ChordKeys } from "../ui/controls"
 import { useViewStore } from "../app/view-store"
 import { SettingRow } from "./SettingRow"
+import { SettingsGroup } from "./SettingsGroup"
 import { useKeybindings } from "../app/keybindings"
 import { dictationStatusQuery } from "../threads/Dictation"
 import { canRecord, dictationError } from "../threads/dictation-recorder"
@@ -86,28 +87,49 @@ export function DictationSettings({
   const model = settings.dictationModel ?? "fast"
   const status = useQuery(dictationStatusQuery(model))
   const shortcut = useKeybindings((state) => state.bindings.dictate)
+  const description = canRecord()
+    ? "Click the microphone in the composer, then speak; what you say is written at the caret. Speech becomes text on the computer running MeldShell, so it is free, needs no account, and recordings never leave it."
+    : "This browser cannot record audio here. Open MeldShell over HTTPS or in the desktop app."
   if (status.isError)
     return (
-      <p role="alert" className="text-[12px] text-[var(--text-secondary)]">
-        Update MeldShell on the host computer to use dictation.
-      </p>
+      <SettingsGroup title="Dictation" description={description}>
+        <p
+          role="alert"
+          className="m-0 [padding:18px_16px] text-[12px] text-[var(--text-secondary)]"
+        >
+          Update MeldShell on the host computer to use dictation.
+        </p>
+      </SettingsGroup>
     )
   if (!status.data)
     return (
-      <div className="flex min-h-[76px] items-center">
-        <ActivitySpinner />
-      </div>
+      <SettingsGroup title="Dictation" description={description}>
+        <div className="flex min-h-[62px] items-center [padding:0_16px] text-[var(--text-tertiary)]">
+          <ActivitySpinner />
+        </div>
+      </SettingsGroup>
     )
   const current = status.data.model === model ? status.data : null
   return (
-    <section className={groupClasses} aria-label="Dictation">
-      <p className="m-0 py-[18px] text-[12px] leading-[1.6] text-[var(--text-secondary)]">
-        {canRecord()
-          ? `Click the microphone in the composer${shortcut ? ` or press ${shortcut}` : ""}, then speak. What you say is written at the caret. Speech becomes text on the computer running MeldShell, so it is free, needs no account, and recordings never leave it.`
-          : "This browser cannot record audio here. Open MeldShell over HTTPS or in the desktop app."}
-      </p>
-      <SettingRow label="Dictation shortcut" description={shortcut || "No shortcut assigned."}>
-        <Button onClick={() => useViewStore.getState().openSettings("keyboard", "shortcuts")}>
+    <SettingsGroup title="Dictation" description={description}>
+      <SettingRow
+        label="Dictation shortcut"
+        description={
+          shortcut ? (
+            <span className="inline-flex flex-wrap items-center gap-x-[6px] gap-y-[2px]">
+              <ChordKeys chord={shortcut} className="text-[11px]" />
+              starts and stops dictation anywhere in MeldShell.
+            </span>
+          ) : (
+            "No shortcut assigned."
+          )
+        }
+      >
+        <Button
+          onClick={() =>
+            useViewStore.getState().selectSettingsSection("keyboard", "Start or stop dictation")
+          }
+        >
           Change shortcut
         </Button>
       </SettingRow>
@@ -159,7 +181,7 @@ export function DictationSettings({
       >
         {current ? <ModelState status={current} /> : <ActivitySpinner />}
       </SettingRow>
-    </section>
+    </SettingsGroup>
   )
 }
 
@@ -174,6 +196,3 @@ const modelTileClasses = [
   "[&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]",
   "[&[data-disabled]]:opacity-[0.6]",
 ].join(" ")
-
-const groupClasses =
-  "settings-group m-0 border-t-[1px] border-t-[color:var(--line-subtle)] border-b-[1px] border-b-[color:var(--line-subtle)]"

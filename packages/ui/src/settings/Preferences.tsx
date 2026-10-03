@@ -1,4 +1,4 @@
-import type { AppSettings, SetAppSettingsInput } from "@meldshell/contracts"
+import type { AppSettings, AppSnapshot, SetAppSettingsInput } from "@meldshell/contracts"
 import { useEffect, useState } from "react"
 import { Slider } from "@base-ui-components/react/slider"
 import { Radio } from "@base-ui-components/react/radio"
@@ -11,7 +11,8 @@ import { Switch } from "../ui/controls"
 import { cx, segmentClasses, segmentGroupClasses } from "../ui/styles"
 import { TEXT_SIZES, THEMES, ThemePreview } from "../ui/ThemePreview"
 import { SettingsGroup } from "./SettingsGroup"
-import { SettingRow } from "./SettingRow"
+import { SettingRow, settingRowPadding } from "./SettingRow"
+import { ThreadTitleRow } from "./ThreadTitleRow"
 
 type FollowUpMode = NonNullable<AppSettings["followUpMode"]>
 type TextSize = NonNullable<AppSettings["transcriptSize"]>
@@ -178,20 +179,105 @@ function OpacitySlider({
   )
 }
 
-export function Preferences({
-  section,
+/** Agents' permissions and follow-ups, then how threads are named, listed, and announced. */
+export function ThreadPreferences({
+  snapshot,
+  onChange,
+  pending,
+}: {
+  readonly snapshot: AppSnapshot
+  readonly onChange: (input: SetAppSettingsInput) => void
+  readonly pending: boolean
+}): React.JSX.Element {
+  const { settings } = snapshot
+  const followUpMode = settings.followUpMode ?? "queue"
+  const fullPermissions = settings.alwaysFullPermissions ?? false
+  return (
+    <>
+      <SettingsGroup title="Agents">
+        <SettingRow
+          label="Always full permissions"
+          description={
+            fullPermissions ? (
+              <span className="inline-flex items-start gap-[6px] text-[var(--color-modified)]">
+                <ShieldAlert
+                  size={13}
+                  strokeWidth={1.9}
+                  aria-hidden="true"
+                  className="flex-none mt-[3px]"
+                />
+                Every agent runs every tool without asking, and the composer hides its permission
+                controls.
+              </span>
+            ) : (
+              "Skip every permission prompt for all agents, starting with the next turn."
+            )
+          }
+        >
+          <Switch
+            label="Always full permissions"
+            checked={fullPermissions}
+            disabled={pending}
+            onCheckedChange={(alwaysFullPermissions) => onChange({ alwaysFullPermissions })}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Follow-ups while the agent works"
+          description={`${FOLLOW_UPS[followUpMode].detail} Ctrl or Cmd with Enter does the other.`}
+        >
+          <Segments<FollowUpMode>
+            label="Follow-ups while the agent works"
+            value={followUpMode}
+            disabled={pending}
+            options={FOLLOW_UP_OPTIONS}
+            onValueChange={(next) => onChange({ followUpMode: next })}
+          />
+        </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup title="Threads">
+        <ThreadTitleRow
+          snapshot={snapshot}
+          pending={pending}
+          onChangeTitleModel={(titleModelId) => onChange({ titleModelId })}
+        />
+        <SettingRow
+          label="Show archived threads"
+          description="Keep archived threads visible in the inbox. Search always includes them."
+        >
+          <Switch
+            label="Show archived threads"
+            checked={settings.showSettled ?? true}
+            disabled={pending}
+            onCheckedChange={(showSettled) => onChange({ showSettled })}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Notification sounds"
+          description="Play a soft chime when a thread you aren't watching finishes or needs your attention."
+        >
+          <Switch
+            label="Notification sounds"
+            checked={settings.sounds ?? true}
+            disabled={pending}
+            onCheckedChange={(sounds) => onChange({ sounds })}
+          />
+        </SettingRow>
+      </SettingsGroup>
+    </>
+  )
+}
+
+/** The theme as previews, then the window and reading comfort. */
+export function AppearancePreferences({
   settings,
   onChange,
   pending,
 }: {
-  readonly section: "threads" | "appearance"
   readonly settings: AppSettings
   readonly onChange: (input: SetAppSettingsInput) => void
   readonly pending: boolean
 }): React.JSX.Element {
   const forceOpaque = window.meldshell.platform === "linux"
-  const followUpMode = settings.followUpMode ?? "queue"
-  const fullPermissions = settings.alwaysFullPermissions ?? false
   const opacity =
     settings.opacity ??
     (settings.theme === "light" ||
@@ -199,147 +285,73 @@ export function Preferences({
       ? 94
       : 88)
   return (
-    <section
-      className="settings-group m-0"
-      aria-label={section === "threads" ? "Thread and agent preferences" : "Appearance preferences"}
-    >
-      {section === "threads" ? (
-        <>
-          <SettingsGroup title="Permissions">
-            <SettingRow
-              label="Always full permissions"
-              description={
-                fullPermissions ? (
-                  <span className="inline-flex items-start gap-[6px] text-[var(--color-modified)]">
-                    <ShieldAlert
-                      size={13}
-                      strokeWidth={1.9}
-                      aria-hidden="true"
-                      className="flex-none mt-[3px]"
-                    />
-                    Every agent runs every tool without asking, and the composer hides its
-                    permission controls.
-                  </span>
-                ) : (
-                  "Skip every permission prompt for all agents, starting with the next turn."
-                )
-              }
-            >
-              <Switch
-                label="Always full permissions"
-                checked={fullPermissions}
-                disabled={pending}
-                onCheckedChange={(alwaysFullPermissions) => onChange({ alwaysFullPermissions })}
-              />
-            </SettingRow>
-          </SettingsGroup>
-          <SettingsGroup title="Sending messages">
-            <SettingRow
-              label="Follow-ups while the agent works"
-              description={`${FOLLOW_UPS[followUpMode].detail} Ctrl or Cmd with Enter does the other.`}
-            >
-              <Segments<FollowUpMode>
-                label="Follow-ups while the agent works"
-                value={followUpMode}
-                disabled={pending}
-                options={FOLLOW_UP_OPTIONS}
-                onValueChange={(next) => onChange({ followUpMode: next })}
-              />
-            </SettingRow>
-          </SettingsGroup>
-          <SettingsGroup title="Inbox">
-            <SettingRow
-              label="Show archived threads"
-              description="Keep archived threads visible in the inbox. Search always includes them."
-            >
-              <Switch
-                label="Show archived threads"
-                checked={settings.showSettled ?? true}
-                disabled={pending}
-                onCheckedChange={(showSettled) => onChange({ showSettled })}
-              />
-            </SettingRow>
-          </SettingsGroup>
-          <SettingsGroup title="Notifications">
-            <SettingRow
-              label="Notification sounds"
-              description="Play a soft chime when a thread you aren't watching finishes or needs your attention."
-            >
-              <Switch
-                label="Notification sounds"
-                checked={settings.sounds ?? true}
-                disabled={pending}
-                onCheckedChange={(sounds) => onChange({ sounds })}
-              />
-            </SettingRow>
-          </SettingsGroup>
-        </>
-      ) : (
-        <div className="border-t-[1px] border-t-[color:var(--line-subtle)] border-b-[1px] border-b-[color:var(--line-subtle)]">
-          <SettingRow label="Theme" description="Choose a look, or follow your system." stacked>
-            <RadioGroup
-              aria-label="Theme"
-              value={settings.theme ?? "dark"}
-              disabled={pending}
-              onValueChange={(value) => {
-                const theme = THEMES.find((option) => option.value === value)?.value
-                if (theme !== undefined) onChange({ theme })
-              }}
-              className="grid grid-cols-3 gap-[10px]"
-            >
-              {THEMES.map((option) => (
-                <Radio.Root key={option.value} value={option.value} className={themeTileClasses}>
-                  <span className="block h-[64px] overflow-hidden rounded-[6px] border-[1px] border-[color:var(--line-subtle)]">
-                    <ThemePreview theme={option.value} />
-                  </span>
-                  <span className="flex items-center justify-center gap-[6px] text-[12px] font-medium">
-                    {option.icon}
-                    {option.label}
-                  </span>
-                </Radio.Root>
-              ))}
-            </RadioGroup>
-          </SettingRow>
-          <SettingRow
-            label="App opacity"
-            description={
-              forceOpaque
-                ? "The app is always fully opaque on Linux."
-                : "Adjust how much of the desktop shows through the background. Windows reduced transparency takes priority."
-            }
-            controlId="app-opacity"
+    <>
+      <SettingsGroup title="Theme" description="Choose a look, or follow your system.">
+        <div className={settingRowPadding}>
+          <RadioGroup
+            aria-label="Theme"
+            value={settings.theme ?? "dark"}
+            disabled={pending}
+            onValueChange={(value) => {
+              const theme = THEMES.find((option) => option.value === value)?.value
+              if (theme !== undefined) onChange({ theme })
+            }}
+            className="grid grid-cols-3 gap-[10px] [@container(max-width:_460px)]:grid-cols-1"
           >
-            <OpacitySlider
-              value={forceOpaque ? 100 : opacity}
-              disabled={pending || forceOpaque}
-              onCommit={(opacity) => onChange({ opacity })}
-            />
-          </SettingRow>
-          <SettingRow
-            label="Transcript text size"
-            description="Adjust message and reply text for comfortable reading."
-          >
-            <Segments<TextSize>
-              label="Transcript text size"
-              value={settings.transcriptSize ?? "medium"}
-              disabled={pending}
-              options={TEXT_SIZE_OPTIONS}
-              onValueChange={(transcriptSize) => onChange({ transcriptSize })}
-            />
-          </SettingRow>
-          <SettingRow
-            label="Reduce motion"
-            description="Turn off interface animations. The Windows reduced-motion preference is also respected."
-          >
-            <Switch
-              label="Reduce motion"
-              checked={settings.reduceMotion ?? false}
-              disabled={pending}
-              onCheckedChange={(reduceMotion) => onChange({ reduceMotion })}
-            />
-          </SettingRow>
+            {THEMES.map((option) => (
+              <Radio.Root key={option.value} value={option.value} className={themeTileClasses}>
+                <span className="block h-[72px] overflow-hidden rounded-[6px] border-[1px] border-[color:var(--line-subtle)]">
+                  <ThemePreview theme={option.value} />
+                </span>
+                <span className="flex items-center justify-center gap-[6px] text-[12px] font-medium">
+                  {option.icon}
+                  {option.label}
+                </span>
+              </Radio.Root>
+            ))}
+          </RadioGroup>
         </div>
-      )}
-    </section>
+      </SettingsGroup>
+      <SettingsGroup title="Display">
+        <SettingRow
+          label="App opacity"
+          description={
+            forceOpaque
+              ? "The app is always fully opaque on Linux."
+              : "Adjust how much of the desktop shows through the background. Windows reduced transparency takes priority."
+          }
+          controlId="app-opacity"
+        >
+          <OpacitySlider
+            value={forceOpaque ? 100 : opacity}
+            disabled={pending || forceOpaque}
+            onCommit={(opacity) => onChange({ opacity })}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Transcript text size"
+          description="Adjust message and reply text for comfortable reading."
+        >
+          <Segments<TextSize>
+            label="Transcript text size"
+            value={settings.transcriptSize ?? "medium"}
+            disabled={pending}
+            options={TEXT_SIZE_OPTIONS}
+            onValueChange={(transcriptSize) => onChange({ transcriptSize })}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Reduce motion"
+          description="Turn off interface animations. The Windows reduced-motion preference is also respected."
+        >
+          <Switch
+            label="Reduce motion"
+            checked={settings.reduceMotion ?? false}
+            disabled={pending}
+            onCheckedChange={(reduceMotion) => onChange({ reduceMotion })}
+          />
+        </SettingRow>
+      </SettingsGroup>
+    </>
   )
 }

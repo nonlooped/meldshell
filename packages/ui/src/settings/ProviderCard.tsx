@@ -35,6 +35,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { SettingRow } from "./SettingRow"
+import { settingsCardSurfaceClasses } from "./SettingsGroup"
 import { effortLabel } from "../data/catalog"
 import { ProviderIcon } from "../ui/ProviderIcon"
 import { Button, ContextMenu, DropdownMenu, MenuAction, Switch, TextField } from "../ui/controls"
@@ -242,15 +243,15 @@ export function ProviderCard({
     <Collapsible.Root
       data-setting-label={provider.displayName}
       tabIndex={-1}
-      className="settings-group m-0 border-t-[1px] border-t-[color:var(--line-subtle)] border-b-[1px] border-b-[color:var(--line-subtle)] [&_+_.settings-group]:border-t-0 provider-card"
+      className={`provider-card m-0 outline-none ${settingsCardSurfaceClasses}`}
       render={<section />}
       open={open}
       onOpenChange={setOpenChoice}
     >
-      <div className="flex items-center justify-between gap-[20px] min-h-[76px] [padding:18px_0] [@container(max-width:_540px)]:flex-wrap [@container(max-width:_540px)]:gap-[12px]">
+      <div className="flex items-center justify-between gap-[20px] min-h-[64px] [padding:12px_16px] [@container(max-width:_540px)]:flex-wrap [@container(max-width:_540px)]:gap-[12px]">
         <Collapsible.Trigger className="flex min-w-0 flex-[1_1_auto] items-center [align-self:stretch] gap-[11px] p-0 border-0 bg-transparent text-inherit cursor-default text-left [&[data-panel-open]_.provider-chevron]:[transform:rotate(180deg)] [&:hover_.setting-label]:text-[var(--accent-hover)]">
           <span
-            className="grid w-[30px] h-[30px] flex-[0_0_30px] text-[var(--text-secondary)] place-items-center"
+            className="grid w-[34px] h-[34px] flex-[0_0_34px] place-items-center rounded-[var(--radius)] border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-hover)] text-[var(--text-secondary)]"
             aria-hidden="true"
           >
             <ProviderIcon provider={provider} size={18} />
@@ -272,7 +273,7 @@ export function ProviderCard({
             />
           </span>
           <ChevronDown
-            className="motion-transform provider-chevron flex-none ml-[2px] text-[var(--text-tertiary)]"
+            className="motion-transform provider-chevron flex-none ml-auto text-[var(--text-tertiary)]"
             size={15}
             strokeWidth={1.75}
           />
@@ -288,7 +289,7 @@ export function ProviderCard({
       </div>
 
       <CollapsiblePanel
-        className="border-t-[1px] border-t-[color:var(--line-subtle)] [&[hidden]]:hidden"
+        className="border-t-[1px] border-t-[color:var(--line-subtle)] [&>*+*]:border-t-[1px] [&>*+*]:border-t-[color:var(--line-subtle)] [&[hidden]]:hidden"
         keepMounted
       >
         <SettingRow
@@ -343,7 +344,7 @@ export function ProviderCard({
         </SettingRow>
 
         <div className="border-t-[1px] border-t-[color:var(--line-subtle)]">
-          <div className="flex items-center justify-between gap-[16px] [padding:18px_0_12px] [@container(max-width:_540px)]:flex-col [@container(max-width:_540px)]:items-start">
+          <div className="flex items-center justify-between gap-[16px] [padding:14px_16px_12px] [@container(max-width:_540px)]:flex-col [@container(max-width:_540px)]:items-start">
             <div className="flex min-w-0 flex-col gap-[4px]">
               <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
                 Models
@@ -367,11 +368,11 @@ export function ProviderCard({
           </div>
 
           {models.length === 0 ? (
-            <p className="settings-empty m-0 [padding:28px_0] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-tertiary)] text-[12.5px] text-center">
+            <p className="settings-empty m-0 [padding:24px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-tertiary)] text-[12.5px] text-center">
               This provider has no models. Add one to make it selectable in the composer.
             </p>
           ) : visibleModels.length === 0 ? (
-            <p className="settings-empty m-0 [padding:28px_0] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-tertiary)] text-[12.5px] text-center">
+            <p className="settings-empty m-0 [padding:24px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-tertiary)] text-[12.5px] text-center">
               No models match “{filter.trim()}”.
             </p>
           ) : (
@@ -390,7 +391,7 @@ export function ProviderCard({
             </ul>
           )}
 
-          <div className="flex items-center justify-between gap-[12px] min-h-[54px] [padding:12px_0] border-t-[1px] border-t-[color:var(--line-subtle)]">
+          <div className="flex items-center justify-between gap-[12px] min-h-[52px] [padding:10px_16px] border-t-[1px] border-t-[color:var(--line-subtle)]">
             <Button size="sm" icon={<Plus size={13} strokeWidth={2} />} onClick={onAddModel}>
               Add model
             </Button>
@@ -666,7 +667,7 @@ function Badge({ children }: { readonly children: string }): React.JSX.Element {
 
 const modelRowClasses = [
   "grid items-center gap-[12px] grid-cols-[minmax(0,_1fr)_96px_104px_28px]",
-  "min-h-[52px] border-t-[1px] border-t-[color:var(--line-subtle)]",
+  "min-h-[52px] [padding:0_10px_0_16px] border-t-[1px] border-t-[color:var(--line-subtle)]",
   "[&[data-off='true']_.model-name]:text-[var(--text-disabled)]",
   "[&[data-off='true']_.model-slug]:text-[var(--text-disabled)]",
   "[@container(max-width:_540px)]:grid-cols-[minmax(0,_1fr)_96px_28px]",

@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { ArrowUpRight, Check, Copy, LogOut, RefreshCw } from "lucide-react"
+import { ArrowUpRight, Check, Copy, LogOut, RefreshCw, ShieldCheck } from "lucide-react"
 import { AppDialog, Button } from "../ui/controls"
 import { ActivitySpinner } from "../ui/motion"
 import { SettingRow } from "./SettingRow"
+import { SettingsGroup } from "./SettingsGroup"
 
 type Tone = "online" | "pending" | "offline" | "danger"
 
@@ -15,9 +16,6 @@ const toneColor: Record<Tone, string> = {
 }
 const messageFor = (cause: unknown) =>
   String(cause).replace(/^(Error: )?(Error invoking remote method '[^']+': )?(Error: )?/, "")
-
-const groupClasses =
-  "settings-group m-0 border-t-[1px] border-t-[color:var(--line-subtle)] border-b-[1px] border-b-[color:var(--line-subtle)]"
 
 const statusLabel: Record<Tone, string> = {
   online: "Online",
@@ -203,7 +201,7 @@ export function RemoteAccess() {
   let rows: ReactNode
   if (!state)
     rows = (
-      <div className="flex min-h-[76px] items-center">
+      <div className="flex min-h-[62px] items-center [padding:0_16px] text-[var(--text-tertiary)]">
         <ActivitySpinner />
       </div>
     )
@@ -212,8 +210,8 @@ export function RemoteAccess() {
   else if (!state.linked)
     rows = (
       <SettingRow
-        label="Remote access"
-        description="Sign in to open your workspaces from a phone or another computer’s browser. Agents keep running here, and your provider logins stay on this computer."
+        label="MeldShell account"
+        description="Not signed in. Signing in links this computer to your account; your provider logins stay here."
       >
         {signIn("Sign in with browser")}
       </SettingRow>
@@ -238,23 +236,34 @@ export function RemoteAccess() {
   else rows = <LinkedComputer state={state} signOut={signOut} onRetried={() => status.refetch()} />
   return (
     <>
-      <section className={groupClasses} aria-label="Account and devices">
+      <SettingsGroup
+        title="Remote access"
+        description="Open your workspaces from a phone or another computer's browser while agents keep running here."
+      >
         {rows}
-      </section>
-      {error && (
-        <p
-          role="alert"
-          className="[margin:12px_0_0] text-[12px]"
-          style={{ color: toneColor.danger }}
-        >
-          {messageFor(error)}
-        </p>
-      )}
-      <p className="[margin:14px_0_0] text-[12px] leading-[1.6] text-[var(--text-tertiary)]">
-        Remote access goes through a relay run by the account service’s operator, who can read and
-        send prompts, output, and file contents for linked computers. Provider credentials stay on
-        this computer.
-      </p>
+        {error && (
+          <p
+            role="alert"
+            className="m-0 [padding:12px_16px] text-[12px]"
+            style={{ color: toneColor.danger }}
+          >
+            {messageFor(error)}
+          </p>
+        )}
+        <div className="flex items-start gap-[10px] [padding:12px_16px] text-[11.5px] leading-[1.6] text-[var(--text-tertiary)]">
+          <ShieldCheck
+            size={14}
+            strokeWidth={1.75}
+            aria-hidden="true"
+            className="flex-none mt-[2px]"
+          />
+          <p className="m-0">
+            Remote access goes through a relay run by the account service’s operator, who can read
+            and send prompts, output, and file contents for linked computers. Provider credentials
+            stay on this computer.
+          </p>
+        </div>
+      </SettingsGroup>
       <AppDialog
         alert
         open={confirmSignOut}

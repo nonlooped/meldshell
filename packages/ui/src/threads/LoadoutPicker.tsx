@@ -71,7 +71,7 @@ export function ModelPickerWithLoadouts({
             }}
             onManage={() => {
               close()
-              useViewStore.getState().openSettings("threads")
+              useViewStore.getState().openSettings("threads", "Loadouts")
             }}
           />
         )}

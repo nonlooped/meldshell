@@ -34,6 +34,10 @@ function DefaultEditor({
   const available = options.some((option) => option.value === preferred)
   if (preferred && !available)
     options.unshift({ value: preferred, label: `${preferred} (unavailable)` })
+  // An empty select reads as broken, so it says why it has nothing to offer.
+  const empty = options.length === 0
+  if (empty)
+    options.push({ value: "", label: editors.isPending ? "Looking for editors…" : "None found" })
   return (
     <SettingRow
       label="Default editor"
@@ -47,7 +51,7 @@ function DefaultEditor({
         label="Default editor"
         value={preferred ?? options[0]?.value ?? ""}
         options={options}
-        disabled={pending || editors.isPending || editors.isError || options.length === 0}
+        disabled={pending || editors.isPending || editors.isError || empty}
         onValueChange={(editor) => onChange({ editor })}
       />
     </SettingRow>
@@ -73,6 +77,13 @@ function HostControls(): React.JSX.Element | null {
   )
 }
 
+const platformLabel = (): string =>
+  window.meldshell.platform === "web"
+    ? "Web browser"
+    : window.meldshell.platform === "linux"
+      ? "Linux desktop"
+      : "Windows desktop"
+
 export function AppSettingsPanel({
   settings,
   pending,
@@ -85,62 +96,33 @@ export function AppSettingsPanel({
   const appInfo = useContext(AppInfoContext)
   return (
     <>
+      <SettingsGroup title="Updates">
+        <UpdateSettings />
+      </SettingsGroup>
       <SettingsGroup title="Runtime & applications">
         <Environment />
         <DefaultEditor settings={settings} pending={pending} onChange={onChange} />
         <HostControls />
       </SettingsGroup>
-      <SettingsGroup title="MeldShell updates">
-        <UpdateSettings />
-      </SettingsGroup>
-      <SettingsGroup title="Setup">
-        <SettingRow
-          label="Setup guide"
-          description="Check your agents, pick a project, and revisit the basics."
-        >
-          <Button onClick={() => useViewStore.getState().openOnboarding()}>Run setup again</Button>
-        </SettingRow>
-      </SettingsGroup>
       <SettingsGroup title="About MeldShell">
-        <section className="max-w-[720px]">
-          <div className="flex items-center gap-[14px] [padding:4px_0_28px] [&_h3]:m-0 [&_h3]:[font-family:var(--font-display)] [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:[margin:3px_0_0] [&_p]:text-[var(--text-tertiary)] [&_p]:text-[11.5px]">
-            <MeldMark className="w-[36px] h-[36px] flex-[0_0_36px] text-[var(--text-primary)]" />
-            <div>
-              <h3>MeldShell</h3>
-              <p>A local desktop workspace for coding-agent threads.</p>
-            </div>
+        <div className="flex items-center gap-[14px] [padding:18px_16px]">
+          <span className="grid w-[44px] h-[44px] flex-none place-items-center rounded-[var(--radius-lg)] border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-hover)]">
+            <MeldMark className="w-[28px] h-[28px] text-[var(--text-primary)]" />
+          </span>
+          <div className="flex min-w-0 flex-col gap-[3px]">
+            <span className="[font-family:var(--font-display)] text-[var(--text-primary)] text-[15px] font-semibold">
+              MeldShell {appInfo.version}
+            </span>
+            <span className="text-[var(--text-tertiary)] text-[12px] tabular-nums">
+              {[
+                platformLabel(),
+                appInfo.electronVersion ? `Electron ${appInfo.electronVersion}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
           </div>
-          <div className="border-t-[1px] border-t-[color:var(--line-subtle)]">
-            <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
-              <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
-                App version
-              </span>
-              <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
-                {appInfo.version}
-              </span>
-            </div>
-            <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
-              <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
-                Platform
-              </span>
-              <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
-                {window.meldshell.platform === "web"
-                  ? "Web browser"
-                  : window.meldshell.platform === "linux"
-                    ? "Linux desktop"
-                    : "Windows desktop"}
-              </span>
-            </div>
-            <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
-              <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
-                Runtime
-              </span>
-              <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
-                {appInfo.electronVersion ? `Electron ${appInfo.electronVersion}` : "Web"}
-              </span>
-            </div>
-          </div>
-        </section>
+        </div>
         <SettingRow
           label="Storage"
           description="Threads and settings are stored on the computer running MeldShell. When remote access is linked, prompts, output, and file contents pass through the account service’s relay; provider credentials stay on the host computer."
@@ -148,6 +130,12 @@ export function AppSettingsPanel({
           <Button onClick={() => useViewStore.getState().selectSettingsSection("account")}>
             Remote access details
           </Button>
+        </SettingRow>
+        <SettingRow
+          label="Setup guide"
+          description="Check your agents, pick a project, and revisit the basics."
+        >
+          <Button onClick={() => useViewStore.getState().openOnboarding()}>Run setup again</Button>
         </SettingRow>
       </SettingsGroup>
     </>

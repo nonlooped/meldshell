@@ -17,6 +17,11 @@ import { ProviderIcon } from "../ui/ProviderIcon"
 import { Button } from "../ui/controls"
 import { Notice } from "../ui/Notice"
 import {
+  settingsCaptionClasses,
+  settingsCardClasses,
+  settingsCardSurfaceClasses,
+} from "./SettingsGroup"
+import {
   budgetLabel,
   monthlyWindowMins,
   mostConstrained,
@@ -480,15 +485,13 @@ function DisconnectedProviders({
   readonly entries: ReadonlyArray<ProviderUsage>
 }): React.JSX.Element {
   return (
-    <section className="[padding:10px_2px_0]" aria-label="Providers not connected">
-      <h3 className="m-0 pb-[8px] text-[var(--text-tertiary)] text-[11.5px] font-medium leading-[1.4]">
-        Not connected
-      </h3>
-      <ul className="m-0 p-0 list-none flex flex-col">
+    <section className="pt-[6px]" aria-label="Providers not connected">
+      <h3 className={settingsCaptionClasses}>Not connected</h3>
+      <ul className={`m-0 p-0 list-none ${settingsCardClasses}`}>
         {entries.map(({ provider, meta, status }) => (
           <li
             key={provider.id}
-            className="flex min-w-0 items-baseline gap-[10px] py-[6px] text-[12px] leading-[1.5]"
+            className="flex min-w-0 items-baseline gap-[10px] [padding:11px_16px] text-[12px] leading-[1.5]"
           >
             <span
               className="flex shrink-0 self-center text-[var(--text-secondary)]"
@@ -533,8 +536,7 @@ export function SubscriptionUsage({
   )
 }
 
-const cardClasses =
-  "[padding:14px_18px_12px] border-[1px] border-[color:var(--line)] rounded-[var(--radius-lg)] bg-[var(--surface-raised)]"
+const cardClasses = `[padding:14px_16px_12px] ${settingsCardSurfaceClasses}`
 
 const quietLineClasses = "m-0 py-[6px] text-[var(--text-secondary)] text-[12px] leading-[1.6]"
 
