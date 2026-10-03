@@ -7,7 +7,7 @@ import { AppDialog, Button, IconButton, MenuAction } from "../ui/controls"
 import { PopPresence } from "../ui/motion"
 import { queryKeys } from "../data/cache"
 
-export type SnapshotPoint = "before" | "after"
+type SnapshotPoint = "before" | "after"
 
 interface Restore {
   readonly turnId: string
