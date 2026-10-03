@@ -80,3 +80,10 @@ test("keeps messages with reference or footnote definitions whole", () => {
   ])
     assert.deepEqual(split(text), [text])
 })
+
+test("scans unmatched brackets in linear time", () => {
+  const text = "[abcdef\n".repeat(20_000)
+  const started = performance.now()
+  assert.equal(markdownBlocks(text).length, 1)
+  assert.ok(performance.now() - started < 250)
+})
