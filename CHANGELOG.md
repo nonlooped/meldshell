@@ -8,6 +8,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Messages sent while the agent is working can now queue or steer. Enter follows a new default in Settings (queue), Ctrl or Cmd with Enter does the other, and a menu beside the send button picks either for one message or changes the default. Steering goes into the same turn on Codex, and stops the turn and continues with your message on Claude Code and Cursor.
 
+- Dictate into the composer. The microphone beside the send button, or Ctrl+Shift+D, records while a live level meter and timer run; stop and what you said is written at the caret, or press Escape to throw it away. It works the same on a phone through remote access, because the host transcribes. Settings > Dictation takes an OpenAI API key (an OPENAI_API_KEY in the environment, or a key Codex signed in with, is used on its own) or the address of any service with OpenAI's transcription API, such as a Whisper server on your network.
+
 - Queued messages are listed above the composer, where each can be edited, sent now to steer the running turn, or removed, with a Clear all for the lot. Each queued message now starts as its own turn instead of being merged into one, and a queue left behind by an interrupted or failed turn waits for you to send it rather than showing only a count.
 
 ### Changed

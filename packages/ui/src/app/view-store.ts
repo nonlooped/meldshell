@@ -9,6 +9,7 @@ export type SettingsSection =
   | "threads"
   | "schedules"
   | "keyboard"
+  | "dictation"
   | "about"
 
 interface ViewStore {

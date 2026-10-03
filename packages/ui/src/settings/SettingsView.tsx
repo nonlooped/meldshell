@@ -19,6 +19,7 @@ import {
   Info,
   Keyboard,
   MessagesSquare,
+  Mic,
   Monitor,
 } from "lucide-react"
 import { useContext } from "react"
@@ -42,6 +43,7 @@ import { UpdateSettings } from "./UpdateSettings"
 import { KeyboardSettings } from "./KeyboardSettings"
 import { ScheduleSettings } from "./ScheduleSettings"
 import { Preferences } from "./Preferences"
+import { DictationSettings } from "./DictationSettings"
 
 interface SettingsViewProps {
   readonly settingsPending: boolean
@@ -113,6 +115,13 @@ const SECTIONS: ReadonlyArray<{
     icon: <AlarmClock size={16} strokeWidth={1.75} />,
     title: "Scheduled prompts",
     caption: "Prompts MeldShell sends to threads on a schedule while it runs.",
+  },
+  {
+    id: "dictation",
+    label: "Dictation",
+    icon: <Mic size={16} strokeWidth={1.75} />,
+    title: "Dictation",
+    caption: "Talk to the composer instead of typing, here or on your phone.",
   },
   {
     id: "keyboard",
@@ -258,6 +267,7 @@ export function SettingsView({
             )}
             {section === "account" && <RemoteAccess />}
             {section === "schedules" && <ScheduleSettings snapshot={snapshot} />}
+            {section === "dictation" && <DictationSettings />}
             {section === "keyboard" && (
               <KeyboardSettings pending={settingsPending} onChange={onChangeAppSettings} />
             )}

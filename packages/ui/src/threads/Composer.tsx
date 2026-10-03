@@ -43,6 +43,7 @@ import { useComposerCompletion } from "./ComposerCompletion"
 import type { ComposerToken } from "./composer-completion"
 import { dropText, launchFromText } from "../ui/flight"
 import { useViewStore } from "../app/view-store"
+import { DictationButton } from "./Dictation"
 import {
   Button,
   ContextMenu,
@@ -741,6 +742,7 @@ export function Composer({
   const sendButtonRef = useRef<HTMLSpanElement>(null)
   const reduced = useMotionPreference()
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [dictationError, setDictationError] = useState<string | null>(null)
   const [loadingAttachments, setLoadingAttachments] = useState(false)
   const attachmentReadsPending = useRef(0)
   const selection = resolveSelection(snapshot, threadId)
@@ -843,6 +845,11 @@ export function Composer({
         {attachmentError && (
           <div className="text-[var(--text-tertiary)] text-[11px] p-[8px]" role="alert">
             {attachmentError}
+          </div>
+        )}
+        {dictationError && (
+          <div className="text-[var(--text-tertiary)] text-[11px] p-[8px]" role="alert">
+            {dictationError}
           </div>
         )}
         <div className="relative grid">
@@ -954,6 +961,14 @@ export function Composer({
               <span className="flex-[1_1_auto] min-w-[8px]" />
 
               <div className="flex flex-none items-center gap-[6px] ml-[auto]">
+                <DictationButton
+                  threadId={threadId}
+                  textareaRef={textareaRef}
+                  draft={draft}
+                  onDraftChange={onDraftChange}
+                  onError={setDictationError}
+                  disabled={sending}
+                />
                 <PopPresence show={running}>
                   <IconButton
                     unstyled

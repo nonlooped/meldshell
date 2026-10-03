@@ -35,6 +35,7 @@ import { AppDialog, Button, TextField } from "../ui/controls"
 import { ActionToast, ErrorToast } from "../ui/Notice"
 import { handleAppShortcut } from "./app-shortcuts"
 import { useKeybindings } from "./keybindings"
+import { useDictationRequests } from "../threads/dictation"
 import { useTabStore, type FileTab } from "./tab-store"
 import { visibleThreads } from "./thread-layout"
 import { useViewportTier, type ViewportTier } from "./viewport"
@@ -641,7 +642,7 @@ export function App(): React.JSX.Element {
       selectedThreadId: selectedTabId,
       closeThread,
       toggleArchived:
-        settingsOpen || selectedFile !== null || selectedThread === null
+        settingsOpen || selectedFile !== undefined || selectedThread === null
           ? null
           : () => toggleArchived(selectedThread),
       cycleTabs,
@@ -650,6 +651,10 @@ export function App(): React.JSX.Element {
       toggleTerminal: terminal.toggle,
       togglePreview: preview.toggle,
       openInEditor: () => editor.open(),
+      dictate:
+        settingsOpen || selectedFile !== undefined || selectedThread === null
+          ? null
+          : () => useDictationRequests.getState().toggle(selectedThread.id),
     }
   })
   useEffect(() => {

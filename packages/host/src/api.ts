@@ -34,6 +34,13 @@ import {
 } from "./workspace-files"
 import { searchWorkspacePaths } from "./workspace-search"
 import { requestGeneratedText } from "./generated-text"
+import { HostPlatform } from "./platform"
+import {
+  dictationDirectory,
+  dictationStatus,
+  setDictationSettings,
+  transcribeAudio,
+} from "./dictation"
 import { readWorkspaceScripts } from "./workspace-scripts"
 import {
   createThread,
@@ -250,6 +257,20 @@ hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false,
       ),
     )
   }),
+)
+const withDictation = <A>(run: (directory: string) => Promise<A>) =>
+  Effect.flatMap(HostPlatform, (platform) =>
+    attempt(() => run(dictationDirectory(platform.databasePath))),
+  )
+hostOperations[C.IPC.getDictationStatus] = operation(noInput, true, () =>
+  withDictation(dictationStatus),
+)
+// Only this host's dictation file changes, so other clients have nothing to reload.
+hostOperations[C.IPC.setDictationSettings] = operation(C.SetDictationSettingsInput, true, (input) =>
+  withDictation((directory) => setDictationSettings(directory, input)),
+)
+hostOperations[C.IPC.transcribeAudio] = operation(C.TranscribeAudioInput, true, (input) =>
+  withDictation((directory) => transcribeAudio(directory, input)),
 )
 for (const [harness, status, refresh, usage] of [
   ["codex", C.IPC.getCodexStatus, C.IPC.refreshCodexStatus, C.IPC.getCodexUsage],

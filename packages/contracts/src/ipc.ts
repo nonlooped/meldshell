@@ -28,6 +28,7 @@ export type {
 } from "./workspace-inputs"
 
 import type { RemotePreviewInput, RemotePreviewFrame } from "./remote-preview"
+import type { DictationStatus, SetDictationSettingsInput, TranscribeAudioInput } from "./dictation"
 
 import type {
   AppSnapshot,
@@ -399,6 +400,14 @@ export const requests = {
   saveSchedule:
     request<(input: SaveScheduleInput) => Promise<ScheduledPrompt>>("meldshell:save-schedule"),
   deleteSchedule: request<(scheduleId: string) => Promise<void>>("meldshell:delete-schedule"),
+  getDictationStatus: request<() => Promise<DictationStatus>>("meldshell:get-dictation-status"),
+  setDictationSettings: request<(input: SetDictationSettingsInput) => Promise<DictationStatus>>(
+    "meldshell:set-dictation-settings",
+  ),
+  /** Turns a composer recording into text on the host. */
+  transcribeAudio: request<(input: TranscribeAudioInput) => Promise<{ readonly text: string }>>(
+    "meldshell:transcribe-audio",
+  ),
 }
 
 export type InvokeApi = {
