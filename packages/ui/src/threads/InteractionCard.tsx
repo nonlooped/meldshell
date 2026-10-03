@@ -312,10 +312,10 @@ export function InteractionCard({
           {mutation.error.message}
         </p>
       )}
-      <footer className="flex flex-wrap items-center justify-end gap-[8px] [padding:10px_14px] border-t-[1px] border-t-[color:var(--line-subtle)] bg-[var(--surface-hover)] [&_.button]:h-[30px]">
+      <footer className="@container flex flex-wrap items-center justify-end gap-[8px] [padding:10px_14px] border-t-[1px] border-t-[color:var(--line-subtle)] bg-[var(--surface-hover)] [&_.button]:h-[30px]">
         {declinable && (
           <TextField
-            className="flex-[1_1_220px] min-w-0 h-[30px]"
+            className="flex-[1_1_100%] @[620px]:flex-[1_1_220px] min-w-0 h-[30px]"
             aria-label="Reason for declining"
             placeholder={
               request.kind === "plan"
