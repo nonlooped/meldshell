@@ -1,11 +1,12 @@
 import { useState } from "react"
 import { Collapsible } from "@base-ui-components/react/collapsible"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowRight, ChevronRight, History } from "lucide-react"
+import { ArrowRight, Check, ChevronRight, Copy, History } from "lucide-react"
 import { HARNESSES, isHarness, type Thread, type TurnHandoff } from "@meldshell/contracts"
 import { ProviderIcon } from "../ui/ProviderIcon"
-import { CopyIconButton, useCopy } from "../ui/CopyButton"
-import { CollapsiblePanel } from "../ui/motion"
+import { copyStatusText, useCopy } from "../ui/CopyButton"
+import { IconButton } from "../ui/controls"
+import { CollapsiblePanel, Swap } from "../ui/motion"
 import { Markdown } from "../ui/Markdown"
 import { disclosureChevronClasses } from "../ui/styles"
 
@@ -48,17 +49,18 @@ function BriefCard({
   const [copyState, copy] = useCopy()
   return (
     <div className="grid border-[1px] border-[color:var(--line-subtle)] border-l-[2px] border-l-[color:var(--accent)] rounded-[var(--radius-lg)] bg-[var(--surface-raised)] overflow-hidden">
-      <div className="flex items-center gap-[8px] [padding:7px_8px_7px_14px] border-b-[1px] border-b-[color:var(--line-subtle)] text-[11px]">
+      <div className="flex items-center gap-[8px] [padding:4px_6px_4px_14px] border-b-[1px] border-b-[color:var(--line-subtle)] text-[11px]">
         <span className="text-[var(--text-secondary)] font-medium">{title}</span>
         <span className="text-[var(--text-tertiary)]">{turnsText(handoff.turnCount)}</span>
         <span className="flex-1" />
-        <span className="text-[var(--text-tertiary)]">
-          <CopyIconButton
-            label={copyState === "copied" ? "Copied" : "Copy summary"}
-            state={copyState}
-            onClick={() => void copy(handoff.brief)}
-          />
+        <span className="text-[var(--text-tertiary)]" role="status">
+          {copyStatusText(copyState)}
         </span>
+        <IconButton label="Copy summary" onClick={() => void copy(handoff.brief)}>
+          <Swap id={copyState === "copied" ? "copied" : "copy"}>
+            {copyState === "copied" ? <Check size={13} /> : <Copy size={13} />}
+          </Swap>
+        </IconButton>
       </div>
       <div
         className={`[padding:10px_16px_12px] text-[var(--text-secondary)] text-[12.5px] overflow-y-auto ${compact ? "max-h-[220px]" : "max-h-[360px]"}`}
@@ -175,7 +177,9 @@ export function HandoffNotice({
               The next message starts a new session with a summary of{" "}
               {handoff === null
                 ? "the turns before the rewind"
-                : `the ${turnsText(handoff.turnCount)} before the rewind`}
+                : handoff.turnCount === 1
+                  ? "the turn before the rewind"
+                  : `the ${handoff.turnCount} turns before the rewind`}
             </span>
           </>
         )}
