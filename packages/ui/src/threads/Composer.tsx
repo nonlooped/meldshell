@@ -24,6 +24,7 @@ import {
   Hammer,
   ListChecks,
   MessageCircleQuestion,
+  MicOff,
   Paperclip,
   RefreshCw,
   ShieldAlert,
@@ -848,8 +849,24 @@ export function Composer({
           </div>
         )}
         {dictationError && (
-          <div className="text-[var(--text-tertiary)] text-[11px] p-[8px]" role="alert">
-            {dictationError}
+          <div
+            className="flex items-center gap-[7px] text-[var(--text-secondary)] text-[11.5px] [padding:6px_6px_2px_8px]"
+            role="alert"
+          >
+            <MicOff
+              size={12}
+              strokeWidth={1.75}
+              className="flex-none text-[var(--text-tertiary)]"
+            />
+            <span className="min-w-0 flex-1">{dictationError}</span>
+            <IconButton
+              unstyled
+              className="motion-colors grid w-[20px] h-[20px] flex-none place-items-center rounded-full border-0 bg-transparent p-0 text-[var(--text-tertiary)] cursor-default [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
+              label="Dismiss"
+              onClick={() => setDictationError(null)}
+            >
+              <X size={11} strokeWidth={2} />
+            </IconButton>
           </div>
         )}
         <div className="relative grid">

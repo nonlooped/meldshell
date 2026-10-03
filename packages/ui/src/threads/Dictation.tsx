@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import type { DictationModel, DictationStatus } from "@meldshell/contracts"
+import {
+  DICTATION_MODELS,
+  MAX_DICTATION_SECONDS,
+  type DictationModel,
+  type DictationStatus,
+} from "@meldshell/contracts"
 import { AnimatePresence, motion } from "motion/react"
 import { Check, Mic, X } from "lucide-react"
 import { ActivitySpinner, useMotionPreference } from "../ui/motion"
@@ -36,11 +41,18 @@ export const dictationStatusQuery = (model: DictationModel | undefined) => ({
 const speakerLanguage = (): string | undefined =>
   navigator.language?.split("-")[0]?.toLowerCase() || undefined
 
-/** What the spinner says while speech becomes text. */
-const transcribingLabel = (status: DictationStatus | undefined): string =>
-  status?.state === "downloading"
-    ? `Downloading the speech model, once (${Math.round((status.progress ?? 0) * 100)}%)…`
-    : "Writing what you said…"
+/** How far a first download has come, or null once the model is in place. */
+const downloadPercent = (status: DictationStatus | undefined): number | null =>
+  status?.state === "downloading" ? Math.round((status.progress ?? 0) * 100) : null
+
+/** The microphone's tooltip, which warns about the one-time download before it happens. */
+const idleLabel = (status: DictationStatus | undefined, model: DictationModel | undefined) =>
+  status && status.state !== "ready"
+    ? `Dictate, after a one-time ${DICTATION_MODELS[model ?? "fast"].size} download`
+    : "Dictate"
+
+/** The last stretch of a recording counts down, so the cap never cuts someone off unawares. */
+const WARN_SECONDS = 30
 
 type Phase = "idle" | "starting" | "recording" | "transcribing"
 
@@ -98,7 +110,62 @@ function Elapsed({ since }: { since: number }): React.JSX.Element {
     const timer = setInterval(() => setNow(performance.now()), 250)
     return () => clearInterval(timer)
   }, [])
+  const left = MAX_DICTATION_SECONDS * 1000 - (now - since)
+  if (left <= WARN_SECONDS * 1000)
+    return (
+      <span className="tabular-nums text-[11.5px] text-[var(--color-deleted)]">
+        {elapsedLabel(Math.max(0, left))} left
+      </span>
+    )
   return <span className="tabular-nums text-[11.5px]">{elapsedLabel(now - since)}</span>
+}
+
+/** Shown while speech becomes text, or while the model downloads the first time. */
+function TranscribingPill({
+  status,
+  ref,
+}: {
+  readonly status: DictationStatus | undefined
+  /** AnimatePresence measures the pill through this while it pops out. */
+  readonly ref?: React.Ref<HTMLSpanElement>
+}): React.JSX.Element {
+  const reduced = useMotionPreference()
+  const percent = downloadPercent(status)
+  return (
+    <motion.span
+      ref={ref}
+      role="status"
+      aria-label={
+        percent === null
+          ? "Turning your speech into text"
+          : `Downloading the speech model, once: ${percent}%`
+      }
+      className={`${recordingClasses} [padding:0_10px_0_8px]`}
+      initial={reduced ? false : { opacity: 0, scale: 0.94 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, transition: { duration: 0.1 } }}
+      transition={{ type: "spring", stiffness: 520, damping: 34 }}
+    >
+      <ActivitySpinner />
+      {percent === null ? (
+        <span className="text-[11.5px]">Transcribing</span>
+      ) : (
+        <>
+          <span className="text-[11.5px] whitespace-nowrap">Getting model</span>
+          <span
+            className="block w-[44px] h-[3px] overflow-hidden rounded-full bg-[var(--surface-active)]"
+            aria-hidden="true"
+          >
+            <span
+              className="block h-full rounded-full bg-[var(--accent)] transition-[width] duration-300"
+              style={{ width: `${percent}%` }}
+            />
+          </span>
+          <span className="text-[11px] tabular-nums">{percent}%</span>
+        </>
+      )}
+    </motion.span>
+  )
 }
 
 interface DictationButtonProps {
@@ -237,7 +304,7 @@ export function DictationButton({
 
   if (!canRecord() || status.isError) return null
 
-  const label = withShortcut("Dictate", shortcut)
+  const label = withShortcut(idleLabel(status.data, model), shortcut)
   return (
     <AnimatePresence initial={false} mode="popLayout">
       {phase === "recording" && recording !== null ? (
@@ -276,6 +343,8 @@ export function DictationButton({
             <Check size={13} strokeWidth={2.5} />
           </IconButton>
         </motion.span>
+      ) : phase === "transcribing" ? (
+        <TranscribingPill key="transcribing" status={status.data} />
       ) : (
         <motion.span
           key="idle"
@@ -287,22 +356,11 @@ export function DictationButton({
           <IconButton
             unstyled
             className={`motion-colors flex-none ${chipClasses}`}
-            label={phase === "transcribing" ? transcribingLabel(status.data) : label}
+            label={label}
             disabled={disabled || phase !== "idle" || status.isPending}
             onClick={toggle}
           >
-            {phase === "idle" ? (
-              <Mic size={13} strokeWidth={1.75} />
-            ) : (
-              <>
-                <ActivitySpinner />
-                {status.data?.state === "downloading" && (
-                  <span className="text-[11px] tabular-nums">
-                    Model {Math.round((status.data.progress ?? 0) * 100)}%
-                  </span>
-                )}
-              </>
-            )}
+            {phase === "starting" ? <ActivitySpinner /> : <Mic size={13} strokeWidth={1.75} />}
           </IconButton>
         </motion.span>
       )}
