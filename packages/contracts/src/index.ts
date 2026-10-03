@@ -13,6 +13,7 @@ export {
   WorkspaceFileInput,
   WorkspaceFileActionInput,
   SearchWorkspacePathsInput,
+  SearchWorkspaceContentsInput,
   GitSnapshotInput,
   GitDiffInput,
   GitCommitDiffInput,

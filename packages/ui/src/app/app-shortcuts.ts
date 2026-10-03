@@ -6,6 +6,8 @@ interface ShortcutActions {
   requestNewThread: () => void
   openThreadPalette: () => void
   openFilePalette: () => void
+  /** Shows the files sidebar's search and focuses it. */
+  searchFiles: () => void
   openSettings: () => void
   selectedThreadId: string | null
   closeThread: (id: string) => void
@@ -46,6 +48,7 @@ export function handleAppShortcut(
     newThread: actions.requestNewThread,
     threadPalette: actions.openThreadPalette,
     filePalette: actions.openFilePalette,
+    searchFiles: actions.searchFiles,
     settings: actions.openSettings,
     closeTab: () => {
       if (actions.selectedThreadId !== null) actions.closeThread(actions.selectedThreadId)

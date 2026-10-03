@@ -33,6 +33,7 @@ import {
   workspaceFileAction,
 } from "./workspace-files"
 import { searchWorkspacePaths } from "./workspace-search"
+import { searchWorkspaceContents } from "./content-search"
 import {
   hasTurnSnapshot,
   readTurnSnapshot,
@@ -214,6 +215,9 @@ export const hostOperations: Record<string, Operation> = {
   ),
   [C.IPC.searchWorkspacePaths]: operation(C.SearchWorkspacePathsInput, true, (input) =>
     withWorkspace(input, (path) => searchWorkspacePaths(path, input.query, input.limit)),
+  ),
+  [C.IPC.searchWorkspaceContents]: operation(C.SearchWorkspaceContentsInput, true, (input) =>
+    withWorkspace(input, (path) => searchWorkspaceContents(path, input)),
   ),
   [C.IPC.listComposerCommands]: operation(
     Schema.Struct({

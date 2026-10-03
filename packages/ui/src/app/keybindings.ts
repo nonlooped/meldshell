@@ -10,6 +10,7 @@ export type ShortcutAction =
   | "newThread"
   | "threadPalette"
   | "filePalette"
+  | "searchFiles"
   | "settings"
   | "closeTab"
   | "archiveThread"
@@ -32,6 +33,7 @@ export interface ShortcutDefinition {
 export const SHORTCUTS: readonly ShortcutDefinition[] = [
   { id: "threadPalette", label: "Go to thread or message", group: "Navigation", chord: "Ctrl+K" },
   { id: "filePalette", label: "Go to file", group: "Navigation", chord: "Ctrl+P" },
+  { id: "searchFiles", label: "Search in files", group: "Navigation", chord: "Ctrl+Shift+F" },
   { id: "newThread", label: "New thread", group: "Navigation", chord: "Ctrl+N" },
   { id: "settings", label: "Open settings", group: "Navigation", chord: "Ctrl+," },
   { id: "closeTab", label: "Close tab", group: "Tabs", chord: "Ctrl+W" },

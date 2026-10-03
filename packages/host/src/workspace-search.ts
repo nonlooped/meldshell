@@ -136,6 +136,11 @@ function searchIndex(index: WorkspaceIndex, query: string, limit: number): Works
     .map(({ path, directory }) => ({ path, directory }))
 }
 
+/** Tracked and unignored files, `/`-separated and relative to the workspace root. */
+export async function workspaceFiles(root: string): Promise<readonly string[]> {
+  return (await workspaceIndex(root)).files
+}
+
 export async function searchWorkspacePaths(
   root: string,
   query: string,

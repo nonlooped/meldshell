@@ -77,6 +77,7 @@ export function selectChecks(files, full = false, entries = workspaces()) {
         "tests/dictation.test.ts",
         "tests/pull-requests.test.ts",
         "tests/review-notes.test.ts",
+        "tests/content-search.test.ts",
         ...releaseTests,
       ]
     : release

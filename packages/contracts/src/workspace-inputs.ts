@@ -31,6 +31,28 @@ export type SearchWorkspacePathsInput = ExactOptional<
   "threadId" | "limit"
 >
 
+export const SearchWorkspaceContentsInput = Schema.Struct({
+  ...WorkspaceScope.fields,
+  query: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(1024)),
+  ),
+  caseSensitive: Schema.Boolean,
+  /** The query is a JavaScript regular expression rather than literal text. */
+  regex: Schema.Boolean,
+  /** The most matching lines to return; the search stops once it has this many. */
+  limit: Schema.optional(
+    Schema.Number.pipe(
+      Schema.check(Schema.isInt()),
+      Schema.check(Schema.isBetween({ minimum: 1, maximum: 5000 })),
+    ),
+  ),
+})
+export type SearchWorkspaceContentsInput = ExactOptional<
+  typeof SearchWorkspaceContentsInput.Type,
+  "threadId" | "limit"
+>
+
 export const WorkspaceFileActionInput = Schema.Struct({
   ...WorkspaceFileInput.fields,
   action: Schema.Literals(["create-file", "create-folder", "rename", "delete"]),

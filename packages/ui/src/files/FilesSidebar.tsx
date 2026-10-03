@@ -9,6 +9,8 @@ import type { Thread, Workspace } from "@meldshell/contracts"
 import type { DirectoryEntry, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
 import { GitSidebar } from "./GitSidebar"
+import { ContentSearch } from "./ContentSearch"
+import { useContentSearch, type FilesSidebarTab } from "./content-search-store"
 import { WorktreeBar } from "./WorktreeBar"
 import { scopeKey } from "../data/workspace-scope"
 import { FileIcon } from "../ui/FileIcon"
@@ -434,13 +436,19 @@ export function FilesSidebar({
 }) {
   const client = useQueryClient()
   const [rootOperation, setRootOperation] = useState<FileOperation | null>(null)
+  const tab = useContentSearch((state) => state.tab)
   return (
-    <Tabs.Root defaultValue="files" className="flex flex-col h-full min-h-0 overflow-hidden">
+    <Tabs.Root
+      value={tab}
+      onValueChange={(value: FilesSidebarTab) => useContentSearch.getState().setTab(value)}
+      className="flex flex-col h-full min-h-0 overflow-hidden"
+    >
       {worktreeThread !== undefined && <WorktreeBar thread={worktreeThread} />}
       <Tabs.List className={panelTabsClasses} aria-label="Workspace sidebar">
         <TabIndicator className="rounded-[var(--radius)] border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-selected)]" />
         <Tabs.Tab value="files">Files</Tabs.Tab>
         <Tabs.Tab value="changes">Changes</Tabs.Tab>
+        <Tabs.Tab value="search">Search</Tabs.Tab>
       </Tabs.List>
       <Tabs.Panel value="files" className="flex flex-col h-full min-h-0 overflow-hidden">
         <div className="flex items-center shrink-0 pr-[6px] [&_.git-section-heading]:flex-1 [&_.git-section-heading]:min-w-0">
@@ -525,6 +533,9 @@ export function FilesSidebar({
       )}
       <Tabs.Panel value="changes" className="flex flex-col h-full min-h-0 overflow-hidden">
         <GitSidebar workspace={workspace} scope={scope} threadId={threadId} />
+      </Tabs.Panel>
+      <Tabs.Panel value="search" className="flex flex-col h-full min-h-0 overflow-hidden">
+        <ContentSearch scope={scope} />
       </Tabs.Panel>
     </Tabs.Root>
   )

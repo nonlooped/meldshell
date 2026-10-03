@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { expect } from "e2e"
 import { test } from "./desktop"
@@ -184,6 +184,46 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
         (item) => item.name === "résumé.md",
       ),
     ).toBe(false)
+  })
+
+  test("Ctrl+Shift+F searches file contents with case and regex toggles and opens a match", async ({
+    desktop,
+  }) => {
+    const workspace = await desktop.addWorkspace()
+    await mkdir(join(desktop.workspace, "src"))
+    await writeFile(
+      join(desktop.workspace, "src/search target.ts"),
+      "const needle = 1\nexport function Needle() {\n  return needle\n}\n",
+    )
+    await desktop.call("createThread", { workspaceId: workspace.id, title: "Find the needle" })
+    const page = desktop.page
+    await page.getByRole("button", { name: "Search threads and messages", exact: true }).click()
+    await page.getByText("Find the needle", { exact: true }).first().click()
+    // Shortcuts pressed inside a dialog belong to it, so wait for the palette to close.
+    await page.getByRole("dialog").waitFor({ state: "detached" })
+
+    await page.keyboard.press("Control+Shift+F")
+    const field = page.getByRole("textbox", { name: "Search in files", exact: true })
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.getAttribute("aria-label")))
+      .toBe("Search in files")
+    const summary = (text: string) =>
+      page
+        .getByRole("status")
+        .filter({ hasText: new RegExp(`^${text}$`) })
+        .waitFor()
+    await field.fill("needle")
+    await summary("3 results in 1 file")
+    await page.getByRole("button", { name: "Match case", exact: true }).click()
+    await summary("2 results in 1 file")
+
+    await page.getByRole("button", { name: "Use regular expression", exact: true }).click()
+    await field.fill("(")
+    await page.getByRole("alert").filter({ hasText: "Unterminated group" }).waitFor()
+    await field.fill("^\\s+return \\w+")
+    await summary("1 result in 1 file")
+    await page.locator('[title="src/search target.ts:3"]').click()
+    await page.getByText("src/search target.ts · L3", { exact: true }).waitFor()
   })
 
   test("an isolated thread edits its worktree without changing the shared checkout", async ({
