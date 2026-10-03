@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+
+- Claude Code turns no longer stop after tool calls or fail to finish in WSL because absent optional event fields were rejected by the host's JSON protocol. Tool results, approvals, and turn completion now omit those fields while preserving native data.
+
 ### Added
 
 - Source Control can open a pull request once a branch has commits. Create pull request shows the base and branch with the commits it carries, pushes anything unpushed, and writes a title and description from the branch's commits and diff (following the repository's pull request template when it has one). You can edit both, preview the description as Markdown, and create it as a draft with Ctrl or Cmd and Enter. The pull request then shows above the composer and in Source Control with a bar of its checks, its review state, and merge conflicts, refreshing while checks run. Expanding it lists each check with a link to its run and each reviewer, and a draft can be marked ready for review from there. This uses the GitHub CLI (gh) signed in on the computer running MeldShell.
