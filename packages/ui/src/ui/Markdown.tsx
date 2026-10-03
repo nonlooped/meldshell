@@ -165,7 +165,8 @@ export function Markdown({
       <div className={`${eventMarkdownClasses} ${className}`}>
         <div
           ref={content}
-          className={"[&_>_:first-child]:mt-[0] [&_>_:last-child]:mb-[0]"}
+          // While a reply streams, each new block rises into place as it arrives.
+          className={`[&_>_:first-child]:mt-[0] [&_>_:last-child]:mb-[0] ${streaming || inheritedStreaming ? "motion-stream" : ""}`}
           onClick={(event) => {
             const target = event.target as HTMLElement
             const image = target.closest(".markdown-image-button")?.querySelector("img")

@@ -4,6 +4,7 @@ import {
   GradientSpinner,
   PopPresence,
   Shimmer,
+  Swap,
   useMotionPreference,
 } from "../ui/motion"
 import { motion } from "motion/react"
@@ -454,20 +455,25 @@ function WorkingSection({
     <Collapsible.Root className="text-[var(--text-tertiary)]" open={open} onOpenChange={setOpen}>
       <Collapsible.Trigger className="motion-colors [list-style:none] flex min-h-[28px] items-center gap-[6px] [padding:3px_6px_3px_2px] rounded-[var(--radius-sm)] cursor-pointer text-[11px] font-medium w-full border-0 bg-transparent text-inherit [font:inherit] text-left [&::-webkit-details-marker]:hidden [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)]">
         <ChevronRight className={disclosureChevronClasses} size={14} />
-        {turn.complete ? (
-          <>
+        {/* Finishing swaps the spinner for what the turn mostly did. */}
+        <Swap
+          id={turn.complete ? "worked" : "working"}
+          className="grid flex-none place-items-center"
+        >
+          {turn.complete ? (
             <WorkIcon work={primaryWork(turn.workingEvents)} />
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-              {workSummary(turn.workingEvents) || "Worked"}
-            </span>
-          </>
-        ) : (
-          <>
+          ) : (
             <GradientSpinner size={11} />
-            <Shimmer className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-              {workSummary(turn.workingEvents) || "Working"}
-            </Shimmer>
-          </>
+          )}
+        </Swap>
+        {turn.complete ? (
+          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            {workSummary(turn.workingEvents) || "Worked"}
+          </span>
+        ) : (
+          <Shimmer className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            {workSummary(turn.workingEvents) || "Working"}
+          </Shimmer>
         )}
         <span className="flex-none font-normal text-[var(--text-tertiary)] opacity-[0.8] [font-variant-numeric:tabular-nums]">
           {formatDuration(turn.durationMs)}

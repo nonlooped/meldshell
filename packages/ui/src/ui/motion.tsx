@@ -1,4 +1,11 @@
-import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react"
 import { Collapsible } from "@base-ui-components/react/collapsible"
 import { AnimatePresence, MotionConfig, motion, type HTMLMotionProps } from "motion/react"
 import { LoaderCircle } from "lucide-react"
@@ -45,11 +52,12 @@ export function useMotionPreference() {
   return useContext(ReducedMotion)
 }
 
-function useEnterMotion(duration = 0.28) {
+function useEnterMotion(duration = 0.28, rise = 0) {
   const reduced = useMotionPreference()
+  // Without a rise, transforms stay untouched so an element's own `transform` class still applies.
   return {
-    initial: reduced ? (false as const) : { opacity: 0 },
-    animate: { opacity: 1 },
+    initial: reduced ? (false as const) : rise ? { opacity: 0, y: rise } : { opacity: 0 },
+    animate: rise ? { opacity: 1, y: 0 } : { opacity: 1 },
     transition: { duration: reduced ? 0 : duration, ease },
   }
 }
@@ -108,6 +116,55 @@ function surfaceMotion(kind: string, side?: string) {
       duration: 0.11,
     }
   return { hidden: { opacity: 0 }, visible: { opacity: 1 }, duration: 0.2 }
+}
+
+/**
+ * A selection highlight that slides between the tabs of the Base UI `Tabs.List` it is the first
+ * child of. The list must be positioned. Offsets are layout pixels, so it stays aligned at any app
+ * zoom and inside a scrolling list.
+ */
+export function TabIndicator({ className = "" }: { className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const indicator = ref.current
+    const list = indicator?.parentElement
+    if (!indicator || !list) return
+    let observed: HTMLElement | null = null
+    const place = () => {
+      const tab = list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+      indicator.hidden = tab === null
+      if (tab === null) return
+      if (tab !== observed) {
+        if (observed !== null) resize.unobserve(observed)
+        resize.observe(tab)
+        observed = tab
+      }
+      indicator.style.left = `${tab.offsetLeft}px`
+      indicator.style.top = `${tab.offsetTop}px`
+      indicator.style.width = `${tab.offsetWidth}px`
+      indicator.style.height = `${tab.offsetHeight}px`
+    }
+    const resize = new ResizeObserver(place)
+    const selection = new MutationObserver(place)
+    place()
+    resize.observe(list)
+    selection.observe(list, { subtree: true, attributeFilter: ["aria-selected"] })
+    // The first placement snaps; later ones glide.
+    const frame = requestAnimationFrame(() => indicator.setAttribute("data-ready", ""))
+    return () => {
+      cancelAnimationFrame(frame)
+      resize.disconnect()
+      selection.disconnect()
+    }
+  }, [])
+  return (
+    <span
+      ref={ref}
+      aria-hidden="true"
+      hidden
+      className={`motion-tab-indicator tab-indicator ${className}`}
+    />
+  )
 }
 
 const SpinningLoader = motion.create(LoaderCircle)
@@ -233,11 +290,13 @@ export function PopPresence({
   )
 }
 
+/** Fades content in once; `rise` also lifts it that many pixels into place. */
 export function FadeDiv({
   duration = 0.28,
+  rise = 0,
   ...props
-}: HTMLMotionProps<"div"> & { duration?: number }) {
-  return <motion.div {...useEnterMotion(duration)} {...props} />
+}: HTMLMotionProps<"div"> & { duration?: number; rise?: number }) {
+  return <motion.div {...useEnterMotion(duration, rise)} {...props} />
 }
 export function FadeMain(props: HTMLMotionProps<"main">) {
   return <motion.main {...useEnterMotion()} {...props} />

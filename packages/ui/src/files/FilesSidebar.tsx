@@ -1,7 +1,7 @@
 import { Tabs } from "@base-ui-components/react/tabs"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Collapsible } from "@base-ui-components/react/collapsible"
-import { CollapsiblePanel } from "../ui/motion"
+import { CollapsiblePanel, TabIndicator } from "../ui/motion"
 import { TreeSkeleton } from "../ui/Skeleton"
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -438,6 +438,7 @@ export function FilesSidebar({
     <Tabs.Root defaultValue="files" className="flex flex-col h-full min-h-0 overflow-hidden">
       {worktreeThread !== undefined && <WorktreeBar thread={worktreeThread} />}
       <Tabs.List className={panelTabsClasses} aria-label="Workspace sidebar">
+        <TabIndicator className="rounded-[var(--radius)] border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-selected)]" />
         <Tabs.Tab value="files">Files</Tabs.Tab>
         <Tabs.Tab value="changes">Changes</Tabs.Tab>
       </Tabs.List>

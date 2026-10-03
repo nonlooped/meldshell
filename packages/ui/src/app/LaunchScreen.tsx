@@ -152,12 +152,21 @@ export function LaunchScreen({ launch }: { launch: Launch }): React.JSX.Element 
                       className="grid place-items-center"
                       title={HARNESSES[harness].label}
                       initial={false}
+                      // A harness that connects lights up with a small bounce.
                       animate={
                         settled
-                          ? { opacity: 1, filter: "grayscale(0)" }
-                          : { opacity: 0.32, filter: "grayscale(1)" }
+                          ? {
+                              opacity: 1,
+                              filter: "grayscale(0)",
+                              scale: reduced ? 1 : [1, 1.28, 1],
+                            }
+                          : { opacity: 0.32, filter: "grayscale(1)", scale: 1 }
                       }
-                      transition={{ duration: reduced ? 0 : 0.4, ease }}
+                      transition={{
+                        duration: reduced ? 0 : 0.4,
+                        ease,
+                        scale: { duration: reduced ? 0 : 0.42, ease: "easeOut" },
+                      }}
                     >
                       <ProviderIcon provider={provider} size={15} />
                     </motion.span>
