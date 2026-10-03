@@ -100,8 +100,9 @@ export function prepareMarkdown(text: string): string {
 }
 
 // Reference and footnote definitions resolve across the whole message, so it stays one block.
-// Labels may span lines and contain escaped brackets.
-const definition = /^[ \t>*+\-\d.)]*\[(?:[^\\\]]|\\[\s\S])+\]:/m
+// Labels may span lines and escape brackets, but never hold an unescaped one, which keeps a
+// scan from each unmatched "[" short.
+const definition = /^[ \t>*+\-\d.)]*\[(?:[^\\[\]]|\\[\s\S]){1,999}\]:/m
 const listItem = /^( *)([-+*]|\d{1,9}[.)])( +|$)/
 const fence = /^( *)((?:(?:[-+*]|\d{1,9}[.)]) +)*)(`{3,}|~{3,}|\${2,})(.*)$/
 // Raw HTML blocks have several ending rules and are rare in replies, so the rest stays joined.
