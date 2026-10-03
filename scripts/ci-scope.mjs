@@ -80,6 +80,7 @@ export function selectChecks(files, full = false, entries = workspaces()) {
         "tests/settings.test.ts",
         "tests/pull-requests.test.ts",
         "tests/review-notes.test.ts",
+        "tests/loadouts.test.ts",
         ...releaseTests,
       ]
     : release

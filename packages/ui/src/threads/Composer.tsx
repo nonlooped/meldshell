@@ -39,7 +39,7 @@ import { effortLabel, resolveSelection, selectableModels } from "../data/catalog
 import { workspaceScope } from "../data/workspace-scope"
 import { FileIcon } from "../ui/FileIcon"
 import { ImageLightbox } from "../ui/MarkdownBlocks"
-import { ModelPicker } from "./ModelPicker"
+import { ModelPickerWithLoadouts } from "./LoadoutPicker"
 import { useComposerCompletion } from "./ComposerCompletion"
 import type { ComposerToken } from "./composer-completion"
 import { dropText, launchFromText } from "../ui/flight"
@@ -587,11 +587,12 @@ function ComposerSettings({
   const visible = selectableModels(snapshot).filter((model) => !model.hidden)
   return (
     <>
-      <ModelPicker
-        providers={snapshot.providers}
+      <ModelPickerWithLoadouts
+        snapshot={snapshot}
+        threadId={threadId}
+        selection={selection}
         models={visible}
-        selected={selection.model}
-        onSelect={(modelId) => onChangeSettings({ threadId, modelId })}
+        onChangeSettings={onChangeSettings}
       />
 
       <ReasoningSettings
