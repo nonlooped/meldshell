@@ -49,6 +49,7 @@ export const useSideQuestions = create<{
   questions: Readonly<Record<string, ReadonlyArray<SideQuestion>>>
   ask: (scope: WorkspaceScope & { readonly threadId: string }, question: string) => Promise<void>
   dismiss: (threadId: string, id: string) => void
+  close: (threadId: string) => void
 }>((set) => {
   const patch = (threadId: string, id: string, change: Partial<SideQuestion>) =>
     set((state) => ({
@@ -91,6 +92,11 @@ export const useSideQuestions = create<{
           ),
         },
       })),
+    close: (threadId) =>
+      set((state) => {
+        const { [threadId]: _closed, ...rest } = state.questions
+        return { questions: rest }
+      }),
   }
 })
 
