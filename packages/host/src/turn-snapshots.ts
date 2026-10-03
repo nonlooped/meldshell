@@ -147,6 +147,50 @@ export async function restoreTurnSnapshot(
   })
 }
 
+/**
+ * Gives a fork's new worktree the files the original thread had at a turn snapshot. The worktree
+ * has nothing of its own yet, so nothing is saved for an undo. Returns false without a snapshot.
+ */
+export async function checkoutTurnSnapshot(
+  cwd: string,
+  threadId: string,
+  turnId: string,
+  point: SnapshotPoint,
+): Promise<boolean> {
+  const commit = await resolveCommit(cwd, turnSnapshotRef(threadId, turnId, point))
+  if (commit === null) return false
+  await writeRepository(cwd, () => restoreFiles(cwd, commit))
+  return true
+}
+
+/**
+ * Points a fork's copied turns at the original turns' snapshots, so restoring and rewinding work
+ * in the fork too. Refs are shared by every worktree of a repository, so the commits are reused.
+ */
+export async function copyTurnSnapshots(
+  cwd: string,
+  from: string,
+  to: string,
+  turns: ReadonlyArray<{ readonly from: string; readonly to: string }>,
+): Promise<void> {
+  const updates: string[] = []
+  for (const turn of turns)
+    for (const point of ["before", "after"] as const) {
+      const commit = await resolveCommit(cwd, turnSnapshotRef(from, turn.from, point))
+      if (commit !== null) updates.push(`update ${turnSnapshotRef(to, turn.to, point)} ${commit}\n`)
+    }
+  if (updates.length > 0) await updateRefs(cwd, updates, "Could not copy the thread's snapshots.")
+}
+
+/** Applies ref updates in one transaction; the list can be longer than a command line allows. */
+const updateRefs = (cwd: string, lines: readonly string[], failure: string) =>
+  new Promise<void>((resolve, reject) => {
+    const child = spawn("git", ["update-ref", "--stdin"], { cwd, windowsHide: true })
+    child.on("error", reject)
+    child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(failure))))
+    child.stdin.end(lines.join(""))
+  })
+
 /** Puts back the files a restore replaced. Only the latest restore can be undone. */
 export async function undoSnapshotRestore(cwd: string, threadId: string): Promise<void> {
   await writeRepository(cwd, async () => {
@@ -164,16 +208,9 @@ export async function deleteThreadSnapshots(cwd: string, threadId: string): Prom
     .split("\n")
     .filter(Boolean)
   if (refs.length === 0) return
-  await new Promise<void>((resolve, reject) => {
-    // One transaction deletes every ref; the list can be longer than a command line allows.
-    const child = spawn("git", ["update-ref", "--stdin"], {
-      cwd,
-      windowsHide: true,
-    })
-    child.on("error", reject)
-    child.on("close", (code) =>
-      code === 0 ? resolve() : reject(new Error("Could not remove the thread's snapshots.")),
-    )
-    child.stdin.end(refs.map((ref) => `delete ${ref}\n`).join(""))
-  })
+  await updateRefs(
+    cwd,
+    refs.map((ref) => `delete ${ref}\n`),
+    "Could not remove the thread's snapshots.",
+  )
 }

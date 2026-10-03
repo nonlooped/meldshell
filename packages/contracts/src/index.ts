@@ -25,4 +25,5 @@ export {
   TurnSnapshotInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,
+  ForkThreadInput,
 } from "./workspace-inputs"

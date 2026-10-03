@@ -56,6 +56,7 @@ import { listIssues } from "./issues"
 import {
   createThread,
   deleteThread,
+  forkThread,
   getWorktreeSetupLog,
   getWorktreeStatus,
   mergeThreadWorktree,
@@ -297,6 +298,7 @@ export const hostOperations: Record<string, Operation> = {
         )
     }),
   ),
+  [C.IPC.forkThread]: operation(C.ForkThreadInput, false, forkThread),
   [C.IPC.undoRewind]: operation(C.UndoSnapshotRestoreInput, false, (input) =>
     Effect.gen(function* () {
       const core = yield* CoreClient

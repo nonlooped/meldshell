@@ -44,6 +44,18 @@ export const ThreadIssue = Schema.Struct({
 
 export type ThreadIssue = typeof ThreadIssue.Type
 
+/** The thread a fork was copied from, at the message it was forked from. */
+export const ThreadFork = Schema.Struct({
+  /** Null once the original thread is deleted; the fork keeps its own copy of the turns. */
+  threadId: Schema.NullOr(Schema.String),
+  /** The original thread's title when it was forked. */
+  title: Schema.String,
+  /** The fork has not run a turn of its own yet, so its next turn starts from a summary. */
+  fresh: Schema.Boolean,
+})
+
+export type ThreadFork = typeof ThreadFork.Type
+
 export const Thread = Schema.Struct({
   id: Schema.String,
   workspaceId: Schema.String,
@@ -77,16 +89,19 @@ export const Thread = Schema.Struct({
   /** Changes whenever turns leave or return to the conversation, so open transcripts are reread. */
   historyRevision: Schema.optional(Schema.String),
   issue: Schema.optional(ThreadIssue),
+  fork: Schema.optional(ThreadFork),
 })
 
 export type Thread = typeof Thread.Type
 
 /**
- * Why a turn's provider received a summary of earlier turns: another harness ran them, or the
- * provider session restarted after a rewind.
+ * Why a turn's provider received a summary of earlier turns: another harness ran them, the
+ * provider session restarted after a rewind, or the thread was forked from another one.
  */
 export const TurnHandoff = Schema.Struct({
-  reason: Schema.Literals(["handoff", "restart"]),
+  reason: Schema.Literals(["handoff", "restart", "fork"]),
+  /** For a fork, the title of the thread it was copied from. */
+  forkedFrom: Schema.optional(Schema.String),
   /** The harnesses whose turns the summary covers, in the order they first ran. */
   from: Schema.Array(Schema.String),
   to: Schema.String,
@@ -914,6 +929,32 @@ export const UndoRewindResult = Schema.Struct({
 })
 
 export type UndoRewindResult = typeof UndoRewindResult.Type
+
+/** Where a fork starts: before a turn's message, or at the end of the turn. */
+export const ForkPoint = Schema.Literals(["before", "after"])
+
+export type ForkPoint = typeof ForkPoint.Type
+
+/** The new thread a fork recorded, with each copied turn's id beside the original's. */
+export const ForkRecord = Schema.Struct({
+  snapshot: AppSnapshot,
+  threadId: Schema.String,
+  /** The message a fork from before a turn starts with, to edit and send; empty otherwise. */
+  text: Schema.String,
+  turns: Schema.Array(Schema.Struct({ from: Schema.String, to: Schema.String })),
+})
+
+export type ForkRecord = typeof ForkRecord.Type
+
+export const ForkResult = Schema.Struct({
+  snapshot: AppSnapshot,
+  threadId: Schema.String,
+  text: Schema.String,
+  /** The fork's files match the original's at that point; an older turn has no snapshot. */
+  filesRestored: Schema.Boolean,
+})
+
+export type ForkResult = typeof ForkResult.Type
 
 export const RuntimeEventInput = Schema.Struct({
   threadId: Schema.String,

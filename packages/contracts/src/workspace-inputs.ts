@@ -130,6 +130,14 @@ export const RestoreTurnSnapshotInput = Schema.Struct({
 })
 export type RestoreTurnSnapshotInput = typeof RestoreTurnSnapshotInput.Type
 
+/** Copies a thread up to a turn into a new thread with its own worktree. */
+export const ForkThreadInput = Schema.Struct({
+  ...TurnSnapshotInput.fields,
+  /** `before` leaves the turn out and returns its message to edit; `after` keeps the whole turn. */
+  point: Schema.Literals(["before", "after"]),
+})
+export type ForkThreadInput = typeof ForkThreadInput.Type
+
 export const UndoSnapshotRestoreInput = Schema.Struct({
   workspaceId: Schema.String,
   threadId: Schema.String,

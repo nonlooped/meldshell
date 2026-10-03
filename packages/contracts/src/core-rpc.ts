@@ -35,6 +35,8 @@ import {
   RewindResult,
   UndoRewindResult,
   TurnHandoff,
+  ForkPoint,
+  ForkRecord,
 } from "./models"
 import { CoreError } from "./errors"
 
@@ -135,6 +137,17 @@ export class CoreRpcs extends RpcGroup.make(
   Rpc.make("UndoRewind", {
     payload: Schema.Struct({ threadId: Schema.String }),
     success: UndoRewindResult,
+    error: CoreError,
+  }),
+  /** Copies a thread's turns up to a point into a new thread that works in `worktree`. */
+  Rpc.make("ForkThread", {
+    payload: Schema.Struct({
+      threadId: Schema.String,
+      turnId: Schema.String,
+      point: ForkPoint,
+      worktree: ThreadWorktree.mapFields(Struct.omit(["state", "setup"])),
+    }),
+    success: ForkRecord,
     error: CoreError,
   }),
   Rpc.make("RecordRuntimeEvent", {
