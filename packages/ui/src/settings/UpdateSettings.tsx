@@ -1,13 +1,14 @@
 import { errorMessage, type AppUpdateStatus } from "@meldshell/contracts"
 import { useEffect, useState } from "react"
 import { Button, SelectField } from "../ui/controls"
+import { SettingRow } from "./SettingRow"
 
 const buttonLabel = (status: AppUpdateStatus | null): string => {
-  if (status === null) return "Loading..."
-  if (status.state === "checking") return "Checking..."
+  if (status === null) return "Loading…"
+  if (status.state === "checking") return "Checking…"
   if (status.state === "downloading") {
     return status.progressPercent === null
-      ? "Downloading..."
+      ? "Downloading…"
       : `Downloading ${Math.round(status.progressPercent)}%`
   }
   if (status.state === "ready") return "Restart and update"
@@ -64,67 +65,59 @@ export function UpdateSettings(): React.JSX.Element {
     }
   }
 
+  const failed = status?.state === "error" || actionError !== null
   return (
     <>
-      <div
-        data-setting-label="MeldShell updates"
-        tabIndex={-1}
-        className="flex flex-wrap items-start justify-between gap-[16px]"
+      <SettingRow
+        label="MeldShell updates"
+        description={
+          <span className="flex flex-col gap-[8px]">
+            <span
+              role={failed ? "alert" : "status"}
+              className={failed ? "text-[var(--color-deleted)]" : undefined}
+            >
+              {actionError ?? status?.message ?? "MeldShell checks GitHub Releases automatically."}
+            </span>
+            {status?.state === "downloading" && status.progressPercent !== null && (
+              <span
+                className="block w-[240px] max-w-full h-[4px] overflow-hidden rounded-full bg-[var(--surface-active)]"
+                role="progressbar"
+                aria-label="Update download progress"
+                aria-valuenow={Math.round(status.progressPercent)}
+              >
+                <span
+                  className="block h-full rounded-full bg-[var(--accent)] transition-[width] duration-300"
+                  style={{ width: `${status.progressPercent}%` }}
+                />
+              </span>
+            )}
+          </span>
+        }
       >
-        <div className="min-w-0">
-          <h3 className="m-0 text-[13px] font-medium text-[var(--text-primary)]">Updates</h3>
-          <p
-            className="[margin:5px_0_0] text-[12px] text-[var(--text-tertiary)]"
-            role={status?.state === "error" || actionError !== null ? "alert" : "status"}
-          >
-            {actionError ?? status?.message ?? "MeldShell checks GitHub Releases automatically."}
-          </p>
-          {status?.state === "downloading" && status.progressPercent !== null && (
-            <progress
-              className="mt-[10px] block h-[4px] w-[240px] max-w-full accent-[var(--accent)]"
-              value={status.progressPercent}
-              max={100}
-              aria-label="Update download progress"
-            />
-          )}
-        </div>
         <Button
-          size="sm"
           variant={status?.state === "ready" ? "primary" : "default"}
           disabled={busy || unavailable}
           onClick={() => void runAction()}
         >
           {buttonLabel(status)}
         </Button>
-      </div>
+      </SettingRow>
       {status !== null && !unavailable && (
-        <div
-          data-setting-label="Release channel"
-          tabIndex={-1}
-          className="mt-[18px] flex flex-wrap items-start justify-between gap-[16px]"
+        <SettingRow
+          label="Release channel"
+          description="Stable releases arrive daily. Nightly builds include new changes every hour and are less tested. Choosing Stable returns to the latest stable release."
         >
-          <div className="min-w-0">
-            <h3 className="m-0 text-[13px] font-medium text-[var(--text-primary)]">
-              Release channel
-            </h3>
-            <p className="[margin:5px_0_0] text-[12px] text-[var(--text-tertiary)]">
-              Stable releases arrive daily. Nightly builds include new changes every hour and are
-              less tested. Choosing Stable returns to the latest stable release.
-            </p>
-          </div>
-          <div className="w-[220px] shrink-0">
-            <SelectField
-              label="Release channel"
-              value={status.channel}
-              options={[
-                { value: "stable", label: "Stable" },
-                { value: "nightly", label: "Nightly" },
-              ]}
-              disabled={busy}
-              onValueChange={(channel) => void setChannel(channel)}
-            />
-          </div>
-        </div>
+          <SelectField
+            label="Release channel"
+            value={status.channel}
+            options={[
+              { value: "stable", label: "Stable" },
+              { value: "nightly", label: "Nightly" },
+            ]}
+            disabled={busy}
+            onValueChange={(channel) => void setChannel(channel)}
+          />
+        </SettingRow>
       )}
     </>
   )

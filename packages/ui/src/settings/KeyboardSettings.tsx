@@ -13,6 +13,7 @@ import {
   useKeybindings,
 } from "../app/keybindings"
 import { Button, ChordKeys, ContextMenu, IconButton, MenuAction } from "../ui/controls"
+import { SettingsGroup, settingsCaptionClasses, settingsCardClasses } from "./SettingsGroup"
 
 const GROUPS = ["Navigation", "Tabs", "Panels", "Workspace", "Input", "Loadouts"] as const
 
@@ -69,7 +70,7 @@ function ChordRecorder({
     <button
       ref={buttonRef}
       type="button"
-      className={`motion-colors flex h-[30px] min-w-[148px] items-center justify-center [padding:0_10px] border-[1px] rounded-[var(--radius-sm)] cursor-default text-[12px] ${
+      className={`motion-colors flex h-[30px] min-w-[148px] [@container(max-width:_460px)]:min-w-[104px] items-center justify-center [padding:0_10px] border-[1px] rounded-[var(--radius-sm)] cursor-default text-[12px] ${
         recording
           ? "border-[color:var(--accent)] bg-[color-mix(in_srgb,_var(--accent)_10%,_transparent)] text-[var(--text-primary)] [box-shadow:0_0_0_3px_color-mix(in_srgb,_var(--accent)_16%,_transparent)]"
           : "border-[color:var(--line)] bg-transparent text-[var(--text-secondary)] [&:hover]:bg-[var(--surface-hover)] [&:hover]:[border-color:var(--line-strong)]"
@@ -160,18 +161,31 @@ export function KeyboardSettings({
   const customized = SHORTCUTS.some((entry) => bindings[entry.id] !== entry.chord)
 
   return (
-    <section className="max-w-[720px]">
-      <p className="[margin:0_0_20px] text-[var(--text-secondary)] text-[12px] leading-[1.6]">
-        Select a shortcut and press the keys you want instead. Shortcuts need Ctrl, Alt, or the
-        system key unless they use a function key. While a terminal has focus, only the tab and
-        terminal shortcuts reach MeldShell; every other key goes to the shell.
-      </p>
+    <SettingsGroup
+      title="Keyboard shortcuts"
+      description="Select a shortcut and press the keys you want instead. Shortcuts need Ctrl, Alt, or the system key unless they use a function key. While a terminal has focus, only tab and terminal shortcuts reach MeldShell."
+      action={
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={pending || !customized}
+          icon={<RotateCcw size={13} />}
+          onClick={() => {
+            setNotice(null)
+            save(
+              Object.fromEntries(SHORTCUTS.map((entry) => [entry.id, entry.chord])) as Keybindings,
+            )
+          }}
+        >
+          Restore all defaults
+        </Button>
+      }
+      bare
+    >
       {GROUPS.map((group) => (
-        <div key={group} className="mb-[24px]">
-          <h3 className="[margin:0_0_4px] text-[var(--text-secondary)] text-[12px] font-medium">
-            {group}
-          </h3>
-          <div className="border-t-[1px] border-t-[color:var(--line-subtle)]">
+        <div key={group} className="mb-[20px] last:mb-0">
+          <h4 className={settingsCaptionClasses}>{group}</h4>
+          <div className={settingsCardClasses}>
             {SHORTCUTS.filter((entry) => entry.group === group).map((entry) => {
               const chord = bindings[entry.id]
               const changed = chord !== entry.chord
@@ -184,7 +198,7 @@ export function KeyboardSettings({
                       key={entry.id}
                       data-setting-label={entry.label}
                       tabIndex={-1}
-                      className="group/shortcut [padding:8px_0] border-b-[1px] border-b-[color:var(--line-subtle)]"
+                      className="group/shortcut [padding:8px_16px] outline-none first:rounded-t-[inherit] last:rounded-b-[inherit]"
                     >
                       <div className="flex min-h-[32px] items-center justify-between gap-[24px]">
                         <span className="flex min-w-0 flex-col gap-[1px]">
@@ -198,14 +212,15 @@ export function KeyboardSettings({
                           )}
                         </span>
                         <span className="flex flex-none items-center gap-[2px]">
-                          <ChordRecorder
-                            definition={entry}
-                            chord={chord}
-                            requested={requested === entry.id}
-                            onStarted={() => setRequested(null)}
-                            onRecord={(next) => assign(entry.id, next)}
-                            onProblem={(text) => setNotice({ id: entry.id, tone: "error", text })}
-                          />
+                          <span className={changed ? "" : "invisible"}>
+                            <IconButton
+                              label={`Restore ${chordLabel(entry.chord)} for ${entry.label}`}
+                              disabled={pending || !changed}
+                              onClick={() => assign(entry.id, entry.chord)}
+                            >
+                              <RotateCcw size={14} />
+                            </IconButton>
+                          </span>
                           {/* Removing is always possible, so it waits for the row to be pointed at. */}
                           <span className="opacity-[0] motion-colors group-hover/shortcut:opacity-[1] group-focus-within/shortcut:opacity-[1] [@media(hover:_none)]:opacity-[1]">
                             <IconButton
@@ -216,14 +231,15 @@ export function KeyboardSettings({
                               <X size={14} />
                             </IconButton>
                           </span>
-                          <span className={changed ? "" : "invisible"}>
-                            <IconButton
-                              label={`Restore ${chordLabel(entry.chord)} for ${entry.label}`}
-                              disabled={pending || !changed}
-                              onClick={() => assign(entry.id, entry.chord)}
-                            >
-                              <RotateCcw size={14} />
-                            </IconButton>
+                          <span className="ml-[6px] flex">
+                            <ChordRecorder
+                              definition={entry}
+                              chord={chord}
+                              requested={requested === entry.id}
+                              onStarted={() => setRequested(null)}
+                              onRecord={(next) => assign(entry.id, next)}
+                              onProblem={(text) => setNotice({ id: entry.id, tone: "error", text })}
+                            />
                           </span>
                         </span>
                       </div>
@@ -271,16 +287,6 @@ export function KeyboardSettings({
           </div>
         </div>
       ))}
-      <Button
-        disabled={pending || !customized}
-        icon={<RotateCcw size={13} />}
-        onClick={() => {
-          setNotice(null)
-          save(Object.fromEntries(SHORTCUTS.map((entry) => [entry.id, entry.chord])) as Keybindings)
-        }}
-      >
-        Restore all defaults
-      </Button>
-    </section>
+    </SettingsGroup>
   )
 }

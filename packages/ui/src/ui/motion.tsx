@@ -123,7 +123,14 @@ function surfaceMotion(kind: string, side?: string) {
  * child of. The list must be positioned. Offsets are layout pixels, so it stays aligned at any app
  * zoom and inside a scrolling list.
  */
-export function TabIndicator({ className = "" }: { className?: string }) {
+export function TabIndicator({
+  className = "",
+  selector = '[role="tab"][aria-selected="true"]',
+}: {
+  className?: string
+  /** The chosen item; a navigation list marks it with `aria-current` instead. */
+  selector?: string
+}) {
   const ref = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const indicator = ref.current
@@ -131,7 +138,7 @@ export function TabIndicator({ className = "" }: { className?: string }) {
     if (!indicator || !list) return
     let observed: HTMLElement | null = null
     const place = () => {
-      const tab = list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+      const tab = list.querySelector<HTMLElement>(selector)
       indicator.hidden = tab === null
       if (tab === null) return
       if (tab !== observed) {
@@ -148,7 +155,11 @@ export function TabIndicator({ className = "" }: { className?: string }) {
     const selection = new MutationObserver(place)
     place()
     resize.observe(list)
-    selection.observe(list, { subtree: true, attributeFilter: ["aria-selected"] })
+    selection.observe(list, {
+      subtree: true,
+      childList: true,
+      attributeFilter: ["aria-selected", "aria-current"],
+    })
     // The first placement snaps; later ones glide.
     const frame = requestAnimationFrame(() => indicator.setAttribute("data-ready", ""))
     return () => {
@@ -156,7 +167,7 @@ export function TabIndicator({ className = "" }: { className?: string }) {
       resize.disconnect()
       selection.disconnect()
     }
-  }, [])
+  }, [selector])
   return (
     <span
       ref={ref}

@@ -8,8 +8,6 @@ export type SettingsSection =
   | "account"
   | "app"
 
-export type SettingsSubsection = "shortcuts" | "dictation" | "configuration" | "usage"
-
 interface ViewStore {
   /** Workspace views cover the workbench while preserving its open tabs. */
   readonly schedulesOpen: boolean
@@ -18,13 +16,15 @@ interface ViewStore {
   readonly closeWorkbenchViews: () => void
   readonly settingsOpen: boolean
   readonly settingsSection: SettingsSection
-  readonly settingsSubsection: SettingsSubsection
-  readonly openSettings: (section?: SettingsSection, subsection?: SettingsSubsection) => void
+  /**
+   * The setting or group to bring into view once its page is on screen, by its
+   * `data-setting-label`. The settings view clears it after scrolling there.
+   */
+  readonly settingsTarget: string | null
+  readonly openSettings: (section?: SettingsSection, target?: string) => void
   readonly closeSettings: () => void
-  readonly selectSettingsSection: (
-    section: SettingsSection,
-    subsection?: SettingsSubsection,
-  ) => void
+  readonly selectSettingsSection: (section: SettingsSection, target?: string) => void
+  readonly clearSettingsTarget: () => void
   /** The first-run guide covers the whole window until it is finished or skipped. */
   readonly onboardingOpen: boolean
   readonly openOnboarding: () => void
@@ -45,26 +45,18 @@ export const useViewStore = create<ViewStore>((set) => ({
   closeWorkbenchViews: () => set({ schedulesOpen: false, settingsOpen: false }),
   settingsOpen: false,
   settingsSection: "threads",
-  settingsSubsection: "shortcuts",
-  openSettings: (section, subsection) =>
+  settingsTarget: null,
+  openSettings: (section, target) =>
     set((state) => ({
       settingsOpen: true,
       schedulesOpen: false,
       settingsSection: section ?? state.settingsSection,
-      settingsSubsection:
-        subsection ??
-        (section === "providers"
-          ? "configuration"
-          : section === "keyboard"
-            ? "shortcuts"
-            : state.settingsSubsection),
+      settingsTarget: target ?? null,
     })),
-  closeSettings: () => set({ settingsOpen: false }),
-  selectSettingsSection: (section, subsection) =>
-    set({
-      settingsSection: section,
-      settingsSubsection: subsection ?? (section === "providers" ? "configuration" : "shortcuts"),
-    }),
+  closeSettings: () => set({ settingsOpen: false, settingsTarget: null }),
+  selectSettingsSection: (section, target) =>
+    set({ settingsSection: section, settingsTarget: target ?? null }),
+  clearSettingsTarget: () => set({ settingsTarget: null }),
   onboardingOpen: false,
   openOnboarding: () => set({ onboardingOpen: true }),
   closeOnboarding: () => set({ onboardingOpen: false }),

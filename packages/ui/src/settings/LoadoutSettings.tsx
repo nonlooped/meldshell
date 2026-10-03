@@ -2,7 +2,8 @@ import { useState } from "react"
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react"
 import type { AppSnapshot, Loadout, SetAppSettingsInput } from "@meldshell/contracts"
 import { LOADOUT_ACTIONS, useKeybindings } from "../app/keybindings"
-import { Button, ChordKeys, IconButton, PanelNote, TextField } from "../ui/controls"
+import { Button, ChordKeys, IconButton, TextField } from "../ui/controls"
+import { SettingsGroup } from "./SettingsGroup"
 import {
   describeLoadout,
   loadoutSelection,
@@ -67,20 +68,17 @@ export function LoadoutSettings({
   const save = (next: ReadonlyArray<Loadout>) => onChange({ loadouts: next })
 
   return (
-    <section className="max-w-[720px]">
-      <p className="[margin:0_0_20px] text-[var(--text-secondary)] text-[12px] leading-[1.6]">
-        A loadout remembers an agent, model, and reasoning effort together. Save one from the foot
-        of the composer's model picker, then switch a thread to it from there or with its shortcut.
-        A thread keeps its own mode and permissions. The order here sets which shortcut each one
-        uses.
-      </p>
+    <SettingsGroup
+      title="Loadouts"
+      description="A loadout remembers an agent, model, and reasoning effort together. Save one from the foot of the composer's model picker, then switch to it there or with its shortcut. The order here sets which shortcut each one uses."
+    >
       {loadouts.length === 0 ? (
-        <PanelNote>
+        <p className="m-0 [padding:22px_16px] text-[var(--text-tertiary)] text-[12.5px] text-center">
           No loadouts yet. Set up the composer the way you like, then choose Save current setup from
-          its loadout menu.
-        </PanelNote>
+          its model picker.
+        </p>
       ) : (
-        <ol className="m-0 p-0 list-none border-t-[1px] border-t-[color:var(--line-subtle)]">
+        <ol className="m-0 p-0 list-none [&>li+li]:border-t-[1px] [&>li+li]:border-t-[color:var(--line-subtle)]">
           {loadouts.map((loadout, index) => {
             const action = LOADOUT_ACTIONS[index]
             const chord = action === undefined ? "" : bindings[action]
@@ -88,12 +86,12 @@ export function LoadoutSettings({
             return (
               <li
                 key={loadout.id}
-                className="group/loadout flex items-center gap-[14px] [padding:10px_0] border-b-[1px] border-b-[color:var(--line-subtle)]"
+                className="group/loadout flex items-center gap-[14px] [padding:10px_10px_10px_16px]"
               >
-                <span className="flex w-[64px] flex-none justify-start text-[11px] text-[var(--text-tertiary)]">
+                <span className="flex w-[76px] flex-none justify-start text-[11px] text-[var(--text-tertiary)]">
                   {chord === "" ? "No shortcut" : <ChordKeys chord={chord} />}
                 </span>
-                <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
                   <LoadoutName
                     loadout={loadout}
                     disabled={pending}
@@ -107,7 +105,7 @@ export function LoadoutSettings({
                       : describeLoadout(selection)}
                   </span>
                 </span>
-                <span className="flex flex-none items-center gap-[2px]">
+                <span className="flex flex-none items-center gap-[2px] opacity-[0.55] motion-colors group-hover/loadout:opacity-100 group-focus-within/loadout:opacity-100 [@media(hover:_none)]:opacity-100">
                   <IconButton
                     label={`Move ${loadout.name} up`}
                     disabled={pending || index === 0}
@@ -141,7 +139,7 @@ export function LoadoutSettings({
       {removed !== null && (
         <p
           role="status"
-          className="flex items-center gap-[8px] [margin:10px_0_0] text-[11.5px] text-[var(--text-secondary)]"
+          className="flex items-center gap-[8px] m-0 [padding:8px_16px] text-[11.5px] text-[var(--text-secondary)]"
         >
           Deleted “{removed.name}”.
           <Button
@@ -157,6 +155,6 @@ export function LoadoutSettings({
           </Button>
         </p>
       )}
-    </section>
+    </SettingsGroup>
   )
 }
