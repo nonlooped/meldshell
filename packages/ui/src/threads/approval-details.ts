@@ -46,7 +46,7 @@ const fieldValue = (value: unknown): string => {
 }
 
 /** A tool call's input as labelled lines, leaving out empty values. */
-export const toolFields = (input: unknown): ToolField[] =>
+const toolFields = (input: unknown): ToolField[] =>
   Object.entries(asRecord(input))
     .filter(([, value]) => value !== undefined && value !== null && value !== "")
     .map(([key, value]) => ({
