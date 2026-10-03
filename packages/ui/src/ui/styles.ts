@@ -182,16 +182,17 @@ export const buttonClasses = [
 
 /**
  * Tabs within a panel, matching the title bar's tabs: selection is a raised surface with a hairline,
- * not an underline.
+ * not an underline. A `TabIndicator` draws that surface and slides it between tabs.
  */
 export const panelTabsClasses = [
-  "flex shrink-0 items-center gap-[2px] [padding:7px_8px] border-b-[1px] border-b-[color:var(--line-subtle)]",
+  "relative flex shrink-0 items-center gap-[2px] [padding:7px_8px] border-b-[1px] border-b-[color:var(--line-subtle)]",
   "[&_button]:inline-flex [&_button]:h-[28px] [&_button]:items-center [&_button]:[padding:0_10px]",
   "[&_button]:border-[1px] [&_button]:border-[color:transparent] [&_button]:rounded-[var(--radius)]",
   "[&_button]:bg-transparent [&_button]:text-[var(--text-tertiary)] [&_button]:text-[12px]",
   "[&_button]:cursor-default [&_button:hover]:bg-[var(--surface-hover)]",
-  "[&_button:hover]:text-[var(--text-secondary)] [&_button[data-active]]:[border-color:var(--line-subtle)]",
-  "[&_button[data-active]]:bg-[var(--surface-selected)] [&_button[data-active]]:text-[var(--text-primary)]",
+  "[&_button]:relative [&_button]:z-[1] [&_button]:motion-colors",
+  "[&_button:hover]:text-[var(--text-secondary)] [&_button[data-active]]:text-[var(--text-primary)]",
+  "[&_button[data-active]:hover]:bg-transparent",
 ].join(" ")
 
 /** A row of mutually exclusive choices, as Base UI `ToggleGroup` and `Toggle` render them. */

@@ -35,7 +35,8 @@ export function Notice({
   }, [copied])
   return (
     <FadeDiv
-      duration={0.2}
+      duration={0.24}
+      rise={4}
       role={role}
       style={{ "--tone": tones[tone] } as React.CSSProperties}
       className={`notice relative grid gap-[4px] [padding:9px_36px_10px_12px] border-[1px] rounded-[var(--radius)] [border-color:color-mix(in_srgb,var(--tone)_22%,transparent)] [background:color-mix(in_srgb,var(--tone)_6%,transparent)] text-[12px] leading-[1.5] ${className}`}
@@ -66,9 +67,9 @@ export function Notice({
   )
 }
 
-/** A floating panel at the bottom of the window. */
+/** A floating panel at the bottom of the window. It rises from below as it appears. */
 const toastClasses = [
-  "fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] flex w-max",
+  "motion-rise [--motion-rise:12px] fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] flex w-max",
   "bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] text-[var(--text-primary)]",
   "border-[1px] border-[color:var(--line)] rounded-[var(--radius-lg)] text-[12px] leading-[1.5]",
   "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
@@ -84,8 +85,7 @@ export function ErrorToast({
   onDismiss: () => void
 }): React.JSX.Element {
   return (
-    <FadeDiv
-      duration={0.2}
+    <div
       className={`${toastClasses} items-start gap-[10px] [padding:10px_10px_10px_14px] max-w-[min(560px,_calc(var(--viewport-w)_*_0.8))]`}
       role="alert"
     >
@@ -94,7 +94,7 @@ export function ErrorToast({
       <Button size="sm" className="flex-none" onClick={onDismiss}>
         Dismiss
       </Button>
-    </FadeDiv>
+    </div>
   )
 }
 
@@ -123,8 +123,7 @@ export function ActionToast({
     return () => window.clearTimeout(timer)
   }, [hovered, onDismiss])
   return (
-    <FadeDiv
-      duration={0.2}
+    <div
       className={`${toastClasses} items-center gap-[8px] [padding:6px_6px_6px_14px] max-w-[min(480px,_calc(var(--viewport-w)_*_0.8))]`}
       role="status"
       onPointerEnter={() => setHovered(true)}
@@ -141,6 +140,6 @@ export function ActionToast({
       >
         <X size={13} />
       </IconButton>
-    </FadeDiv>
+    </div>
   )
 }

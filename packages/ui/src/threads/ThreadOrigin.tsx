@@ -7,9 +7,13 @@ import { Folder, GitBranch } from "lucide-react"
 import { replaceSnapshot } from "../data/cache"
 import { DropdownMenu, MenuChoice, MenuRadioGroup } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
+import { motion } from "motion/react"
+import { useMotionPreference } from "../ui/motion"
 import { ErrorToast } from "../ui/Notice"
 import { segmentClasses, segmentGroupClasses } from "../ui/styles"
 import { WorktreeSetupNote } from "../files/WorktreeSetup"
+
+const originEase = [0.16, 1, 0.3, 1] as const
 
 type DraftLocation = { workspaceId?: string; isolated?: boolean }
 
@@ -43,10 +47,28 @@ export function ThreadOrigin({
 }): React.JSX.Element {
   const { mutation, busy } = useDraftLocation(thread.id)
   const workspace = workspaces.find((entry) => entry.id === thread.workspaceId)
+  const reduced = useMotionPreference()
+  // The mark settles out of a blur, then the question rises beneath it, echoing the launch screen.
+  const enter = (
+    delay: number,
+    from: Record<string, number | string>,
+    to: Record<string, number | string>,
+  ) => ({
+    initial: reduced ? (false as const) : { opacity: 0, ...from },
+    animate: { opacity: 1, ...to },
+    transition: { duration: reduced ? 0 : 0.6, delay: reduced ? 0 : delay, ease: originEase },
+  })
   return (
     <div className="flex flex-col items-center text-center">
-      <MeldMark className="w-[24px] h-[24px] mb-[18px] text-[var(--text-tertiary)] opacity-[0.7]" />
-      <h2 className="m-0 [font-family:var(--font-display)] text-[21px] font-semibold leading-[1.35] tracking-[-0.015em] text-[var(--text-primary)] [text-wrap:balance]">
+      <motion.div
+        {...enter(0, { scale: 0.8, filter: "blur(6px)" }, { scale: 1, filter: "blur(0px)" })}
+      >
+        <MeldMark className="block w-[24px] h-[24px] mb-[18px] text-[var(--text-tertiary)] opacity-[0.7]" />
+      </motion.div>
+      <motion.h2
+        {...enter(0.08, { y: 6 }, { y: 0 })}
+        className="m-0 [font-family:var(--font-display)] text-[21px] font-semibold leading-[1.35] tracking-[-0.015em] text-[var(--text-primary)] [text-wrap:balance]"
+      >
         What should we work on in{" "}
         <DropdownMenu
           align="center"
@@ -85,7 +107,7 @@ export function ThreadOrigin({
           </MenuRadioGroup>
         </DropdownMenu>
         ?
-      </h2>
+      </motion.h2>
       {mutation.isError && (
         <ErrorToast message={mutation.error.message} onDismiss={() => mutation.reset()} />
       )}

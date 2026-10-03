@@ -167,7 +167,7 @@ export function Switch({
       aria-label={label}
       onCheckedChange={(next) => onCheckedChange(next)}
     >
-      <BaseSwitch.Thumb className="motion-transform motion-duration-200 switch-thumb block w-[13px] h-[13px] rounded-[50%] bg-[var(--text-secondary)] [transform:translateX(2px)]" />
+      <BaseSwitch.Thumb className={switchThumbClasses} />
     </BaseSwitch.Root>
   )
 }
@@ -175,10 +175,10 @@ export function Switch({
 export function Checkbox(props: BaseCheckbox.Root.Props): React.JSX.Element {
   return (
     <BaseCheckbox.Root
-      className="inline-flex items-center justify-center w-[15px] h-[15px] flex-[0_0_15px] border-[1px] border-[color:var(--line-strong)] rounded-[3px] bg-[var(--surface-hover)] text-[var(--accent-foreground)] [&[data-checked]]:[border-color:var(--accent)] [&[data-checked]]:bg-[var(--accent)]"
+      className="motion-colors inline-flex items-center justify-center w-[15px] h-[15px] flex-[0_0_15px] border-[1px] border-[color:var(--line-strong)] rounded-[3px] bg-[var(--surface-hover)] text-[var(--accent-foreground)] [&[data-checked]]:[border-color:var(--accent)] [&[data-checked]]:bg-[var(--accent)]"
       {...props}
     >
-      <BaseCheckbox.Indicator className="flex">
+      <BaseCheckbox.Indicator className="motion-pop flex">
         <Check size={12} strokeWidth={2.5} />
       </BaseCheckbox.Indicator>
     </BaseCheckbox.Root>
@@ -188,10 +188,10 @@ export function Checkbox(props: BaseCheckbox.Root.Props): React.JSX.Element {
 export function Radio(props: BaseRadio.Root.Props): React.JSX.Element {
   return (
     <BaseRadio.Root
-      className="inline-flex items-center justify-center w-[15px] h-[15px] flex-[0_0_15px] border-[1px] border-[color:var(--line-strong)] bg-[var(--surface-hover)] text-[var(--accent-foreground)] rounded-[50%] [&[data-checked]]:[border-color:var(--accent)] [&[data-checked]]:bg-[var(--accent)]"
+      className="motion-colors inline-flex items-center justify-center w-[15px] h-[15px] flex-[0_0_15px] border-[1px] border-[color:var(--line-strong)] bg-[var(--surface-hover)] text-[var(--accent-foreground)] rounded-[50%] [&[data-checked]]:[border-color:var(--accent)] [&[data-checked]]:bg-[var(--accent)]"
       {...props}
     >
-      <BaseRadio.Indicator className="w-[5px] h-[5px] rounded-[50%] [background:currentColor]" />
+      <BaseRadio.Indicator className="motion-pop w-[5px] h-[5px] rounded-[50%] [background:currentColor]" />
     </BaseRadio.Root>
   )
 }
@@ -579,6 +579,17 @@ const switchClasses = [
   "[&[data-checked]]:[border-color:transparent] [&[data-checked]]:bg-[var(--accent)]",
   "[&:disabled]:opacity-[0.45] [&[data-checked]_.switch-thumb]:bg-[var(--accent-foreground)]",
   "[&[data-checked]_.switch-thumb]:[transform:translateX(17px)]",
+  // A pressed thumb stretches toward the side it will travel to, like a held knob.
+  "[&:active:not(:disabled)_.switch-thumb]:w-[16px]",
+  "[&[data-checked]:active:not(:disabled)_.switch-thumb]:[transform:translateX(14px)]",
+].join(" ")
+
+/** The thumb springs across with a slight overshoot; motion preferences remove the travel. */
+const switchThumbClasses = [
+  "switch-thumb block w-[13px] h-[13px] rounded-[999px] bg-[var(--text-secondary)] [transform:translateX(2px)]",
+  "[transition-property:transform,width,background-color]",
+  "[transition-duration:calc(240ms_*_var(--motion-scale,_1))]",
+  "[transition-timing-function:cubic-bezier(0.34,_1.4,_0.64,_1)]",
 ].join(" ")
 
 const selectPopupClasses = cx(

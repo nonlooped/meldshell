@@ -44,6 +44,15 @@
       opacity: 0.45;
     }
   }
+  @keyframes ready-pop {
+    0%,
+    100% {
+      scale: 1;
+    }
+    40% {
+      scale: 1.14;
+    }
+  }
 }
 
 /* State transitions. Tailwind owns each state; these utilities interpolate between the resolved
@@ -96,6 +105,72 @@
   transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
   @starting-style {
     opacity: 0;
+  }
+}
+/* Content that rises a few pixels as it fades in when inserted, such as a toast or a settings
+ * section. It uses `translate`, so it composes with a `transform` the element already has. */
+@utility motion-rise {
+  transition-property: opacity, translate;
+  transition-duration: calc(var(--motion-duration, 280ms) * var(--motion-scale, 1));
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  @starting-style {
+    opacity: 0;
+    translate: 0 var(--motion-rise, 6px);
+  }
+}
+/* Each block of a streaming reply rises into place as it arrives; earlier blocks stay put. */
+@utility motion-stream {
+  & > * {
+    transition-property: opacity, translate;
+    transition-duration: calc(360ms * var(--motion-scale, 1));
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    @starting-style {
+      opacity: 0;
+      translate: 0 4px;
+    }
+  }
+}
+/* A mark that pops in when it appears, such as a checkbox tick. */
+@utility motion-pop {
+  transition-property: opacity, scale;
+  transition-duration: calc(220ms * var(--motion-scale, 1));
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  @starting-style {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+/* Virtualized rows glide to their new position when the list reorders, and fade in when added.
+ * Overscan mounts rows off screen while scrolling, so the fade is only seen for new rows. */
+@utility motion-reorder {
+  transition-property: transform, opacity;
+  transition-duration: calc(260ms * var(--motion-scale, 1));
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  @starting-style {
+    opacity: 0;
+  }
+}
+/* A selection highlight that slides between tabs; `TabIndicator` places it on the selected tab.
+ * It snaps into place first and glides only on later changes. */
+@utility motion-tab-indicator {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  &[data-ready] {
+    transition-property: left, top, width, height;
+    transition-duration: calc(280ms * var(--motion-scale, 1));
+    transition-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1.05);
+  }
+}
+/* A control that just became ready, such as the send button once there is something to send,
+ * bounces once. Motion preferences remove it. */
+@utility motion-ready {
+  animation: ready-pop 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  :root[data-reduce-motion="true"] & {
+    animation: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
   }
 }
 /* A placeholder shape for content that is still loading. It breathes gently unless motion is

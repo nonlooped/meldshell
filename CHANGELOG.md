@@ -12,6 +12,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Changed
 
+- The app moves with more life. Settings sections and the Files and Changes tabs slide their selection highlight to the chosen tab (which also restores the missing highlight in Settings), streaming replies rise into place block by block, and a finished turn swaps its spinner for what it did. Switches spring across and stretch while held, checkboxes and radio buttons pop their marks, the send button bounces once there is something to send, inbox threads glide to their new place when they move, toasts and notices rise in, an empty thread's heading settles in beneath the mark, and each agent on the launch screen bounces as it connects. Reduce motion turns all of it off.
+
 - Internal catalog, session, setup, title, queue-priority, and approval writes now complete without rebuilding an unused application snapshot.
 
 - In narrow windows the title bar keeps only the sidebar toggles and tabs: the editor, run, preview, and terminal buttons move into one Thread tools menu, and on phones the tab strip becomes a single button that names the open tab and lists the others.

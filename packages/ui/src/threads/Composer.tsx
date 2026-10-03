@@ -947,7 +947,8 @@ export function Composer({
                 <span ref={sendButtonRef} className="inline-flex items-center">
                   <IconButton
                     unstyled
-                    className={`motion-colors ${sendButtonClasses}`}
+                    // Bounces once when there is first something to send.
+                    className={`motion-colors ${sendButtonClasses} ${canSend ? "motion-ready" : ""}`}
                     disabled={!canSend}
                     aria-label={running ? FOLLOW_UP[followUp].label : "Send message"}
                     label={sendTitle({

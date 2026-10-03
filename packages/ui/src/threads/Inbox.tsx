@@ -758,7 +758,8 @@ export function Inbox({
               return (
                 <div
                   key={row.id}
-                  className="absolute top-[0] left-[0] w-full"
+                  // A thread that moves, such as one that just updated, glides to its new place.
+                  className="motion-reorder absolute top-[0] left-[0] w-full"
                   style={{ transform: `translateY(${item.start}px)`, height: item.size }}
                 >
                   {row.type === "heading" ? (

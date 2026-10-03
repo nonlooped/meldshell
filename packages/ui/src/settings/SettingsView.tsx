@@ -1,5 +1,5 @@
 import { RemoteAccess } from "./RemoteAccess"
-import { FadeDiv } from "../ui/motion"
+import { FadeDiv, TabIndicator } from "../ui/motion"
 import { useState } from "react"
 import { Tabs } from "@base-ui-components/react/tabs"
 import type {
@@ -174,6 +174,7 @@ function SettingsSidebar({
         )}
         aria-label="Settings sections"
       >
+        <TabIndicator className="rounded-[var(--radius)] bg-[var(--surface-selected)] [box-shadow:inset_0_0_0_1px_var(--line-subtle)]" />
         {SECTIONS.map((entry) => (
           <Tabs.Tab key={entry.id} value={entry.id}>
             {entry.icon}
@@ -245,7 +246,7 @@ export function SettingsView({
           key={section}
           className="min-h-0 [padding:0_40px_48px] [@container(max-width:_640px)]:pr-[24px] [@container(max-width:_640px)]:pl-[24px] [@container(max-width:_460px)]:pr-[16px] [@container(max-width:_460px)]:pl-[16px] overflow-y-auto [scrollbar-gutter:stable]"
         >
-          <FadeDiv className="w-[min(720px,_100%)] [margin:0_auto]">
+          <FadeDiv rise={8} className="w-[min(720px,_100%)] [margin:0_auto]">
             {settingsError && <p role="alert">{settingsError}</p>}
             {(section === "general" || section === "appearance") && (
               <Preferences
@@ -412,14 +413,13 @@ export function SettingsView({
 }
 
 const settingsNavItemsClasses = [
-  "flex min-h-0 overflow-y-auto flex-col gap-[1px] [&_button]:flex [&_button]:relative",
+  "relative flex min-h-0 overflow-y-auto flex-col gap-[1px] [&_button]:flex [&_button]:relative",
   "[&_button]:min-h-[36px] [&_button]:shrink-0 [&_button]:items-center [&_button]:gap-[9px]",
   "[&_button]:[padding:0_12px] [&_button]:border-0 [&_button]:rounded-[var(--radius)]",
   "[&_button]:bg-transparent [&_button]:text-[var(--text-secondary)] [&_button]:cursor-default",
   "[&_button]:text-[12.5px] [&_button]:text-left [&_button:hover]:bg-[var(--surface-hover)]",
-  "[&_button:hover]:text-[var(--text-primary)] [&_button[data-selected]]:bg-[var(--surface-selected)]",
-  "[&_button[data-selected]]:text-[var(--text-primary)]",
-  "[&_button[data-selected]]:[box-shadow:inset_0_0_0_1px_var(--line-subtle)]",
+  "[&_button:hover]:text-[var(--text-primary)] [&_button[data-active]]:text-[var(--text-primary)]",
+  "[&_button]:z-[1] [&_button[data-active]:hover]:bg-transparent",
 ].join(" ")
 
 const settingsHeaderClasses = [
