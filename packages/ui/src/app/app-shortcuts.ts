@@ -26,6 +26,11 @@ interface ShortcutActions {
   toggleTerminal: () => void
   togglePreview: () => void
   openInEditor: () => void
+  /**
+   * Pops the thread in front out into its own window, or a popped-out window's thread back into the
+   * main window; null when no thread is in front or this client cannot open windows.
+   */
+  popOutThread: (() => void) | null
   /** Starts or stops dictation in the thread in front; null when no thread is. */
   dictate: (() => void) | null
   /**
@@ -59,6 +64,7 @@ export function handleAppShortcut(
   if (action === "closeTab" && (actions.settingsOpen || actions.selectedThreadId === null)) return
   if (action === "archiveThread" && actions.toggleArchived === null) return
   if (action === "dictate" && actions.dictate === null) return
+  if (action === "popOutThread" && actions.popOutThread === null) return
   if (isLoadoutAction(action)) {
     const slot = LOADOUT_ACTIONS.indexOf(action)
     if (actions.applyLoadout === null || slot >= actions.loadoutCount) return
@@ -85,6 +91,7 @@ export function handleAppShortcut(
     toggleTerminal: actions.toggleTerminal,
     togglePreview: actions.togglePreview,
     openInEditor: actions.openInEditor,
+    popOutThread: () => actions.popOutThread?.(),
     dictate: () => actions.dictate?.(),
   }
   run[action]()

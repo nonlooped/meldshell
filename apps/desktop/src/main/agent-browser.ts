@@ -11,7 +11,7 @@ import {
   type ToolPage,
 } from "./agent-browser-tools"
 import { PREVIEW_PARTITION } from "./preview"
-import { getMainWindow } from "./window"
+import { windowForThread } from "./window"
 
 /*
  * Agents drive each thread's browser preview through a loopback MCP server. Provider workers get
@@ -33,10 +33,11 @@ const hidden = new Map<string, BrowserWindow>()
 const lastUrls = new Map<string, string>()
 const attachWaiters = new Map<string, Set<(page: WebContents) => void>>()
 
-const sendToWindow = (channel: string, ...args: unknown[]): boolean => {
-  const window = getMainWindow()
+/** Tells the window that shows the thread, which is its own window once it was popped out. */
+const sendToWindow = (channel: string, threadId: string, ...args: unknown[]): boolean => {
+  const window = windowForThread(threadId)
   if (window === null || window.isDestroyed()) return false
-  window.webContents.send(channel, ...args)
+  window.webContents.send(channel, threadId, ...args)
   return true
 }
 

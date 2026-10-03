@@ -412,4 +412,45 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     expect(await desktop.call("listSchedules", { threadId: first.id })).toEqual([])
     expect((await desktop.call("listSchedules", { threadId: second.id }))[0]?.id).toBe(sibling.id)
   })
+
+  test("a thread pops out into its own window with its draft and docks back", async ({
+    desktop,
+  }) => {
+    const workspace = await desktop.addWorkspace()
+    const created = await desktop.call("createThread", {
+      workspaceId: workspace.id,
+      title: "Second monitor work",
+    })
+    const thread = created.threads.find((item) => item.title === "Second monitor work")!
+    const page = desktop.page
+    await page.getByRole("button", { name: "Search threads and messages", exact: true }).click()
+    await page.getByText("Second monitor work", { exact: true }).first().click()
+    await page.getByRole("dialog").waitFor({ state: "detached" })
+    const composer = page.getByLabel(/^Message /)
+    await composer.fill("Keep this draft")
+    await page.keyboard.press("Control+Shift+O")
+
+    const popped = await desktop.threadWindow(thread.id)
+    // The window shows the thread alone, with the unsent draft that followed it.
+    await expect.poll(() => popped.getByLabel(/^Message /).inputValue()).toBe("Keep this draft")
+    expect(await popped.getByRole("button", { name: "Search threads and messages" }).count()).toBe(
+      0,
+    )
+    await expect.poll(() => popped.title()).toBe("Second monitor work · MeldShell")
+    // The main window gives the thread up and brings its window forward instead of reopening it.
+    await page.getByRole("tab", { name: /Second monitor work/ }).waitFor({ state: "detached" })
+
+    await popped.getByLabel(/^Message /).fill("Edited in its window")
+    await popped.getByRole("button", { name: /^Move back to main window/ }).click()
+    await expect.poll(() => desktop.otherWindows().length).toBe(0)
+    await page.getByRole("tab", { name: /Second monitor work/ }).waitFor()
+    await expect.poll(() => composer.inputValue()).toBe("Edited in its window")
+
+    // A window still open when the app quits opens again at the next launch.
+    await page.keyboard.press("Control+Shift+O")
+    await desktop.threadWindow(thread.id)
+    await desktop.restart()
+    const restored = await desktop.threadWindow(thread.id)
+    await restored.getByRole("button", { name: /^Move back to main window/ }).waitFor()
+  })
 })

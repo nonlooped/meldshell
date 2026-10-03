@@ -11,6 +11,7 @@ import {
   type SplitEdge,
   type ThreadLayout,
 } from "./thread-layout"
+import { shownElsewhere, showThreadWindow } from "./thread-windows"
 
 export interface FileTab extends WorkspaceScope {
   readonly id: string
@@ -86,7 +87,8 @@ export const useTabStore = create<TabStore>((set, get) => ({
   threadTabs: [],
   selectedThreadTabId: null,
   layout: null,
-  dropThread: (target, threadId, zone) =>
+  dropThread: (target, threadId, zone) => {
+    if (shownElsewhere(threadId)) return showThreadWindow(threadId)
     set((state) => {
       const active = state.threadTabs.find((tab) => tab.id === state.selectedThreadTabId)
       if (!active) return state
@@ -105,7 +107,8 @@ export const useTabStore = create<TabStore>((set, get) => ({
         if (!visibleThreads(layout).includes(id)) tabs.push(newThreadTab(id))
       }
       return { ...tabState(tabs, active.id), selectedFileId: null }
-    }),
+    })
+  },
   openBeside: (threadId, edge) => {
     const state = get()
     if (state.selectedFileId !== null || state.selectedThreadId === null) state.openThread(threadId)
@@ -187,7 +190,9 @@ export const useTabStore = create<TabStore>((set, get) => ({
   },
   openThreadIds: [],
   selectedThreadId: null,
-  openThread: (threadId) =>
+  openThread: (threadId) => {
+    // A thread popped out into its own window stays there; opening it brings that window forward.
+    if (shownElsewhere(threadId)) return showThreadWindow(threadId)
     set((state) => {
       const existing = state.threadTabs.find((tab) => visibleThreads(tab.layout).includes(threadId))
       const tab = existing ?? newThreadTab(threadId)
@@ -197,7 +202,8 @@ export const useTabStore = create<TabStore>((set, get) => ({
           )
         : [...state.threadTabs, tab]
       return { ...tabState(tabs, tab.id), selectedFileId: null }
-    }),
+    })
+  },
   closeThread: (threadId) =>
     set((state) => {
       const index = state.threadTabs.findIndex((tab) =>

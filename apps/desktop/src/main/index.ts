@@ -14,6 +14,7 @@ import {
 } from "./runtime/shutdown"
 import { createWindow, getMainWindow, installApplicationMenu } from "./window"
 import { registerIpc } from "./ipc"
+import { registerThreadWindows, restoreThreadWindows } from "./thread-windows"
 import { updateService } from "./updater"
 import { toError } from "@meldshell/contracts"
 
@@ -103,8 +104,10 @@ const desktopProgram = Effect.scoped(
       electronApp.setAppUserModelId("com.meldshell.desktop")
       // Register handlers before loading the renderer. Their runtime calls wait for core safely.
       registerIpc()
+      registerThreadWindows()
       installApplicationMenu()
       openWindow()
+      void restoreThreadWindows()
       updateService.start()
     })
     yield* Effect.raceFirst(

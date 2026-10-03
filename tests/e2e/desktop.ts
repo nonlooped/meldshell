@@ -30,6 +30,29 @@ export class Desktop {
     return this.window
   }
 
+  /** The renderer windows other than the main one, such as threads popped out into their own. */
+  otherWindows(): Page[] {
+    if (!this.application) throw new Error("Desktop is not running")
+    return this.application.windows().filter((window) => window !== this.window)
+  }
+
+  /** The window a thread was popped out into, once it has opened. */
+  async threadWindow(threadId: string): Promise<Page> {
+    let found: Page | undefined
+    await this.page.waitForFunction(
+      async (id) => (await window.meldshell.desktop?.threadWindows?.list())?.includes(id) ?? false,
+      threadId,
+    )
+    await expectEventually(() => {
+      found = this.otherWindows().find((window) =>
+        window.url().includes(`thread=${encodeURIComponent(threadId)}`),
+      )
+      return found !== undefined
+    })
+    found!.setDefaultTimeout(10_000)
+    return found!
+  }
+
   async start(): Promise<void> {
     this.directory = await mkdtemp(join(tmpdir(), "meldshell-e2e-"))
     this.workspace = join(this.directory, "workspace with spaces")
@@ -118,6 +141,14 @@ export class Desktop {
         `Added workspace missing from snapshot: expected ${this.workspace}, received ${snapshot.workspaces.map((item) => item.path).join(", ")}`,
       )
     return workspace
+  }
+}
+
+async function expectEventually(check: () => boolean, timeout = 10_000): Promise<void> {
+  const deadline = Date.now() + timeout
+  while (!check()) {
+    if (Date.now() > deadline) throw new Error("Timed out waiting for a window")
+    await new Promise((resolve) => setTimeout(resolve, 100))
   }
 }
 
