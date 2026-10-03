@@ -215,11 +215,11 @@ export const startsSubagent = (event: CanonicalEvent): boolean => {
 }
 
 /** The call a subagent's event belongs to, if any. */
-export const parentCall = (event: CanonicalEvent): string | null =>
+const parentCall = (event: CanonicalEvent): string | null =>
   nonEmptyText(asRecord(asRecord(event.payload).item).parentToolUseId)
 
 /** The native id a working-log event's item carries. */
-export const itemId = (event: CanonicalEvent): string | null =>
+const itemId = (event: CanonicalEvent): string | null =>
   nonEmptyText(asRecord(asRecord(event.payload).item).id)
 
 export interface LogNode {
