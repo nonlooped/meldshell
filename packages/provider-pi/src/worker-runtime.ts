@@ -280,7 +280,8 @@ export const runPiWorker = (
   /** The thread's running Pi, or a new one that opens the thread's saved Pi session. */
   const sessionFor = async (dispatch: TurnDispatch): Promise<Session> => {
     const existing = sessions.get(dispatch.threadId)
-    if (existing && existing.rpc.error === null) return existing
+    // A rewind clears the thread's saved session, so a running Pi holds a conversation it no longer has.
+    if (existing && existing.rpc.error === null && dispatch.nativeThreadId !== null) return existing
     if (existing) {
       sessions.delete(dispatch.threadId)
       await closeSession(existing)

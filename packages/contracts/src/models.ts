@@ -54,9 +54,43 @@ export const Thread = Schema.Struct({
   queuedCount: Schema.Number,
   turnCount: Schema.Number,
   worktree: Schema.optional(ThreadWorktree),
+  /**
+   * The harness that ran the latest turn still in the conversation. A turn on another harness
+   * starts with a summary of the work it has not seen.
+   */
+  lastHarness: Schema.optional(Schema.String),
+  /**
+   * A rewind took turns out of the conversation and can still be undone, which stays true until
+   * the next turn starts. That turn begins a new provider session from a summary.
+   */
+  rewound: Schema.optional(Schema.Boolean),
+  /** Changes whenever turns leave or return to the conversation, so open transcripts are reread. */
+  historyRevision: Schema.optional(Schema.String),
 })
 
 export type Thread = typeof Thread.Type
+
+/**
+ * Why a turn's provider received a summary of earlier turns: another harness ran them, or the
+ * provider session restarted after a rewind.
+ */
+export const TurnHandoff = Schema.Struct({
+  reason: Schema.Literals(["handoff", "restart"]),
+  /** The harnesses whose turns the summary covers, in the order they first ran. */
+  from: Schema.Array(Schema.String),
+  to: Schema.String,
+  turnCount: Schema.Number,
+  /** Exactly what the provider was given ahead of the user's message. */
+  brief: Schema.String,
+})
+
+export type TurnHandoff = typeof TurnHandoff.Type
+
+const carriesHandoff = Schema.is(Schema.Struct({ handoff: TurnHandoff }))
+
+/** The summary a user message was sent with, when its provider session had missed earlier turns. */
+export const messageHandoff = (payload: unknown): TurnHandoff | null =>
+  carriesHandoff(payload) ? payload.handoff : null
 
 export const CanonicalEventKind = Schema.Literals([
   "user",
@@ -771,9 +805,24 @@ export const TurnDispatch = Schema.Struct({
   approvalPolicy: ApprovalPolicy,
   text: Schema.String,
   attachments: Schema.Array(InputAttachment),
+  /** Earlier work this provider session has not seen, sent along with the user's message. */
+  context: Schema.optional(Schema.NullOr(Schema.String)),
 })
 
 export type TurnDispatch = typeof TurnDispatch.Type
+
+/**
+ * The message text a provider receives. A handoff summary leads, except before a slash command,
+ * which only works at the start of a message.
+ */
+export const promptText = (dispatch: Pick<TurnDispatch, "text" | "context">): string => {
+  const context = dispatch.context ?? ""
+  if (context === "") return dispatch.text
+  if (dispatch.text === "") return context
+  return dispatch.text.startsWith("/")
+    ? `${dispatch.text}\n\n${context}`
+    : `${context}\n\n${dispatch.text}`
+}
 
 /**
  * One throwaway provider turn whose only job is naming a thread. It never becomes a MeldShell turn,
@@ -800,6 +849,27 @@ export const SubmitTurnResult = Schema.Struct({
 })
 
 export type SubmitTurnResult = typeof SubmitTurnResult.Type
+
+/** A thread taken back to just before one of its turns. */
+export const RewindResult = Schema.Struct({
+  snapshot: AppSnapshot,
+  /** The rewound turn's first message, so it can be edited and sent again. */
+  text: Schema.String,
+  /** How many turns left the conversation. */
+  turnCount: Schema.Number,
+  /** The files went back too; a folder outside Git, or an older turn, has no snapshot. */
+  filesRestored: Schema.Boolean,
+})
+
+export type RewindResult = typeof RewindResult.Type
+
+export const UndoRewindResult = Schema.Struct({
+  snapshot: AppSnapshot,
+  /** The rewind restored files, so undoing it puts them back as well. */
+  filesRestored: Schema.Boolean,
+})
+
+export type UndoRewindResult = typeof UndoRewindResult.Type
 
 export const RuntimeEventInput = Schema.Struct({
   threadId: Schema.String,

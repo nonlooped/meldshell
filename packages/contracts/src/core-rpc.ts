@@ -32,6 +32,8 @@ import {
   TranscriptSearchPage,
   SaveScheduleInput,
   ScheduledPrompt,
+  RewindResult,
+  UndoRewindResult,
 } from "./models"
 import { CoreError } from "./errors"
 
@@ -110,6 +112,22 @@ export class CoreRpcs extends RpcGroup.make(
   Rpc.make("SubmitTurn", {
     payload: SubmitTurnInput,
     success: SubmitTurnResult,
+    error: CoreError,
+  }),
+  /** Takes a turn and every later one out of the conversation; the next turn starts a new session. */
+  Rpc.make("RewindThread", {
+    payload: Schema.Struct({
+      threadId: Schema.String,
+      turnId: Schema.String,
+      filesRestored: Schema.Boolean,
+    }),
+    success: RewindResult,
+    error: CoreError,
+  }),
+  /** Returns the latest rewind's turns and provider sessions, until the next turn starts. */
+  Rpc.make("UndoRewind", {
+    payload: Schema.Struct({ threadId: Schema.String }),
+    success: UndoRewindResult,
     error: CoreError,
   }),
   Rpc.make("RecordRuntimeEvent", {

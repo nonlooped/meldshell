@@ -351,6 +351,12 @@ export const runCursorWorker = (
     emit: Emit,
   ): Promise<Session> => {
     let session = sessions.get(dispatch.threadId)
+    // A rewind clears the thread's saved session, so an open one holds a conversation it no longer has.
+    if (session && session.sessionId !== dispatch.nativeThreadId) {
+      sessions.delete(dispatch.threadId)
+      await closeSession(session)
+      session = undefined
+    }
     if (!session) {
       session = await createSession(
         dispatch.workspacePath,

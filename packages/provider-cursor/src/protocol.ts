@@ -5,6 +5,7 @@ import {
   CursorSessionNotification,
   asRecords,
   asText,
+  promptText,
   type ProviderModelCatalogEntry,
   type TurnDispatch,
   type UnknownRecord,
@@ -49,7 +50,7 @@ export const cursorPrompt = async (
   dispatch: TurnDispatch,
   images: boolean,
 ): Promise<ContentBlock[]> => {
-  const prompt: ContentBlock[] = [{ type: "text", text: dispatch.text }]
+  const prompt: ContentBlock[] = [{ type: "text", text: promptText(dispatch) }]
   for (const attachment of dispatch.attachments) {
     if (attachment.type === "mention" || attachment.type === "skill") {
       prompt.push({

@@ -6,7 +6,11 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
-- Every turn now snapshots the thread's files when it starts and when it finishes, the way T3Code checkpoints do. A turn's changed-files list comes from those snapshots, so it includes edits made by shell commands. The restore icon beside a turn's changes (or on its prompt) rewinds the folder to before that turn in one click, and right-clicking a turn can also return to its end. A line marks where the files now stand and an Undo pill puts back what was there. Snapshots live under Git refs that stay out of branch history, skip ignored files and folders outside Git, and are removed when their thread is deleted.
+- Every turn now snapshots the thread's files when it starts and when it finishes, the way T3Code checkpoints do. A turn's changed-files list comes from those snapshots, so it includes edits made by shell commands. The restore icon beside a turn's changes rewinds the folder to before that turn in one click, and right-clicking a turn can also return to its end. A line marks where the files now stand and an Undo pill puts back what was there. Snapshots live under Git refs that stay out of branch history, skip ignored files and folders outside Git, and are removed when their thread is deleted.
+
+- A thread can move to another agent partway through. Pick a model from a different provider and the composer says it will pick up from the previous agent; its first turn receives a summary of every turn it has not seen (each request, the files changed, the commands run, and the reply), and a line above that message opens the exact summary it was given. Switching back later sends only what happened in between.
+
+- Rewind a thread from any of your messages. The rewind icon on a prompt (or Rewind to this message in its menu) takes that turn and every later one out of the conversation, returns the files to before it when they were snapshotted, and puts the message back in the composer to edit and send again. The next turn starts a fresh agent session from a summary of the turns that remain, and Undo brings the turns, files, and session back until you send something new.
 
 - Messages sent while the agent is working can now queue or steer. Enter follows a new default in Settings (queue), Ctrl or Cmd with Enter does the other, and a menu beside the send button picks either for one message or changes the default. Steering goes into the same turn on Codex, and stops the turn and continues with your message on Claude Code and Cursor.
 

@@ -49,3 +49,4 @@ export {
   claimDueSchedules,
   recordScheduleRun,
 } from "./schedules"
+export { rewindThread, undoRewind } from "./rewind"

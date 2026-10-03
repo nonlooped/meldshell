@@ -17,6 +17,7 @@ import { Composer } from "./Composer"
 import { QueuedMessages } from "./QueuedMessages"
 import { skillAttachments } from "./composer-completion"
 import { Transcript } from "./Transcript"
+import { HandoffNotice } from "./Handoff"
 import { ThreadBranchToggle, ThreadOrigin } from "./ThreadOrigin"
 import { useState } from "react"
 import { ScheduleDialog } from "../schedules/ScheduleDialog"
@@ -102,6 +103,16 @@ export function ThreadView({
       <FadeDiv className={threadContentClasses}>
         <Transcript
           threadId={thread.id}
+          revision={thread.historyRevision}
+          onRewound={(text) => {
+            const current = useThreadDrafts.getState().drafts[thread.id]?.text ?? ""
+            update(thread.id, { text: current === "" ? text : `${text}\n\n${current}` })
+          }}
+          onRewindUndone={(text) => {
+            // The rewound message leaves again unless it was edited in the meantime.
+            if ((useThreadDrafts.getState().drafts[thread.id]?.text ?? "") === text)
+              update(thread.id, { text: "", tokens: [] })
+          }}
           running={thread.activity === "running"}
           onAnswer={submitTurnMutation.isPending ? undefined : answer}
           scope={workspaceScope(thread)}
@@ -151,6 +162,7 @@ export function ThreadView({
           onSchedule={() => setScheduling(true)}
           accessory={
             <>
+              <HandoffNotice thread={thread} harness={harness} />
               <QueuedMessages
                 items={queued}
                 running={busy}

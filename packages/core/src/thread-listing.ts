@@ -24,11 +24,18 @@ const THREAD_ACTIVITY = `CASE
       WHEN 'completed' THEN 'completed'
       ELSE 'idle'
     END
-    FROM turns r WHERE r.thread_id = t.id ORDER BY r.started_at DESC LIMIT 1
+    FROM turns r WHERE r.thread_id = t.id AND r.rewound_at IS NULL
+    ORDER BY r.started_at DESC LIMIT 1
   ), 'idle')
 END`
 
-/** The derived `ThreadRow` fields: activity, queued input, and turn count. */
+/**
+ * The derived `ThreadRow` fields: activity, queued input, turn count, the harness of the latest
+ * turn still in the conversation, and whether a rewind can be undone.
+ */
 export const THREAD_SUMMARY = `${THREAD_ACTIVITY} AS activity,
   (SELECT COUNT(*) FROM queued_inputs q WHERE q.thread_id = t.id) AS queued_count,
-  (SELECT COUNT(*) FROM turns r WHERE r.thread_id = t.id) AS turn_count`
+  (SELECT COUNT(*) FROM turns r WHERE r.thread_id = t.id) AS turn_count,
+  (SELECT r.harness FROM turns r WHERE r.thread_id = t.id AND r.rewound_at IS NULL
+    ORDER BY r.started_at DESC, r.rowid DESC LIMIT 1) AS last_harness,
+  EXISTS (SELECT 1 FROM thread_rewinds rw WHERE rw.thread_id = t.id) AS rewound`

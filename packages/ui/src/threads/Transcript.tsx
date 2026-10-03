@@ -23,17 +23,20 @@ import { Toggle } from "@base-ui-components/react/toggle"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Button, ContextMenu, MenuAction } from "../ui/controls"
 import { disclosureChevronClasses } from "../ui/styles"
-import type { CanonicalEvent } from "@meldshell/contracts"
+import { messageHandoff, type CanonicalEvent } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { TurnChanges } from "./TurnChanges"
 import {
   RestoreBeforeButton,
   RestoredMarker,
+  RewindButton,
+  RewindMenuAction,
   SnapshotMenuActions,
   TurnSnapshots,
   useTurnSnapshot,
 } from "./TurnSnapshots"
+import { HandoffMarker } from "./Handoff"
 import { ToolOutput } from "./ToolOutput"
 import { fileChangePatches } from "./file-change-diffs"
 import { toolDetails } from "./tool-details"
@@ -636,6 +639,7 @@ function TurnRow({
     ...turn.workingEvents.map((event) => event.payload),
     turn.finalResponse?.payload,
   ])
+  const handoff = messageHandoff(turn.userMessages[0]?.payload)
   return (
     <MarkdownSources value={sources}>
       <MarkdownStreaming value={!turn.complete}>
@@ -646,6 +650,7 @@ function TurnRow({
           transition={{ duration: 0.5, ease: settle }}
         >
           <RestoredMarker turnId={turn.id} point="before" />
+          {handoff !== null && <HandoffMarker handoff={handoff} />}
           {turn.userMessages.map((event, index) => (
             <Message
               key={event.id}
@@ -653,8 +658,15 @@ function TurnRow({
               arrivingIn={entering && !reduced && index === 0 ? threadId : undefined}
               flash={index === 0 ? flash : undefined}
               onQuote={onQuote}
-              actions={index === 0 && <RestoreBeforeButton turnId={turn.id} snapshot={snapshot} />}
-              menu={index === 0 && snapshotMenu}
+              actions={index === 0 && <RewindButton turnId={turn.id} />}
+              menu={
+                index === 0 && (
+                  <>
+                    <RewindMenuAction turnId={turn.id} />
+                    {snapshotMenu}
+                  </>
+                )
+              }
               className={
                 "[&_>_.message-actions]:justify-end [&_>_.event-markdown]:[padding:12px_16px] [&_>_.event-markdown]:border-[1px] [&_>_.event-markdown]:border-[color:var(--line-subtle)] [&_>_.event-markdown]:rounded-[var(--radius-lg)] [&_>_.event-markdown]:bg-[var(--surface-hover)] [&_>_.event-markdown]:text-[var(--text-primary)] w-[fit-content] max-w-[min(78%,_680px)] ml-[auto] relative [&_>_.message-actions]:absolute [&_>_.message-actions]:bottom-[0] [&_>_.message-actions]:right-[calc(100%_+_4px)] [&_>_.message-actions]:mt-[0] [&_>_.message-actions]:flex-row-reverse [&_>_.message-actions]:flex-nowrap [&_>_.message-actions]:whitespace-nowrap"
               }
@@ -715,13 +727,21 @@ function useEnteringTurn(turns: ReadonlyArray<TranscriptTurn> | undefined): stri
 
 export function Transcript({
   threadId,
+  revision,
   targetTurnId,
   scope,
   origin,
   running = false,
   onAnswer,
   onQuote,
+  onRewound,
+  onRewindUndone,
 }: {
+  /** Changes when turns leave or return to the conversation, so the transcript is read again. */
+  readonly revision?: string
+  /** Receives a rewound message, to edit and send again. */
+  readonly onRewound?: (text: string) => void
+  readonly onRewindUndone?: (text: string) => void
   readonly running?: boolean
   /** Sends a reply to the latest turn's questions; absent while the thread cannot take one. */
   readonly onAnswer?: (text: string, turnId: string) => Promise<void>
@@ -745,7 +765,7 @@ export function Transcript({
     return () => window.clearTimeout(timer)
   }, [jump])
   const client = useQueryClient()
-  const key = queryKeys.transcript(threadId)
+  const key = queryKeys.transcript(threadId, revision)
   const current = () => client.getQueryData<TranscriptWindow>(key)
   const query = useQuery({
     queryKey: key,
@@ -807,7 +827,13 @@ export function Transcript({
   return (
     <MarkdownWorkspace value={scope}>
       <div className="motion-enter @container relative grid min-h-0 min-w-0 grid-rows-[minmax(0,_1fr)]">
-        <TurnSnapshots workspaceId={scope?.workspaceId} threadId={threadId} running={running}>
+        <TurnSnapshots
+          workspaceId={scope?.workspaceId}
+          threadId={threadId}
+          running={running}
+          onRewound={onRewound}
+          onRewindUndone={onRewindUndone}
+        >
           {query.isError && (
             <Button variant="ghost" size="sm" onClick={() => void query.refetch()}>
               Retry transcript updates

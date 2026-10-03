@@ -309,6 +309,22 @@ export const runMigrations = Effect.gen(function* () {
       version: 12,
       apply: sql`ALTER TABLE queued_inputs ADD COLUMN steer INTEGER NOT NULL DEFAULT 0`,
     },
+    {
+      version: 13,
+      apply: Effect.gen(function* () {
+        // A rewound turn keeps its events but leaves the conversation and the transcript.
+        yield* sql`ALTER TABLE turns ADD COLUMN rewound_at TEXT`
+        yield* sql`ALTER TABLE threads ADD COLUMN history_revision TEXT`
+        // The latest rewind and the provider sessions it set aside, kept until the next turn.
+        yield* sql`CREATE TABLE thread_rewinds (
+          thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+          rewound_at TEXT NOT NULL,
+          turn_count INTEGER NOT NULL,
+          files_restored INTEGER NOT NULL CHECK (files_restored IN (0, 1)),
+          sessions TEXT NOT NULL
+        )`
+      }),
+    },
   ]
   const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table'`
   const has = (name: string) => tables.some((table) => table.name === name)
