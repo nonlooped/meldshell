@@ -6,16 +6,21 @@ import { EventFromRow } from "./database/rows"
 
 // Backward windows include the whole boundary turn: projecting a partial turn can
 // lose its user message, item starts, and provider-native grouping context.
+// Rewound turns keep their events, but the transcript leaves them out.
 export const getTranscript = (input: TranscriptQuery) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const kept = sql`(turn_id IS NULL OR turn_id NOT IN (
+      SELECT id FROM turns WHERE thread_id = ${input.threadId} AND rewound_at IS NOT NULL
+    ))`
     const limit = Math.max(1, Math.min(200, Math.floor(input.limit ?? 80)))
     if (input.afterSequence !== undefined) {
       const rows = yield* readRows(
         EventFromRow,
         sql`
         SELECT * FROM events WHERE thread_id = ${input.threadId}
-        AND sequence > ${input.afterSequence} ORDER BY sequence ASC LIMIT ${limit + 1}
+        AND sequence > ${input.afterSequence} AND ${kept}
+        ORDER BY sequence ASC LIMIT ${limit + 1}
       `,
       )
       const page = rows.slice(0, limit)
@@ -29,7 +34,7 @@ export const getTranscript = (input: TranscriptQuery) =>
       EventFromRow,
       sql`
       SELECT * FROM events WHERE thread_id = ${input.threadId}
-      AND sequence < ${before} ORDER BY sequence DESC LIMIT ${limit + 1}
+      AND sequence < ${before} AND ${kept} ORDER BY sequence DESC LIMIT ${limit + 1}
     `,
     )
     const page = rows.slice(0, limit).reverse()
@@ -53,7 +58,7 @@ export const getTranscript = (input: TranscriptQuery) =>
         ? []
         : yield* sql<{ sequence: number }>`
       SELECT sequence FROM events WHERE thread_id = ${input.threadId}
-      AND sequence < ${first} LIMIT 1
+      AND sequence < ${first} AND ${kept} LIMIT 1
     `
     return {
       events: page,

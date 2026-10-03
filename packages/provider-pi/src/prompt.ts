@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises"
 import { extname } from "node:path"
-import type { TurnDispatch } from "@meldshell/contracts"
+import { promptText, type TurnDispatch } from "@meldshell/contracts"
 import { referenceText } from "@meldshell/provider-runtime"
 
 const IMAGE_TYPES: Readonly<Record<string, string>> = {
@@ -31,7 +31,7 @@ const image = async (type: "image" | "localImage", value: string): Promise<PiIma
 
 /** The fields of Pi's `prompt` command for a turn: its text, references, and images. */
 export const piPrompt = async (
-  dispatch: Pick<TurnDispatch, "text" | "attachments">,
+  dispatch: Pick<TurnDispatch, "text" | "context" | "attachments">,
 ): Promise<{ message: string; images?: PiImage[] }> => {
   const references: string[] = []
   const images: PiImage[] = []
@@ -42,6 +42,6 @@ export const piPrompt = async (
     }
     images.push(await image(attachment.type, attachment.value))
   }
-  const message = [dispatch.text, ...references].filter(Boolean).join("\n\n")
+  const message = [promptText(dispatch), ...references].filter(Boolean).join("\n\n")
   return images.length ? { message, images } : { message }
 }

@@ -6,7 +6,13 @@ export const queryKeys = {
   threads: ["threads"] as const,
   search: ["transcript-search"] as const,
   schedules: ["schedules"] as const,
-  transcript: (threadId: string) => ["transcript", threadId] as const,
+  /** A history revision keeps a transcript from before a rewind or its undo apart from after it. */
+  transcript: (threadId: string, revision?: string) =>
+    revision === undefined
+      ? (["transcript", threadId] as const)
+      : (["transcript", threadId, revision] as const),
+  turnSnapshots: (threadId: string) => ["turn-snapshot", threadId] as const,
+  turnSnapshot: (threadId: string, turnId: string) => ["turn-snapshot", threadId, turnId] as const,
   providerStatus: (harness: string) => ["provider-status", harness] as const,
   providerUpdate: (harness: string) => ["provider-update", harness] as const,
   providerUsage: (harness: string) => ["provider-usage", harness] as const,

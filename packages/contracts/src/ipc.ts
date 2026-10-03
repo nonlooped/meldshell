@@ -10,6 +10,9 @@ import type {
   GitCommitDiffInput,
   GitSnapshotInput,
   GitDiffInput,
+  TurnSnapshotInput,
+  RestoreTurnSnapshotInput,
+  UndoSnapshotRestoreInput,
 } from "./workspace-inputs"
 export type {
   WorkspaceScope,
@@ -25,6 +28,9 @@ export type {
   GitDiffInput,
   GitFileAction,
   GitDiffSide,
+  TurnSnapshotInput,
+  RestoreTurnSnapshotInput,
+  UndoSnapshotRestoreInput,
 } from "./workspace-inputs"
 
 import type { RemotePreviewInput, RemotePreviewFrame } from "./remote-preview"
@@ -59,6 +65,9 @@ import type {
   ComposerCommand,
   SaveScheduleInput,
   ScheduledPrompt,
+  RewindResult,
+  UndoRewindResult,
+  TurnHandoff,
 } from "./models"
 
 export type ComposerAttachment = InputAttachment & { readonly previewUrl?: string }
@@ -106,6 +115,16 @@ export interface GitSnapshot {
   readonly changes: readonly GitChange[]
   readonly commits: readonly GitCommit[]
   readonly hasMore: boolean
+}
+
+/** What a turn's snapshots hold; a folder outside Git, or a turn from before snapshots, has none. */
+export interface TurnSnapshot {
+  /** The files were snapshotted when the turn started, so they can be restored to that point. */
+  readonly before: boolean
+  /** The files were snapshotted when the turn finished. */
+  readonly after: boolean
+  /** Every change between the two snapshots, including edits made by shell commands. */
+  readonly patch: string | null
 }
 
 type AppUpdateState =
@@ -218,6 +237,24 @@ interface DesktopApi {
   readonly threadPort: (threadId: string) => Promise<number>
   /** Opens an http or https address in the system browser. */
   readonly openExternal: (url: string) => Promise<void>
+  /** Agents driving a thread's browser preview, on desktops whose host runs locally. */
+  readonly agentBrowser?: AgentBrowserApi
+}
+
+/** What an agent is doing in a thread's preview, and where on the page when it points somewhere. */
+export interface AgentBrowserActivity {
+  readonly label: string
+  readonly point?: { readonly x: number; readonly y: number }
+}
+
+interface AgentBrowserApi {
+  /** Names the page a thread's preview shows, so agents act on what the user sees. */
+  readonly attach: (threadId: string, webContentsId: number) => void
+  /** An agent opened an address in a thread's preview. */
+  readonly onShow: (listener: (threadId: string, url: string) => void) => () => void
+  readonly onActivity: (
+    listener: (threadId: string, activity: AgentBrowserActivity) => void,
+  ) => () => void
 }
 
 interface Request<Invoke> {
@@ -283,6 +320,26 @@ export const requests = {
     "meldshell:get-git-snapshot",
   ),
   getGitDiff: request<(input: GitDiffInput) => Promise<string>>("meldshell:get-git-diff"),
+  getTurnSnapshot: request<(input: TurnSnapshotInput) => Promise<TurnSnapshot>>(
+    "meldshell:get-turn-snapshot",
+  ),
+  restoreTurnSnapshot: request<(input: RestoreTurnSnapshotInput) => Promise<void>>(
+    "meldshell:restore-turn-snapshot",
+  ),
+  undoSnapshotRestore: request<(input: UndoSnapshotRestoreInput) => Promise<void>>(
+    "meldshell:undo-snapshot-restore",
+  ),
+  /** What the thread's next turn would be told about work its agent has not seen. */
+  previewHandoff: request<(threadId: string) => Promise<TurnHandoff | null>>(
+    "meldshell:preview-handoff",
+  ),
+  /** Takes a thread back to before a turn: its conversation, and its files when snapshotted. */
+  rewindThread:
+    request<(input: TurnSnapshotInput) => Promise<RewindResult>>("meldshell:rewind-thread"),
+  undoRewind:
+    request<(input: UndoSnapshotRestoreInput) => Promise<UndoRewindResult>>(
+      "meldshell:undo-rewind",
+    ),
   renameWorkspace: request<(input: { workspaceId: string; name: string }) => Promise<AppSnapshot>>(
     "meldshell:rename-workspace",
   ),
@@ -429,6 +486,9 @@ export const IPC = {
   revealFile: "meldshell:reveal-file",
   threadPort: "meldshell:thread-port",
   openExternal: "meldshell:open-external",
+  agentBrowserAttach: "meldshell:agent-browser-attach",
+  agentBrowserShow: "meldshell:agent-browser-show",
+  agentBrowserActivity: "meldshell:agent-browser-activity",
 } as const
 
 export type MeldShellApi = InvokeApi & {

@@ -9,7 +9,8 @@ import { Bot } from "lucide-react"
 import piLogo from "./assets/pi-logo.svg"
 
 interface ProviderIconProps {
-  readonly provider?: Provider
+  /** Only the vendor key picks the icon, so a harness's vendor stands in for a configured provider. */
+  readonly provider?: Pick<Provider, "key">
   readonly size: number
 }
 

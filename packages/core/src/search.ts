@@ -54,6 +54,9 @@ export const searchTranscripts = (input: SearchTranscriptsInput) =>
       JOIN threads t ON t.id = e.thread_id
       WHERE transcript_document_search MATCH ${match}
         AND (${input.workspaceId ?? null} IS NULL OR t.workspace_id = ${input.workspaceId ?? null})
+        AND NOT EXISTS (
+          SELECT 1 FROM turns r WHERE r.id = e.turn_id AND r.rewound_at IS NOT NULL
+        )
       ORDER BY rank, e.created_at DESC, e.id
       LIMIT 51 OFFSET ${offset}`,
     )
