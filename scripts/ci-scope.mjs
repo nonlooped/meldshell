@@ -70,7 +70,7 @@ export function selectChecks(files, full = false, entries = workspaces()) {
         !releaseTests.includes(path),
     )
   const tests = rootTests
-    ? ["tests/ci-scope.test.mjs", ...releaseTests]
+    ? ["tests/ci-scope.test.mjs", "tests/markdown-blocks.test.ts", ...releaseTests]
     : release
       ? releaseTests
       : []

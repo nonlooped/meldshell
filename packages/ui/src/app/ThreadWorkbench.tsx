@@ -1,10 +1,5 @@
-import {
-  centeredStateClasses,
-  textInputClasses,
-  iconButtonClasses,
-  paneSeparatorClasses,
-} from "../ui/styles"
-import { Pressable, FadeDiv, useMotionPreference } from "../ui/motion"
+import { textInputClasses, iconButtonClasses, paneSeparatorClasses } from "../ui/styles"
+import { Pressable, useMotionPreference } from "../ui/motion"
 import { useLayoutEffect, useRef, useState } from "react"
 import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
@@ -19,6 +14,7 @@ import {
   MenuAction,
 } from "../ui/controls"
 import { ThreadView } from "../threads/ThreadView"
+import { ThreadSkeleton } from "../ui/Skeleton"
 import { TerminalPanel } from "../terminals/TerminalPanel"
 import { terminalApi, useTerminalStore } from "../terminals/terminal-store"
 import { useKeybindings } from "./keybindings"
@@ -425,9 +421,7 @@ function LayoutNode({
   if (node.kind === "thread") {
     const thread = props.threads.find((candidate) => candidate.id === node.threadId)
     return thread === undefined ? (
-      <FadeDiv className={centeredStateClasses} role="status">
-        <p>Loading thread…</p>
-      </FadeDiv>
+      <ThreadSkeleton />
     ) : (
       <ThreadTile thread={thread} split={split} {...props} />
     )

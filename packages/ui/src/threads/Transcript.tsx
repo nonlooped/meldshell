@@ -35,6 +35,7 @@ import { MessageRail } from "./MessageRail"
 import { AsyncQuestions } from "./AsyncQuestions"
 import { landFlight } from "../ui/flight"
 import { Notice } from "../ui/Notice"
+import { TranscriptSkeleton } from "../ui/Skeleton"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { refreshTranscript, type TranscriptWindow } from "../data/transcript"
 import { useVirtualizer } from "@tanstack/react-virtual"
@@ -684,9 +685,7 @@ export function Transcript({
 
   if (query.isLoading)
     return (
-      <div className="transcript-loading min-h-0 [padding:36px_clamp(24px,_7vw,_104px)] text-[var(--text-tertiary)] text-[12px]">
-        Loading transcript…
-      </div>
+      <TranscriptSkeleton className="transcript-loading min-h-0 overflow-hidden [padding:36px_clamp(24px,_7vw,_104px)]" />
     )
   if (query.isError && !query.data)
     return (
@@ -703,7 +702,7 @@ export function Transcript({
 
   return (
     <MarkdownWorkspace value={scope}>
-      <div className="@container relative grid min-h-0 min-w-0 grid-rows-[minmax(0,_1fr)]">
+      <div className="motion-enter @container relative grid min-h-0 min-w-0 grid-rows-[minmax(0,_1fr)]">
         {query.isError && (
           <Button variant="ghost" size="sm" onClick={() => void query.refetch()}>
             Retry transcript updates

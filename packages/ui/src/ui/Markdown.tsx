@@ -1,4 +1,4 @@
-import { lazy, Suspense, useContext, useId, useMemo, useRef, useState } from "react"
+import { lazy, memo, Suspense, useContext, useId, useMemo, useRef, useState } from "react"
 import ReactMarkdown, { defaultUrlTransform, type Components, type Options } from "react-markdown"
 import type { Element } from "hast"
 import remarkGfm from "remark-gfm"
@@ -19,6 +19,7 @@ import {
   enrichMarkdown,
   fileReference,
   inlineFileReference,
+  markdownBlocks,
   nodeText,
   prepareMarkdown,
 } from "./markdown-model"
@@ -106,6 +107,41 @@ const components: Components = {
 }
 const remarkPlugins = [remarkGfm]
 const MarkdownMath = lazy(() => import("./MarkdownMath"))
+const urlTransform: Options["urlTransform"] = (url, key) =>
+  fileReference(url)
+    ? url
+    : key === "src" && /^data:image\/(?:png|jpeg|gif|webp);base64,/i.test(url)
+      ? url
+      : defaultUrlTransform(url)
+
+// One top-level run of the message. Finished runs keep their text while a reply streams, so
+// memoization skips re-parsing and re-highlighting everything but the growing last run.
+const MarkdownBlock = memo(function MarkdownBlock({
+  text,
+  prefix,
+}: {
+  readonly text: string
+  readonly prefix: string
+}) {
+  const prepared = prepareMarkdown(text)
+  const markdownProps: Options = {
+    components,
+    remarkPlugins,
+    rehypePlugins: [[enrichMarkdown, { prefix, query: "" }]],
+    urlTransform,
+    children: prepared,
+  }
+  const fallback = <ReactMarkdown {...markdownProps} />
+  return mayContainMath(prepared) ? (
+    <ErrorBoundary fallback={fallback}>
+      <Suspense fallback={fallback}>
+        <MarkdownMath {...markdownProps} />
+      </Suspense>
+    </ErrorBoundary>
+  ) : (
+    fallback
+  )
+})
 
 export function Markdown({
   text,
@@ -123,20 +159,7 @@ export function Markdown({
     images: { src: string; alt: string }[]
     index: number
   }>()
-  const prepared = useMemo(() => prepareMarkdown(text), [text])
-  const markdownProps: Options = {
-    components,
-    remarkPlugins,
-    rehypePlugins: [[enrichMarkdown, { prefix, query: "" }]],
-    urlTransform: (url, key) =>
-      fileReference(url)
-        ? url
-        : key === "src" && /^data:image\/(?:png|jpeg|gif|webp);base64,/i.test(url)
-          ? url
-          : defaultUrlTransform(url),
-    children: prepared,
-  }
-  const fallback = <ReactMarkdown {...markdownProps} />
+  const blocks = useMemo(() => markdownBlocks(text), [text])
   return (
     <MarkdownStreaming value={streaming || inheritedStreaming}>
       <div className={`${eventMarkdownClasses} ${className}`}>
@@ -157,15 +180,10 @@ export function Markdown({
             })
           }}
         >
-          {mayContainMath(prepared) ? (
-            <ErrorBoundary fallback={fallback}>
-              <Suspense fallback={fallback}>
-                <MarkdownMath {...markdownProps} />
-              </Suspense>
-            </ErrorBoundary>
-          ) : (
-            fallback
-          )}
+          {blocks.map((block, index) => (
+            // Blocks only grow at the end, so a position identifies the same run across chunks.
+            <MarkdownBlock key={index} text={block} prefix={`${prefix}-${index}`} />
+          ))}
         </div>
         {gallery && (
           <ImageLightbox
