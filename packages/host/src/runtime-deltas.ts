@@ -28,10 +28,37 @@ const cursorDelta = (
   }
 }
 
+/** Pi's text and thinking deltas; the latest cumulative usage replaces earlier readings. */
+const piDelta = (
+  input: RuntimeEventInput,
+): { text: string; fields: unknown; replace: (text: string) => unknown } | undefined => {
+  if (input.method !== "pi/message_update") return
+  const params = input.params as {
+    usage?: unknown
+    assistantMessageEvent?: { type?: string; delta?: unknown }
+  } | null
+  const update = params?.assistantMessageEvent
+  if (
+    !update ||
+    !["text_delta", "thinking_delta"].includes(update.type ?? "") ||
+    typeof update.delta !== "string"
+  )
+    return
+  const { delta: text, ...eventFields } = update
+  const { usage: _usage, ...fields } = params
+  return {
+    text,
+    fields: { ...fields, assistantMessageEvent: eventFields },
+    replace: (next) => ({ ...params, assistantMessageEvent: { ...update, delta: next } }),
+  }
+}
+
+const nativeDelta = (input: RuntimeEventInput) => cursorDelta(input) ?? piDelta(input)
+
 export const isRuntimeDelta = (input: RuntimeEventInput): boolean =>
   input.validated === true &&
   input.requestId === undefined &&
-  (cursorDelta(input) !== undefined ||
+  (nativeDelta(input) !== undefined ||
     ((input.method.endsWith("/delta") || input.method.endsWith("/outputDelta")) &&
       typeof input.params === "object" &&
       input.params !== null &&
@@ -45,17 +72,17 @@ export const mergeRuntimeDelta = (
   if (previous === undefined || !isRuntimeDelta(previous) || !isRuntimeDelta(input)) return
   const { params: previousParams, ...previousEnvelope } = previous
   const { params, ...envelope } = input
-  const cursor = cursorDelta(input),
-    previousCursor = cursorDelta(previous)
-  if (Boolean(cursor) !== Boolean(previousCursor)) return
-  if (cursor && previousCursor) {
+  const native = nativeDelta(input),
+    previousNative = nativeDelta(previous)
+  if (Boolean(native) !== Boolean(previousNative)) return
+  if (native && previousNative) {
     if (
-      cursor.text.length + previousCursor.text.length > 65_536 ||
+      native.text.length + previousNative.text.length > 65_536 ||
       !isDeepStrictEqual(envelope, previousEnvelope) ||
-      !isDeepStrictEqual(cursor.fields, previousCursor.fields)
+      !isDeepStrictEqual(native.fields, previousNative.fields)
     )
       return
-    return { ...input, params: cursor.replace(previousCursor.text + cursor.text) }
+    return { ...input, params: native.replace(previousNative.text + native.text) }
   }
   const { delta: previousText, ...previousFields } = previousParams as Record<string, unknown> & {
     delta: string

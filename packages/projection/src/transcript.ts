@@ -1,6 +1,7 @@
 import { Result, Schema } from "effect"
 import { eventKind, eventText, planText } from "./normalization"
 import { prepareCursorEvents } from "./cursor"
+import { preparePiEvents } from "./pi"
 import {
   asRecord,
   decodeNativePayload,
@@ -261,7 +262,7 @@ export const prepareTranscriptEvents = (
   }
 
   // MCP startup progress never appears in the transcript, so its payload shape cannot fail a turn.
-  for (const event of prepareCursorEvents(events)) {
+  for (const event of prepareCursorEvents(preparePiEvents(events))) {
     if (asyncQuestions(event).length > 0) questionTurns.add(event.turnId)
     if (event.method !== "mcpServer/startupStatus/updated") append(event)
   }

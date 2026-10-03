@@ -1,8 +1,10 @@
 import { homedir } from "node:os"
+import { Result } from "effect"
 import {
   asRecord,
   asRecords,
   asText,
+  decodePiPayload,
   errorMessage,
   type ComposerCommand,
   type PiDialog,
@@ -13,41 +15,42 @@ import {
   type WorkerCommand,
 } from "@meldshell/contracts"
 import { eventPublisher, workerCommand, type WorkerPort } from "@meldshell/provider-runtime"
-import { ApprovalGate, READ_ONLY_TOOLS } from "./approval-gate"
 import { decodeDialog, dialogResponse } from "./dialogs"
-import { atLeast, discoverPi, MINIMUM_PI_VERSION, type PiCommand } from "./discovery"
-import { PiEvents, type RunOutcome } from "./events"
+import { discoverPi, type PiCommand } from "./discovery"
 import { parseModelSlug, piModels } from "./models"
 import { piPrompt } from "./prompt"
 import { PiRpc } from "./rpc"
 
 type Emit = (method: string, params: unknown, validated?: boolean, requestId?: string) => void
-type TurnStatus = "completed" | "failed" | "interrupted"
 
-interface TurnOutcome {
-  readonly result: TurnStatus
-  readonly error?: string
+/** One thread's Pi, kept running between turns as Pi's RPC mode intends. */
+interface Session {
+  rpc: PiRpc
+  /** Reports to the running turn; null between turns, when Pi's records belong to no turn. */
+  emit: Emit | null
+  /** Ends the running turn's wait once Pi will not continue on its own. */
+  settle: (() => void) | null
+  /** How the last assistant message ended, which decides the turn's status. */
+  stopReason: string | null
+  stopError: string | null
 }
 
 interface RunningTurn {
   readonly dispatch: TurnDispatch
-  readonly emit: Emit
-  rpc?: PiRpc
+  session?: Session
   interrupted: boolean
-  /** Ends the wait for Pi to settle, as `agent_settled` or a finished abort does. */
-  settle: () => void
   task: Promise<void>
 }
 
 interface PendingDialog {
-  readonly turn: RunningTurn
+  readonly session: Session
   readonly dialog: PiDialog
   readonly timer: ReturnType<typeof setTimeout> | undefined
 }
 
-/** How long a title or command listing may take before its Pi process is stopped. */
+/** How long a title or command listing may take before its Pi is stopped. */
 const SHORT_TASK_MS = 60_000
-/** How long an interrupted turn may take to settle before its Pi process is stopped. */
+/** How long an interrupted turn may take to settle before its Pi is stopped. */
 const INTERRUPT_GRACE_MS = 5_000
 
 /** Resolves once Pi settles, or fails with Pi's own diagnostics if it exits first. */
@@ -59,24 +62,13 @@ const untilSettled = (rpc: PiRpc, settled: Promise<void>): Promise<void> =>
     }),
   ])
 
-const acceptsImages = (model: UnknownRecord): boolean =>
-  Array.isArray(model.input) && model.input.includes("image")
-
-/** A run's last assistant message decides the turn: aborted, failed, or completed. */
-const turnOutcome = (interrupted: boolean, outcome: RunOutcome): TurnOutcome => {
-  if (interrupted || outcome.stopReason === "aborted") return { result: "interrupted" }
-  if (outcome.stopReason === "error")
-    return { result: "failed", error: outcome.error ?? "Pi's model request failed." }
-  return { result: "completed" }
-}
-
 export const runPiWorker = (
   port: WorkerPort,
   dependencies: { readonly discover: () => Promise<PiCommand> } = { discover: discoverPi },
 ): { shutdown: () => Promise<void> } => {
   const publish = eventPublisher(port)
-  const gate = new ApprovalGate()
   const connections = new Set<PiRpc>()
+  const sessions = new Map<string, Session>()
   const turns = new Map<string, RunningTurn>()
   const dialogs = new Map<string, PendingDialog>()
   let discovered: PiCommand | null = null
@@ -160,24 +152,13 @@ export const runPiWorker = (
     probing = (async () => {
       publish({ type: "provider-status", status: status("probing", "Connecting to Pi…") })
       try {
-        // Discover again on every probe, so an update or a new install is picked up.
         discovered = await dependencies.discover().catch((cause: unknown) => {
           discovered = null
           throw cause
         })
-        if (!atLeast(discovered.version, MINIMUM_PI_VERSION)) {
-          publish({
-            type: "provider-status",
-            status: status(
-              "outdated",
-              `MeldShell needs Pi ${MINIMUM_PI_VERSION} or newer. Run pi update, then check again.`,
-            ),
-          })
-          return
-        }
-        const catalog = await readCatalog()
+        const models = await readCatalog()
         if (stopping) return
-        if (catalog.length === 0)
+        if (models.length === 0)
           publish({
             type: "provider-status",
             status: status(
@@ -189,7 +170,7 @@ export const runPiWorker = (
           publish({
             type: "provider-ready",
             providerKey: "pi",
-            models: catalog,
+            models,
             status: status("ready", "Pi is ready."),
           })
       } catch (cause) {
@@ -201,29 +182,19 @@ export const runPiWorker = (
     return probing
   }
 
-  /** Pi has no permission prompts; MeldShell narrows its tools or loads its approval gate. */
-  const permissionArgs = async (dispatch: TurnDispatch): Promise<string[]> => {
-    const readOnly =
-      dispatch.sandbox === "read-only" ||
-      (dispatch.approvalPolicy === "never" && dispatch.sandbox !== "danger-full-access")
-    if (readOnly) return ["--tools", READ_ONLY_TOOLS.join(",")]
-    if (dispatch.approvalPolicy === "never") return []
-    return ["--extension", await gate.path()]
-  }
-
   const resolvedDialog = (requestId: string): void => {
     const pending = dialogs.get(requestId)
     if (pending === undefined) return
     clearTimeout(pending.timer)
     dialogs.delete(requestId)
-    pending.turn.emit("serverRequest/resolved", { requestId })
+    pending.session.emit?.("serverRequest/resolved", { requestId })
   }
 
-  const cancelDialogs = (turn: RunningTurn): void => {
+  const cancelDialogs = (session: Session): void => {
     for (const [requestId, pending] of dialogs) {
-      if (pending.turn !== turn) continue
+      if (pending.session !== session) continue
       try {
-        turn.rpc?.answer(requestId, { cancelled: true })
+        session.rpc.answer(requestId, { cancelled: true })
       } catch {
         /* Pi has already exited. */
       }
@@ -231,21 +202,10 @@ export const runPiWorker = (
     }
   }
 
-  /** Dialogs wait for the user; Pi's other extension UI records are notifications. */
-  const extensionRequest = (turn: RunningTurn, record: UnknownRecord): void => {
-    const dialog = decodeDialog(record)
-    if (dialog === null) {
-      if (record.method === "notify" && asText(record.message))
-        turn.emit("item/completed", {
-          item: {
-            id: `pi:notify:${asText(record.id)}`,
-            type: "providerStatus",
-            text: asText(record.message),
-            result: asText(record.notifyType) || "info",
-            status: "completed",
-          },
-        })
-      else turn.emit(`pi/extension_ui/${asText(record.method) || "unknown"}`, record, false)
+  /** A dialog waits for the user, as in Pi's own interface; outside a turn nobody can answer. */
+  const openDialog = (session: Session, dialog: PiDialog, record: UnknownRecord): void => {
+    if (!session.emit) {
+      session.rpc.answer(dialog.id, { cancelled: true })
       return
     }
     // Pi answers a timed dialog itself once its timeout passes.
@@ -253,49 +213,97 @@ export const runPiWorker = (
       dialog.timeout === undefined
         ? undefined
         : setTimeout(() => resolvedDialog(dialog.id), dialog.timeout)
-    dialogs.set(dialog.id, { turn, dialog, timer })
-    turn.emit("pi/extension_ui_request", record, true, dialog.id)
+    dialogs.set(dialog.id, { session, dialog, timer })
+    session.emit("pi/extension_ui_request", record, true, dialog.id)
   }
 
-  /** Starts Pi on the thread's session with the permissions the turn chose. */
-  const openTurn = async (turn: RunningTurn, events: PiEvents): Promise<PiRpc | null> => {
-    const { dispatch } = turn
-    const sessionId = dispatch.nativeThreadId ?? dispatch.threadId
-    const args = ["--session-id", sessionId, ...(await permissionArgs(dispatch))]
-    if (turn.interrupted) return null
-    turn.rpc = await connect(dispatch.workspacePath, args, (record) => {
-      if (record.type === "extension_ui_request") return extensionRequest(turn, record)
-      if (record.type === "agent_settled") turn.settle()
-      events.accept(record)
-    })
-    return turn.interrupted ? null : turn.rpc
+  /** Forwards Pi's records unchanged, noting how each assistant message ended. */
+  const onRecord = (session: Session, record: UnknownRecord): void => {
+    if (record.type === "agent_settled") session.settle?.()
+    const message = record.type === "message_end" ? asRecord(record.message) : {}
+    if (message.role === "assistant") {
+      session.stopReason = asText(message.stopReason) || null
+      session.stopError = asText(message.errorMessage) || null
+    }
+    const dialog = record.type === "extension_ui_request" ? decodeDialog(record) : null
+    if (dialog !== null) return openDialog(session, dialog, record)
+    const decoded = decodePiPayload(record)
+    if (Result.isFailure(decoded))
+      publish({
+        type: "protocol-error",
+        message: `Invalid Pi ${asText(record.type) || "record"}: ${decoded.failure.message}`,
+        raw: record,
+      })
+    session.emit?.(`pi/${asText(record.type) || "record"}`, record, Result.isSuccess(decoded))
+  }
+
+  const closeSession = async (session: Session): Promise<void> => {
+    cancelDialogs(session)
+    session.emit = null
+    session.settle = null
+    await session.rpc.close()
+  }
+
+  /** The thread's running Pi, or a new one that opens the thread's saved Pi session. */
+  const sessionFor = async (dispatch: TurnDispatch): Promise<Session> => {
+    const existing = sessions.get(dispatch.threadId)
+    if (existing && existing.rpc.error === null) return existing
+    if (existing) {
+      sessions.delete(dispatch.threadId)
+      await closeSession(existing)
+    }
+    const args = dispatch.nativeThreadId ? ["--session", dispatch.nativeThreadId] : []
+    const session: Session = {
+      rpc: undefined as unknown as PiRpc,
+      emit: null,
+      settle: null,
+      stopReason: null,
+      stopError: null,
+    }
+    session.rpc = await connect(dispatch.workspacePath, args, (record) => onRecord(session, record))
+    sessions.set(dispatch.threadId, session)
+    return session
+  }
+
+  /** Selects the turn's model and thinking level where they differ from the session's. */
+  const configure = async (session: Session, dispatch: TurnDispatch): Promise<UnknownRecord> => {
+    const state = asRecord(await session.rpc.request("get_state"))
+    const { provider, modelId } = parseModelSlug(dispatch.model)
+    const model = asRecord(state.model)
+    if (model.provider !== provider || model.id !== modelId)
+      await session.rpc.request("set_model", { provider, modelId })
+    if (dispatch.reasoningEffort !== null && state.thinkingLevel !== dispatch.reasoningEffort)
+      await session.rpc.request("set_thinking_level", { level: dispatch.reasoningEffort })
+    return state
   }
 
   /** Sends the turn's prompt and waits until Pi will not continue on its own. */
-  const runTurn = async (
-    turn: RunningTurn,
-    events: PiEvents,
-    settled: Promise<void>,
-  ): Promise<TurnOutcome> => {
-    const rpc = await openTurn(turn, events)
-    if (rpc === null) return { result: "interrupted" }
+  const runPrompt = async (turn: RunningTurn, session: Session): Promise<void> => {
     const { dispatch } = turn
-    const model = asRecord(await rpc.request("set_model", parseModelSlug(dispatch.model)))
-    if (dispatch.reasoningEffort !== null)
-      await rpc.request("set_thinking_level", { level: dispatch.reasoningEffort })
-    const state = asRecord(await rpc.request("get_state"))
+    const state = await configure(session, dispatch)
     publish({
       type: "provider-session",
       threadId: dispatch.threadId,
-      nativeThreadId: asText(state.sessionId) || (dispatch.nativeThreadId ?? dispatch.threadId),
+      nativeThreadId: asText(state.sessionFile) || asText(state.sessionId),
     })
-    const prompt = await piPrompt(dispatch, acceptsImages(model))
-    if (turn.interrupted) return { result: "interrupted" }
-    const accepted = asRecord(await rpc.request("prompt", prompt, 0))
+    const prompt = await piPrompt(dispatch)
+    if (turn.interrupted) throw new Error("Pi turn interrupted.")
+    session.stopReason = null
+    session.stopError = null
+    const settled = new Promise<void>((resolve) => {
+      session.settle = resolve
+    })
+    const accepted = asRecord(await session.rpc.request("prompt", prompt, 0))
     // An extension command or input handler consumed the prompt; no run started.
-    if (accepted.disposition !== "handled") await untilSettled(rpc, settled)
-    return turnOutcome(turn.interrupted, events.outcome)
+    if (accepted.disposition !== "handled") await untilSettled(session.rpc, settled)
   }
+
+  const completion = (turn: RunningTurn, session: Session) =>
+    turn.interrupted || session.stopReason === "aborted"
+      ? { status: "interrupted" }
+      : session.stopReason === "error"
+        ? { status: "failed", error: session.stopError ?? "Pi's model request failed." }
+        : { status: "completed" }
 
   const startTurn = (dispatch: TurnDispatch): void => {
     if (dispatch.harness !== "pi") throw new Error("Turn routed to the wrong provider.")
@@ -304,6 +312,8 @@ export const runPiWorker = (
       [...turns.values()].some((turn) => turn.dispatch.threadId === dispatch.threadId)
     )
       throw new Error("This Pi thread is already running.")
+    const turn: RunningTurn = { dispatch, interrupted: false, task: Promise.resolve() }
+    turns.set(dispatch.turnId, turn)
     const emit: Emit = (method, params, validated = true, requestId) =>
       publish({
         type: "runtime-event",
@@ -317,32 +327,34 @@ export const runPiWorker = (
           ...(requestId === undefined ? {} : { requestId }),
         },
       })
-    const turn: RunningTurn = {
-      dispatch,
-      emit,
-      interrupted: false,
-      settle: () => undefined,
-      task: Promise.resolve(),
-    }
-    const settled = new Promise<void>((resolve) => {
-      turn.settle = resolve
-    })
-    turns.set(dispatch.turnId, turn)
-    const events = new PiEvents(dispatch.turnId, emit)
-    emit("turn/started", { turn: { id: dispatch.turnId, status: "running" } })
+    emit("turn/started", { turn: { id: dispatch.turnId } })
     turn.task = (async () => {
-      const { result, error } = await runTurn(turn, events, settled).catch(
-        (cause: unknown): TurnOutcome => ({
-          result: turn.interrupted || stopping ? "interrupted" : "failed",
+      let result: { status: string; error?: string }
+      try {
+        const session = await sessionFor(dispatch)
+        turn.session = session
+        session.emit = emit
+        if (turn.interrupted) throw new Error("Pi turn interrupted.")
+        await runPrompt(turn, session)
+        result = completion(turn, session)
+      } catch (cause) {
+        result = {
+          status: turn.interrupted || stopping ? "interrupted" : "failed",
           error: errorMessage(cause),
-        }),
-      )
-      // The turn ends once its Pi has exited, so a queued turn never shares the session file.
-      cancelDialogs(turn)
-      await turn.rpc?.close()
+        }
+        // A Pi that failed mid-turn is replaced on the thread's next turn.
+        if (turn.session) {
+          sessions.delete(dispatch.threadId)
+          await closeSession(turn.session)
+        }
+      }
+      if (turn.session) {
+        cancelDialogs(turn.session)
+        turn.session.emit = null
+        turn.session.settle = null
+      }
       turns.delete(dispatch.turnId)
-      if (result === "failed" && error) emit("error", { error: { message: error } })
-      emit("turn/completed", { turn: { status: result, ...(error ? { error } : {}) } })
+      emit("turn/completed", { turn: result })
     })()
   }
 
@@ -353,20 +365,21 @@ export const runPiWorker = (
       return
     }
     turn.interrupted = true
-    cancelDialogs(turn)
-    const rpc = turn.rpc
-    if (rpc === undefined) {
+    const session = turn.session
+    if (session === undefined) {
       ack()
       return
     }
-    const timer = setTimeout(() => void rpc.close(), INTERRUPT_GRACE_MS)
-    void turn.task.finally(() => clearTimeout(timer))
+    cancelDialogs(session)
     // Abort answers once the session is idle, so the run is over even without `agent_settled`.
-    // A failed abort stops Pi instead; either way the turn settles through its task.
-    void rpc.request("abort", {}, INTERRUPT_GRACE_MS).then(
-      () => turn.settle(),
-      () => void rpc.close(),
+    void session.rpc.request("abort", {}, INTERRUPT_GRACE_MS).then(
+      () => session.settle?.(),
+      () => void session.rpc.close(),
     )
+    const timer = setTimeout(() => {
+      if (turns.has(nativeTurnId)) void session.rpc.close()
+    }, INTERRUPT_GRACE_MS)
+    void turn.task.finally(() => clearTimeout(timer))
     ack()
   }
 
@@ -381,8 +394,10 @@ export const runPiWorker = (
       return
     }
     try {
-      const response = dialogResponse(pending.dialog, message.decision, message.answers)
-      pending.turn.rpc?.answer(requestId, response)
+      pending.session.rpc.answer(
+        requestId,
+        dialogResponse(pending.dialog, message.decision, message.answers),
+      )
     } catch (cause) {
       ack(errorMessage(cause))
       return
@@ -393,18 +408,14 @@ export const runPiWorker = (
 
   const generateTitle = async (request: TitleRequest): Promise<void> => {
     try {
-      const title = await withPi(
-        request.workspacePath,
-        ["--no-tools", "--no-context-files", "--no-skills", "--no-prompt-templates"],
-        async (rpc, settled) => {
-          await rpc.request("set_model", parseModelSlug(request.model))
-          if (request.reasoningEffort !== null)
-            await rpc.request("set_thinking_level", { level: request.reasoningEffort })
-          await rpc.request("prompt", { message: request.prompt }, 0)
-          await untilSettled(rpc, settled)
-          return asText(asRecord(await rpc.request("get_last_assistant_text")).text)
-        },
-      )
+      const title = await withPi(request.workspacePath, ["--no-tools"], async (rpc, settled) => {
+        await rpc.request("set_model", parseModelSlug(request.model))
+        if (request.reasoningEffort !== null)
+          await rpc.request("set_thinking_level", { level: request.reasoningEffort })
+        await rpc.request("prompt", { message: request.prompt }, 0)
+        await untilSettled(rpc, settled)
+        return asText(asRecord(await rpc.request("get_last_assistant_text")).text)
+      })
       if (stopping) return
       if (title.trim()) publish({ type: "thread-title", threadId: request.threadId, title })
       else
@@ -448,7 +459,8 @@ export const runPiWorker = (
     for (const turn of turns.values()) turn.interrupted = true
     await Promise.all([...connections].map((rpc) => rpc.close()))
     await Promise.allSettled([...turns.values()].map((turn) => turn.task))
-    await gate.dispose()
+    sessions.clear()
+    dialogs.clear()
   }
 
   port.on("message", ({ data }) => {

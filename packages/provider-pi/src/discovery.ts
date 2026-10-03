@@ -4,9 +4,6 @@ import which from "which"
 import { asRecord } from "@meldshell/contracts"
 import { pathExists, runCommand } from "@meldshell/provider-runtime/command"
 
-/** The oldest Pi whose RPC protocol MeldShell speaks: prompt dispositions and `agent_settled`. */
-export const MINIMUM_PI_VERSION = "1.0.0"
-
 export interface PiCommand {
   /** The program to start; Node when Pi is a JavaScript entry point. */
   readonly command: string
@@ -62,16 +59,4 @@ export const discoverPi = async (): Promise<PiCommand> => {
   }
   const { command, args } = await launcher(path)
   return { command, args, version: await versionOf(command, args), executablePath: found ?? path }
-}
-
-/** Whether `version` is at least `minimum`, comparing numeric release parts. */
-export const atLeast = (version: string, minimum: string): boolean => {
-  const parts = (value: string): number[] =>
-    (value.split(/[-+]/)[0] ?? "").split(".").map((part) => Number.parseInt(part, 10) || 0)
-  const [left, right] = [parts(version), parts(minimum)]
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0)
-    if (difference !== 0) return difference > 0
-  }
-  return true
 }

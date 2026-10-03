@@ -64,8 +64,8 @@ Use fresh operating-system user profiles. Run the provider matrix on Windows and
 | Claude ready | PATH/override discovery, streaming, completion, restart resume, interruption, approvals, questions, attachments, Code/Plan, and supported settings work |
 | Cursor unavailable | Missing CLI, wrong executable/handshake, and authentication failures leave other providers usable |
 | Cursor ready | Catalog and exact model IDs, Agent/Plan/Ask, streaming, permissions, questions/plans, cancellation, attachments, and restart session loading work |
-| Pi unavailable | Missing CLI, a release older than 1.0.0, and no model credentials identify the required action while other providers remain usable |
-| Pi ready | Catalog of credentialed models, thinking levels, streaming, read-only/ask/full tool permissions, extension dialogs, cancellation, attachments, and restart session resume work |
+| Pi unavailable | Missing CLI and no model credentials identify the required action while other providers remain usable |
+| Pi ready | Catalog of credentialed models, thinking levels, streaming, extension dialogs, cancellation, attachments, and restart session resume work |
 | Provider switching | Switching among installed harnesses resumes each native history without importing other providers' messages |
 | Worker failure | Affected work settles, other providers continue, and reconnect does not replay ambiguous submissions |
 | Usage | All configured provider cards refresh or show an account-appropriate unavailable/error state |
