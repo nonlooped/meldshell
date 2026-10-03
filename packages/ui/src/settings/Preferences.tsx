@@ -10,9 +10,11 @@ import type { ReactNode } from "react"
 import { Switch } from "../ui/controls"
 import { cx, segmentClasses, segmentGroupClasses } from "../ui/styles"
 import { TEXT_SIZES, THEMES, ThemePreview } from "../ui/ThemePreview"
+import { resolveColorTheme } from "../app/color-themes"
 import { SettingsGroup } from "./SettingsGroup"
 import { SettingRow, settingRowPadding } from "./SettingRow"
 import { ThreadTitleRow } from "./ThreadTitleRow"
+import { ColorThemeSettings, themeTileClasses } from "./ThemeSettings"
 
 type FollowUpMode = NonNullable<AppSettings["followUpMode"]>
 type TextSize = NonNullable<AppSettings["transcriptSize"]>
@@ -114,16 +116,6 @@ function Segments<Value extends string>({
     </ToggleGroup>
   )
 }
-
-const themeTileClasses = [
-  "motion-colors relative grid gap-[8px] p-[6px] pb-[8px] border-[1px] border-[color:var(--line)]",
-  "rounded-[var(--radius-lg)] bg-transparent text-[var(--text-secondary)] cursor-default",
-  "[&:hover]:[border-color:var(--line-strong)] [&:hover]:text-[var(--text-primary)]",
-  "[&[data-checked]]:[border-color:var(--accent)] [&[data-checked]]:text-[var(--text-primary)]",
-  "[&[data-checked]]:[box-shadow:0_0_0_3px_color-mix(in_srgb,var(--accent)_18%,transparent)]",
-  "[&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]",
-  "[&[data-disabled]]:opacity-[0.6]",
-].join(" ")
 
 function OpacitySlider({
   value,
@@ -267,7 +259,7 @@ export function ThreadPreferences({
   )
 }
 
-/** The theme as previews, then the window and reading comfort. */
+/** The mode and colour theme as previews, then the window and reading comfort. */
 export function AppearancePreferences({
   settings,
   onChange,
@@ -284,9 +276,10 @@ export function AppearancePreferences({
     (settings.theme === "system" && window.matchMedia("(prefers-color-scheme: light)").matches)
       ? 94
       : 88)
+  const colors = resolveColorTheme(settings)
   return (
     <>
-      <SettingsGroup title="Theme" description="Choose a look, or follow your system.">
+      <SettingsGroup title="Theme" description="Choose dark or light, or follow your system.">
         <div className={settingRowPadding}>
           <RadioGroup
             aria-label="Theme"
@@ -301,7 +294,7 @@ export function AppearancePreferences({
             {THEMES.map((option) => (
               <Radio.Root key={option.value} value={option.value} className={themeTileClasses}>
                 <span className="block h-[72px] overflow-hidden rounded-[6px] border-[1px] border-[color:var(--line-subtle)]">
-                  <ThemePreview theme={option.value} />
+                  <ThemePreview theme={option.value} colors={colors} />
                 </span>
                 <span className="flex items-center justify-center gap-[6px] text-[12px] font-medium">
                   {option.icon}
@@ -312,6 +305,7 @@ export function AppearancePreferences({
           </RadioGroup>
         </div>
       </SettingsGroup>
+      <ColorThemeSettings settings={settings} onChange={onChange} pending={pending} />
       <SettingsGroup title="Display">
         <SettingRow
           label="App opacity"

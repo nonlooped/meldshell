@@ -88,7 +88,7 @@ export function watchAppearance(onChange: () => void): () => void {
   })
   observer.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ["data-theme", "data-text-size", "style"],
+    attributeFilter: ["data-theme", "data-color-theme", "data-text-size", "style"],
   })
   const contrast = window.matchMedia("(prefers-contrast: more)")
   contrast.addEventListener("change", onChange)
