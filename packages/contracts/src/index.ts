@@ -23,6 +23,7 @@ export {
   CreatePullRequestInput,
   ListIssuesInput,
   TurnSnapshotInput,
+  SideQuestionInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,
 } from "./workspace-inputs"

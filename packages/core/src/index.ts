@@ -42,6 +42,7 @@ export {
   reconcileWorker,
   finishShutdown,
   previewHandoff,
+  sideQuestionPrompt,
 } from "./turns"
 export {
   listSchedules,

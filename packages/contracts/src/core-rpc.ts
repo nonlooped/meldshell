@@ -121,6 +121,12 @@ export class CoreRpcs extends RpcGroup.make(
     success: Schema.NullOr(TurnHandoff),
     error: CoreError,
   }),
+  /** The prompt for a side question about a thread, which its agent never sees. */
+  Rpc.make("SideQuestionPrompt", {
+    payload: Schema.Struct({ threadId: Schema.String, question: Schema.String }),
+    success: Schema.String,
+    error: CoreError,
+  }),
   /** Takes a turn and every later one out of the conversation; the next turn starts a new session. */
   Rpc.make("RewindThread", {
     payload: Schema.Struct({
