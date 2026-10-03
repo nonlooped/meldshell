@@ -3,6 +3,7 @@ import type {
   WorkspaceFileInput,
   WorkspaceFileActionInput,
   SearchWorkspacePathsInput,
+  SearchWorkspaceContentsInput,
   GitFileActionInput,
   GitBulkActionInput,
   GitCommitInput,
@@ -21,6 +22,7 @@ export type {
   WorkspaceFileInput,
   WorkspaceFileActionInput,
   SearchWorkspacePathsInput,
+  SearchWorkspaceContentsInput,
   GitFileActionInput,
   GitBulkActionInput,
   GitCommitInput,
@@ -94,6 +96,29 @@ export interface WorkspacePathMatch {
   /** Workspace-relative, `/`-separated; directories end with `/`. */
   readonly path: string
   readonly directory: boolean
+}
+/** One line of a file that matches a content search. */
+export interface ContentSearchLine {
+  /** 1-based. */
+  readonly line: number
+  /** The line, trimmed and cut to a window around its first match. */
+  readonly text: string
+  /** Whether `text` starts partway into the line. */
+  readonly clipped: boolean
+  /** Matched character spans in `text`, as `[start, end)` offsets. */
+  readonly ranges: ReadonlyArray<readonly [number, number]>
+}
+export interface ContentSearchFile {
+  /** Workspace-relative, `/`-separated. */
+  readonly path: string
+  readonly lines: readonly ContentSearchLine[]
+}
+export interface ContentSearchResult {
+  readonly files: readonly ContentSearchFile[]
+  /** Matching lines across every file returned. */
+  readonly lineCount: number
+  /** The search stopped early, at the line limit or its time budget. */
+  readonly truncated: boolean
 }
 export interface FilePreview {
   readonly kind: "text" | "markdown" | "html" | "image" | "video" | "unsupported"
@@ -374,6 +399,9 @@ export const requests = {
   searchWorkspacePaths: request<
     (input: SearchWorkspacePathsInput) => Promise<readonly WorkspacePathMatch[]>
   >("meldshell:search-workspace-paths"),
+  searchWorkspaceContents: request<
+    (input: SearchWorkspaceContentsInput) => Promise<ContentSearchResult>
+  >("meldshell:search-workspace-contents"),
   listComposerCommands: request<
     (input: WorkspaceScope & { harness: string }) => Promise<readonly ComposerCommand[]>
   >("meldshell:list-composer-commands"),

@@ -232,10 +232,25 @@ export function FileViewer({ file }: { file: FileTab }) {
   // A line reference points into the source, so it always shows as text.
   const rich = structured !== null && !showSource && !file.line
   const lineCount = file.line && preview ? preview.content.split("\n").length : 0
+  const { line, endLine, path } = file
   useEffect(() => {
-    if (file.line && preview && lineRef.current?.dataset.path === file.path)
-      lineRef.current.scrollIntoView({ block: "center" })
-  }, [file.line, file.path, preview])
+    const marker = lineRef.current
+    const code = marker?.parentElement?.querySelector("code")
+    if (!line || !preview || !marker || !code || marker.dataset.path !== path) return
+    // A font's own ascent and descent can make each line taller than the line height, so the
+    // marker follows where lines actually fall, including after a web font finishes loading.
+    const rendered = preview.content.endsWith("\n") ? lineCount - 1 : lineCount
+    const place = () => {
+      const pitch = code.getBoundingClientRect().height / Math.max(rendered, 1)
+      marker.style.top = `${(line - 1) * pitch}px`
+      marker.style.height = `${(Math.min(endLine ?? line, lineCount) - line + 1) * pitch}px`
+    }
+    place()
+    marker.scrollIntoView({ block: "center" })
+    const observer = new ResizeObserver(place)
+    observer.observe(code)
+    return () => observer.disconnect()
+  }, [line, endLine, path, preview, lineCount])
   return (
     <section
       className="flex flex-col h-full min-h-0 overflow-hidden"

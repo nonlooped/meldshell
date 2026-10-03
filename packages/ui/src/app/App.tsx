@@ -26,6 +26,7 @@ import { IssuePalette } from "./IssuePalette"
 import { ThreadPalette } from "./ThreadPalette"
 import { Inbox } from "../threads/Inbox"
 import { FilesSidebar } from "../files/FilesSidebar"
+import { selectedSearchText, useContentSearch } from "../files/content-search-store"
 import { DiffViewer } from "../files/DiffViewer"
 import { FileViewer } from "../files/FileViewer"
 import { MeldMark } from "../ui/MeldMark"
@@ -731,6 +732,11 @@ export function App(): React.JSX.Element {
       requestNewThread,
       openThreadPalette: () => setThreadPaletteOpen(true),
       openFilePalette: () => setFilePaletteOpen(true),
+      searchFiles: () => {
+        closeWorkbenchViews()
+        if (sourceControl.collapsed) toggleSourceControl()
+        useContentSearch.getState().openSearch(selectedSearchText())
+      },
       openIssuePicker: () => useViewStore.getState().openIssuePicker(),
       openSettings: () => openSettings(),
       selectedThreadId: selectedTabId,

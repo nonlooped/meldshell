@@ -90,6 +90,7 @@ test("global inputs, CI machinery, and forced runs select every workspace", () =
       "tests/pull-requests.test.ts",
       "tests/issues.test.ts",
       "tests/review-notes.test.ts",
+      "tests/content-search.test.ts",
       "tests/loadouts.test.ts",
       "tests/changelog.test.ts",
       "tests/release-cli.test.mjs",
