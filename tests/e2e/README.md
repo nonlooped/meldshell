@@ -43,7 +43,7 @@ Eleven journeys replace 72 application test files. They test outcomes across bou
 | Device lifecycle | Real account API, local D1/DO, independent devices, revoke and re-register |
 | Rejected writes and sign-out | Invalid input, untrusted origin, unchanged state, session revocation |
 
-Each attempt gets a temporary directory. Desktop attempts create a fresh Git repository, SQLite data directory, and Electron user profile; a restart within an attempt retains these directories. Control attempts apply committed migrations and seed one offline account session in a separate local D1 store. Teardown closes the processes before removing their data. Tests run with one worker and no retries so failure is visible.
+Each attempt gets a temporary directory. Desktop attempts create a fresh Git repository, SQLite data directory, and Electron user profile; a restart within an attempt retains these directories. Control attempts apply committed migrations and seed one offline account session in a separate local D1 store. Teardown closes the processes before removing their data. Tests run with one worker and no retries so failure is visible. Control HTTP requests have a 30-second fetch/body deadline to accommodate local auth, D1, and Durable Object cold starts on Windows CI; the journey's 90-second overall deadline still applies. Request steps record the method and path, but not credentials or bodies.
 
 Reports are written to `.e2e/` (JSON, JUnit, Markdown) and uploaded by CI. Fixture IPC/API operations appear as e2e steps. These custom engines do not currently record browser traces or screenshots. AI actions are optional in e2e; these journeys use deterministic actions and assertions and need no agent configuration.
 

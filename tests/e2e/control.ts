@@ -8,6 +8,9 @@ import { defineEngine } from "e2e/engine"
 import { unstable_startWorker } from "wrangler"
 
 const origin = "http://localhost:4321"
+// The first request boots local auth, D1, and Durable Objects; Windows CI can exceed 10 seconds.
+const REQUEST_TIMEOUT_MS = 30_000
+
 export class Control {
   private worker: Awaited<ReturnType<typeof unstable_startWorker>> | undefined
   private directory = ""
@@ -62,7 +65,7 @@ export class Control {
         ...(options.authenticated === false ? {} : { Authorization: `Bearer ${this.token}` }),
       },
       ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
     return { status: response.status, body: (await response.json()) as unknown }
   }
@@ -90,7 +93,15 @@ export function controlEngine() {
     },
     endAttempt: () => control.stop(),
     fixtures: {
-      control: (context) => context.fixture("control", control, { request: { kind: "resource" } }),
+      control: (context) =>
+        context.fixture("control", control, {
+          request: {
+            kind: "resource",
+            label: (path, options) => `${options?.method ?? "GET"} ${path}`,
+            // request() owns the fetch/body deadline; the test retains its overall timeout.
+            timeout: false,
+          },
+        }),
     },
   })
 }
