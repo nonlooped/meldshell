@@ -51,6 +51,15 @@ export class Desktop {
       "Initial workspace",
     ])
     await this.launch()
+    await this.skipSetup()
+  }
+
+  /** A fresh profile opens the first-run guide once the launch screen leaves; journeys skip it. */
+  private async skipSetup(): Promise<void> {
+    const guide = this.page.getByRole("dialog", { name: "Set up MeldShell", exact: true })
+    // The launch screen can wait on harness probes before the guide appears.
+    await guide.getByRole("button", { name: "Skip setup", exact: true }).click({ timeout: 30_000 })
+    await guide.waitFor({ state: "detached" })
   }
 
   private async launch(): Promise<void> {

@@ -27,13 +27,14 @@ The repository's UI verification policy applies to local Electron runs. Listing 
 
 ## Coverage and isolation
 
-Ten journeys replace 72 application test files. They test outcomes across boundaries rather than mapping old unit assertions one for one:
+Eleven journeys replace 72 application test files. They test outcomes across boundaries rather than mapping old unit assertions one for one:
 
 | Journey | Boundaries and outcomes |
 | --- | --- |
 | Returning user | Real preload IPC, workspace/thread mutations, worker/database persistence, full Electron restart, typed core errors from the restarted RPC client, renamed entries in the thread palette |
 | Archive and delete | Durable archive status, deletion, sibling preservation, survivor in the thread palette after restart |
 | Preferences | Accessible Settings controls, saved settings, restart, rendered theme |
+| First-run setup | Guide shown on a fresh profile and skipped, rerun from Settings, live theme choice, first thread with a focused composer, completion kept across restart |
 | Workspace files | Actual files with spaces and Unicode, preview/list/rename/delete, rejection of writes outside the workspace |
 | Isolated work | Actual Git worktree, checkout isolation, persisted worktree identity and file access after restart |
 | Model catalog | Custom model edits, restart, removal without altering existing models |

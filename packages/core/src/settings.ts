@@ -24,6 +24,7 @@ const PREFERENCES = [
   "reduceMotion",
   "sounds",
   "editor",
+  "onboarded",
 ] as const
 
 const Keybindings = Schema.fromJsonString(Schema.Record(Schema.String, Schema.String))
@@ -61,6 +62,7 @@ export const readAppSettings = Effect.gen(function* () {
     reduceMotion: stored(StoredBoolean, values.get("reduceMotion")) ?? false,
     sounds: stored(StoredBoolean, values.get("sounds")) ?? true,
     editor: values.get("editor"),
+    onboarded: stored(StoredBoolean, values.get("onboarded")) ?? false,
     keybindings: stored(Keybindings, values.get(KEYBINDINGS_SETTING)),
   } satisfies AppSettings
 })

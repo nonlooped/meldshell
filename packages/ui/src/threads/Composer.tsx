@@ -1,6 +1,6 @@
 import { chipClasses } from "../ui/styles"
 import { PopPresence, Pressable, Swap, useMotionPreference } from "../ui/motion"
-import { Fragment, useLayoutEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { Notice } from "../ui/Notice"
 import { Button as BaseButton } from "@base-ui-components/react/button"
@@ -39,6 +39,7 @@ import { ModelPicker } from "./ModelPicker"
 import { useComposerCompletion } from "./ComposerCompletion"
 import type { ComposerToken } from "./composer-completion"
 import { dropText, launchFromText } from "../ui/flight"
+import { useViewStore } from "../app/view-store"
 import {
   Button,
   ContextMenu,
@@ -751,6 +752,14 @@ export function Composer({
     textarea.style.minHeight = ""
     textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden"
   }, [draft])
+
+  // The first-run guide hands over to the new thread's composer.
+  const focusRequested = useViewStore((state) => state.composerFocusThreadId === threadId)
+  useEffect(() => {
+    if (!focusRequested) return
+    textareaRef.current?.focus()
+    useViewStore.getState().focusComposer(null)
+  }, [focusRequested])
 
   return (
     <div className="composer-zone [padding:0_clamp(24px,_7vw,_104px)_18px] [&_.notice]:max-w-[860px] [&_.notice]:mr-[auto] [&_.notice]:ml-[auto]">
