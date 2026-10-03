@@ -403,11 +403,9 @@ function SearchResults({
   return (
     <div ref={listRef} id="settings-search-results" role="listbox" aria-label="Matching settings">
       {sections.map(({ section, entries }) => {
-        const Icon = section.icon
         return (
           <div key={section.id} role="group" aria-label={section.label} className="mb-[24px]">
-            <p className="flex items-center gap-[7px] m-0 [padding:0_2px_8px] text-[var(--text-tertiary)] text-[11.5px] font-medium">
-              <Icon size={13} strokeWidth={1.75} aria-hidden="true" />
+            <p className="m-0 [padding:0_2px_8px] text-[var(--text-tertiary)] text-[11.5px] font-medium">
               {section.label}
             </p>
             <div className={settingsCardClasses}>
@@ -668,7 +666,6 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
   const tier = useViewportTier()
   const stacked = tier === "phone"
   const active = sectionFor(section)
-  const ActiveIcon = active.icon
 
   return (
     <div
@@ -720,34 +717,20 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
           duration={0.22}
           className="w-[min(720px,_calc(100%_-_64px))] [margin:0_auto] [padding:36px_0_64px] [@container(max-width:_640px)]:w-[calc(100%_-_40px)] [@container(max-width:_460px)]:w-[calc(100%_-_24px)] [@container(max-width:_460px)]:pt-[22px]"
         >
-          <header className="flex items-center justify-between gap-[16px] mb-[28px]">
-            <div className="flex min-w-0 items-center gap-[14px]">
-              <span
-                aria-hidden="true"
-                className="grid w-[40px] h-[40px] flex-none place-items-center rounded-[var(--radius-lg)] border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-card)] text-[var(--accent)] [@container(max-width:_460px)]:hidden"
-              >
-                {searching ? (
-                  <Search size={18} strokeWidth={1.75} />
-                ) : (
-                  <ActiveIcon size={18} strokeWidth={1.75} />
-                )}
-              </span>
-              <div className="flex min-w-0 flex-col gap-[3px]">
-                <h2 className="m-0 [font-family:var(--font-display)] text-[21px] font-semibold tracking-[-0.015em] leading-[1.25]">
-                  {searching ? "Search results" : active.label}
-                </h2>
-                <p
-                  role={searching ? "status" : undefined}
-                  className="m-0 text-[var(--text-secondary)] text-[12.5px] leading-[1.5]"
-                >
-                  {searching
-                    ? results.length === 0
-                      ? "Nothing found."
-                      : `${results.length} ${results.length === 1 ? "setting matches" : "settings match"} “${query.trim()}”. Use the arrow keys and Enter to open one.`
-                    : active.caption}
-                </p>
-              </div>
-            </div>
+          <header className="flex min-w-0 flex-col gap-[4px] mb-[28px] [padding:0_2px]">
+            <h2 className="m-0 [font-family:var(--font-display)] text-[22px] font-semibold tracking-[-0.015em] leading-[1.25]">
+              {searching ? "Search results" : active.label}
+            </h2>
+            <p
+              role={searching ? "status" : undefined}
+              className="m-0 text-[var(--text-secondary)] text-[12.5px] leading-[1.5]"
+            >
+              {searching
+                ? results.length === 0
+                  ? "Nothing found."
+                  : `${results.length} ${results.length === 1 ? "setting matches" : "settings match"} “${query.trim()}”. Use the arrow keys and Enter to open one.`
+                : active.caption}
+            </p>
           </header>
 
           {settingsError && (
