@@ -117,13 +117,16 @@ export const createThread = (input: RecordThreadInput) =>
         yield* sql`
           INSERT INTO threads (
             id, workspace_id, title, status, created_at, updated_at, title_locked, title_manual,
-            worktree_path, worktree_branch, worktree_base, worktree_state
+            worktree_path, worktree_branch, worktree_base, worktree_state,
+            issue_number, issue_title, issue_url, issue_context
           )
           VALUES (
             ${threadId}, ${input.workspaceId}, ${title}, 'active',
             ${timestamp}, ${timestamp}, ${titleLocked}, ${titleLocked},
             ${input.worktree?.path ?? null}, ${input.worktree?.branch ?? null},
-            ${input.worktree?.baseBranch ?? null}, ${input.worktree === undefined ? null : "ready"}
+            ${input.worktree?.baseBranch ?? null}, ${input.worktree === undefined ? null : "ready"},
+            ${input.issue?.number ?? null}, ${input.issue?.title ?? null},
+            ${input.issue?.url ?? null}, ${input.issue?.context ?? null}
           )
         `
         yield* sql`
@@ -194,6 +197,9 @@ export const setProviderSession = (
 
 const LocationRow = Schema.Struct({
   ...WorktreeColumns.fields,
+  issue_number: Schema.NullOr(Schema.Number),
+  issue_title: Schema.NullOr(Schema.String),
+  issue_url: Schema.NullOr(Schema.String),
   id: Schema.String,
   workspace_id: Schema.String,
   workspace_path: Schema.String,
@@ -207,6 +213,7 @@ const locationRows = (sql: SqlClient.SqlClient, where: ReturnType<SqlClient.SqlC
     sql`
     SELECT t.id, t.workspace_id, w.path AS workspace_path,
       t.worktree_path, t.worktree_branch, t.worktree_base, t.worktree_state, t.worktree_setup,
+      t.issue_number, t.issue_title, t.issue_url,
       EXISTS (SELECT 1 FROM turns r WHERE r.thread_id = t.id AND r.status = 'running')
         OR EXISTS (SELECT 1 FROM queued_inputs q WHERE q.thread_id = t.id) AS busy
     FROM threads t JOIN workspaces w ON w.id = t.workspace_id
@@ -219,6 +226,14 @@ const fromLocationRow = (row: LocationRow): ThreadLocation => ({
   workspaceId: row.workspace_id,
   workspacePath: row.workspace_path,
   worktree: fromWorktreeColumns(row),
+  issue:
+    row.issue_number === null
+      ? null
+      : {
+          number: Number(row.issue_number),
+          title: row.issue_title ?? "",
+          url: row.issue_url ?? "",
+        },
   busy: row.busy === 1,
 })
 

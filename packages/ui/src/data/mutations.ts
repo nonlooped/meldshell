@@ -62,7 +62,7 @@ export function useWorkspaceActions(
 export function useThreadManagementActions(
   snapshot: AppSnapshot,
   callbacks: {
-    created: (threadId?: string) => void
+    created: (threadId: string | undefined, input: Input<"createThread">) => void
     deleted: (threadId: string) => void
   },
 ) {
@@ -72,12 +72,12 @@ export function useThreadManagementActions(
   )
   const createThreadMutation = useSnapshotMutation(
     (input: Input<"createThread">) => window.meldshell.createThread(input),
-    (next) => {
+    (next, input) => {
       const existing = new Set([
         ...snapshot.threadSettings.map((settings) => settings.threadId),
         ...snapshot.threads.map((thread) => thread.id),
       ])
-      callbacks.created(next.threads.find((thread) => !existing.has(thread.id))?.id)
+      callbacks.created(next.threads.find((thread) => !existing.has(thread.id))?.id, input)
     },
   )
   const setStatusMutation = useSnapshotMutation((input: Input<"setThreadStatus">) =>

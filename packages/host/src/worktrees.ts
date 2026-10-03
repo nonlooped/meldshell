@@ -23,11 +23,13 @@ export const worktreePresent = (path: string): Promise<boolean> =>
 
 /**
  * Creates a new branch and checkout for one thread under `directory`, starting from the commit the
- * workspace has checked out. The workspace folder itself is left untouched.
+ * workspace has checked out. The workspace folder itself is left untouched. A `branchName` that is
+ * already taken gets a short suffix.
  */
 export async function createWorktree(
   workspacePath: string,
   directory: string,
+  branchName?: string,
 ): Promise<NewWorktree> {
   const root = (await git(workspacePath, ["rev-parse", "--show-toplevel"])).trim()
   const head = await gitValue(root, ["rev-parse", "--verify", "HEAD"])
@@ -35,7 +37,12 @@ export async function createWorktree(
     throw new Error("Make a first commit in this workspace before starting an isolated thread.")
   const baseBranch = await currentBranch(root)
   const id = randomBytes(4).toString("hex")
-  const branch = `meldshell/${id}`
+  const branch =
+    branchName === undefined
+      ? `meldshell/${id}`
+      : (await branchExists(root, branchName))
+        ? `${branchName}-${id}`
+        : branchName
   const path = join(directory, `${basename(root).replace(/[^\w.-]+/g, "-")}-${id}`)
   await mkdir(directory, { recursive: true })
   await writeRepository(root, async () => {

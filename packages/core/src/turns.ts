@@ -109,6 +109,7 @@ const createDispatch = (
 
     const { alwaysFullPermissions } = yield* readAppSettings
     const handoff = yield* missedWork(threadId, row.harness, row.native_thread_id !== null)
+    const issue = yield* issueContext(threadId)
     // New work makes the latest rewind permanent: its turns stay out of the conversation.
     yield* sql`DELETE FROM thread_rewinds WHERE thread_id = ${threadId}`
     const turnId = randomUUID()
@@ -144,8 +145,24 @@ const createDispatch = (
       approvalPolicy: alwaysFullPermissions ? "never" : row.approval_policy,
       text,
       attachments,
-      context: handoff?.brief ?? null,
+      context: [issue, handoff?.brief].filter(Boolean).join("\n\n") || null,
     } satisfies TurnDispatch
+  })
+
+/**
+ * A thread started from an issue opens its conversation with the issue's text. Only the first turn
+ * still in the conversation carries it, so a rewind to the start sends it again.
+ */
+const issueContext = (threadId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const [row] = yield* sql<{ readonly issue_context: string | null }>`
+      SELECT issue_context FROM threads t
+      WHERE t.id = ${threadId} AND NOT EXISTS (
+        SELECT 1 FROM turns r WHERE r.thread_id = t.id AND r.rewound_at IS NULL
+      )
+    `
+    return row?.issue_context ?? null
   })
 
 /** The summary the thread's next turn would carry on its selected harness, if any. */

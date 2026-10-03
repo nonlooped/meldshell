@@ -82,6 +82,13 @@ export const CreatePullRequestInput = Schema.Struct({
 })
 export type CreatePullRequestInput = ExactOptional<typeof CreatePullRequestInput.Type, "threadId">
 
+/** Open issues in the workspace's GitHub repository; an empty query lists the most recently updated. */
+export const ListIssuesInput = Schema.Struct({
+  workspaceId: Schema.String,
+  query: Schema.String.pipe(Schema.check(Schema.isMaxLength(256))),
+})
+export type ListIssuesInput = typeof ListIssuesInput.Type
+
 export type GenerateCommitMessageInput = ExactOptional<WorkspaceScope, "threadId">
 export type GitFileAction = GitFileActionInput["action"]
 export type GitDiffSide = Exclude<GitDiffInput["side"], undefined>

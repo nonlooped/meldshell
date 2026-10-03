@@ -1,7 +1,15 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { Thread, ThreadWorktree } from "@meldshell/contracts"
-import { GitBranch, GitMerge, MoreHorizontal, RotateCw, ScrollText, Trash2 } from "lucide-react"
+import {
+  CircleDot,
+  GitBranch,
+  GitMerge,
+  MoreHorizontal,
+  RotateCw,
+  ScrollText,
+  Trash2,
+} from "lucide-react"
 import { AppDialog, Button, Checkbox, ContextMenu, DropdownMenu, MenuAction } from "../ui/controls"
 import { replaceSnapshot } from "../data/cache"
 import { useWorkspaceScripts } from "../terminals/workspace-scripts"
@@ -219,6 +227,26 @@ export function WorktreeBar({ thread }: { thread: Thread }): React.JSX.Element |
           </DropdownMenu>
         )}
       </div>
+      {thread.issue !== undefined && (
+        <a
+          href={thread.issue.url}
+          target="_blank"
+          rel="noreferrer"
+          title={`Open #${thread.issue.number} on GitHub`}
+          className="motion-colors flex min-w-0 items-center gap-[7px] mt-[2px] text-[var(--text-secondary)] no-underline [&:hover]:text-[var(--text-primary)]"
+        >
+          <CircleDot
+            size={13}
+            strokeWidth={2}
+            className="shrink-0 text-[var(--color-added)]"
+            aria-hidden="true"
+          />
+          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            <span className="text-[var(--text-tertiary)] tabular-nums">#{thread.issue.number}</span>{" "}
+            {thread.issue.title}
+          </span>
+        </a>
+      )}
       <WorktreeSetupNote thread={thread} className="[margin:4px_0_0] text-[11px]" />
       {rerun.isError && (
         <p

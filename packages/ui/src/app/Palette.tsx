@@ -61,6 +61,7 @@ export function PaletteSearch<Item>({
   onPick,
   renderItem,
   contextActions,
+  notice,
 }: {
   readonly items: readonly Item[]
   readonly query: string
@@ -71,6 +72,8 @@ export function PaletteSearch<Item>({
   readonly onPick: (item: Item) => void
   readonly renderItem: (item: Item) => React.ReactNode
   readonly contextActions?: (item: Item) => React.ReactNode
+  /** Shown under the input instead of results, such as why there are none. */
+  readonly notice?: React.ReactNode
 }): React.JSX.Element {
   return (
     <Combobox.Root<Item>
@@ -96,6 +99,14 @@ export function PaletteSearch<Item>({
           aria-label={placeholder}
         />
       </div>
+      {notice !== undefined && notice !== null && (
+        <div
+          role="status"
+          className="flex items-center gap-[8px] min-h-[40px] [padding:10px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[12.5px] leading-[1.5] text-[var(--text-tertiary)]"
+        >
+          {notice}
+        </div>
+      )}
       {items.length > 0 && (
         <Combobox.List
           className="flex max-h-[min(360px,_calc(var(--viewport-h)_*_0.6))] flex-col gap-[1px] overflow-y-auto p-[6px] border-t-[1px] border-t-[color:var(--line-subtle)]"
