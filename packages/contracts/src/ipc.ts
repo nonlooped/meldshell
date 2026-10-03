@@ -170,7 +170,7 @@ export interface PullRequestStatus {
   readonly issue: ThreadIssue | null
 }
 
-export interface IssueLabel {
+interface IssueLabel {
   readonly name: string
   /** Hex without the leading `#`, as GitHub stores it. */
   readonly color: string
