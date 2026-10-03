@@ -36,7 +36,17 @@ function fixture(t, entries = "- A fix.\n\n") {
   git("add", ".")
   git("commit", "-m", "Initial")
   git("tag", "v0.1.0")
-  const run = (...args) => spawnSync(process.execPath, [script, ...args], { cwd, encoding: "utf8" })
+  // Every CLI call in a fixture sees the same minute, including duplicate-tag checks.
+  const now = Date.now()
+  const clock = `data:text/javascript,${encodeURIComponent(`
+    const NativeDate = Date
+    globalThis.Date = class extends NativeDate {
+      constructor(...args) { super(...(args.length ? args : [${now}])) }
+      static now() { return ${now} }
+    }
+  `)}`
+  const run = (...args) =>
+    spawnSync(process.execPath, ["--import", clock, script, ...args], { cwd, encoding: "utf8" })
   const plan = (channel, ...args) => {
     const result = run("plan", channel, ...args)
     assert.equal(result.status, 0, result.stderr)
