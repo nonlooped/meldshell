@@ -1,7 +1,8 @@
 import type { AppSettings, SetAppSettingsInput } from "@meldshell/contracts"
 import { useEffect, useState } from "react"
 import { Slider } from "@base-ui-components/react/slider"
-import { SelectField, Switch } from "../ui/controls"
+import { Button, SelectField, Switch } from "../ui/controls"
+import { useViewStore } from "../app/view-store"
 import { Environment } from "./Environment"
 import { SettingRow } from "./SettingRow"
 
@@ -106,6 +107,14 @@ export function Preferences({
               disabled={pending}
               onCheckedChange={(showSettled) => onChange({ showSettled })}
             />
+          </SettingRow>
+          <SettingRow
+            label="Setup guide"
+            description="Check your agents, pick a project, and revisit the basics."
+          >
+            <Button onClick={() => useViewStore.getState().openOnboarding()}>
+              Run setup again
+            </Button>
           </SettingRow>
         </>
       ) : (

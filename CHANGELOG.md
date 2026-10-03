@@ -28,6 +28,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
+- A full-screen first-run guide takes a fresh install to its first prompt: it shows which coding agents are installed and signed in, chooses a project folder, and sets the theme, text size, sounds, and permissions, then opens a new thread on a ready agent with the composer focused. Existing installs skip it, and Settings → General → Setup guide runs it again. Pi now shows its own logo instead of a generic icon.
+
 - Pi (pi.dev) is the fourth native provider. MeldShell drives your installed Pi through its RPC mode in a separate worker, keeps one Pi session per thread and resumes it from Pi's own session file, and offers every model Pi has credentials for with its thinking levels. Pi's tools run as they do in Pi itself. Work your Pi extensions start on their own, such as after one of their commands or from a timer, appears as its own turn, and their dialogs appear as questions. Pi can be updated from Settings.
 
 ## [0.13.0] - 2026-10-02

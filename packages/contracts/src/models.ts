@@ -366,6 +366,8 @@ export const AppSettings = Schema.Struct({
   editor: Schema.optional(Schema.String),
   /** Shortcut chords that differ from the defaults, by action; an empty chord removes one. */
   keybindings: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /** Whether the first-run guide has been finished or skipped. */
+  onboarded: Schema.optional(Schema.Boolean),
 
   /** A `ProviderModel` id, or `CURRENT_TITLE_MODEL`. */
   titleModelId: Schema.String,

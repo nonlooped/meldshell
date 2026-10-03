@@ -6,6 +6,7 @@ import googleIcon from "@iconify-icons/logos/google-icon"
 import openaiIcon from "@iconify-icons/simple-icons/openai"
 import { Icon } from "@iconify/react"
 import { Bot } from "lucide-react"
+import piLogo from "./assets/pi-logo.svg"
 
 interface ProviderIconProps {
   readonly provider?: Provider
@@ -21,6 +22,18 @@ export function ProviderIcon({ provider, size }: ProviderIconProps): React.JSX.E
     openai: openaiIcon,
   } as const
   const key = provider?.key.toLowerCase()
+  if (key === "pi")
+    return (
+      <img
+        src={piLogo}
+        width={size}
+        height={size}
+        alt=""
+        className="shrink-0 [image-rendering:pixelated]"
+        data-provider="pi"
+        aria-hidden="true"
+      />
+    )
   const icon = key === undefined ? undefined : providerIcons[key as keyof typeof providerIcons]
 
   if (icon !== undefined) {

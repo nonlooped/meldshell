@@ -15,7 +15,7 @@ import {
 import { useAppAppearance } from "./appearance"
 import { Tabs } from "@base-ui-components/react/tabs"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Thread, TranscriptSearchResult } from "@meldshell/contracts"
+import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import type { RunScript, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { workspaceScope } from "../data/workspace-scope"
 import { Plus, Settings } from "lucide-react"
@@ -48,6 +48,8 @@ import { useOpenInEditor } from "./editors"
 import { previewSupported, usePreviewStore } from "../preview/preview-store"
 
 import { SettingsView } from "../settings/SettingsView"
+import { OnboardingLayer } from "../onboarding/Onboarding"
+import { needsOnboarding } from "../onboarding/onboarding-model"
 
 // A freshly created thread stays out of the inbox until it carries work of its own.
 const isDraftThread = (thread: Thread): boolean =>
@@ -383,6 +385,22 @@ function usePreviewToggle(closeSettings: () => void, selectTab: (id: string) => 
   return { shown: !previewSupported || !threadOnScreen ? null : open, toggle }
 }
 
+/**
+ * A fresh install opens the first-run guide once, as the launch screen gives way. Returns whether
+ * the app stays hidden behind the launch screen or the guide.
+ */
+function useFirstRun(launching: boolean, loaded: boolean, snapshot: AppSnapshot): boolean {
+  const open = useViewStore((state) => state.onboardingOpen)
+  const decided = useRef(false)
+  const firstRun = loaded && needsOnboarding(snapshot)
+  useEffect(() => {
+    if (launching || !loaded || decided.current) return
+    decided.current = true
+    if (firstRun) useViewStore.getState().openOnboarding()
+  }, [launching, loaded, firstRun])
+  return launching || open
+}
+
 export function App(): React.JSX.Element {
   const openThreadIds = useTabStore((state) => state.openThreadIds)
   const selectedThreadId = useTabStore((state) => state.selectedThreadId)
@@ -417,6 +435,7 @@ export function App(): React.JSX.Element {
 
   const { snapshotQuery, threadPagesQuery, snapshot } = useAppData()
   const launch = useLaunch(!snapshotQuery.isPending, snapshot.providers)
+  const appHidden = useFirstRun(launch.loading, snapshotQuery.isSuccess, snapshot)
 
   const {
     pinMutation,
@@ -600,7 +619,8 @@ export function App(): React.JSX.Element {
   })
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (shortcutActions.current !== null)
+      // The first-run guide owns the window; shortcuts would act on the app hidden behind it.
+      if (shortcutActions.current !== null && !useViewStore.getState().onboardingOpen)
         handleAppShortcut(event, useKeybindings.getState().bindings, shortcutActions.current)
     }
     window.addEventListener("keydown", onKeyDown)
@@ -617,7 +637,7 @@ export function App(): React.JSX.Element {
     <MotionPreferences reduceMotion={snapshot.settings.reduceMotion ?? false}>
       {/* The app and the launch screen crossfade over one shared backdrop. */}
       <div className="relative w-full h-full bg-[var(--scrim)]">
-        <LaunchReveal loading={launch.loading}>
+        <LaunchReveal loading={appHidden}>
           <Tabs.Root
             className="w-full h-full grid grid-rows-[var(--titlebar-height)_minmax(0,_1fr)] text-[var(--text-primary)] text-[13px] leading-[1.45]"
             value={selectedTabId}
@@ -847,7 +867,7 @@ export function App(): React.JSX.Element {
               }}
             />
 
-            {selectedApproval !== null && !launch.loading && (
+            {selectedApproval !== null && !appHidden && (
               <InteractionDialog
                 key={selectedApproval.id}
                 request={selectedApproval}
@@ -924,6 +944,14 @@ export function App(): React.JSX.Element {
           </Tabs.Root>
         </LaunchReveal>
         <LaunchScreen launch={launch} />
+        <OnboardingLayer
+          launching={launch.loading}
+          snapshot={snapshot}
+          onOpenThread={(threadId) => {
+            closeSettings()
+            openThread(threadId)
+          }}
+        />
       </div>
     </MotionPreferences>
   )
