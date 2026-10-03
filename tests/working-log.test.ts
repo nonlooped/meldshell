@@ -54,7 +54,7 @@ test("Claude tool rows name the file, pattern, or URL they worked on", () => {
   )
   assert.equal(
     title(claude("7", "Task", { description: "Find approval code", subagent_type: "Explore" })),
-    "Explore Find approval code",
+    "Explore agent Find approval code",
   )
   assert.equal(
     title(claude("8", "mcp__browser__browser_click", { selector: "#go" })),

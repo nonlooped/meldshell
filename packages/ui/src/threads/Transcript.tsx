@@ -23,7 +23,7 @@ import { Toggle } from "@base-ui-components/react/toggle"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Button, ContextMenu, MenuAction } from "../ui/controls"
 import { disclosureChevronClasses } from "../ui/styles"
-import { messageHandoff, type CanonicalEvent } from "@meldshell/contracts"
+import { asRecord, messageHandoff, type CanonicalEvent } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { TurnChanges } from "./TurnChanges"
@@ -284,6 +284,18 @@ function ToolBody({
         )}
       </>
     )
+  if (startsSubagent(event)) {
+    // The subagent's steps sit above; its brief and answer read as text, not arguments.
+    const item = asRecord(asRecord(event.payload).item)
+    const prompt = asRecord(item.arguments).prompt
+    const result = typeof item.aggregatedOutput === "string" ? item.aggregatedOutput : tool.output
+    return (
+      <>
+        {typeof prompt === "string" && prompt && <ToolOutput label="Prompt" text={prompt} />}
+        {result && <ToolOutput label="Result" text={result} />}
+      </>
+    )
+  }
   if (event.kind === "tool")
     return (
       <>

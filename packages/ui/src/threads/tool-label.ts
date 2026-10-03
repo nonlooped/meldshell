@@ -128,7 +128,7 @@ function claudeLabel(name: string, args: Record<string, unknown>): ToolLabel {
     case "Agent": {
       const type = text(args.subagent_type)
       return label(
-        type === null || type === "general-purpose" ? "Agent" : toolName(type),
+        type === null || type === "general-purpose" ? "Agent" : `${toolName(type)} agent`,
         firstText(args, ["description", "prompt"]),
       )
     }
