@@ -305,6 +305,10 @@ export const runMigrations = Effect.gen(function* () {
       version: 11,
       apply: sql`ALTER TABLE threads ADD COLUMN title_manual INTEGER NOT NULL DEFAULT 0`,
     },
+    {
+      version: 12,
+      apply: sql`ALTER TABLE queued_inputs ADD COLUMN steer INTEGER NOT NULL DEFAULT 0`,
+    },
   ]
   const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table'`
   const has = (name: string) => tables.some((table) => table.name === name)

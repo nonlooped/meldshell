@@ -11,6 +11,7 @@ import {
   CollaborationMode,
   Provider,
   ProviderModel,
+  QueuedInput,
   ProviderModelCatalogEntry,
   ReasoningEffort,
   SandboxMode,
@@ -82,6 +83,16 @@ export const ApprovalRow = Schema.Struct({
   created_at: Text,
 })
 export type ApprovalRow = typeof ApprovalRow.Type
+
+export const QueuedInputRow = Schema.Struct({
+  id: Schema.Number,
+  thread_id: Text,
+  text: Text,
+  attachments: Schema.fromJsonString(Schema.Array(Schema.Unknown)),
+  steer: Flag,
+  created_at: Text,
+})
+export type QueuedInputRow = typeof QueuedInputRow.Type
 
 export const ProviderRow = Schema.Struct({
   id: Text,
@@ -398,6 +409,17 @@ const fromThreadSettingsRow = (row: ThreadSettingsRow): ThreadSettings => ({
 export const WorkspaceFromRow = project(WorkspaceRow, Workspace, fromWorkspaceRow)
 export const ThreadFromRow = project(ThreadRow, Thread, fromThreadRow)
 export const EventFromRow = project(EventRow, CanonicalEvent, fromEventRow)
+const fromQueuedInputRow = (row: QueuedInputRow) =>
+  ({
+    id: row.id,
+    threadId: row.thread_id,
+    text: row.text,
+    attachmentCount: row.attachments.length,
+    steer: row.steer === 1,
+    createdAt: row.created_at,
+  }) satisfies QueuedInput
+
+export const QueuedInputFromRow = project(QueuedInputRow, QueuedInput, fromQueuedInputRow)
 export const ApprovalFromRow = project(ApprovalRow, ApprovalRequest, fromApprovalRow)
 export const ProviderFromRow = project(ProviderRow, Provider, fromProviderRow)
 export const ModelFromRow = project(ProviderModelRow, ProviderModel, fromProviderModelRow)

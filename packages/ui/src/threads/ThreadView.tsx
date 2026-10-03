@@ -3,15 +3,18 @@ import { FadeDiv } from "../ui/motion"
 import {
   errorMessage,
   type AppSnapshot,
+  type FollowUpDelivery,
+  type QueuedInput,
   type Thread,
   type TranscriptSearchResult,
 } from "@meldshell/contracts"
-import { useThreadActions } from "../data/mutations"
+import { useAppSettingsMutation, useConversationActions } from "../data/mutations"
 import { refreshProviderStatus, useSelectedProvider } from "../data/providers"
 import { workspaceScope } from "../data/workspace-scope"
 import { emptyDraft, useThreadDrafts } from "../app/thread-drafts"
 import { ErrorToast } from "../ui/Notice"
 import { Composer } from "./Composer"
+import { QueuedMessages } from "./QueuedMessages"
 import { skillAttachments } from "./composer-completion"
 import { Transcript } from "./Transcript"
 import { ThreadBranchToggle, ThreadOrigin } from "./ThreadOrigin"
@@ -32,34 +35,37 @@ export function ThreadView({
   const [scheduling, setScheduling] = useState(false)
   const update = useThreadDrafts((state) => state.update)
   const { harness, providerStatus, providerReady } = useSelectedProvider(snapshot, thread.id)
-  const { threadSettingsMutation, submitTurnMutation, interruptMutation } = useThreadActions(
-    snapshot,
-    {
-      created: () => {
-        // App handles thread creation.
-      },
-      deleted: () => {
-        // App handles thread deletion.
-      },
-      submitted: () => {
-        // send clears only the submitted draft contents.
-      },
-    },
-  )
-  const send = async () => {
+  const {
+    threadSettingsMutation,
+    submitTurnMutation,
+    removeQueuedInputMutation,
+    steerQueuedInputMutation,
+    interruptMutation,
+  } = useConversationActions()
+  const settingsMutation = useAppSettingsMutation()
+  const followUp = snapshot.settings.followUpMode ?? "queue"
+  const queued = snapshot.queuedInputs.filter((item) => item.threadId === thread.id)
+  const queueBusy = removeQueuedInputMutation.isPending || steerQueuedInputMutation.isPending
+  const busy = ["running", "queued", "approval"].includes(thread.activity)
+  const send = async (delivery: FollowUpDelivery = followUp) => {
     const sent = useThreadDrafts.getState().drafts[thread.id] ?? emptyDraft
     if (sent.sending) return
     update(thread.id, { sending: true, error: null })
     try {
-      await submitTurnMutation.mutateAsync({
+      const submitted = await submitTurnMutation.mutateAsync({
         threadId: thread.id,
         text: sent.text,
         attachments: [
           ...sent.attachments.map(({ type, value, name }) => ({ type, value, name })),
           ...skillAttachments(sent.text, sent.tokens),
         ],
+        delivery,
       })
       useThreadDrafts.getState().finish(thread.id, sent)
+      if (delivery === "steer" && submitted.disposition === "queued" && busy)
+        update(thread.id, {
+          error: "This turn can't be steered right now, so the message was queued instead.",
+        })
     } catch (error) {
       update(thread.id, {
         sending: false,
@@ -67,7 +73,6 @@ export function ThreadView({
       })
     }
   }
-  const busy = ["running", "queued", "approval"].includes(thread.activity)
   /** Replies to a question Codex left in the transcript. */
   const answer = async (text: string, questionTurnId: string) => {
     try {
@@ -77,8 +82,21 @@ export function ThreadView({
       throw error
     }
   }
+  /** Moves a waiting follow-up back into the composer, ahead of whatever is being drafted. */
+  const edit = (item: QueuedInput) => {
+    removeQueuedInputMutation.mutate(item, {
+      onSuccess: () => {
+        const current = useThreadDrafts.getState().drafts[thread.id]?.text ?? ""
+        update(thread.id, { text: current === "" ? item.text : `${item.text}\n\n${current}` })
+      },
+    })
+  }
   const error =
-    draft.error ?? threadSettingsMutation.error?.message ?? interruptMutation.error?.message
+    draft.error ??
+    threadSettingsMutation.error?.message ??
+    interruptMutation.error?.message ??
+    removeQueuedInputMutation.error?.message ??
+    steerQueuedInputMutation.error?.message
   return (
     <div className="grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]">
       <FadeDiv className={threadContentClasses}>
@@ -114,7 +132,8 @@ export function ThreadView({
           onRecheckProvider={() => void refreshProviderStatus(harness)}
           onChangeSettings={(input) => threadSettingsMutation.mutate(input)}
           running={busy}
-          queuedCount={thread.queuedCount}
+          followUp={followUp}
+          onFollowUpChange={(followUpMode) => settingsMutation.mutate({ followUpMode })}
           sending={draft.sending}
           attachments={draft.attachments}
           onAddAttachments={(selected) => {
@@ -126,11 +145,26 @@ export function ThreadView({
               attachments: draft.attachments.filter((_, itemIndex) => itemIndex !== index),
             })
           }
-          onSend={() => void send()}
+          onSend={(delivery) => void send(delivery)}
           onInterrupt={() => interruptMutation.mutate(thread.id)}
           interrupting={interruptMutation.isPending}
           onSchedule={() => setScheduling(true)}
-          accessory={<ThreadSchedules threadId={thread.id} />}
+          accessory={
+            <>
+              <QueuedMessages
+                items={queued}
+                running={busy}
+                pending={queueBusy}
+                onEdit={edit}
+                onSteer={(item) => steerQueuedInputMutation.mutate(item)}
+                onRemove={(item) => removeQueuedInputMutation.mutate(item)}
+                onClear={() => {
+                  for (const item of queued) removeQueuedInputMutation.mutate(item)
+                }}
+              />
+              <ThreadSchedules threadId={thread.id} />
+            </>
+          }
         />
         {thread.turnCount === 0 && <ThreadBranchToggle thread={thread} />}
       </FadeDiv>
@@ -151,6 +185,8 @@ export function ThreadView({
             update(thread.id, { error: null })
             threadSettingsMutation.reset()
             interruptMutation.reset()
+            removeQueuedInputMutation.reset()
+            steerQueuedInputMutation.reset()
           }}
         />
       )}

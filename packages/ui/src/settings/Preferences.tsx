@@ -98,6 +98,23 @@ export function Preferences({
             />
           </SettingRow>
           <SettingRow
+            label="Follow-ups while the agent works"
+            description="What Enter does with a message sent mid-turn. Queue waits for the turn to finish; Steer redirects it now (Codex takes it into the same turn, Claude Code and Cursor stop and continue). Ctrl or Cmd with Enter does the other."
+            controlId="follow-up-mode"
+          >
+            <SelectField<NonNullable<AppSettings["followUpMode"]>>
+              id="follow-up-mode"
+              label="Follow-ups while the agent works"
+              value={settings.followUpMode ?? "queue"}
+              disabled={pending}
+              options={[
+                { value: "queue", label: "Queue" },
+                { value: "steer", label: "Steer" },
+              ]}
+              onValueChange={(followUpMode) => onChange({ followUpMode })}
+            />
+          </SettingRow>
+          <SettingRow
             label="Show archived threads"
             description="Keep archived threads visible in the inbox. Search always includes them."
           >

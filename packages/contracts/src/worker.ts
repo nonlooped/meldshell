@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import {
   ApprovalDecision,
   CodexUsage,
+  InputAttachment,
   ComposerCommand,
   ProviderModelCatalogEntry,
   ProviderStatus,
@@ -16,6 +17,7 @@ export const WorkerCommand = Schema.Union([
     nativeThreadId: Schema.String,
     nativeTurnId: Schema.String,
     text: Schema.String,
+    attachments: Schema.optional(Schema.Array(InputAttachment)),
   }),
   Schema.Struct({ type: Schema.Literal("start-turn"), dispatch: TurnDispatch }),
   Schema.Struct({ type: Schema.Literal("generate-title"), request: TitleRequest }),

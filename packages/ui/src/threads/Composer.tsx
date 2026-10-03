@@ -9,6 +9,7 @@ import {
   HARNESSES,
   type AppSnapshot,
   type CollaborationMode,
+  type FollowUpDelivery,
   type ReasoningEffort,
   type SandboxMode,
   type SetThreadSettingsInput,
@@ -28,8 +29,10 @@ import {
   ShieldAlert,
   X,
   ArrowUp,
+  CornerDownRight,
   ListPlus,
   Square,
+  type LucideProps,
 } from "lucide-react"
 import { effortLabel, resolveSelection, selectableModels } from "../data/catalog"
 import { workspaceScope } from "../data/workspace-scope"
@@ -63,11 +66,14 @@ interface ComposerProps {
   readonly providerDetail: string
   readonly onRecheckProvider: () => void
   readonly onChangeSettings: (input: SetThreadSettingsInput) => void
-  readonly onSend: () => void
+  /** `delivery` only matters while a turn runs: wait for it, or redirect it. */
+  readonly onSend: (delivery: FollowUpDelivery) => void
+  /** What Enter does while a turn runs; the opposite is Ctrl or Cmd with Enter. */
+  readonly followUp: FollowUpDelivery
+  readonly onFollowUpChange: (delivery: FollowUpDelivery) => void
   readonly onInterrupt: () => void
   readonly running: boolean
   readonly interrupting: boolean
-  readonly queuedCount: number
   readonly sending: boolean
   readonly attachments: ReadonlyArray<ComposerAttachment>
   readonly onAddAttachments: (attachments: ReadonlyArray<ComposerAttachment>) => void
@@ -77,6 +83,26 @@ interface ComposerProps {
   /** Shown above the message box, such as the thread's scheduled prompts. */
   readonly accessory?: React.ReactNode
 }
+
+const FOLLOW_UP = {
+  queue: { label: "Queue for next turn", short: "Queue", icon: ListPlus },
+  steer: { label: "Steer the current turn", short: "Steer", icon: CornerDownRight },
+} as const satisfies Record<FollowUpDelivery, unknown>
+
+const DELIVERIES = ["queue", "steer"] as const
+
+function FollowUpIcon({
+  delivery,
+  ...props
+}: { delivery: FollowUpDelivery } & LucideProps): React.JSX.Element {
+  const Icon = FOLLOW_UP[delivery].icon
+  return <Icon {...props} />
+}
+
+const otherDelivery = (delivery: FollowUpDelivery): FollowUpDelivery =>
+  delivery === "queue" ? "steer" : "queue"
+
+const MODIFIER_KEY = window.meldshell.platform === "darwin" ? "⌘" : "Ctrl"
 
 const SPEED_LABEL = { standard: "Standard", fast: "Fast" } as const
 const SANDBOX_LABEL: Readonly<Record<SandboxMode, string>> = {
@@ -285,6 +311,7 @@ function sendTitle({
   loadingAttachments,
   hasContent,
   running,
+  delivery,
   settingUp,
 }: {
   sending: boolean
@@ -294,6 +321,7 @@ function sendTitle({
   loadingAttachments: boolean
   hasContent: boolean
   running: boolean
+  delivery: FollowUpDelivery
   settingUp: boolean
 }): string {
   if (sending) return "Sending message…"
@@ -302,7 +330,7 @@ function sendTitle({
   if (!hasSelection) return "Enable a model in Settings"
   if (loadingAttachments) return "Adding attachments…"
   if (!hasContent) return "Write a message or attach a file"
-  if (running) return "Queue for the next turn (Enter)"
+  if (running) return `${FOLLOW_UP[delivery].label} (Enter)`
   return `Send to ${providerName} (Enter)`
 }
 
@@ -339,7 +367,9 @@ function ReasoningSettings({
               <LevelIcon index={selectedEffortIndex} count={efforts.length} />
             </span>
           )}
-          <span className="overflow-hidden text-ellipsis">
+          <span
+            className={`overflow-hidden text-ellipsis ${efforts.length > 0 ? "chip-label" : ""}`}
+          >
             {selection.reasoningEffort === null
               ? efforts.length > 0
                 ? "Reasoning"
@@ -347,14 +377,14 @@ function ReasoningSettings({
               : `${effortLabel(selection.reasoningEffort)} effort`}
           </span>
           {efforts.length > 0 && supportsFast && selection.speed === "fast" && (
-            <span className="flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[10.5px] leading-[1.3]">
+            <span className="chip-label flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[10.5px] leading-[1.3]">
               Fast
             </span>
           )}
           <ChevronDown
             size={13}
             strokeWidth={1.75}
-            className="flex-none text-[var(--text-tertiary)]"
+            className="chip-chevron flex-none text-[var(--text-tertiary)]"
           />
         </BaseButton>
       }
@@ -564,20 +594,22 @@ function ComposerSettings({
               }
             >
               {!fullPermissions && <SandboxIcon mode={selection.sandbox} />}
-              <span className="overflow-hidden text-ellipsis">
+              <span
+                className={`overflow-hidden text-ellipsis ${fullPermissions ? "" : "chip-label"}`}
+              >
                 {fullPermissions ? MODES[selection.mode].label : selected.label}
               </span>
               {!fullPermissions &&
                 selection.mode !== "default" &&
                 modes.includes(selection.mode) && (
-                  <span className="flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[10.5px] leading-[1.3]">
+                  <span className="chip-label flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[10.5px] leading-[1.3]">
                     {MODES[selection.mode].label}
                   </span>
                 )}
               <ChevronDown
                 size={13}
                 strokeWidth={1.75}
-                className="flex-none text-[var(--text-tertiary)]"
+                className="chip-chevron flex-none text-[var(--text-tertiary)]"
               />
             </BaseButton>
           }
@@ -671,10 +703,11 @@ export function Composer({
   onRecheckProvider,
   onChangeSettings,
   onSend,
+  followUp,
+  onFollowUpChange,
   onInterrupt,
   running,
   interrupting,
-  queuedCount,
   sending,
   attachments,
   onAddAttachments,
@@ -685,9 +718,6 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sendButtonRef = useRef<HTMLSpanElement>(null)
   const reduced = useMotionPreference()
-  // The queue label keeps its last count while it leaves.
-  const lastQueuedCount = useRef(queuedCount)
-  if (queuedCount > 0) lastQueuedCount.current = queuedCount
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
   const [loadingAttachments, setLoadingAttachments] = useState(false)
   const attachmentReadsPending = useRef(0)
@@ -712,14 +742,15 @@ export function Composer({
     !sending &&
     !loadingAttachments
 
-  const send = (): void => {
+  const send = (delivery: FollowUpDelivery = followUp): void => {
     const textarea = textareaRef.current
     if (textarea !== null && !reduced && draft.trim()) {
       // A queued prompt waits for its turn, so it joins the queue instead of the transcript.
-      if (running && sendButtonRef.current !== null) dropText(textarea, sendButtonRef.current)
+      if (running && delivery === "queue" && sendButtonRef.current !== null)
+        dropText(textarea, sendButtonRef.current)
       else launchFromText(`prompt:${threadId}`, textarea)
     }
-    onSend()
+    onSend(delivery)
   }
 
   const addAttachments = async (
@@ -762,7 +793,7 @@ export function Composer({
   }, [focusRequested])
 
   return (
-    <div className="composer-zone [padding:0_clamp(24px,_7vw,_104px)_18px] [&_.notice]:max-w-[860px] [&_.notice]:mr-[auto] [&_.notice]:ml-[auto]">
+    <div className="composer-zone [padding:0_var(--pane-gutter)_max(18px,_env(safe-area-inset-bottom))] [&_.notice]:max-w-[860px] [&_.notice]:mr-[auto] [&_.notice]:ml-[auto]">
       {!providerReady && (
         <Notice
           tone="warning"
@@ -854,7 +885,8 @@ export function Composer({
                     attachmentReadsPending.current === 0
                   ) {
                     event.preventDefault()
-                    send()
+                    // Ctrl or Cmd picks the delivery Enter does not.
+                    send(event.ctrlKey || event.metaKey ? otherDelivery(followUp) : followUp)
                   }
                 }}
               />
@@ -871,10 +903,10 @@ export function Composer({
 
         <ContextMenu
           trigger={
-            <div className="flex items-center flex-wrap gap-[6px] [padding:2px_8px_8px] [@container(max-width:_620px)]:gap-[4px] [@container(max-width:_620px)]:[&_.chip]:px-[6px]">
+            <div className={composerToolbarClasses}>
               <IconButton
                 unstyled
-                className={`motion-colors ${chipClasses}`}
+                className={`motion-colors flex-none ${chipClasses}`}
                 label="Attach image, file, or skill"
                 disabled={loadingAttachments || sending}
                 onClick={() => void addAttachments(() => window.meldshell.selectAttachments())}
@@ -883,7 +915,7 @@ export function Composer({
               </IconButton>
               <IconButton
                 unstyled
-                className={`motion-colors ${chipClasses}`}
+                className={`motion-colors flex-none ${chipClasses}`}
                 label="Schedule this prompt"
                 disabled={sending}
                 onClick={onSchedule}
@@ -900,13 +932,6 @@ export function Composer({
               <span className="flex-[1_1_auto] min-w-[8px]" />
 
               <div className="flex flex-none items-center gap-[6px] ml-[auto]">
-                <PopPresence show={queuedCount > 0}>
-                  <span className="inline-flex gap-[3px] text-[var(--text-tertiary)] text-[10.5px] tabular-nums whitespace-nowrap">
-                    <Swap id={String(lastQueuedCount.current)}>{lastQueuedCount.current}</Swap>
-                    queued {lastQueuedCount.current === 1 ? "message" : "messages"}
-                  </span>
-                </PopPresence>
-
                 <PopPresence show={running}>
                   <IconButton
                     unstyled
@@ -919,12 +944,12 @@ export function Composer({
                   </IconButton>
                 </PopPresence>
 
-                <span ref={sendButtonRef} className="inline-flex">
+                <span ref={sendButtonRef} className="inline-flex items-center">
                   <IconButton
                     unstyled
                     className={`motion-colors ${sendButtonClasses}`}
                     disabled={!canSend}
-                    aria-label={running ? "Queue message" : "Send message"}
+                    aria-label={running ? FOLLOW_UP[followUp].label : "Send message"}
                     label={sendTitle({
                       sending,
                       providerReady,
@@ -933,19 +958,71 @@ export function Composer({
                       loadingAttachments,
                       hasContent: draft.trim().length > 0 || attachments.length > 0,
                       running,
+                      delivery: followUp,
                       settingUp,
                     })}
-                    onClick={send}
+                    onClick={() => send()}
                   >
-                    <Swap id={running ? "queue" : "send"}>
+                    <Swap id={running ? followUp : "send"}>
                       {running ? (
-                        <ListPlus size={15} strokeWidth={2.25} />
+                        <FollowUpIcon delivery={followUp} size={15} strokeWidth={2.25} />
                       ) : (
                         <ArrowUp size={16} strokeWidth={2.25} />
                       )}
                     </Swap>
                   </IconButton>
                 </span>
+                <PopPresence show={running}>
+                  <DropdownMenu
+                    align="end"
+                    side="top"
+                    trigger={
+                      <BaseButton
+                        render={<Pressable />}
+                        type="button"
+                        className="motion-colors grid w-[20px] h-[28px] flex-none p-0 border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover]:text-[var(--text-primary)]"
+                        aria-label="Choose how to send while the agent works"
+                      >
+                        <ChevronDown size={13} strokeWidth={2} />
+                      </BaseButton>
+                    }
+                  >
+                    <MenuGroup label="Send this message">
+                      {DELIVERIES.map((delivery) => (
+                        <MenuAction
+                          key={delivery}
+                          disabled={!canSend}
+                          icon={<FollowUpIcon delivery={delivery} size={14} strokeWidth={1.75} />}
+                          onClick={() => send(delivery)}
+                        >
+                          {FOLLOW_UP[delivery].label}
+                        </MenuAction>
+                      ))}
+                    </MenuGroup>
+                    <MenuSeparator />
+                    <MenuGroup label="Enter while working">
+                      <MenuRadioGroup
+                        value={followUp}
+                        onValueChange={(value) =>
+                          onFollowUpChange(value === "steer" ? "steer" : "queue")
+                        }
+                      >
+                        {DELIVERIES.map((delivery) => (
+                          <MenuChoice
+                            key={delivery}
+                            value={delivery}
+                            detail={FOLLOW_UP[delivery].short}
+                          >
+                            {FOLLOW_UP[delivery].label}
+                          </MenuChoice>
+                        ))}
+                      </MenuRadioGroup>
+                      <div className="[padding:4px_9px_6px] text-[var(--text-tertiary)] text-[10.5px] leading-[1.4]">
+                        {MODIFIER_KEY}+Enter does the other.
+                      </div>
+                    </MenuGroup>
+                  </DropdownMenu>
+                </PopPresence>
               </div>
             </div>
           }
@@ -995,6 +1072,18 @@ const composerClasses = [
   "[&_.composer-highlight]:leading-[1.55] [&_.composer-highlight]:[scrollbar-gutter:stable]",
   "[&_textarea]:outline-none [&_textarea]:resize-none",
   "[&_textarea::placeholder]:text-[var(--text-tertiary)]",
+].join(" ")
+
+/**
+ * Model, effort, and permission chips share one row. As it narrows they shrink and truncate, drop
+ * their chevrons, then keep only their icons; each chip's label stays in its accessible name.
+ */
+const composerToolbarClasses = [
+  "flex items-center flex-nowrap gap-[6px] [padding:2px_8px_8px]",
+  "[&_.chip]:min-w-0 [&_.chip]:shrink",
+  "[@container(max-width:_620px)]:gap-[4px] [@container(max-width:_620px)]:[&_.chip]:px-[6px]",
+  "[@container(max-width:_520px)]:[&_.chip-chevron]:hidden",
+  "[@container(max-width:_440px)]:[&_.chip-label]:hidden",
 ].join(" ")
 
 const riskyChipClasses = [

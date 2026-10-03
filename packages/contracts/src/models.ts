@@ -353,8 +353,15 @@ export const Theme = Schema.Literals(["dark", "light", "system"])
 
 export const TranscriptSize = Schema.Literals(["small", "medium", "large"])
 
+/** How a message sent while a turn runs reaches the agent: after the turn, or into it. */
+export const FollowUpDelivery = Schema.Literals(["queue", "steer"])
+
+export type FollowUpDelivery = typeof FollowUpDelivery.Type
+
 export const AppSettings = Schema.Struct({
   alwaysFullPermissions: Schema.optional(Schema.Boolean),
+  /** What Enter does while a turn runs; the opposite is one modifier away. Queues by default. */
+  followUpMode: Schema.optional(FollowUpDelivery),
   opacity: Schema.optional(AppOpacity),
   showSettled: Schema.optional(Schema.Boolean),
   theme: Schema.optional(Theme),
@@ -375,6 +382,18 @@ export const AppSettings = Schema.Struct({
 
 export type AppSettings = typeof AppSettings.Type
 
+/** A follow-up waiting for its turn. `steer` ones jump the queue and interrupt what is running. */
+export const QueuedInput = Schema.Struct({
+  id: Schema.Number,
+  threadId: Schema.String,
+  text: Schema.String,
+  attachmentCount: Schema.Number,
+  steer: Schema.Boolean,
+  createdAt: Schema.String,
+})
+
+export type QueuedInput = typeof QueuedInput.Type
+
 export const AppSnapshot = Schema.Struct({
   workspaces: Schema.Array(Workspace),
   threads: Schema.Array(Thread),
@@ -382,6 +401,7 @@ export const AppSnapshot = Schema.Struct({
   models: Schema.Array(ProviderModel),
   threadSettings: Schema.Array(ThreadSettings),
   approvals: Schema.Array(ApprovalRequest),
+  queuedInputs: Schema.Array(QueuedInput),
   settings: AppSettings,
 })
 
@@ -685,6 +705,8 @@ export const SubmitTurnInput = Schema.Struct({
   threadId: Schema.String,
   text: Schema.String,
   attachments: Schema.optional(Schema.Array(InputAttachment)),
+  /** Whether a message sent while a turn runs waits for it (`queue`, the default) or redirects it. */
+  delivery: Schema.optional(FollowUpDelivery),
 })
 
 export type SubmitTurnInput = typeof SubmitTurnInput.Type
@@ -773,6 +795,8 @@ export const SubmitTurnResult = Schema.Struct({
   disposition: Schema.Literals(["started", "queued", "steered"]),
   dispatch: Schema.NullOr(TurnDispatch),
   titleRequest: Schema.NullOr(TitleRequest),
+  /** The queue entry a `queued` message became. */
+  queuedInputId: Schema.optional(Schema.Number),
 })
 
 export type SubmitTurnResult = typeof SubmitTurnResult.Type
@@ -822,6 +846,15 @@ export const ProviderSessionInput = Schema.Struct({
 })
 
 export type ProviderSessionInput = typeof ProviderSessionInput.Type
+
+/** A queued follow-up's content, read to deliver it into the running turn. */
+export const QueuedInputContent = Schema.Struct({
+  threadId: Schema.String,
+  text: Schema.String,
+  attachments: Schema.Array(InputAttachment),
+})
+
+export type QueuedInputContent = typeof QueuedInputContent.Type
 
 export const InterruptedTurn = Schema.Struct({
   harness: Schema.String,

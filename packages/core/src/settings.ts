@@ -1,6 +1,7 @@
 import * as SqlClient from "effect/sql/SqlClient"
 import {
   AppOpacity,
+  FollowUpDelivery,
   CURRENT_TITLE_MODEL,
   Theme,
   TranscriptSize,
@@ -17,6 +18,7 @@ const SHUTTING_DOWN_SETTING = "shutting_down"
 /** Preferences stored as strings, one row each, in the order `setAppSettings` accepts them. */
 const PREFERENCES = [
   "alwaysFullPermissions",
+  "followUpMode",
   "opacity",
   "showSettled",
   "theme",
@@ -54,6 +56,7 @@ export const readAppSettings = Effect.gen(function* () {
   const values = new Map(rows.map((row) => [row.key, row.value]))
   return {
     alwaysFullPermissions: stored(StoredBoolean, values.get("alwaysFullPermissions")) ?? false,
+    followUpMode: stored(FollowUpDelivery, values.get("followUpMode")) ?? "queue",
     opacity: stored(Opacity, values.get("opacity")),
     titleModelId: values.get(TITLE_MODEL_SETTING) ?? CURRENT_TITLE_MODEL,
     showSettled: stored(StoredBoolean, values.get("showSettled")) ?? true,

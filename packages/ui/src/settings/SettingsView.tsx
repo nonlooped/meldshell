@@ -27,6 +27,8 @@ import { modelsForProvider } from "../data/catalog"
 import { useViewStore, type SettingsSection } from "../app/view-store"
 import { AppDialog, Button, IconButton } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
+import { cx } from "../ui/styles"
+import { useViewportTier, type ViewportTier } from "../app/viewport"
 import { ModelDialog } from "./ModelDialog"
 import { ProviderCard } from "./ProviderCard"
 import { ThreadTitleCard } from "./ThreadTitleCard"
@@ -133,6 +135,56 @@ const desktopPlatformLabel = (): string => {
   return "Windows desktop"
 }
 
+const settingsColumns = (tier: ViewportTier, sidebarWidth: number) => {
+  if (tier === "phone") return "minmax(0, 1fr)"
+  return `${tier === "compact" ? Math.min(sidebarWidth, 208) : sidebarWidth}px minmax(0, 1fr)`
+}
+
+/** The way back and the section list: a column beside the content, or a scrolling bar above it. */
+function SettingsSidebar({
+  stacked,
+  onClose,
+}: {
+  stacked: boolean
+  onClose: () => void
+}): React.JSX.Element {
+  return (
+    <aside
+      className={
+        stacked
+          ? "grid min-w-0 grid-cols-[auto_minmax(0,_1fr)] items-center gap-[4px] [padding:6px_8px] border-b-[1px] border-b-[color:var(--line-subtle)]"
+          : "grid min-h-0 grid-rows-[auto_minmax(0,_1fr)] [padding:14px_12px_10px] border-r-[1px] border-r-[color:var(--line-subtle)]"
+      }
+    >
+      <div className={`flex items-center gap-[6px] ${stacked ? "" : "[padding:0_4px_14px]"}`}>
+        <IconButton label="Close settings (Esc)" onClick={onClose}>
+          <ArrowLeft size={16} strokeWidth={1.75} />
+        </IconButton>
+        <h1
+          className={`m-0 [font-family:var(--font-display)] text-[15px] font-semibold tracking-[-0.01em] leading-[22px] ${stacked ? "sr-only" : ""}`}
+        >
+          Settings
+        </h1>
+      </div>
+
+      <Tabs.List
+        className={cx(
+          settingsNavItemsClasses,
+          stacked && "flex-row! overflow-x-auto overflow-y-hidden [scrollbar-width:none]",
+        )}
+        aria-label="Settings sections"
+      >
+        {SECTIONS.map((entry) => (
+          <Tabs.Tab key={entry.id} value={entry.id}>
+            {entry.icon}
+            {entry.label}
+          </Tabs.Tab>
+        ))}
+      </Tabs.List>
+    </aside>
+  )
+}
+
 export function SettingsView({
   snapshot,
   settingsPending,
@@ -156,41 +208,25 @@ export function SettingsView({
   const [deleteTarget, setDeleteTarget] = useState<ProviderModel | null>(null)
   const [resetTarget, setResetTarget] = useState<Provider | null>(null)
 
+  const tier = useViewportTier()
+  const stacked = tier === "phone"
   const active = SECTIONS.find((entry) => entry.id === section) ?? SECTIONS[0]
   const usageProviders = snapshot.providers.filter(hasSubscriptionUsage)
 
   return (
     <Tabs.Root
       data-settings-layout
-      className="grid h-full min-h-0 grid-cols-[212px_minmax(0,_1fr)]"
-      orientation="vertical"
+      className={`grid h-full min-h-0 ${stacked ? "grid-rows-[auto_minmax(0,_1fr)]" : ""}`}
+      orientation={stacked ? "horizontal" : "vertical"}
       value={section}
       onValueChange={(value) => {
         const next = SECTIONS.find((entry) => entry.id === value)
         if (next) selectSection(next.id)
       }}
-      style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)` }}
+      style={{ gridTemplateColumns: settingsColumns(tier, sidebarWidth) }}
     >
       {/* The heading doubles as the way back, so leaving sits where the eye starts; Escape also works. */}
-      <aside className="grid min-h-0 grid-rows-[auto_minmax(0,_1fr)] [padding:14px_12px_10px] border-r-[1px] border-r-[color:var(--line-subtle)]">
-        <div className="flex items-center gap-[6px] [padding:0_4px_14px]">
-          <IconButton label="Close settings (Esc)" onClick={closeSettings}>
-            <ArrowLeft size={16} strokeWidth={1.75} />
-          </IconButton>
-          <h1 className="m-0 [font-family:var(--font-display)] text-[15px] font-semibold tracking-[-0.01em] leading-[22px]">
-            Settings
-          </h1>
-        </div>
-
-        <Tabs.List className={settingsNavItemsClasses} aria-label="Settings sections">
-          {SECTIONS.map((entry) => (
-            <Tabs.Tab key={entry.id} value={entry.id}>
-              {entry.icon}
-              {entry.label}
-            </Tabs.Tab>
-          ))}
-        </Tabs.List>
-      </aside>
+      <SettingsSidebar stacked={stacked} onClose={closeSettings} />
 
       <Tabs.Panel
         key={section}
@@ -207,7 +243,7 @@ export function SettingsView({
 
         <div
           key={section}
-          className="min-h-0 [padding:0_40px_48px] [@media(max-width:_880px)]:pr-[24px] [@media(max-width:_880px)]:pl-[24px] [@media(max-width:_680px)]:pr-[16px] [@media(max-width:_680px)]:pl-[16px] overflow-y-auto [scrollbar-gutter:stable]"
+          className="min-h-0 [padding:0_40px_48px] [@container(max-width:_640px)]:pr-[24px] [@container(max-width:_640px)]:pl-[24px] [@container(max-width:_460px)]:pr-[16px] [@container(max-width:_460px)]:pl-[16px] overflow-y-auto [scrollbar-gutter:stable]"
         >
           <FadeDiv className="w-[min(720px,_100%)] [margin:0_auto]">
             {settingsError && <p role="alert">{settingsError}</p>}
@@ -391,6 +427,6 @@ const settingsHeaderClasses = [
   "[padding:32px_0_24px] [margin:0_auto] [&_h2]:m-0 [&_h2]:[font-family:var(--font-display)]",
   "[&_h2]:text-[23px] [&_h2]:font-semibold [&_h2]:tracking-[-0.01em] [&_p]:[margin:6px_0_0]",
   "[&_p]:text-[var(--text-secondary)] [&_p]:text-[12.5px]",
-  "[@media(max-width:_880px)]:w-[calc(100%_-_48px)]",
-  "[@media(max-width:_680px)]:w-[calc(100%_-_32px)] [@media(max-width:_680px)]:pt-[24px]",
+  "[@container(max-width:_640px)]:w-[calc(100%_-_48px)]",
+  "[@container(max-width:_460px)]:w-[calc(100%_-_32px)] [@container(max-width:_460px)]:pt-[24px]",
 ].join(" ")

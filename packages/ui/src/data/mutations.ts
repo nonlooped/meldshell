@@ -1,4 +1,4 @@
-import type { AppSnapshot, Thread } from "@meldshell/contracts"
+import type { AppSnapshot, QueuedInput, Thread } from "@meldshell/contracts"
 import type { InvokeApi } from "@meldshell/contracts/ipc"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { forgetThreads, invalidateThread, queryKeys, replaceSnapshot } from "./cache"
@@ -59,12 +59,11 @@ export function useWorkspaceActions(
   }
 }
 
-export function useThreadActions(
+export function useThreadManagementActions(
   snapshot: AppSnapshot,
   callbacks: {
     created: (threadId?: string) => void
     deleted: (threadId: string) => void
-    submitted: () => void
   },
 ) {
   const client = useQueryClient()
@@ -94,21 +93,6 @@ export function useThreadActions(
       callbacks.deleted(id)
     },
   )
-  const threadSettingsMutation = useSnapshotMutation((input: Input<"setThreadSettings">) =>
-    window.meldshell.setThreadSettings(input),
-  )
-  const submitTurnMutation = useMutation({
-    mutationFn: (input: Input<"submitTurn">) => window.meldshell.submitTurn(input),
-    onSuccess: (result, input) => {
-      replaceSnapshot(client, result.snapshot)
-      void client.invalidateQueries({ queryKey: queryKeys.transcript(input.threadId) })
-      callbacks.submitted()
-    },
-  })
-  const interruptMutation = useMutation({
-    mutationFn: (id: string) => window.meldshell.interruptTurn(id),
-    onSettled: (_result, _error, id) => invalidateThread(client, id),
-  })
   const resolveApprovalMutation = useMutation({
     mutationFn: (input: Input<"resolveApproval">) => window.meldshell.resolveApproval(input),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.snapshot }),
@@ -119,10 +103,39 @@ export function useThreadActions(
     setStatusMutation,
     renameThreadMutation,
     deleteThreadMutation,
+    resolveApprovalMutation,
+  }
+}
+
+export function useConversationActions() {
+  const client = useQueryClient()
+  const threadSettingsMutation = useSnapshotMutation((input: Input<"setThreadSettings">) =>
+    window.meldshell.setThreadSettings(input),
+  )
+  const submitTurnMutation = useMutation({
+    mutationFn: (input: Input<"submitTurn">) => window.meldshell.submitTurn(input),
+    onSuccess: (result, input) => {
+      replaceSnapshot(client, result.snapshot)
+      void client.invalidateQueries({ queryKey: queryKeys.transcript(input.threadId) })
+    },
+  })
+  const removeQueuedInputMutation = useSnapshotMutation((item: QueuedInput) =>
+    window.meldshell.removeQueuedInput(item.id),
+  )
+  const steerQueuedInputMutation = useSnapshotMutation(
+    (item: QueuedInput) => window.meldshell.steerQueuedInput(item.id),
+    (_snapshot, item) => invalidateThread(client, item.threadId),
+  )
+  const interruptMutation = useMutation({
+    mutationFn: (id: string) => window.meldshell.interruptTurn(id),
+    onSettled: (_result, _error, id) => invalidateThread(client, id),
+  })
+  return {
     threadSettingsMutation,
     submitTurnMutation,
+    removeQueuedInputMutation,
+    steerQueuedInputMutation,
     interruptMutation,
-    resolveApprovalMutation,
   }
 }
 
