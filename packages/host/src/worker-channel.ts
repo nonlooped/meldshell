@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto"
 import {
   asRecord,
   CommandsResult,
+  SessionHistoryResult,
+  SessionsResult,
+  type CliSessionHistory,
+  type CliSessionSummary,
   toError,
   UsageResult,
   type CodexUsage,
@@ -156,6 +160,57 @@ export const requestCommands = (
     Effect.timeoutOrElse({
       duration: "30 seconds",
       orElse: () => Effect.fail(new Error(`${label} commands took too long to load.`)),
+    }),
+  )
+}
+
+export const requestSessions = (
+  child: HostProcess,
+  label: string,
+  workspacePath: string,
+): Effect.Effect<ReadonlyArray<CliSessionSummary>, Error> => {
+  const requestId = randomUUID()
+  return exchange(
+    child,
+    post(child, { type: "list-sessions", requestId, workspacePath }),
+    replyFor(
+      "sessions-result",
+      requestId,
+      SessionsResult,
+      (reply) => reply.sessions,
+      `${label} returned an invalid sessions response.`,
+    ),
+    `${label} disconnected. Try again shortly.`,
+  ).pipe(
+    Effect.timeoutOrElse({
+      duration: "30 seconds",
+      orElse: () => Effect.fail(new Error(`${label} sessions took too long to load.`)),
+    }),
+  )
+}
+
+export const requestSessionHistory = (
+  child: HostProcess,
+  label: string,
+  workspacePath: string,
+  nativeThreadId: string,
+): Effect.Effect<CliSessionHistory, Error> => {
+  const requestId = randomUUID()
+  return exchange(
+    child,
+    post(child, { type: "read-session", requestId, workspacePath, nativeThreadId }),
+    replyFor(
+      "session-history-result",
+      requestId,
+      SessionHistoryResult,
+      (reply) => reply.history,
+      `${label} returned an invalid session.`,
+    ),
+    `${label} disconnected. Try again shortly.`,
+  ).pipe(
+    Effect.timeoutOrElse({
+      duration: "60 seconds",
+      orElse: () => Effect.fail(new Error(`${label} took too long to read the session.`)),
     }),
   )
 }

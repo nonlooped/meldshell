@@ -22,6 +22,7 @@ const input = Schema.Struct({
   workspaceId: Schema.optional(Schema.String),
   threadId: Schema.optional(Schema.String),
   run: Schema.optional(Schema.String),
+  cli: Schema.optional(Schema.Boolean),
   data: Schema.optional(Schema.String.pipe(Schema.check(Schema.isMaxLength(64 * 1024)))),
   cols: Schema.optional(dimensions.cols),
   rows: Schema.optional(dimensions.rows),
@@ -152,6 +153,7 @@ export function remoteTerminals(
         cols: value.cols ?? 80,
         rows: value.rows ?? 24,
         ...(value.run === undefined ? {} : { run: value.run }),
+        ...(value.cli === true ? { cli: true } : {}),
       })
       if (session.open.has(id)) session.open.set(id, result)
       return result

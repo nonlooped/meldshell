@@ -51,3 +51,4 @@ export {
   recordScheduleRun,
 } from "./schedules"
 export { rewindThread, undoRewind } from "./rewind"
+export { importCliSession, findSessionThreads, resumableSession } from "./cli-sessions"

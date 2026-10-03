@@ -107,6 +107,19 @@ export function useThreadManagementActions(
   }
 }
 
+/** Brings a CLI session in as a thread, or finds the thread that already holds it. */
+export function useImportSessionMutation(imported: (threadId: string) => void) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: Input<"importCliSession">) => window.meldshell.importCliSession(input),
+    onSuccess: (result) => {
+      replaceSnapshot(client, result.snapshot)
+      void client.invalidateQueries({ queryKey: ["cli-sessions"] })
+      imported(result.threadId)
+    },
+  })
+}
+
 export const useThreadSettingsMutation = () =>
   useSnapshotMutation((input: Input<"setThreadSettings">) =>
     window.meldshell.setThreadSettings(input),

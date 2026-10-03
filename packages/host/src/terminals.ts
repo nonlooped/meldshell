@@ -64,7 +64,7 @@ export function createTerminals(
       sessions.set(input.id, entry)
       try {
         const { file, args } = shellCommand()
-        const { cwd, env, run } = await host.terminalContext(input, input.run)
+        const { cwd, env, run } = await host.terminalContext(input, input.run, input.cli === true)
         const { spawn } = await import("node-pty")
         if (entry.closed) throw new Error("This terminal was closed while opening.")
         const pty = spawn(file, args, {

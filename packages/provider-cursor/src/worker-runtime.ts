@@ -644,6 +644,20 @@ export const runCursorWorker = (
         case "list-commands":
           void listCommands(message.requestId, message.workspacePath)
           break
+        case "list-sessions":
+          publish({
+            type: "sessions-result",
+            requestId: message.requestId,
+            error: "Cursor sessions cannot be imported.",
+          })
+          break
+        case "read-session":
+          publish({
+            type: "session-history-result",
+            requestId: message.requestId,
+            error: "Cursor sessions cannot be imported.",
+          })
+          break
         case "shutdown":
           void shutdown().then(
             () => ack(),

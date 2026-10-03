@@ -69,6 +69,9 @@ interface TitleBarProps {
   /** What the editor opens: the thread's own worktree or the shared workspace folder. */
   readonly editorFolder: "worktree" | "workspace"
   readonly onOpenInEditor: (editorId: string) => void
+  /** The CLI that can continue the thread on screen, such as "Claude Code CLI", or null. */
+  readonly cli: string | null
+  readonly onOpenInCli: () => void
 }
 
 const noDrag = "[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
@@ -192,6 +195,17 @@ function RunButton({
   )
 }
 
+/** Continues the thread's agent session in its own command-line tool, in the thread's terminal. */
+function CliMenuItems({ cli, onOpen }: { cli: string; onOpen: () => void }): React.JSX.Element {
+  return (
+    <MenuGroup label="Continue this conversation in">
+      <MenuAction icon={<SquareTerminal size={13} />} onClick={onOpen}>
+        <span className="text-[var(--text-primary)]">{cli}</span>
+      </MenuAction>
+    </MenuGroup>
+  )
+}
+
 function EditorMenuItems({
   editors,
   folder,
@@ -229,15 +243,22 @@ function EditorMenuItems({
   )
 }
 
-/** Lists the editors found on this computer; the one used last comes first. */
+/**
+ * Lists the editors found on this computer, the one used last first, and the CLI that can continue
+ * the thread.
+ */
 function OpenInEditorButton({
   editors,
   folder,
   onOpen,
+  cli,
+  onOpenInCli,
 }: {
   editors: readonly ExternalEditor[]
   folder: "worktree" | "workspace"
   onOpen: (editorId: string) => void
+  cli: string | null
+  onOpenInCli: () => void
 }): React.JSX.Element {
   const shortcut = useKeybindings((state) => state.bindings.openInEditor)
   return (
@@ -255,7 +276,9 @@ function OpenInEditorButton({
         </BaseButton>
       }
     >
-      <EditorMenuItems editors={editors} folder={folder} onOpen={onOpen} />
+      {editors.length > 0 && <EditorMenuItems editors={editors} folder={folder} onOpen={onOpen} />}
+      {editors.length > 0 && cli !== null && <MenuSeparator />}
+      {cli !== null && <CliMenuItems cli={cli} onOpen={onOpenInCli} />}
     </DropdownMenu>
   )
 }
@@ -273,6 +296,8 @@ type ThreadToolsProps = Pick<
   | "onTogglePreview"
   | "terminalShown"
   | "onToggleTerminal"
+  | "cli"
+  | "onOpenInCli"
 >
 
 /** In a narrow window the editor, run, preview, and terminal buttons share one menu. */
@@ -288,6 +313,8 @@ function ThreadToolsMenu({
   onTogglePreview,
   terminalShown,
   onToggleTerminal,
+  cli,
+  onOpenInCli,
 }: ThreadToolsProps): React.JSX.Element | null {
   const bindings = useKeybindings((state) => state.bindings)
   const sections: React.ReactNode[] = []
@@ -318,6 +345,7 @@ function ThreadToolsMenu({
         onOpen={onOpenInEditor}
       />,
     )
+  if (cli !== null) sections.push(<CliMenuItems key="cli" cli={cli} onOpen={onOpenInCli} />)
   if (runScripts.length > 0)
     sections.push(
       <RunMenuItems
@@ -660,15 +688,24 @@ function ThreadToolButtons({
   onTogglePreview,
   terminalShown,
   onToggleTerminal,
+  cli,
+  onOpenInCli,
 }: ThreadToolsProps): React.JSX.Element {
   const bindings = useKeybindings((state) => state.bindings)
-  const hasThreadTools = (editors !== null && editors.length > 0) || runScripts.length > 0
+  const hasEditors = editors !== null && editors.length > 0
+  const hasThreadTools = hasEditors || cli !== null || runScripts.length > 0
   return (
     <>
       {hasThreadTools && (
         <div className="flex flex-none items-center gap-[2px]">
-          {editors !== null && editors.length > 0 && (
-            <OpenInEditorButton editors={editors} folder={editorFolder} onOpen={onOpenInEditor} />
+          {(hasEditors || cli !== null) && (
+            <OpenInEditorButton
+              editors={editors ?? []}
+              folder={editorFolder}
+              onOpen={onOpenInEditor}
+              cli={cli}
+              onOpenInCli={onOpenInCli}
+            />
           )}
           <RunButton
             scripts={runScripts}
@@ -735,6 +772,8 @@ export function TitleBar({
   editors,
   editorFolder,
   onOpenInEditor,
+  cli,
+  onOpenInCli,
 }: TitleBarProps): React.JSX.Element {
   const bindings = useKeybindings((state) => state.bindings)
   const tier = useViewportTier()
@@ -751,6 +790,8 @@ export function TitleBar({
     onTogglePreview,
     terminalShown,
     onToggleTerminal,
+    cli,
+    onOpenInCli,
   }
   return (
     <header

@@ -77,6 +77,7 @@ import type {
   TurnHandoff,
   ThreadIssue,
 } from "./models"
+import type { CliSessionList, ImportCliSessionInput, ImportedCliSession } from "./cli-sessions"
 
 export type ComposerAttachment = InputAttachment & { readonly previewUrl?: string }
 
@@ -290,6 +291,8 @@ export interface TerminalOpenInput {
   readonly rows: number
   /** Starts the workspace run script with this name in the new shell. */
   readonly run?: string
+  /** Continues the thread's session in its harness's CLI in the new shell. */
+  readonly cli?: boolean
 }
 
 export interface TerminalSession {
@@ -297,7 +300,7 @@ export interface TerminalSession {
   readonly windowsPty?: boolean
   readonly cwd: string
   readonly shell: string
-  /** The run script the shell was started with. */
+  /** The run script, or the CLI command, the shell was started with. */
   readonly run?: RunScript
 }
 
@@ -431,6 +434,14 @@ export const requests = {
     "meldshell:create-pull-request",
   ),
   listIssues: request<(input: ListIssuesInput) => Promise<IssueList>>("meldshell:list-issues"),
+  /** The Claude Code and Codex sessions started in a terminal in a workspace's folder. */
+  listCliSessions: request<(workspaceId: string) => Promise<CliSessionList>>(
+    "meldshell:list-cli-sessions",
+  ),
+  /** Brings a CLI session in as a thread, or returns the thread that already holds it. */
+  importCliSession: request<(input: ImportCliSessionInput) => Promise<ImportedCliSession>>(
+    "meldshell:import-cli-session",
+  ),
   generateCommitMessage: request<(input: GenerateCommitMessageInput) => Promise<string>>(
     "meldshell:generate-commit-message",
   ),

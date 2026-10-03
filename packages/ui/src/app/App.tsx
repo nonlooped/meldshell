@@ -9,13 +9,21 @@ import { useAppData } from "../data/queries"
 import {
   useWorkspaceActions,
   useThreadManagementActions,
+  useImportSessionMutation,
   useCatalogActions,
   useAppSettingsMutation,
 } from "../data/mutations"
 import { useAppAppearance } from "./appearance"
 import { Tabs } from "@base-ui-components/react/tabs"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { AppSnapshot, Thread, TranscriptSearchResult, Workspace } from "@meldshell/contracts"
+import {
+  cliLabel,
+  isCliHarness,
+  type AppSnapshot,
+  type Thread,
+  type TranscriptSearchResult,
+  type Workspace,
+} from "@meldshell/contracts"
 import type { RunScript, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { workspaceScope } from "../data/workspace-scope"
 import { AlarmClock, Plus, Settings } from "lucide-react"
@@ -23,6 +31,7 @@ import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import { InteractionDialog } from "../threads/InteractionDialog"
 import { FilePalette } from "./FilePalette"
 import { IssuePalette } from "./IssuePalette"
+import { SessionPalette } from "./SessionPalette"
 import { ThreadPalette } from "./ThreadPalette"
 import { Inbox } from "../threads/Inbox"
 import { FilesSidebar } from "../files/FilesSidebar"
@@ -430,6 +439,12 @@ function DeleteWorktreeNote({ thread }: { thread: Thread | null }): React.JSX.El
   )
 }
 
+/** The CLI that can continue a thread's latest harness session, or null when it has none. */
+const threadCli = (thread: Thread | undefined): string | null =>
+  thread !== undefined && thread.lastHarness !== undefined && isCliHarness(thread.lastHarness)
+    ? cliLabel(thread.lastHarness)
+    : null
+
 /**
  * The title bar's terminal toggle and Run button for the thread on screen. `shown` is null without
  * one, and `runScripts` is empty unless its workspace has run scripts.
@@ -448,7 +463,8 @@ function useTerminalToggle(
   const open = useTerminalStore((state) =>
     selectedThreadId === null ? false : state.threads[selectedThreadId]?.open === true,
   )
-  const workspaceId = threads.find((thread) => thread.id === selectedThreadId)?.workspaceId
+  const thread = threads.find((candidate) => candidate.id === selectedThreadId)
+  const workspaceId = thread?.workspaceId
   const scripts = useWorkspaceScripts(terminalApi === undefined ? undefined : workspaceId)
   const withThread = useCallback(
     (action: (threadId: string) => void): void => {
@@ -472,6 +488,10 @@ function useTerminalToggle(
     const { selectedThreadId: threadId } = useTabStore.getState()
     if (threadId !== null) useTerminalStore.getState().stopRun(threadId, name)
   }, [])
+  const continueInCli = useCallback(
+    () => withThread((threadId) => useTerminalStore.getState().continueInCli(threadId)),
+    [withThread],
+  )
   const shown = terminalApi === undefined || !threadOnScreen ? null : open
   const running = useRunningScripts(shown === null ? null : selectedThreadId)
   return {
@@ -481,6 +501,9 @@ function useTerminalToggle(
     running,
     run,
     stopRun,
+    /** The CLI that can continue the thread on screen in its terminal. */
+    cli: shown === null ? null : threadCli(thread),
+    continueInCli,
   }
 }
 
@@ -542,6 +565,7 @@ export function App(): React.JSX.Element {
   const openSchedules = useViewStore((state) => state.openSchedules)
   const workbenchCovered = useViewStore((state) => state.settingsOpen || state.schedulesOpen)
   const issuePicker = useViewStore((state) => state.issuePicker)
+  const sessionPicker = useViewStore((state) => state.sessionPicker)
 
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
   const [threadPaletteOpen, setThreadPaletteOpen] = useState(false)
@@ -604,6 +628,10 @@ export function App(): React.JSX.Element {
       setSearchThreads((threads) => threads.filter((thread) => thread.workspaceId !== workspaceId))
       setSearchTarget(null)
     },
+  })
+  const importSessionMutation = useImportSessionMutation((threadId) => {
+    closeWorkbenchViews()
+    openThread(threadId)
   })
   const { updateProviderMutation, upsertModelMutation, deleteModelMutation, resetCatalogMutation } =
     useCatalogActions()
@@ -811,6 +839,8 @@ export function App(): React.JSX.Element {
               editors={editor.editors}
               editorFolder={editorFolder(worktreeThread)}
               onOpenInEditor={editor.open}
+              cli={terminal.cli}
+              onOpenInCli={terminal.continueInCli}
             />
 
             {settingsOpen ? (
@@ -1029,6 +1059,20 @@ export function App(): React.JSX.Element {
                     createThreadMutation.reset()
                     throw error
                   })
+              }
+            />
+            <SessionPalette
+              open={sessionPicker !== null}
+              onOpenChange={(open) => {
+                if (!open) useViewStore.getState().closeSessionPicker()
+              }}
+              workspace={pickerWorkspace(snapshot.workspaces, sessionPicker, activeWorkspaceId)}
+              onImport={(workspaceId, session) =>
+                importSessionMutation.mutateAsync({
+                  workspaceId,
+                  harness: session.harness,
+                  nativeThreadId: session.nativeThreadId,
+                })
               }
             />
             {selectedApproval !== null && !appHidden && (

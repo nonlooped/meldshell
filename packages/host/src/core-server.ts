@@ -63,6 +63,9 @@ import {
   rewindThread,
   undoRewind,
   previewHandoff,
+  importCliSession,
+  findSessionThreads,
+  resumableSession,
 } from "@meldshell/core"
 import {
   FiberSet,
@@ -166,6 +169,10 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
     PreviewHandoff: ({ threadId }) => exposeCoreRead(previewHandoff(threadId)),
     RewindThread: (input) => exposeCoreError(rewindThread(input)),
     UndoRewind: ({ threadId }) => exposeCoreError(undoRewind(threadId)),
+    ImportCliSession: (input) => exposeCoreError(importCliSession(input)),
+    FindSessionThreads: ({ harness, nativeThreadIds }) =>
+      exposeCoreRead(findSessionThreads(harness, nativeThreadIds)),
+    GetResumableSession: ({ threadId }) => exposeCoreRead(resumableSession(threadId)),
     RecordRuntimeEvent: (input) => exposeCoreError(recordRuntimeEvent(input)),
     SetProviderSession: (input) =>
       exposeCoreError(setProviderSession(input.threadId, input.nativeThreadId, input.harness)),

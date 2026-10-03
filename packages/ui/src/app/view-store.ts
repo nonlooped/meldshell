@@ -36,6 +36,10 @@ interface ViewStore {
   readonly issuePicker: { readonly workspaceId?: string } | null
   readonly openIssuePicker: (workspaceId?: string) => void
   readonly closeIssuePicker: () => void
+  /** The session picker lists terminal sessions from this workspace, or the active one. */
+  readonly sessionPicker: { readonly workspaceId?: string } | null
+  readonly openSessionPicker: (workspaceId?: string) => void
+  readonly closeSessionPicker: () => void
 }
 
 export const useViewStore = create<ViewStore>((set) => ({
@@ -66,4 +70,8 @@ export const useViewStore = create<ViewStore>((set) => ({
   openIssuePicker: (workspaceId) =>
     set({ issuePicker: workspaceId === undefined ? {} : { workspaceId } }),
   closeIssuePicker: () => set({ issuePicker: null }),
+  sessionPicker: null,
+  openSessionPicker: (workspaceId) =>
+    set({ sessionPicker: workspaceId === undefined ? {} : { workspaceId } }),
+  closeSessionPicker: () => set({ sessionPicker: null }),
 }))

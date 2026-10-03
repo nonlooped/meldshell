@@ -28,6 +28,8 @@ export const appendEvent = (
   method: string,
   text: string | null,
   payload: unknown,
+  /** When the event happened; an imported turn keeps the times its harness recorded. */
+  createdAt: string = new Date().toISOString(),
 ) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
@@ -36,8 +38,7 @@ export const appendEvent = (
         id, thread_id, turn_id, sequence, kind, method, text, provider_data, created_at
       )
       SELECT ${randomUUID()}, ${threadId}, ${turnId}, COALESCE(MAX(sequence), 0) + 1,
-             ${kind}, ${method}, ${text}, ${JSON.stringify(payload ?? null)},
-             ${new Date().toISOString()}
+             ${kind}, ${method}, ${text}, ${JSON.stringify(payload ?? null)}, ${createdAt}
       FROM events WHERE thread_id = ${threadId}
     `
   })

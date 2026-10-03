@@ -70,6 +70,11 @@ interface TerminalStore {
   readonly run: (threadId: string, name: string) => void
   /** Ends the shell running the named run script, stopping its servers. */
   readonly stopRun: (threadId: string, name: string) => void
+  /**
+   * Continues the thread's Claude Code or Codex session in its CLI in a new shell, or shows the
+   * shell already running it.
+   */
+  readonly continueInCli: (threadId: string) => void
   readonly close: (threadId: string, terminalId: string) => void
   readonly focus: (threadId: string, terminalId: string) => void
   readonly resizeSplit: (threadId: string, splitId: string, ratio: number) => void
@@ -112,6 +117,8 @@ const runShellByScript = new Map<string, string>()
 const outputTails = new Map<string, string>()
 
 const runKey = (threadId: string, name: string) => `${threadId}\n${name}`
+/** Stands in for a run script's name on the shell that continues the thread in its CLI. */
+const CLI_SHELL = "\u0000cli"
 
 function forgetRunShell(id: string): void {
   for (const [key, runId] of runShellByScript) if (runId === id) runShellByScript.delete(key)
@@ -230,6 +237,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       info: { ...state.info, [id]: { state: "starting" } },
     }))
   },
+  continueInCli: (threadId) => get().run(threadId, CLI_SHELL),
   stopRun: (threadId, name) => {
     const id = runShellByScript.get(runKey(threadId, name))
     if (id !== undefined) get().close(threadId, id)
@@ -286,7 +294,11 @@ export function useRunningScripts(threadId: string | null): readonly string[] {
       if (layout === undefined) return noScripts
       return terminalIds(layout).flatMap((id) => {
         const info = state.info[id]
-        return info?.state === "running" && info.run !== undefined ? [info.run.name] : []
+        return info?.state === "running" &&
+          info.run !== undefined &&
+          runShells.get(id) !== CLI_SHELL
+          ? [info.run.name]
+          : []
       })
     }),
   )
@@ -409,26 +421,23 @@ function createInstance(id: string): Instance {
 function startShell(id: string, scope: Required<WorkspaceScope>, instance: Instance): void {
   const { term } = instance
   const run = runShells.get(id)
-  terminalApi
-    ?.open({ id, ...scope, cols: term.cols, rows: term.rows, ...(run ? { run } : {}) })
-    .then(
-      ({ shell, cwd, run, windowsPty }) => {
-        if (windowsPty) term.options.windowsPty = { backend: "conpty" }
-        setInfo(id, { state: "running", shell, cwd, ...(run === undefined ? {} : { run }) })
-        // The pane may have been fitted while the shell was starting.
-        terminalApi?.resize(id, term.cols, term.rows)
-      },
-      (error: unknown) => {
-        instance.exited = true
-        // A failed run shell stays to show why; the next Run starts a fresh one.
-        forgetRunShell(id)
-        const message = errorMessage(error)
-        setInfo(id, { state: "failed", message })
-        term.write(
-          `\x1b[31m${message.replace(/^Error invoking remote method '[^']+': /, "")}\x1b[0m`,
-        )
-      },
-    )
+  const launch = run === CLI_SHELL ? { cli: true } : run ? { run } : {}
+  terminalApi?.open({ id, ...scope, cols: term.cols, rows: term.rows, ...launch }).then(
+    ({ shell, cwd, run, windowsPty }) => {
+      if (windowsPty) term.options.windowsPty = { backend: "conpty" }
+      setInfo(id, { state: "running", shell, cwd, ...(run === undefined ? {} : { run }) })
+      // The pane may have been fitted while the shell was starting.
+      terminalApi?.resize(id, term.cols, term.rows)
+    },
+    (error: unknown) => {
+      instance.exited = true
+      // A failed run shell stays to show why; the next Run starts a fresh one.
+      forgetRunShell(id)
+      const message = errorMessage(error)
+      setInfo(id, { state: "failed", message })
+      term.write(`\x1b[31m${message.replace(/^Error invoking remote method '[^']+': /, "")}\x1b[0m`)
+    },
+  )
 }
 
 // The bundled monospace face must be ready before xterm measures its cells.

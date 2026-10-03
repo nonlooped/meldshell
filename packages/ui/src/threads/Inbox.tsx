@@ -706,6 +706,15 @@ export function Inbox({
           >
             New thread from an issue…
           </MenuAction>
+          <MenuAction
+            onClick={() =>
+              useViewStore
+                .getState()
+                .openSessionPicker(workspaceId === "all" ? undefined : workspaceId)
+            }
+          >
+            Bring in a terminal session…
+          </MenuAction>
           {workspaceId !== "all" && (
             <MenuAction onClick={() => setWorkspaceId("all")}>Show all workspaces</MenuAction>
           )}

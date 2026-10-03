@@ -582,6 +582,20 @@ export const runPiWorker = (
         case "list-commands":
           void listCommands(message.requestId, message.workspacePath)
           break
+        case "list-sessions":
+          publish({
+            type: "sessions-result",
+            requestId: message.requestId,
+            error: "Pi sessions cannot be imported.",
+          })
+          break
+        case "read-session":
+          publish({
+            type: "session-history-result",
+            requestId: message.requestId,
+            error: "Pi sessions cannot be imported.",
+          })
+          break
         case "steer-turn":
           ack("Pi turns are not steered from MeldShell.")
           break

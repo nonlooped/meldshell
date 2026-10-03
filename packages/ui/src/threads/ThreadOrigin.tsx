@@ -3,7 +3,7 @@ import { useIsMutating, useMutation, useMutationState, useQueryClient } from "@t
 import type { Thread, Workspace } from "@meldshell/contracts"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { ToggleGroup } from "@base-ui-components/react/toggle-group"
-import { ArrowUpRight, CircleDot, Folder, GitBranch } from "lucide-react"
+import { ArrowUpRight, CircleDot, Folder, GitBranch, SquareTerminal } from "lucide-react"
 import { replaceSnapshot } from "../data/cache"
 import { DropdownMenu, MenuChoice, MenuRadioGroup } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
@@ -17,6 +17,10 @@ import { useViewStore } from "../app/view-store"
 const originEase = [0.16, 1, 0.3, 1] as const
 
 type DraftLocation = { workspaceId?: string; isolated?: boolean }
+
+/** The quiet buttons beside the branch toggle that start the thread from something else. */
+const originActionClasses =
+  "motion-colors inline-flex shrink-0 items-center gap-[6px] h-[26px] [padding:0_9px] border-0 rounded-[var(--radius-sm)] bg-transparent text-[12px] text-[var(--text-secondary)] cursor-default [&:hover:not(:disabled)]:bg-[var(--surface-hover)] [&:hover:not(:disabled)]:text-[var(--text-primary)] [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)]"
 
 const draftLocationKey = (threadId: string) => ["draft-location", threadId] as const
 
@@ -223,10 +227,22 @@ export function ThreadBranchToggle({ thread }: { thread: Thread }): React.JSX.El
             disabled={busy}
             title="Start a thread on its own branch from an open GitHub issue"
             onClick={() => useViewStore.getState().openIssuePicker(thread.workspaceId)}
-            className="motion-colors inline-flex shrink-0 items-center gap-[6px] h-[26px] [padding:0_9px] border-0 rounded-[var(--radius-sm)] bg-transparent text-[12px] text-[var(--text-secondary)] cursor-default [&:hover:not(:disabled)]:bg-[var(--surface-hover)] [&:hover:not(:disabled)]:text-[var(--text-primary)] [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)]"
+            className={originActionClasses}
           >
             <CircleDot size={13} strokeWidth={2} aria-hidden="true" />
             From an issue
+          </BaseButton>
+        )}
+        {thread.issue === undefined && note === undefined && (
+          <BaseButton
+            type="button"
+            disabled={busy}
+            title="Continue a Claude Code or Codex session started in a terminal"
+            onClick={() => useViewStore.getState().openSessionPicker(thread.workspaceId)}
+            className={originActionClasses}
+          >
+            <SquareTerminal size={13} strokeWidth={2} aria-hidden="true" />
+            From the terminal
           </BaseButton>
         )}
       </div>
