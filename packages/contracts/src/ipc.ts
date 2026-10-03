@@ -122,8 +122,6 @@ export interface TurnSnapshot {
   readonly after: boolean
   /** Every change between the two snapshots, including edits made by shell commands. */
   readonly patch: string | null
-  /** A restore can be undone because the files were snapshotted just before it. */
-  readonly undoable: boolean
 }
 
 type AppUpdateState =
