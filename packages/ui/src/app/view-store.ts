@@ -1,24 +1,30 @@
 import { create } from "zustand"
 
 export type SettingsSection =
-  | "account"
-  | "general"
-  | "appearance"
-  | "providers"
-  | "usage"
   | "threads"
-  | "schedules"
+  | "appearance"
   | "keyboard"
-  | "dictation"
-  | "about"
+  | "providers"
+  | "account"
+  | "app"
+
+export type SettingsSubsection = "shortcuts" | "dictation" | "configuration" | "usage"
 
 interface ViewStore {
-  /** Settings takes over the whole workbench; open tabs stay untouched behind it. */
+  /** Workspace views cover the workbench while preserving its open tabs. */
+  readonly schedulesOpen: boolean
+  readonly openSchedules: () => void
+  readonly closeSchedules: () => void
+  readonly closeWorkbenchViews: () => void
   readonly settingsOpen: boolean
   readonly settingsSection: SettingsSection
-  readonly openSettings: (section?: SettingsSection) => void
+  readonly settingsSubsection: SettingsSubsection
+  readonly openSettings: (section?: SettingsSection, subsection?: SettingsSubsection) => void
   readonly closeSettings: () => void
-  readonly selectSettingsSection: (section: SettingsSection) => void
+  readonly selectSettingsSection: (
+    section: SettingsSection,
+    subsection?: SettingsSubsection,
+  ) => void
   /** The first-run guide covers the whole window until it is finished or skipped. */
   readonly onboardingOpen: boolean
   readonly openOnboarding: () => void
@@ -29,12 +35,32 @@ interface ViewStore {
 }
 
 export const useViewStore = create<ViewStore>((set) => ({
+  schedulesOpen: false,
+  openSchedules: () => set({ schedulesOpen: true, settingsOpen: false }),
+  closeSchedules: () => set({ schedulesOpen: false }),
+  closeWorkbenchViews: () => set({ schedulesOpen: false, settingsOpen: false }),
   settingsOpen: false,
-  settingsSection: "general",
-  openSettings: (section) =>
-    set((state) => ({ settingsOpen: true, settingsSection: section ?? state.settingsSection })),
+  settingsSection: "threads",
+  settingsSubsection: "shortcuts",
+  openSettings: (section, subsection) =>
+    set((state) => ({
+      settingsOpen: true,
+      schedulesOpen: false,
+      settingsSection: section ?? state.settingsSection,
+      settingsSubsection:
+        subsection ??
+        (section === "providers"
+          ? "configuration"
+          : section === "keyboard"
+            ? "shortcuts"
+            : state.settingsSubsection),
+    })),
   closeSettings: () => set({ settingsOpen: false }),
-  selectSettingsSection: (section) => set({ settingsSection: section }),
+  selectSettingsSection: (section, subsection) =>
+    set({
+      settingsSection: section,
+      settingsSubsection: subsection ?? (section === "providers" ? "configuration" : "shortcuts"),
+    }),
   onboardingOpen: false,
   openOnboarding: () => set({ onboardingOpen: true }),
   closeOnboarding: () => set({ onboardingOpen: false }),

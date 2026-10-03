@@ -240,6 +240,8 @@ export function ProviderCard({
 
   return (
     <Collapsible.Root
+      data-setting-label={provider.displayName}
+      tabIndex={-1}
       className="settings-group m-0 border-t-[1px] border-t-[color:var(--line-subtle)] border-b-[1px] border-b-[color:var(--line-subtle)] [&_+_.settings-group]:border-t-0 provider-card"
       render={<section />}
       open={open}

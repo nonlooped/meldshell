@@ -215,7 +215,9 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
       if (completed) return
       completed = true
       if (error && result === "failed") emit("error", { error: { message: error } })
-      emit("turn/completed", { turn: { status: result, error } })
+      emit("turn/completed", {
+        turn: { status: result, ...(error === undefined ? {} : { error }) },
+      })
     }
     const startSession = (sessionId: string): void => {
       state.sessionId = sessionId

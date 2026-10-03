@@ -509,6 +509,18 @@
   }
 }
 
+/*
+ * `AnimatePresence mode="popLayout"` lifts a leaving element out of the layout and leaves it
+ * where it was until its exit finishes, often on top of whatever took its place. It only fades
+ * now, so clicks reach the control beneath, such as dictation's stop button under the microphone.
+ */
+@layer components {
+  [data-motion-pop-id],
+  [data-motion-pop-id] * {
+    pointer-events: none;
+  }
+}
+
 /* Where an agent clicked or typed in a preview: a ring that grows and fades once. Reduced motion
  * keeps the ring still and lets it fade with the agent's label. */
 @layer components {

@@ -73,7 +73,7 @@ export const toolApproval = (
     params: {
       approvalScope: "turn",
       reason: `Claude Code wants to use ${toolName}.\n${JSON.stringify(toolInput, null, 2)}`,
-      command: toolInput.command,
+      ...(toolInput.command === undefined ? {} : { command: toolInput.command }),
       permissions: { tool: toolName, input: toolInput },
       questions,
       ...(plan ? { plan: typeof toolInput.plan === "string" ? toolInput.plan : "" } : {}),
