@@ -146,6 +146,10 @@ export interface PullRequestStatus {
   readonly published: boolean
   /** Commits on the branch that are not on its base, so a pull request has something to show. */
   readonly ahead: number
+  /** Commits a push would publish; every commit ahead of the base when the branch is unpublished. */
+  readonly unpushed: number
+  /** Subjects of the newest commits ahead of the base, newest first, at most 20. */
+  readonly commits: readonly string[]
   /** Why GitHub cannot be reached, as a sentence; null when the GitHub CLI answered. */
   readonly unavailable: string | null
   readonly pullRequest: PullRequest | null
@@ -323,6 +327,9 @@ export const requests = {
   gitPush: request<(input: WorkspaceScope) => Promise<void>>("meldshell:git-push"),
   getPullRequest: request<(input: WorkspaceScope) => Promise<PullRequestStatus>>(
     "meldshell:get-pull-request",
+  ),
+  markPullRequestReady: request<(input: WorkspaceScope) => Promise<PullRequestStatus>>(
+    "meldshell:mark-pull-request-ready",
   ),
   generatePullRequest: request<(input: WorkspaceScope) => Promise<PullRequestDraft>>(
     "meldshell:generate-pull-request",

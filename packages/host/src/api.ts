@@ -37,6 +37,7 @@ import { requestGeneratedText } from "./generated-text"
 import {
   createPullRequest,
   getPullRequestStatus,
+  markPullRequestReady,
   parsePullRequestDraft,
   pullRequestPrompt,
 } from "./pull-requests"
@@ -272,6 +273,11 @@ const preferredBase = (scope: WorkspaceScope) =>
 hostOperations[C.IPC.getPullRequest] = operation(C.WorkspaceScope, true, (input) =>
   Effect.flatMap(preferredBase(input), (base) =>
     withWorkspace(input, (path) => getPullRequestStatus(path, base)),
+  ),
+)
+hostOperations[C.IPC.markPullRequestReady] = operation(C.WorkspaceScope, false, (input) =>
+  Effect.flatMap(preferredBase(input), (base) =>
+    withWorkspace(input, (path) => markPullRequestReady(path, base)),
   ),
 )
 hostOperations[C.IPC.generatePullRequest] = operation(C.WorkspaceScope, false, (input) =>

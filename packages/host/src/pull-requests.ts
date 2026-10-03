@@ -255,11 +255,22 @@ export async function getPullRequestStatus(
     workspacePath,
     preferredBase,
   )
-  const ahead =
-    compare === null || branch === null || branch === base
-      ? 0
-      : Number(await gitValue(root, ["rev-list", "--count", `${compare}..HEAD`])) || 0
-  const status = { branch, baseBranch: base, published, ahead }
+  const comparable = compare !== null && branch !== null && branch !== base
+  const [ahead, subjects, unpushed] = await Promise.all([
+    comparable ? gitValue(root, ["rev-list", "--count", `${compare}..HEAD`]) : null,
+    comparable
+      ? gitValue(root, ["log", "--format=%s", "--max-count=20", `${compare}..HEAD`])
+      : null,
+    published ? gitValue(root, ["rev-list", "--count", "@{upstream}..HEAD"]) : null,
+  ])
+  const status = {
+    branch,
+    baseBranch: base,
+    published,
+    ahead: Number(ahead) || 0,
+    unpushed: published ? Number(unpushed) || 0 : Number(ahead) || 0,
+    commits: subjects ? subjects.split("\n").filter(Boolean) : [],
+  }
   // Only a published branch other than its base can have a pull request; nothing needs GitHub before then.
   if (branch === null || !published || branch === base)
     return { ...status, unavailable: null, pullRequest: null }
@@ -391,5 +402,15 @@ export async function createPullRequest(
     input.body,
     60_000,
   )
+  return getPullRequestStatus(workspacePath, preferredBase)
+}
+
+/** Marks a draft pull request ready for review. */
+export async function markPullRequestReady(
+  workspacePath: string,
+  preferredBase: string | null,
+): Promise<PullRequestStatus> {
+  const root = (await git(workspacePath, ["rev-parse", "--show-toplevel"])).trim()
+  await gh(root, ["pr", "ready"])
   return getPullRequestStatus(workspacePath, preferredBase)
 }
