@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { isRecord, type UnknownRecord } from "@meldshell/contracts"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
+import { LineFramer } from "@meldshell/provider-runtime/line-framer"
 import type { PiCommand } from "./discovery"
 
 /** A Pi record larger than this is treated as a broken stream rather than buffered further. */
@@ -21,34 +22,6 @@ interface Pending {
   readonly resolve: (data: unknown) => void
   readonly reject: (error: Error) => void
   readonly timer: ReturnType<typeof setTimeout> | undefined
-}
-
-/**
- * Splits Pi's stdout into records on LF only, as Pi's RPC framing requires. Node's `readline` is
- * unsuitable because it also splits on U+2028 and U+2029, which are valid inside JSON strings.
- */
-class JsonLines {
-  private chunks: Buffer[] = []
-  private size = 0
-  constructor(private readonly line: (text: string) => void) {}
-
-  push(chunk: Buffer): void {
-    let start = 0
-    for (let index = chunk.indexOf(10); index !== -1; index = chunk.indexOf(10, start)) {
-      const tail = chunk.subarray(start, index)
-      const bytes = this.size === 0 ? tail : Buffer.concat([...this.chunks, tail])
-      this.chunks = []
-      this.size = 0
-      const text = bytes.toString("utf8")
-      this.line(text.endsWith("\r") ? text.slice(0, -1) : text)
-      start = index + 1
-    }
-    if (start < chunk.length) {
-      this.chunks.push(chunk.subarray(start))
-      this.size += chunk.length - start
-      if (this.size > MAX_RECORD_BYTES) throw new Error("Pi exceeded the RPC record size limit.")
-    }
-  }
 }
 
 /** One `pi --mode rpc` process: correlated commands in, responses and session events out. */
@@ -74,7 +47,11 @@ export class PiRpc {
       stdio: "pipe",
       env: process.env,
     })
-    const lines = new JsonLines((text) => this.receive(text))
+    const lines = new LineFramer(
+      (text) => this.receive(text),
+      MAX_RECORD_BYTES,
+      "Pi exceeded the RPC record size limit.",
+    )
     this.child.stdout.on("data", (chunk: Buffer) => {
       try {
         lines.push(chunk)
