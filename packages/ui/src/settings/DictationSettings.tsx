@@ -10,7 +10,7 @@ import { ActivitySpinner } from "../ui/motion"
 import { Button, SelectField, TextField } from "../ui/controls"
 import { SettingRow } from "./SettingRow"
 import { dictationStatusQuery } from "../threads/Dictation"
-import { canRecord, dictationError } from "../threads/dictation"
+import { canRecord, dictationError } from "../threads/dictation-recorder"
 
 type Service = "openai" | "custom"
 

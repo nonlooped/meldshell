@@ -16,7 +16,7 @@ import {
   startRecording,
   useDictationRequests,
   type Recording,
-} from "./dictation"
+} from "./dictation-recorder"
 
 export const dictationStatusQuery = {
   queryKey: ["dictation-status"],

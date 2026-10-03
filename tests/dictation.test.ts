@@ -8,7 +8,7 @@ import {
   setDictationSettings,
   transcribeAudio,
 } from "../packages/host/src/dictation"
-import { insertDictation } from "../packages/ui/src/threads/dictation"
+import { insertDictation } from "../packages/ui/src/threads/dictation-recorder"
 
 let directory = ""
 let codexHome = ""
