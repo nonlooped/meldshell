@@ -310,12 +310,33 @@ function tabScope(file: FileTab | undefined, thread: Thread | null): WorkspaceSc
   return thread === null ? undefined : workspaceScope(thread)
 }
 
-function FileOrThread({ file, children }: { file?: FileTab; children: React.ReactNode }) {
+/** The thread a diff's line notes go to: its worktree's thread, or the open thread sharing its folder. */
+function reviewThreadId(file: FileTab, thread: Thread | null): string | undefined {
+  if (file.threadId !== undefined) return file.threadId
+  return thread?.workspaceId === file.workspaceId && thread.worktree === undefined
+    ? thread.id
+    : undefined
+}
+
+function FileOrThread({
+  file,
+  thread,
+  children,
+}: {
+  file?: FileTab
+  thread: Thread | null
+  children: React.ReactNode
+}) {
   if (!file) return <>{children}</>
   return (
     <Tabs.Panel render={<FadeDiv />} value={file.id} className={threadContentClasses}>
       {file.diffSide ? (
-        <DiffViewer key={file.id} file={file} side={file.diffSide} />
+        <DiffViewer
+          key={file.id}
+          file={file}
+          side={file.diffSide}
+          reviewThreadId={reviewThreadId(file, thread)}
+        />
       ) : (
         <FileViewer key={file.id} file={file} />
       )}
@@ -791,7 +812,7 @@ export function App(): React.JSX.Element {
 
                 <Panel id="thread" minSize={layout.threadMin}>
                   <main className="grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]">
-                    <FileOrThread file={selectedFile}>
+                    <FileOrThread file={selectedFile} thread={selectedThread}>
                       <ThreadPane
                         databaseError={snapshotQuery.isError}
                         hasThread={selectedThread !== null}

@@ -16,6 +16,8 @@ import { useViewStore } from "../app/view-store"
 import { ErrorToast } from "../ui/Notice"
 import { Composer } from "./Composer"
 import { QueuedMessages } from "./QueuedMessages"
+import { ReviewNotes } from "./ReviewNotes"
+import { reviewNotesMessage } from "./review-notes"
 import { skillAttachments } from "./composer-completion"
 import { Transcript } from "./Transcript"
 import { HandoffNotice } from "./Handoff"
@@ -99,6 +101,19 @@ export function ThreadView({
     interruptMutation.error?.message ??
     removeQueuedInputMutation.error?.message ??
     steerQueuedInputMutation.error?.message
+  /** Sends the notes left on diff lines as one follow-up, leaving the draft in the composer alone. */
+  const sendNotes = async (notes: Parameters<typeof reviewNotesMessage>[0]) => {
+    try {
+      await submitTurnMutation.mutateAsync({
+        threadId: thread.id,
+        text: reviewNotesMessage(notes),
+        delivery: followUp,
+      })
+    } catch (error) {
+      update(thread.id, { error: errorMessage(error) })
+      throw error
+    }
+  }
   return (
     <div className="grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]">
       <FadeDiv className={threadContentClasses}>
@@ -165,6 +180,17 @@ export function ThreadView({
           onSchedule={() => setScheduling(true)}
           accessory={
             <>
+              <ReviewNotes
+                threadId={thread.id}
+                blocked={
+                  !providerReady
+                    ? "The agent is unavailable, so notes cannot be sent yet"
+                    : thread.worktree?.setup === "running"
+                      ? "Notes can be sent once the worktree is set up"
+                      : null
+                }
+                onSend={sendNotes}
+              />
               <HandoffNotice thread={thread} harness={harness} />
               <QueuedMessages
                 items={queued}
