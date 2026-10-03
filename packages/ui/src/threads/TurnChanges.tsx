@@ -20,9 +20,42 @@ function Counts({ insertions, deletions }: { insertions: number; deletions: numb
     >
       {insertions > 0 && <span className="text-[var(--color-added)]">+{insertions}</span>}
       {deletions > 0 && <span className="text-[var(--color-deleted)]">−{deletions}</span>}
+      <DiffBar insertions={insertions} deletions={deletions} />
     </span>
   )
 }
+
+const BAR_BLOCKS = 5
+
+/** The balance of added and removed lines as five blocks, readable before the numbers are. */
+function DiffBar({ insertions, deletions }: { insertions: number; deletions: number }) {
+  const total = insertions + deletions
+  if (total === 0) return null
+  const added = Math.round((insertions / total) * BAR_BLOCKS)
+  const removed = Math.min(BAR_BLOCKS - added, Math.round((deletions / total) * BAR_BLOCKS))
+  return (
+    <span className="inline-flex items-center gap-[1px]" aria-hidden="true">
+      {Array.from({ length: BAR_BLOCKS }, (_, block) => (
+        <span
+          key={block}
+          className="w-[6px] h-[6px] rounded-[1.5px]"
+          style={{
+            background:
+              block < added
+                ? "var(--color-added)"
+                : block < added + removed
+                  ? "var(--color-deleted)"
+                  : "var(--line-strong)",
+          }}
+        />
+      ))}
+    </span>
+  )
+}
+
+/** Long change lists show their first files and fold the rest behind one row. */
+const SHOWN_FILES = 5
+const FOLD_AFTER = 7
 
 function FileChangeRow({ path, patch }: { path: string; patch: string }) {
   const [open, setOpen] = useState(false)
@@ -79,6 +112,7 @@ function FileChangeRow({ path, patch }: { path: string; patch: string }) {
 }
 
 export function TurnChanges({ events }: { events: ReadonlyArray<CanonicalEvent> }) {
+  const [showAll, setShowAll] = useState(false)
   const entries = turnChangePatches(events).flatMap(({ path, patch }) => {
     const files = parseFileDiffs(patch)
     return files.length > 0
@@ -90,6 +124,7 @@ export function TurnChanges({ events }: { events: ReadonlyArray<CanonicalEvent> 
   })
   if (entries.length === 0) return null
   const files = entries.flatMap(({ patch }) => parseFileDiffs(patch))
+  const folded = entries.length > FOLD_AFTER
   const count = new Set(entries.map(({ path }) => path.replaceAll("\\", "/"))).size
   return (
     <section
@@ -102,9 +137,22 @@ export function TurnChanges({ events }: { events: ReadonlyArray<CanonicalEvent> 
         </strong>
         {files.length === entries.length && <Counts {...diffLineCounts(files)} />}
       </div>
-      {entries.map(({ path, patch }, index) => (
+      {entries.slice(0, folded ? SHOWN_FILES : undefined).map(({ path, patch }, index) => (
         <FileChangeRow key={`${index}:${path}`} path={path} patch={patch} />
       ))}
+      {folded && (
+        <Collapsible.Root open={showAll} onOpenChange={setShowAll}>
+          <CollapsiblePanel>
+            {entries.slice(SHOWN_FILES).map(({ path, patch }, index) => (
+              <FileChangeRow key={`${index + SHOWN_FILES}:${path}`} path={path} patch={patch} />
+            ))}
+          </CollapsiblePanel>
+          <Collapsible.Trigger className={turnChangeTriggerClasses}>
+            <ChevronRight size={13} className={disclosureChevronClasses} aria-hidden="true" />
+            {showAll ? "Show fewer files" : `Show ${entries.length - SHOWN_FILES} more files`}
+          </Collapsible.Trigger>
+        </Collapsible.Root>
+      )}
     </section>
   )
 }

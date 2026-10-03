@@ -12,6 +12,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Changed
 
+- Choices show instead of tell. Settings picks a theme from small previews of each look, sets transcript text size with a row of Aa samples, and switches follow-ups between Queue and Steer with the explanation for only the chosen one. The composer's mode and permission menus say in one line what each choice does, and a turn's changed files each carry a small added/removed bar, with long lists folding after the first five files.
+
 - The app moves with more life. Settings sections and the Files and Changes tabs slide their selection highlight to the chosen tab (which also restores the missing highlight in Settings), streaming replies rise into place block by block, and a finished turn swaps its spinner for what it did. Switches spring across and stretch while held, checkboxes and radio buttons pop their marks, the send button bounces once there is something to send, inbox threads glide to their new place when they move, toasts and notices rise in, an empty thread's heading settles in beneath the mark, and each agent on the launch screen bounces as it connects. Reduce motion turns all of it off.
 
 - Internal catalog, session, setup, title, queue-priority, and approval writes now complete without rebuilding an unused application snapshot.
