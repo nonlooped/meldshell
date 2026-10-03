@@ -44,6 +44,7 @@ import { type GraphRow, layoutGraph } from "./git-graph"
 import { relativeAge } from "../ui/relative-age"
 import { scopeKey } from "../data/workspace-scope"
 import { CopyAbsolutePathAction, RevealFileAction } from "../ui/FileContextActions"
+import { PullRequestSection } from "./PullRequest"
 const graphColors = [
   "var(--color-info)",
   "var(--color-added)",
@@ -263,6 +264,8 @@ export function GitSidebar({
     await Promise.all([
       client.invalidateQueries({ queryKey: ["git", workspace?.id] }),
       client.invalidateQueries({ queryKey: ["git-diff", workspace?.id] }),
+      // A commit or push can make a pull request possible, or bring an open one new checks.
+      client.invalidateQueries({ queryKey: ["pull-request", workspace?.id] }),
     ])
   }
   const action = useMutation({
@@ -311,6 +314,7 @@ export function GitSidebar({
             onBusy={setCommitBusy}
             onRefresh={refresh}
           />
+          <PullRequestSection scope={scope} threadId={threadId} />
           {action.isError && <PanelNote role="alert">{action.error.message}</PanelNote>}
           {bulkAction.isError && <PanelNote role="alert">{bulkAction.error.message}</PanelNote>}
           <Group className="min-h-0 flex-1" orientation="vertical">
@@ -337,7 +341,7 @@ export function GitSidebar({
                 scope={scope}
                 changes={query.data.changes}
                 refreshing={query.isFetching}
-                onRefresh={() => void query.refetch()}
+                onRefresh={() => void refresh()}
               />
             </Panel>
             <Separator

@@ -18,4 +18,5 @@ export {
   GitFileActionInput,
   GitBulkActionInput,
   GitCommitInput,
+  CreatePullRequestInput,
 } from "./workspace-inputs"

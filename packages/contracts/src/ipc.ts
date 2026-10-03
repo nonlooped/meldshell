@@ -7,6 +7,7 @@ import type {
   GitBulkActionInput,
   GitCommitInput,
   GenerateCommitMessageInput,
+  CreatePullRequestInput,
   GitCommitDiffInput,
   GitSnapshotInput,
   GitDiffInput,
@@ -20,6 +21,7 @@ export type {
   GitBulkActionInput,
   GitCommitInput,
   GenerateCommitMessageInput,
+  CreatePullRequestInput,
   GitCommitDiffInput,
   GitSnapshotInput,
   GitDiffInput,
@@ -106,6 +108,52 @@ export interface GitSnapshot {
   readonly changes: readonly GitChange[]
   readonly commits: readonly GitCommit[]
   readonly hasMore: boolean
+}
+
+export type PullRequestCheckState = "passed" | "failed" | "pending" | "skipped"
+
+export interface PullRequestCheck {
+  readonly name: string
+  readonly state: PullRequestCheckState
+  readonly url: string | null
+}
+
+export interface PullRequestReview {
+  readonly author: string
+  readonly state: "approved" | "changes-requested" | "commented"
+}
+
+export interface PullRequest {
+  readonly number: number
+  readonly title: string
+  readonly url: string
+  readonly state: "open" | "draft" | "merged" | "closed"
+  readonly baseBranch: string
+  /** GitHub's summary of the reviews the base branch requires; null when none are required. */
+  readonly reviewDecision: "approved" | "changes-requested" | "review-required" | null
+  readonly reviews: readonly PullRequestReview[]
+  readonly checks: readonly PullRequestCheck[]
+  readonly conflicts: boolean
+}
+
+/** What the checked-out branch can do on GitHub, read through the host's GitHub CLI. */
+export interface PullRequestStatus {
+  /** Null on a detached HEAD. */
+  readonly branch: string | null
+  /** The branch a new pull request targets. */
+  readonly baseBranch: string | null
+  /** Whether the branch has an upstream on a remote. */
+  readonly published: boolean
+  /** Commits on the branch that are not on its base, so a pull request has something to show. */
+  readonly ahead: number
+  /** Why GitHub cannot be reached, as a sentence; null when the GitHub CLI answered. */
+  readonly unavailable: string | null
+  readonly pullRequest: PullRequest | null
+}
+
+export interface PullRequestDraft {
+  readonly title: string
+  readonly body: string
 }
 
 type AppUpdateState =
@@ -273,6 +321,15 @@ export const requests = {
   gitBulkAction: request<(input: GitBulkActionInput) => Promise<void>>("meldshell:git-bulk-action"),
   gitCommit: request<(input: GitCommitInput) => Promise<void>>("meldshell:git-commit"),
   gitPush: request<(input: WorkspaceScope) => Promise<void>>("meldshell:git-push"),
+  getPullRequest: request<(input: WorkspaceScope) => Promise<PullRequestStatus>>(
+    "meldshell:get-pull-request",
+  ),
+  generatePullRequest: request<(input: WorkspaceScope) => Promise<PullRequestDraft>>(
+    "meldshell:generate-pull-request",
+  ),
+  createPullRequest: request<(input: CreatePullRequestInput) => Promise<PullRequestStatus>>(
+    "meldshell:create-pull-request",
+  ),
   generateCommitMessage: request<(input: GenerateCommitMessageInput) => Promise<string>>(
     "meldshell:generate-commit-message",
   ),

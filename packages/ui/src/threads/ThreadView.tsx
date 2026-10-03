@@ -18,6 +18,7 @@ import { QueuedMessages } from "./QueuedMessages"
 import { skillAttachments } from "./composer-completion"
 import { Transcript } from "./Transcript"
 import { ThreadBranchToggle, ThreadOrigin } from "./ThreadOrigin"
+import { ThreadPullRequest } from "../files/PullRequest"
 import { useState } from "react"
 import { ScheduleDialog } from "../schedules/ScheduleDialog"
 import { ThreadSchedules } from "../schedules/ThreadSchedules"
@@ -163,6 +164,7 @@ export function ThreadView({
                 }}
               />
               <ThreadSchedules threadId={thread.id} />
+              <ThreadPullRequest thread={thread} />
             </>
           }
         />

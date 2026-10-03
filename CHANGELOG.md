@@ -6,6 +6,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
+- Source Control can open a pull request once a branch has commits. Create pull request pushes anything unpushed, writes a title and description from the branch's commits and diff (following the repository's pull request template when it has one), and lets you edit both and choose draft before it opens. The pull request then shows above the composer and in Source Control with its checks, review decision, and merge conflicts, refreshing while checks run, and each check opens its run on GitHub. This uses the GitHub CLI (gh) signed in on the computer running MeldShell.
+
 - Messages sent while the agent is working can now queue or steer. Enter follows a new default in Settings (queue), Ctrl or Cmd with Enter does the other, and a menu beside the send button picks either for one message or changes the default. Steering goes into the same turn on Codex, and stops the turn and continues with your message on Claude Code and Cursor.
 
 - Queued messages are listed above the composer, where each can be edited, sent now to steer the running turn, or removed, with a Clear all for the lot. Each queued message now starts as its own turn instead of being merged into one, and a queue left behind by an interrupted or failed turn waits for you to send it rather than showing only a count.
