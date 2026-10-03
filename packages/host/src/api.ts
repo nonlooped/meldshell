@@ -34,6 +34,7 @@ import {
 } from "./workspace-files"
 import { searchWorkspacePaths } from "./workspace-search"
 import {
+  hasTurnSnapshot,
   readTurnSnapshot,
   restoreTurnSnapshot,
   threadFolder,
@@ -132,6 +133,9 @@ export const hostOperations: Record<string, Operation> = {
   ),
   [C.IPC.removeWorkspace]: operation(Schema.String, false, removeWorkspace),
   [C.IPC.getWorktreeStatus]: operation(Schema.String, true, getWorktreeStatus),
+  [C.IPC.previewHandoff]: coreCall(Schema.String, true, (core, threadId) =>
+    core.PreviewHandoff({ threadId }),
+  ),
   [C.IPC.setDraftLocation]: operation(
     Schema.Struct({
       threadId: Schema.String,
@@ -255,6 +259,38 @@ export const hostOperations: Record<string, Operation> = {
     Effect.flatMap(idleThreadFolder(input), (path) =>
       attempt(() => undoSnapshotRestore(path, input.threadId)),
     ),
+  ),
+  [C.IPC.rewindThread]: operation(C.TurnSnapshotInput, false, (input) =>
+    Effect.gen(function* () {
+      const core = yield* CoreClient
+      const path = yield* idleThreadFolder(input)
+      // The files go back first, so the conversation never forgets work the folder still holds.
+      const filesRestored = yield* attempt(async () => {
+        if (!(await hasTurnSnapshot(path, input.threadId, input.turnId, "before"))) return false
+        await restoreTurnSnapshot(path, input.threadId, input.turnId, "before")
+        return true
+      })
+      return yield* core
+        .RewindThread({ threadId: input.threadId, turnId: input.turnId, filesRestored })
+        .pipe(
+          Effect.tapError(() =>
+            filesRestored
+              ? attempt(() => undoSnapshotRestore(path, input.threadId)).pipe(
+                  Effect.catch(Effect.logError),
+                )
+              : Effect.void,
+          ),
+        )
+    }),
+  ),
+  [C.IPC.undoRewind]: operation(C.UndoSnapshotRestoreInput, false, (input) =>
+    Effect.gen(function* () {
+      const core = yield* CoreClient
+      const path = yield* idleThreadFolder(input)
+      const result = yield* core.UndoRewind({ threadId: input.threadId })
+      if (result.filesRestored) yield* attempt(() => undoSnapshotRestore(path, input.threadId))
+      return result
+    }),
   ),
 }
 hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false, (input) =>

@@ -93,6 +93,14 @@ const snapshotDiff = (cwd: string, from: string, to: string) =>
     "--",
   ])
 
+/** Whether a turn's files were snapshotted at a point, without reading what changed. */
+export const hasTurnSnapshot = async (
+  cwd: string,
+  threadId: string,
+  turnId: string,
+  point: SnapshotPoint,
+): Promise<boolean> => (await resolveCommit(cwd, turnSnapshotRef(threadId, turnId, point))) !== null
+
 export async function readTurnSnapshot(
   cwd: string,
   threadId: string,

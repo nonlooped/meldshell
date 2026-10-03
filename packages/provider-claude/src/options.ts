@@ -1,5 +1,5 @@
 import type { Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk"
-import type { TurnDispatch } from "@meldshell/contracts"
+import { promptText, type TurnDispatch } from "@meldshell/contracts"
 import { readFile } from "node:fs/promises"
 import { extname } from "node:path"
 import { referenceText } from "@meldshell/provider-runtime"
@@ -97,7 +97,8 @@ const localImage = async (value: string): Promise<string> => {
 }
 export const claudePrompt = async (dispatch: TurnDispatch): Promise<SDKUserMessage> => {
   const content: Exclude<SDKUserMessage["message"]["content"], string> = []
-  if (dispatch.text) content.push({ type: "text", text: dispatch.text })
+  const text = promptText(dispatch)
+  if (text) content.push({ type: "text", text })
   for (const attachment of dispatch.attachments) {
     if (attachment.type === "mention" || attachment.type === "skill") {
       content.push({ type: "text", text: referenceText(attachment) })

@@ -24,6 +24,8 @@ import {
 import { Effect, Schema, Struct } from "effect"
 import { appendEvent } from "./database/persistence"
 import { transaction } from "./database/transaction"
+import { EventFromRow, readRows } from "./database/rows"
+import { buildHandoff } from "./handoff"
 import {
   DEFAULT_THREAD_TITLE,
   THREAD_TITLE_LIMIT,
@@ -106,6 +108,9 @@ const createDispatch = (
         : "default"
 
     const { alwaysFullPermissions } = yield* readAppSettings
+    const handoff = yield* missedWork(threadId, row.harness, row.native_thread_id !== null)
+    // New work makes the latest rewind permanent: its turns stay out of the conversation.
+    yield* sql`DELETE FROM thread_rewinds WHERE thread_id = ${threadId}`
     const turnId = randomUUID()
     const timestamp = new Date().toISOString()
     yield* sql`
@@ -121,6 +126,7 @@ const createDispatch = (
     yield* appendEvent(threadId, turnId, "user", "user/message", text, {
       text,
       attachments,
+      ...(handoff === null ? {} : { handoff }),
     })
 
     return {
@@ -138,7 +144,60 @@ const createDispatch = (
       approvalPolicy: alwaysFullPermissions ? "never" : row.approval_policy,
       text,
       attachments,
+      context: handoff?.brief ?? null,
     } satisfies TurnDispatch
+  })
+
+/** The summary the thread's next turn would carry on its selected harness, if any. */
+export const previewHandoff = (threadId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const [row] = yield* sql<{
+      readonly harness: string
+      readonly native_thread_id: string | null
+    }>`
+      SELECT p.harness, ps.native_thread_id
+      FROM thread_settings s
+      JOIN providers p ON p.id = s.provider_id
+      LEFT JOIN provider_sessions ps ON ps.thread_id = s.thread_id AND ps.harness = p.harness
+      WHERE s.thread_id = ${threadId}
+    `
+    if (row === undefined) return null
+    return yield* missedWork(threadId, row.harness, row.native_thread_id !== null)
+  })
+
+/**
+ * The turns a harness's provider session has not seen, summarized. A session has seen everything
+ * up to its own latest turn; without a session, which a rewind also clears, it has seen nothing.
+ */
+const missedWork = (threadId: string, harness: string, hasSession: boolean) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const turns = yield* sql<{
+      readonly id: string
+      readonly harness: string
+      readonly status: string
+    }>`
+      SELECT id, harness, status FROM turns
+      WHERE thread_id = ${threadId} AND rewound_at IS NULL
+      ORDER BY started_at, rowid
+    `
+    const missed = hasSession
+      ? turns.slice(turns.findLastIndex((turn) => turn.harness === harness) + 1)
+      : turns
+    if (missed.length === 0) return null
+    const events = yield* readRows(
+      EventFromRow,
+      sql`SELECT * FROM events WHERE thread_id = ${threadId}
+        AND turn_id IN ${sql.in(missed.map((turn) => turn.id))} ORDER BY sequence`,
+    )
+    return buildHandoff(
+      harness,
+      missed.map((turn) => ({
+        ...turn,
+        events: events.filter((event) => event.turnId === turn.id),
+      })),
+    )
   })
 
 const queueInput = (
@@ -438,6 +497,7 @@ export const openProviderTurn = (input: OpenProviderTurnInput) =>
       SELECT id FROM turns WHERE thread_id = ${input.threadId} AND status = 'running' LIMIT 1
     `
     if (threads.length === 0 || running.length > 0) return false
+    yield* sql`DELETE FROM thread_rewinds WHERE thread_id = ${input.threadId}`
     const timestamp = new Date().toISOString()
     yield* sql`
       INSERT INTO turns (

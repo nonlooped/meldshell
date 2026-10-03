@@ -1,4 +1,4 @@
-import type { TurnDispatch } from "@meldshell/contracts"
+import { promptText, type TurnDispatch } from "@meldshell/contracts"
 import { BROWSER_SERVER, browserUrl } from "@meldshell/provider-runtime/browser"
 
 /**
@@ -31,9 +31,9 @@ export const threadSettings = (dispatch: TurnDispatch) => ({
 })
 
 export const inputItems = (
-  dispatch: Pick<TurnDispatch, "text" | "attachments">,
+  dispatch: Pick<TurnDispatch, "text" | "context" | "attachments">,
 ): ReadonlyArray<Record<string, unknown>> => [
-  ...(dispatch.text === "" ? [] : [{ type: "text", text: dispatch.text }]),
+  ...[promptText(dispatch)].filter(Boolean).map((text) => ({ type: "text", text })),
   ...dispatch.attachments.map((attachment) => {
     switch (attachment.type) {
       case "image":

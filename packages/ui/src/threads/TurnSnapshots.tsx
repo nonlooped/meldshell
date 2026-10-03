@@ -1,11 +1,12 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, type ReactNode } from "react"
+import { create } from "zustand"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, CircleAlert, History, Undo2, X } from "lucide-react"
+import { Check, CircleAlert, History, Rewind, Undo2, X } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { TurnSnapshot } from "@meldshell/contracts/ipc"
 import { IconButton, MenuAction } from "../ui/controls"
 import { GradientSpinner, PopPresence, Swap } from "../ui/motion"
-import { queryKeys } from "../data/cache"
+import { queryKeys, replaceSnapshot } from "../data/cache"
 
 type SnapshotPoint = "before" | "after"
 
@@ -22,6 +23,8 @@ interface SnapshotScope {
   /** The snapshot the folder was last restored to, while that restore can still be undone. */
   readonly restored: Restore | null
   readonly restore: (restore: Restore) => void
+  /** Takes the conversation, and the files when they were snapshotted, back to before a turn. */
+  readonly rewind: (turnId: string) => void
 }
 
 const SnapshotContext = createContext<SnapshotScope | null>(null)
@@ -72,6 +75,35 @@ export function RestoreBeforeButton({
       <History size={13} />
     </IconButton>
   )
+}
+
+/**
+ * Rewinds the thread to just before a message: later turns leave the conversation, the files go
+ * back when they were snapshotted, and the message returns to the composer to edit and resend.
+ */
+export function RewindButton({ turnId }: { readonly turnId: string }): React.JSX.Element | null {
+  const scope = useContext(SnapshotContext)
+  if (scope === null || turnId.startsWith("event:")) return null
+  return (
+    <IconButton
+      unstyled
+      label="Rewind to this message"
+      disabled={scope.busy}
+      onClick={() => scope.rewind(turnId)}
+    >
+      <Rewind size={13} />
+    </IconButton>
+  )
+}
+
+export function RewindMenuAction({
+  turnId,
+}: {
+  readonly turnId: string
+}): React.JSX.Element | null {
+  const scope = useContext(SnapshotContext)
+  if (scope === null || scope.busy || turnId.startsWith("event:")) return null
+  return <MenuAction onClick={() => scope.rewind(turnId)}>Rewind to this message</MenuAction>
 }
 
 /** Context menu entries for a turn's snapshots. */
@@ -140,25 +172,61 @@ const dismissClasses = [
   "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]",
 ].join(" ")
 
+interface Rewound {
+  readonly turnCount: number
+  readonly filesRestored: boolean
+  /** The rewound message as it went into the composer. */
+  readonly text: string
+}
+
 type Status =
-  | { readonly state: "restoring" }
+  | { readonly state: "restoring" | "rewinding" }
   | { readonly state: "restored"; readonly restore: Restore }
-  | { readonly state: "undone" }
+  | { readonly state: "rewound"; readonly rewound: Rewound }
+  | { readonly state: "undone"; readonly rewind: boolean }
   | { readonly state: "failed"; readonly message: string }
 
-const statusText = (status: Status) =>
-  status.state === "restoring"
-    ? "Restoring files…"
-    : status.state === "undone"
-      ? "Restore undone"
-      : status.state === "failed"
-        ? status.message
-        : "Files restored"
+/**
+ * Each thread's pill outlives the transcript that showed it: rewinding every turn swaps the
+ * transcript for the empty thread's view, and the Undo has to survive that.
+ */
+const useStatuses = create<{
+  readonly statuses: Readonly<Record<string, Status>>
+  readonly set: (threadId: string, status: Status | null) => void
+}>((set) => ({
+  statuses: {},
+  set: (threadId, status) =>
+    set(({ statuses }) => {
+      const { [threadId]: _, ...rest } = statuses
+      return { statuses: status === null ? rest : { ...rest, [threadId]: status } }
+    }),
+}))
+
+const turns = (count: number) => `${count} ${count === 1 ? "turn" : "turns"}`
+
+const statusText = (status: Status) => {
+  switch (status.state) {
+    case "restoring":
+      return "Restoring files…"
+    case "rewinding":
+      return "Rewinding…"
+    case "restored":
+      return "Files restored"
+    case "rewound":
+      return status.rewound.filesRestored
+        ? `Rewound ${turns(status.rewound.turnCount)} and their files`
+        : `Rewound ${turns(status.rewound.turnCount)}`
+    case "undone":
+      return status.rewind ? "Rewind undone" : "Restore undone"
+    case "failed":
+      return status.message
+  }
+}
 
 function StatusIcon({ status }: { readonly status: Status }): React.JSX.Element {
   return (
     <Swap id={status.state}>
-      {status.state === "restoring" ? (
+      {status.state === "restoring" || status.state === "rewinding" ? (
         <GradientSpinner size={12} />
       ) : status.state === "failed" ? (
         <CircleAlert size={14} className="text-[var(--color-deleted)]" aria-hidden="true" />
@@ -170,24 +238,34 @@ function StatusIcon({ status }: { readonly status: Status }): React.JSX.Element 
 }
 
 /**
- * Owns restoring a thread's files to a turn snapshot. A restore runs at once, because the current
- * files are saved first, and a pill reports it with an Undo until the next restore, a new turn, or
- * a dismissal.
+ * Owns restoring a thread's files to a turn snapshot and rewinding its conversation. Both run at
+ * once, because what they replace is kept, and a pill reports each with an Undo until the next
+ * restore, a new turn, or a dismissal.
  */
 export function TurnSnapshots({
   workspaceId,
   threadId,
   running,
+  onRewound,
+  onRewindUndone,
+  inline = false,
   children,
 }: {
+  /** Shows the pill below the content instead of floating over the transcript's foot. */
+  readonly inline?: boolean
   /** Absent when the transcript has no folder to restore, such as a remote preview. */
   readonly workspaceId: string | undefined
   readonly threadId: string
   readonly running: boolean
+  /** Receives the rewound message, to edit and send again. */
+  readonly onRewound?: (text: string) => void
+  /** Receives the message a rewind put in the composer, once the rewind is undone. */
+  readonly onRewindUndone?: (text: string) => void
   readonly children: ReactNode
 }): React.JSX.Element {
   const client = useQueryClient()
-  const [status, setStatus] = useState<Status | null>(null)
+  const status = useStatuses((state) => state.statuses[threadId] ?? null)
+  const setStatus = (next: Status | null) => useStatuses.getState().set(threadId, next)
   const refresh = () => client.invalidateQueries({ queryKey: queryKeys.turnSnapshots(threadId) })
   const fail = (cause: Error) => setStatus({ state: "failed", message: cause.message })
   const restore = useMutation({
@@ -198,26 +276,44 @@ export function TurnSnapshots({
     onError: fail,
     onSettled: refresh,
   })
+  const rewind = useMutation({
+    mutationFn: (turnId: string) =>
+      window.meldshell.rewindThread({ workspaceId: workspaceId!, threadId, turnId }),
+    onMutate: () => setStatus({ state: "rewinding" }),
+    onSuccess: ({ snapshot, ...rewound }) => {
+      replaceSnapshot(client, snapshot)
+      setStatus({ state: "rewound", rewound })
+      onRewound?.(rewound.text)
+    },
+    onError: fail,
+    onSettled: refresh,
+  })
   const undo = useMutation({
-    mutationFn: () => window.meldshell.undoSnapshotRestore({ workspaceId: workspaceId!, threadId }),
-    onSuccess: () => setStatus({ state: "undone" }),
+    mutationFn: async (rewound: Rewound | null) => {
+      if (rewound === null)
+        return window.meldshell.undoSnapshotRestore({ workspaceId: workspaceId!, threadId })
+      replaceSnapshot(
+        client,
+        (await window.meldshell.undoRewind({ workspaceId: workspaceId!, threadId })).snapshot,
+      )
+      onRewindUndone?.(rewound.text)
+    },
+    onSuccess: (_, rewound) => setStatus({ state: "undone", rewind: rewound !== null }),
     onError: fail,
     onSettled: refresh,
   })
   // A new turn changes the files again, so the restore it followed is no longer the latest state.
-  const [wasRunning, setWasRunning] = useState(running)
-  if (running !== wasRunning) {
-    setWasRunning(running)
-    if (running) setStatus(null)
-  }
+  useEffect(() => {
+    if (running) useStatuses.getState().set(threadId, null)
+  }, [running, threadId])
   // A finished undo fades on its own; a restore waits for its Undo and a failure for its reader.
   useEffect(() => {
     if (status?.state !== "undone") return
-    const timer = window.setTimeout(() => setStatus(null), 2400)
+    const timer = window.setTimeout(() => useStatuses.getState().set(threadId, null), 2400)
     return () => window.clearTimeout(timer)
-  }, [status])
+  }, [status, threadId])
   if (workspaceId === undefined) return <>{children}</>
-  const pending = restore.isPending || undo.isPending
+  const pending = restore.isPending || rewind.isPending || undo.isPending
   return (
     <SnapshotContext
       value={{
@@ -226,10 +322,17 @@ export function TurnSnapshots({
         busy: running || pending,
         restored: status?.state === "restored" ? status.restore : null,
         restore: (input) => restore.mutate(input),
+        rewind: (turnId) => rewind.mutate(turnId),
       }}
     >
       {children}
-      <div className="absolute z-[2] bottom-[52px] inset-x-[16px] flex justify-center pointer-events-none">
+      <div
+        className={
+          inline
+            ? "flex justify-center mt-[16px] empty:hidden"
+            : "absolute z-[2] bottom-[52px] inset-x-[16px] flex justify-center pointer-events-none"
+        }
+      >
         <PopPresence show={status !== null}>
           {status !== null && (
             <div role="status" className={pillClasses}>
@@ -240,18 +343,18 @@ export function TurnSnapshots({
               >
                 {statusText(status)}
               </span>
-              {status.state === "restored" && (
+              {(status.state === "restored" || status.state === "rewound") && (
                 <BaseButton
                   type="button"
                   disabled={pending}
-                  onClick={() => undo.mutate()}
+                  onClick={() => undo.mutate(status.state === "rewound" ? status.rewound : null)}
                   className={pillButtonClasses}
                 >
                   <Undo2 size={13} aria-hidden="true" />
                   Undo
                 </BaseButton>
               )}
-              {status.state !== "restoring" && (
+              {status.state !== "restoring" && status.state !== "rewinding" && (
                 <IconButton
                   unstyled
                   label="Dismiss"

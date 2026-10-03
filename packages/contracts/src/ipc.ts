@@ -65,6 +65,9 @@ import type {
   ComposerCommand,
   SaveScheduleInput,
   ScheduledPrompt,
+  RewindResult,
+  UndoRewindResult,
+  TurnHandoff,
 } from "./models"
 
 export type ComposerAttachment = InputAttachment & { readonly previewUrl?: string }
@@ -326,6 +329,17 @@ export const requests = {
   undoSnapshotRestore: request<(input: UndoSnapshotRestoreInput) => Promise<void>>(
     "meldshell:undo-snapshot-restore",
   ),
+  /** What the thread's next turn would be told about work its agent has not seen. */
+  previewHandoff: request<(threadId: string) => Promise<TurnHandoff | null>>(
+    "meldshell:preview-handoff",
+  ),
+  /** Takes a thread back to before a turn: its conversation, and its files when snapshotted. */
+  rewindThread:
+    request<(input: TurnSnapshotInput) => Promise<RewindResult>>("meldshell:rewind-thread"),
+  undoRewind:
+    request<(input: UndoSnapshotRestoreInput) => Promise<UndoRewindResult>>(
+      "meldshell:undo-rewind",
+    ),
   renameWorkspace: request<(input: { workspaceId: string; name: string }) => Promise<AppSnapshot>>(
     "meldshell:rename-workspace",
   ),
