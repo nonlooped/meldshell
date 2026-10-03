@@ -4,6 +4,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-03
+
 ### Changed
 
 - Streaming agent activity no longer reloads every thread, model, setting, and schedule on each tool event; mid-turn events refresh only that thread's transcript, and the full app state reloads when a turn finishes, an approval arrives or resolves, or a thread's title or mode changes.
@@ -275,7 +277,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/nonlooped/meldshell/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/nonlooped/meldshell/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/nonlooped/meldshell/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/nonlooped/meldshell/compare/v0.10.0...v0.11.0
