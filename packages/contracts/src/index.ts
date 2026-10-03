@@ -20,6 +20,7 @@ export {
   GitBulkActionInput,
   GitCommitInput,
   CreatePullRequestInput,
+  ListIssuesInput,
   TurnSnapshotInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,

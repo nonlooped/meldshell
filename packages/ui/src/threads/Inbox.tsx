@@ -43,6 +43,7 @@ import {
 } from "../ui/controls"
 import { relativeAge } from "../ui/relative-age"
 import { useScheduledThreadIds } from "../schedules/schedule-queries"
+import { useViewStore } from "../app/view-store"
 import {
   glanceLabel,
   isFinished,
@@ -695,6 +696,15 @@ export function Inbox({
             }
           >
             {workspaceId === "all" ? "New thread" : "New thread in this workspace"}
+          </MenuAction>
+          <MenuAction
+            onClick={() =>
+              useViewStore
+                .getState()
+                .openIssuePicker(workspaceId === "all" ? undefined : workspaceId)
+            }
+          >
+            New thread from an issue…
           </MenuAction>
           {workspaceId !== "all" && (
             <MenuAction onClick={() => setWorkspaceId("all")}>Show all workspaces</MenuAction>

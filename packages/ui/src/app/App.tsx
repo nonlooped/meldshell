@@ -15,13 +15,14 @@ import {
 import { useAppAppearance } from "./appearance"
 import { Tabs } from "@base-ui-components/react/tabs"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
+import type { AppSnapshot, Thread, TranscriptSearchResult, Workspace } from "@meldshell/contracts"
 import type { RunScript, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { workspaceScope } from "../data/workspace-scope"
 import { AlarmClock, Plus, Settings } from "lucide-react"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import { InteractionDialog } from "../threads/InteractionDialog"
 import { FilePalette } from "./FilePalette"
+import { IssuePalette } from "./IssuePalette"
 import { ThreadPalette } from "./ThreadPalette"
 import { Inbox } from "../threads/Inbox"
 import { FilesSidebar } from "../files/FilesSidebar"
@@ -55,9 +56,25 @@ import { SettingsView } from "../settings/SettingsView"
 import { OnboardingLayer } from "../onboarding/Onboarding"
 import { needsOnboarding } from "../onboarding/onboarding-model"
 
-// A freshly created thread stays out of the inbox until it carries work of its own.
+// A freshly created thread stays out of the inbox until it carries work of its own; an issue is
+// work of its own, so a thread started from one is never reused as a blank draft.
 const isDraftThread = (thread: Thread): boolean =>
-  thread.turnCount === 0 && thread.queuedCount === 0
+  thread.turnCount === 0 && thread.queuedCount === 0 && thread.issue === undefined
+
+/** An issue thread starts with a message ready to send; the issue itself travels with it. */
+const prefillIssueDraft = (threadId: string, issue: number | undefined): void => {
+  if (issue !== undefined)
+    useThreadDrafts.getState().update(threadId, { text: `Resolve issue #${issue}.` })
+}
+
+/** The issue picker lists the workspace it was opened for, else the active one, else the latest. */
+const pickerWorkspace = (
+  workspaces: readonly Workspace[],
+  picker: { readonly workspaceId?: string } | null,
+  activeWorkspaceId: string,
+) =>
+  workspaces.find((workspace) => workspace.id === (picker?.workspaceId ?? activeWorkspaceId)) ??
+  workspaces[0]
 
 function MutationErrors({
   mutations,
@@ -523,6 +540,7 @@ export function App(): React.JSX.Element {
   const schedulesOpen = useViewStore((state) => state.schedulesOpen)
   const openSchedules = useViewStore((state) => state.openSchedules)
   const workbenchCovered = useViewStore((state) => state.settingsOpen || state.schedulesOpen)
+  const issuePicker = useViewStore((state) => state.issuePicker)
 
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
   const [threadPaletteOpen, setThreadPaletteOpen] = useState(false)
@@ -554,8 +572,10 @@ export function App(): React.JSX.Element {
     deleteThreadMutation,
     resolveApprovalMutation,
   } = useThreadManagementActions(snapshot, {
-    created: (threadId) => {
-      if (threadId !== undefined) openThread(threadId)
+    created: (threadId, input) => {
+      if (threadId === undefined) return
+      prefillIssueDraft(threadId, input.issue)
+      openThread(threadId)
     },
     deleted: (threadId) => {
       removeThread(threadId)
@@ -711,6 +731,7 @@ export function App(): React.JSX.Element {
       requestNewThread,
       openThreadPalette: () => setThreadPaletteOpen(true),
       openFilePalette: () => setFilePaletteOpen(true),
+      openIssuePicker: () => useViewStore.getState().openIssuePicker(),
       openSettings: () => openSettings(),
       selectedThreadId: selectedTabId,
       closeThread,
@@ -988,6 +1009,22 @@ export function App(): React.JSX.Element {
               }}
             />
 
+            <IssuePalette
+              open={issuePicker !== null}
+              onOpenChange={(open) => {
+                if (!open) useViewStore.getState().closeIssuePicker()
+              }}
+              workspace={pickerWorkspace(snapshot.workspaces, issuePicker, activeWorkspaceId)}
+              onStart={(workspaceId, issue) =>
+                createThreadMutation
+                  .mutateAsync({ workspaceId, issue: issue.number })
+                  .then(closeWorkbenchViews, (error: unknown) => {
+                    // The picker shows the error itself, so the app-wide toast stays away.
+                    createThreadMutation.reset()
+                    throw error
+                  })
+              }
+            />
             {selectedApproval !== null && !appHidden && (
               <InteractionDialog
                 key={selectedApproval.id}

@@ -10,6 +10,7 @@ interface ShortcutActions {
   settingsOpen: boolean
   closeSettings: () => void
   requestNewThread: () => void
+  openIssuePicker: () => void
   openThreadPalette: () => void
   openFilePalette: () => void
   openSettings: () => void
@@ -66,6 +67,7 @@ export function handleAppShortcut(
   event.preventDefault()
   const run: Record<Exclude<ShortcutAction, LoadoutAction>, () => void> = {
     newThread: actions.requestNewThread,
+    issuePicker: actions.openIssuePicker,
     threadPalette: actions.openThreadPalette,
     filePalette: actions.openFilePalette,
     settings: actions.openSettings,

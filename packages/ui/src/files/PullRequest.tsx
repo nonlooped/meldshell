@@ -17,6 +17,7 @@ import {
   ChevronRight,
   CircleCheck,
   CircleDashed,
+  CircleDot,
   CircleMinus,
   CircleX,
   Eye,
@@ -445,6 +446,28 @@ function BranchSummary({ status }: { status: PullRequestStatus }): React.JSX.Ele
           </span>
         )}
       </div>
+      {status.issue !== null && (
+        <p className="m-0 mt-[8px] flex min-w-0 items-center gap-[6px] text-[12px] text-[var(--text-tertiary)]">
+          <CircleDot
+            size={13}
+            strokeWidth={2}
+            className="flex-none text-[var(--color-added)]"
+            aria-hidden="true"
+          />
+          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            Closes{" "}
+            <a
+              href={status.issue.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[var(--text-secondary)] no-underline [&:hover]:text-[var(--text-primary)] [&:hover]:underline"
+            >
+              #{status.issue.number} {status.issue.title}
+            </a>{" "}
+            when it merges
+          </span>
+        </p>
+      )}
       <CollapsiblePanel>
         <ol className="m-0 mt-[8px] max-h-[120px] overflow-y-auto [padding:4px_10px] list-none border-l-[2px] border-l-[color:var(--line-subtle)] text-[11.5px] leading-[1.7] text-[var(--text-secondary)]">
           {status.commits.map((subject, index) => (

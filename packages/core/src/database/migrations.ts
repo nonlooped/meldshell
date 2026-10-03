@@ -325,6 +325,16 @@ export const runMigrations = Effect.gen(function* () {
         )`
       }),
     },
+    {
+      version: 14,
+      apply: Effect.gen(function* () {
+        // The issue a thread started from. Its text is the first turn's context, so it stays put.
+        yield* sql`ALTER TABLE threads ADD COLUMN issue_number INTEGER`
+        yield* sql`ALTER TABLE threads ADD COLUMN issue_title TEXT`
+        yield* sql`ALTER TABLE threads ADD COLUMN issue_url TEXT`
+        yield* sql`ALTER TABLE threads ADD COLUMN issue_context TEXT`
+      }),
+    },
   ]
   const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table'`
   const has = (name: string) => tables.some((table) => table.name === name)

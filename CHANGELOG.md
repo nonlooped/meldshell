@@ -12,6 +12,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
+- Start a thread from a GitHub issue. Ctrl+Shift+N, From an issue under an empty thread's composer, or New thread from an issue in the inbox's workspace menu lists the workspace repository's open issues with their labels; type to search them or enter a number. Picking one opens a thread titled after the issue on its own branch and worktree (named like `meldshell/42-login-redirect-loops`), with a link to the issue and a message ready to send. The issue's description, labels, and latest comments go to the agent with the thread's first message. A pull request created from that thread says it closes the issue and adds `Closes #42` to its description, so GitHub links the two and closes the issue when it merges. This uses the GitHub CLI (gh) signed in on the computer running MeldShell.
+
 - Loadouts save an agent, model, and reasoning effort so a thread can switch to them in one step, keeping its own mode and permissions. They sit at the foot of the composer's model picker, which marks the one the thread is on and saves the current setup under a name; Ctrl+1 to Ctrl+5 switch the thread in front to the first five. Settings > Threads & agents > Loadouts renames, reorders (which changes their shortcuts), and deletes them, and Settings > Keyboard & dictation > Keyboard shortcuts can change the keys.
 
 - Settings search finds preferences, shortcuts, and providers and opens their location. A Default editor selector makes the existing Open in editor preference explicit.

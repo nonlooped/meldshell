@@ -7,6 +7,7 @@ import { CoreClient } from "./core-client"
 import { HostPlatform } from "./platform"
 import { statusAt } from "./git"
 import { deleteThreadSnapshots } from "./turn-snapshots"
+import { issueBranchName, readIssue } from "./issues"
 import {
   createWorktree,
   mergeWorktree,
@@ -66,11 +67,12 @@ export const scopePath = (scope: WorkspaceScope) =>
 const withNewWorktree = <A, E, R>(
   workspacePath: string,
   record: (worktree: Awaited<ReturnType<typeof createWorktree>>) => Effect.Effect<A, E, R>,
+  branchName?: string,
 ) =>
   Effect.gen(function* () {
     const platform = yield* HostPlatform
     const worktree = yield* attempt(() =>
-      createWorktree(workspacePath, join(dirname(platform.databasePath), "worktrees")),
+      createWorktree(workspacePath, join(dirname(platform.databasePath), "worktrees"), branchName),
     )
     return yield* record(worktree).pipe(
       Effect.tapError(() =>
@@ -100,19 +102,37 @@ const setUpCreatedWorktree = (snapshot: AppSnapshot, worktreePath: string) => {
       )
 }
 
+/**
+ * Creates a thread. A thread started from an issue reads the issue first, so a GitHub problem leaves
+ * nothing behind, then works on a branch named after it.
+ */
 export const createThread = (input: CreateThreadInput) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
+    if (input.isolated !== true && input.issue === undefined)
+      return yield* core.CreateThread({
+        workspaceId: input.workspaceId,
+        ...(input.title === undefined ? {} : { title: input.title }),
+      })
+    const workspacePath = yield* scopePath({ workspaceId: input.workspaceId })
+    const issueNumber = input.issue
+    const issue =
+      issueNumber === undefined
+        ? undefined
+        : yield* attempt(() => readIssue(workspacePath, issueNumber))
+    const title = input.title ?? issue?.title
     const record = {
       workspaceId: input.workspaceId,
-      ...(input.title === undefined ? {} : { title: input.title }),
+      ...(title === undefined ? {} : { title }),
+      ...(issue === undefined ? {} : { issue }),
     }
-    if (input.isolated !== true) return yield* core.CreateThread(record)
-    const workspacePath = yield* scopePath({ workspaceId: input.workspaceId })
-    return yield* withNewWorktree(workspacePath, (worktree) =>
-      core
-        .CreateThread({ ...record, worktree })
-        .pipe(Effect.flatMap((snapshot) => setUpCreatedWorktree(snapshot, worktree.path))),
+    return yield* withNewWorktree(
+      workspacePath,
+      (worktree) =>
+        core
+          .CreateThread({ ...record, worktree })
+          .pipe(Effect.flatMap((snapshot) => setUpCreatedWorktree(snapshot, worktree.path))),
+      issue === undefined ? undefined : issueBranchName(issue),
     )
   })
 
@@ -141,8 +161,10 @@ export const setDraftLocation = (input: {
     const workspacePath = yield* scopePath({ workspaceId })
     const record = { threadId: input.threadId, workspaceId }
     const snapshot = isolated
-      ? yield* withNewWorktree(workspacePath, (worktree) =>
-          core.SetDraftLocation({ ...record, worktree }),
+      ? yield* withNewWorktree(
+          workspacePath,
+          (worktree) => core.SetDraftLocation({ ...record, worktree }),
+          location.issue === null ? undefined : issueBranchName(location.issue),
         )
       : yield* core.SetDraftLocation({ ...record, worktree: null })
     if (current !== null)

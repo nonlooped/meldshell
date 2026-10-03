@@ -8,6 +8,7 @@ import { create } from "zustand"
 
 export type ShortcutAction =
   | "newThread"
+  | "issuePicker"
   | "threadPalette"
   | "filePalette"
   | "settings"
@@ -39,6 +40,12 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   { id: "threadPalette", label: "Go to thread or message", group: "Navigation", chord: "Ctrl+K" },
   { id: "filePalette", label: "Go to file", group: "Navigation", chord: "Ctrl+P" },
   { id: "newThread", label: "New thread", group: "Navigation", chord: "Ctrl+N" },
+  {
+    id: "issuePicker",
+    label: "New thread from a GitHub issue",
+    group: "Navigation",
+    chord: "Ctrl+Shift+N",
+  },
   { id: "settings", label: "Open settings", group: "Navigation", chord: "Ctrl+," },
   { id: "closeTab", label: "Close tab", group: "Tabs", chord: "Ctrl+W" },
   { id: "archiveThread", label: "Archive or restore thread", group: "Navigation", chord: "Ctrl+E" },

@@ -3,7 +3,7 @@ import { useIsMutating, useMutation, useMutationState, useQueryClient } from "@t
 import type { Thread, Workspace } from "@meldshell/contracts"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { ToggleGroup } from "@base-ui-components/react/toggle-group"
-import { Folder, GitBranch } from "lucide-react"
+import { ArrowUpRight, CircleDot, Folder, GitBranch } from "lucide-react"
 import { replaceSnapshot } from "../data/cache"
 import { DropdownMenu, MenuChoice, MenuRadioGroup } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
@@ -12,6 +12,7 @@ import { useMotionPreference } from "../ui/motion"
 import { ErrorToast } from "../ui/Notice"
 import { segmentClasses, segmentGroupClasses } from "../ui/styles"
 import { WorktreeSetupNote } from "../files/WorktreeSetup"
+import { useViewStore } from "../app/view-store"
 
 const originEase = [0.16, 1, 0.3, 1] as const
 
@@ -58,13 +59,59 @@ export function ThreadOrigin({
     animate: { opacity: 1, ...to },
     transition: { duration: reduced ? 0 : 0.6, delay: reduced ? 0 : delay, ease: originEase },
   })
+  const mark = (
+    <motion.div
+      {...enter(0, { scale: 0.8, filter: "blur(6px)" }, { scale: 1, filter: "blur(0px)" })}
+    >
+      <MeldMark className="block w-[24px] h-[24px] mb-[18px] text-[var(--text-tertiary)] opacity-[0.7]" />
+    </motion.div>
+  )
+  // An issue already says what to work on, so its title takes the question's place.
+  if (thread.issue !== undefined)
+    return (
+      <div className="flex flex-col items-center text-center">
+        {mark}
+        <motion.a
+          {...enter(0.04, { y: 4 }, { y: 0 })}
+          href={thread.issue.url}
+          target="_blank"
+          rel="noreferrer"
+          title="Open the issue on GitHub"
+          className="motion-colors group inline-flex items-center gap-[6px] h-[24px] mb-[8px] [padding:0_9px_0_8px] rounded-full border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-hover)] text-[12px] text-[var(--text-secondary)] no-underline [&:hover]:text-[var(--text-primary)] [&:hover]:border-[color:var(--line)] [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)]"
+        >
+          <CircleDot
+            size={13}
+            strokeWidth={2}
+            className="text-[var(--color-added)]"
+            aria-hidden="true"
+          />
+          <span className="tabular-nums">Issue #{thread.issue.number}</span>
+          {workspace !== undefined && (
+            <span className="text-[var(--text-tertiary)]">in {workspace.name}</span>
+          )}
+          <ArrowUpRight
+            size={12}
+            className="text-[var(--text-tertiary)] motion-transform group-hover:[transform:translate(1px,-1px)]"
+            aria-hidden="true"
+          />
+        </motion.a>
+        <motion.h2
+          {...enter(0.08, { y: 6 }, { y: 0 })}
+          className="m-0 max-w-[560px] [font-family:var(--font-display)] text-[21px] font-semibold leading-[1.35] tracking-[-0.015em] text-[var(--text-primary)] [text-wrap:balance]"
+        >
+          {thread.issue.title}
+        </motion.h2>
+        <motion.p
+          {...enter(0.14, { y: 4 }, { y: 0 })}
+          className="m-0 mt-[8px] max-w-[440px] text-[12.5px] leading-[1.55] text-[var(--text-tertiary)] [text-wrap:pretty]"
+        >
+          The issue's description and comments go to the agent with your first message.
+        </motion.p>
+      </div>
+    )
   return (
     <div className="flex flex-col items-center text-center">
-      <motion.div
-        {...enter(0, { scale: 0.8, filter: "blur(6px)" }, { scale: 1, filter: "blur(0px)" })}
-      >
-        <MeldMark className="block w-[24px] h-[24px] mb-[18px] text-[var(--text-tertiary)] opacity-[0.7]" />
-      </motion.div>
+      {mark}
       <motion.h2
         {...enter(0.08, { y: 6 }, { y: 0 })}
         className="m-0 [font-family:var(--font-display)] text-[21px] font-semibold leading-[1.35] tracking-[-0.015em] text-[var(--text-primary)] [text-wrap:balance]"
@@ -169,6 +216,18 @@ export function ThreadBranchToggle({ thread }: { thread: Thread }): React.JSX.El
           <span className="min-w-0 text-[var(--text-tertiary)] text-[12px]">{note}</span>
         ) : (
           <WorktreeSetupNote thread={thread} className="text-[12px]" />
+        )}
+        {thread.issue === undefined && note === undefined && (
+          <BaseButton
+            type="button"
+            disabled={busy}
+            title="Start a thread on its own branch from an open GitHub issue"
+            onClick={() => useViewStore.getState().openIssuePicker(thread.workspaceId)}
+            className="motion-colors inline-flex shrink-0 items-center gap-[6px] h-[26px] [padding:0_9px] border-0 rounded-[var(--radius-sm)] bg-transparent text-[12px] text-[var(--text-secondary)] cursor-default [&:hover:not(:disabled)]:bg-[var(--surface-hover)] [&:hover:not(:disabled)]:text-[var(--text-primary)] [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)]"
+          >
+            <CircleDot size={13} strokeWidth={2} aria-hidden="true" />
+            From an issue
+          </BaseButton>
         )}
       </div>
       {mutation.isError && (

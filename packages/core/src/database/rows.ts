@@ -55,6 +55,9 @@ export const ThreadRow = Schema.Struct({
   queued_count: Schema.Number,
   turn_count: Schema.Number,
   history_revision: NullableText,
+  issue_number: Schema.NullOr(Schema.Number),
+  issue_title: NullableText,
+  issue_url: NullableText,
   last_harness: NullableText,
   rewound: Flag,
 })
@@ -214,6 +217,9 @@ export const threadColumns = columnList([
   "worktree_state",
   "worktree_setup",
   "history_revision",
+  "issue_number",
+  "issue_title",
+  "issue_url",
 ] satisfies ReadonlyArray<keyof ThreadRow>)
 
 const fromWorkspaceRow = (row: WorkspaceRow): Workspace => ({
@@ -241,6 +247,15 @@ export const fromThreadRow = (row: ThreadRow): Thread => {
     ...(row.last_harness === null ? {} : { lastHarness: row.last_harness }),
     ...(row.rewound === 1 ? { rewound: true } : {}),
     ...(row.history_revision === null ? {} : { historyRevision: row.history_revision }),
+    ...(row.issue_number === null
+      ? {}
+      : {
+          issue: {
+            number: Number(row.issue_number),
+            title: row.issue_title ?? "",
+            url: row.issue_url ?? "",
+          },
+        }),
   }
 }
 
