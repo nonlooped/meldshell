@@ -12,11 +12,14 @@ export function ModelPicker({
   models,
   selected,
   onSelect,
+  footer,
 }: {
   readonly providers: ReadonlyArray<Provider>
   readonly models: ReadonlyArray<ProviderModel>
   readonly selected: ProviderModel
   readonly onSelect: (id: string) => void
+  /** Shown under the model list; `close` dismisses the picker. */
+  readonly footer?: (close: () => void) => React.ReactNode
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -135,6 +138,7 @@ export function ModelPicker({
                   ? "No matching models."
                   : "Enable a model in Settings > Providers & models."}
               </Combobox.Empty>
+              {footer?.(() => setOpen(false))}
             </div>
           </Combobox.Popup>
         </Combobox.Positioner>

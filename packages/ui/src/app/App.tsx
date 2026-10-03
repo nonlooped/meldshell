@@ -15,13 +15,14 @@ import {
 import { useAppAppearance } from "./appearance"
 import { Tabs } from "@base-ui-components/react/tabs"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
+import type { AppSnapshot, Thread, TranscriptSearchResult, Workspace } from "@meldshell/contracts"
 import type { RunScript, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { workspaceScope } from "../data/workspace-scope"
 import { AlarmClock, Plus, Settings } from "lucide-react"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
 import { InteractionDialog } from "../threads/InteractionDialog"
 import { FilePalette } from "./FilePalette"
+import { IssuePalette } from "./IssuePalette"
 import { ThreadPalette } from "./ThreadPalette"
 import { Inbox } from "../threads/Inbox"
 import { FilesSidebar } from "../files/FilesSidebar"
@@ -37,6 +38,7 @@ import { ActionToast, ErrorToast } from "../ui/Notice"
 import { handleAppShortcut } from "./app-shortcuts"
 import { useKeybindings } from "./keybindings"
 import { useDictationRequests } from "../threads/dictation-recorder"
+import { useLoadoutSwitch } from "../threads/loadout-switch"
 import { useTabStore, type FileTab } from "./tab-store"
 import { visibleThreads } from "./thread-layout"
 import { useViewportTier, type ViewportTier } from "./viewport"
@@ -55,9 +57,25 @@ import { SettingsView } from "../settings/SettingsView"
 import { OnboardingLayer } from "../onboarding/Onboarding"
 import { needsOnboarding } from "../onboarding/onboarding-model"
 
-// A freshly created thread stays out of the inbox until it carries work of its own.
+// A freshly created thread stays out of the inbox until it carries work of its own; an issue is
+// work of its own, so a thread started from one is never reused as a blank draft.
 const isDraftThread = (thread: Thread): boolean =>
-  thread.turnCount === 0 && thread.queuedCount === 0
+  thread.turnCount === 0 && thread.queuedCount === 0 && thread.issue === undefined
+
+/** An issue thread starts with a message ready to send; the issue itself travels with it. */
+const prefillIssueDraft = (threadId: string, issue: number | undefined): void => {
+  if (issue !== undefined)
+    useThreadDrafts.getState().update(threadId, { text: `Resolve issue #${issue}.` })
+}
+
+/** The issue picker lists the workspace it was opened for, else the active one, else the latest. */
+const pickerWorkspace = (
+  workspaces: readonly Workspace[],
+  picker: { readonly workspaceId?: string } | null,
+  activeWorkspaceId: string,
+) =>
+  workspaces.find((workspace) => workspace.id === (picker?.workspaceId ?? activeWorkspaceId)) ??
+  workspaces[0]
 
 function MutationErrors({
   mutations,
@@ -74,6 +92,20 @@ function MutationErrors({
       }}
     />
   )
+}
+
+/** The shortcuts that act on the thread in front, or none of them when no thread is. */
+function threadShortcuts(
+  thread: Thread | null,
+  toggleArchived: (thread: Thread) => void,
+  applyLoadout: (threadId: string, slot: number) => void,
+): Pick<Parameters<typeof handleAppShortcut>[2], "toggleArchived" | "dictate" | "applyLoadout"> {
+  if (thread === null) return { toggleArchived: null, dictate: null, applyLoadout: null }
+  return {
+    toggleArchived: () => toggleArchived(thread),
+    dictate: () => useDictationRequests.getState().toggle(thread.id),
+    applyLoadout: (slot) => applyLoadout(thread.id, slot),
+  }
 }
 
 function ThreadPane({
@@ -509,6 +541,7 @@ export function App(): React.JSX.Element {
   const schedulesOpen = useViewStore((state) => state.schedulesOpen)
   const openSchedules = useViewStore((state) => state.openSchedules)
   const workbenchCovered = useViewStore((state) => state.settingsOpen || state.schedulesOpen)
+  const issuePicker = useViewStore((state) => state.issuePicker)
 
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
   const [threadPaletteOpen, setThreadPaletteOpen] = useState(false)
@@ -540,8 +573,10 @@ export function App(): React.JSX.Element {
     deleteThreadMutation,
     resolveApprovalMutation,
   } = useThreadManagementActions(snapshot, {
-    created: (threadId) => {
-      if (threadId !== undefined) openThread(threadId)
+    created: (threadId, input) => {
+      if (threadId === undefined) return
+      prefillIssueDraft(threadId, input.issue)
+      openThread(threadId)
     },
     deleted: (threadId) => {
       removeThread(threadId)
@@ -573,6 +608,7 @@ export function App(): React.JSX.Element {
   const { updateProviderMutation, upsertModelMutation, deleteModelMutation, resetCatalogMutation } =
     useCatalogActions()
   const appSettingsMutation = useAppSettingsMutation()
+  const loadoutSwitch = useLoadoutSwitch(snapshot)
 
   useAppAppearance(snapshot.settings)
 
@@ -688,6 +724,8 @@ export function App(): React.JSX.Element {
   // The listener stays registered; each render hands it the current actions.
   const shortcutActions = useRef<Parameters<typeof handleAppShortcut>[2] | null>(null)
   useEffect(() => {
+    // The thread a thread shortcut acts on: none while settings or a file is in front.
+    const frontThread = workbenchCovered || selectedFile !== undefined ? null : selectedThread
     shortcutActions.current = {
       settingsOpen: workbenchCovered,
       closeSettings: closeWorkbenchViews,
@@ -699,13 +737,10 @@ export function App(): React.JSX.Element {
         if (sourceControl.collapsed) toggleSourceControl()
         useContentSearch.getState().openSearch(selectedSearchText())
       },
+      openIssuePicker: () => useViewStore.getState().openIssuePicker(),
       openSettings: () => openSettings(),
       selectedThreadId: selectedTabId,
       closeThread,
-      toggleArchived:
-        workbenchCovered || selectedFile !== undefined || selectedThread === null
-          ? null
-          : () => toggleArchived(selectedThread),
       cycleTabs: (direction) => {
         closeWorkbenchViews()
         cycleTabs(direction)
@@ -715,10 +750,8 @@ export function App(): React.JSX.Element {
       toggleTerminal: terminal.toggle,
       togglePreview: preview.toggle,
       openInEditor: () => editor.open(),
-      dictate:
-        workbenchCovered || selectedFile !== undefined || selectedThread === null
-          ? null
-          : () => useDictationRequests.getState().toggle(selectedThread.id),
+      ...threadShortcuts(frontThread, toggleArchived, loadoutSwitch.apply),
+      loadoutCount: loadoutSwitch.count,
     }
   })
   useEffect(() => {
@@ -932,6 +965,7 @@ export function App(): React.JSX.Element {
                 addWorkspaceMutation,
                 createThreadMutation,
                 editor.mutation,
+                ...loadoutSwitch.errors,
               ]}
             />
             <AppDialog
@@ -981,6 +1015,22 @@ export function App(): React.JSX.Element {
               }}
             />
 
+            <IssuePalette
+              open={issuePicker !== null}
+              onOpenChange={(open) => {
+                if (!open) useViewStore.getState().closeIssuePicker()
+              }}
+              workspace={pickerWorkspace(snapshot.workspaces, issuePicker, activeWorkspaceId)}
+              onStart={(workspaceId, issue) =>
+                createThreadMutation
+                  .mutateAsync({ workspaceId, issue: issue.number })
+                  .then(closeWorkbenchViews, (error: unknown) => {
+                    // The picker shows the error itself, so the app-wide toast stays away.
+                    createThreadMutation.reset()
+                    throw error
+                  })
+              }
+            />
             {selectedApproval !== null && !appHidden && (
               <InteractionDialog
                 key={selectedApproval.id}

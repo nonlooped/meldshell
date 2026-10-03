@@ -35,6 +35,15 @@ export const ThreadWorktree = Schema.Struct({
 
 export type ThreadWorktree = typeof ThreadWorktree.Type
 
+/** The GitHub issue a thread was started from; its text goes to the agent with the first message. */
+export const ThreadIssue = Schema.Struct({
+  number: Schema.Number,
+  title: Schema.String,
+  url: Schema.String,
+})
+
+export type ThreadIssue = typeof ThreadIssue.Type
+
 export const Thread = Schema.Struct({
   id: Schema.String,
   workspaceId: Schema.String,
@@ -67,6 +76,7 @@ export const Thread = Schema.Struct({
   rewound: Schema.optional(Schema.Boolean),
   /** Changes whenever turns leave or return to the conversation, so open transcripts are reread. */
   historyRevision: Schema.optional(Schema.String),
+  issue: Schema.optional(ThreadIssue),
 })
 
 export type Thread = typeof Thread.Type
@@ -393,6 +403,25 @@ export const FollowUpDelivery = Schema.Literals(["queue", "steer"])
 
 export type FollowUpDelivery = typeof FollowUpDelivery.Type
 
+/** How many loadouts can be saved: one for each of the Ctrl+1 to Ctrl+5 shortcuts. */
+export const MAX_LOADOUTS = 5
+
+/**
+ * A saved composer setup: the agent (through its model), reasoning effort, and speed. Applying one
+ * sets all of them on a thread at once and leaves its mode and permissions alone.
+ */
+export const Loadout = Schema.Struct({
+  id: Schema.String.pipe(Schema.check(Schema.isMaxLength(64))),
+  name: Schema.String.pipe(Schema.check(Schema.isMaxLength(48))),
+  modelId: Schema.String.pipe(Schema.check(Schema.isMaxLength(256))),
+  reasoningEffort: Schema.NullOr(ReasoningEffort.pipe(Schema.check(Schema.isMaxLength(32)))),
+  speed: ModelSpeed,
+})
+
+export type Loadout = typeof Loadout.Type
+
+export const Loadouts = Schema.Array(Loadout).pipe(Schema.check(Schema.isMaxLength(MAX_LOADOUTS)))
+
 export const AppSettings = Schema.Struct({
   alwaysFullPermissions: Schema.optional(Schema.Boolean),
   /** What Enter does while a turn runs; the opposite is one modifier away. Queues by default. */
@@ -410,6 +439,8 @@ export const AppSettings = Schema.Struct({
   editor: Schema.optional(Schema.String),
   /** Shortcut chords that differ from the defaults, by action; an empty chord removes one. */
   keybindings: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /** Saved composer setups, in shortcut order: the first is Ctrl+1. */
+  loadouts: Schema.optional(Loadouts),
   /** Whether the first-run guide has been finished or skipped. */
   onboarded: Schema.optional(Schema.Boolean),
 
@@ -606,6 +637,13 @@ export const CreateThreadInput = Schema.Struct({
   title: Schema.optional(Schema.String),
   /** Gives the thread its own branch and worktree instead of the workspace checkout. */
   isolated: Schema.optional(Schema.Boolean),
+  /** Starts from this GitHub issue in the workspace's repository, on a branch of its own. */
+  issue: Schema.optional(
+    Schema.Number.pipe(
+      Schema.check(Schema.isInt()),
+      Schema.check(Schema.isBetween({ minimum: 1, maximum: 2 ** 31 })),
+    ),
+  ),
 })
 
 export type CreateThreadInput = typeof CreateThreadInput.Type
@@ -615,6 +653,8 @@ export const RecordThreadInput = Schema.Struct({
   workspaceId: Schema.String,
   title: Schema.optional(Schema.String),
   worktree: Schema.optional(ThreadWorktree.mapFields(Struct.omit(["state", "setup"]))),
+  /** The issue's text, as the host read it from GitHub, is kept for the thread's first turn. */
+  issue: Schema.optional(Schema.Struct({ ...ThreadIssue.fields, context: Schema.String })),
 })
 
 export type RecordThreadInput = typeof RecordThreadInput.Type
@@ -625,6 +665,7 @@ export const ThreadLocation = Schema.Struct({
   workspaceId: Schema.String,
   workspacePath: Schema.String,
   worktree: Schema.NullOr(ThreadWorktree),
+  issue: Schema.NullOr(ThreadIssue),
   /** A turn is running or input is queued, so the folder must stay where it is. */
   busy: Schema.Boolean,
 })

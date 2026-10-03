@@ -8,6 +8,7 @@ import { create } from "zustand"
 
 export type ShortcutAction =
   | "newThread"
+  | "issuePicker"
   | "threadPalette"
   | "filePalette"
   | "searchFiles"
@@ -22,11 +23,17 @@ export type ShortcutAction =
   | "togglePreview"
   | "openInEditor"
   | "dictate"
+  | LoadoutAction
+
+/** The shortcuts that switch to a saved loadout, in loadout order. */
+export const LOADOUT_ACTIONS = ["loadout1", "loadout2", "loadout3", "loadout4", "loadout5"] as const
+
+export type LoadoutAction = (typeof LOADOUT_ACTIONS)[number]
 
 export interface ShortcutDefinition {
   readonly id: ShortcutAction
   readonly label: string
-  readonly group: "Navigation" | "Tabs" | "Panels" | "Workspace" | "Input"
+  readonly group: "Navigation" | "Tabs" | "Panels" | "Workspace" | "Input" | "Loadouts"
   readonly chord: string
 }
 
@@ -35,6 +42,12 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   { id: "filePalette", label: "Go to file", group: "Navigation", chord: "Ctrl+P" },
   { id: "searchFiles", label: "Search in files", group: "Navigation", chord: "Ctrl+Shift+F" },
   { id: "newThread", label: "New thread", group: "Navigation", chord: "Ctrl+N" },
+  {
+    id: "issuePicker",
+    label: "New thread from a GitHub issue",
+    group: "Navigation",
+    chord: "Ctrl+Shift+N",
+  },
   { id: "settings", label: "Open settings", group: "Navigation", chord: "Ctrl+," },
   { id: "closeTab", label: "Close tab", group: "Tabs", chord: "Ctrl+W" },
   { id: "archiveThread", label: "Archive or restore thread", group: "Navigation", chord: "Ctrl+E" },
@@ -56,6 +69,12 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   },
   { id: "openInEditor", label: "Open in editor", group: "Workspace", chord: "Ctrl+Shift+E" },
   { id: "dictate", label: "Start or stop dictation", group: "Input", chord: "Ctrl+Shift+D" },
+  ...LOADOUT_ACTIONS.map((id, index) => ({
+    id,
+    label: `Switch to loadout ${index + 1}`,
+    group: "Loadouts" as const,
+    chord: `Ctrl+${index + 1}`,
+  })),
 ]
 
 export type Keybindings = Readonly<Record<ShortcutAction, string>>

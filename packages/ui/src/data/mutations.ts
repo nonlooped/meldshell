@@ -62,7 +62,7 @@ export function useWorkspaceActions(
 export function useThreadManagementActions(
   snapshot: AppSnapshot,
   callbacks: {
-    created: (threadId?: string) => void
+    created: (threadId: string | undefined, input: Input<"createThread">) => void
     deleted: (threadId: string) => void
   },
 ) {
@@ -72,12 +72,12 @@ export function useThreadManagementActions(
   )
   const createThreadMutation = useSnapshotMutation(
     (input: Input<"createThread">) => window.meldshell.createThread(input),
-    (next) => {
+    (next, input) => {
       const existing = new Set([
         ...snapshot.threadSettings.map((settings) => settings.threadId),
         ...snapshot.threads.map((thread) => thread.id),
       ])
-      callbacks.created(next.threads.find((thread) => !existing.has(thread.id))?.id)
+      callbacks.created(next.threads.find((thread) => !existing.has(thread.id))?.id, input)
     },
   )
   const setStatusMutation = useSnapshotMutation((input: Input<"setThreadStatus">) =>
@@ -107,11 +107,14 @@ export function useThreadManagementActions(
   }
 }
 
-export function useConversationActions() {
-  const client = useQueryClient()
-  const threadSettingsMutation = useSnapshotMutation((input: Input<"setThreadSettings">) =>
+export const useThreadSettingsMutation = () =>
+  useSnapshotMutation((input: Input<"setThreadSettings">) =>
     window.meldshell.setThreadSettings(input),
   )
+
+export function useConversationActions() {
+  const client = useQueryClient()
+  const threadSettingsMutation = useThreadSettingsMutation()
   const submitTurnMutation = useMutation({
     mutationFn: (input: Input<"submitTurn">) => window.meldshell.submitTurn(input),
     onSuccess: (result, input) => {

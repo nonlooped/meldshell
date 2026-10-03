@@ -9,6 +9,7 @@ import type {
   GitCommitInput,
   GenerateCommitMessageInput,
   CreatePullRequestInput,
+  ListIssuesInput,
   GitCommitDiffInput,
   GitSnapshotInput,
   GitDiffInput,
@@ -27,6 +28,7 @@ export type {
   GitCommitInput,
   GenerateCommitMessageInput,
   CreatePullRequestInput,
+  ListIssuesInput,
   GitCommitDiffInput,
   GitSnapshotInput,
   GitDiffInput,
@@ -73,6 +75,7 @@ import type {
   RewindResult,
   UndoRewindResult,
   TurnHandoff,
+  ThreadIssue,
 } from "./models"
 
 export type ComposerAttachment = InputAttachment & { readonly previewUrl?: string }
@@ -118,7 +121,7 @@ export interface ContentSearchResult {
   readonly truncated: boolean
 }
 export interface FilePreview {
-  readonly kind: "text" | "markdown" | "html" | "image" | "unsupported"
+  readonly kind: "text" | "markdown" | "html" | "image" | "video" | "unsupported"
   readonly content: string
 }
 
@@ -188,6 +191,30 @@ export interface PullRequestStatus {
   /** Why GitHub cannot be reached, as a sentence; null when the GitHub CLI answered. */
   readonly unavailable: string | null
   readonly pullRequest: PullRequest | null
+  /** The issue the thread started from, which a new pull request closes. */
+  readonly issue: ThreadIssue | null
+}
+
+interface IssueLabel {
+  readonly name: string
+  /** Hex without the leading `#`, as GitHub stores it. */
+  readonly color: string
+}
+
+/** An open issue as the issue picker lists it. */
+export interface IssueSummary {
+  readonly number: number
+  readonly title: string
+  readonly url: string
+  readonly author: string
+  readonly labels: readonly IssueLabel[]
+  readonly updatedAt: string
+}
+
+export interface IssueList {
+  readonly issues: readonly IssueSummary[]
+  /** Why GitHub cannot be reached, as a sentence; null when the GitHub CLI answered. */
+  readonly unavailable: string | null
 }
 
 export interface PullRequestDraft {
@@ -403,6 +430,7 @@ export const requests = {
   createPullRequest: request<(input: CreatePullRequestInput) => Promise<PullRequestStatus>>(
     "meldshell:create-pull-request",
   ),
+  listIssues: request<(input: ListIssuesInput) => Promise<IssueList>>("meldshell:list-issues"),
   generateCommitMessage: request<(input: GenerateCommitMessageInput) => Promise<string>>(
     "meldshell:generate-commit-message",
   ),

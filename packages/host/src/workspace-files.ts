@@ -126,10 +126,27 @@ const PREVIEWABLE_IMAGES = new Set([
   "image/avif",
 ])
 
+/** Video formats the viewer plays; Chromium decodes these without extra codecs. */
+const PLAYABLE_VIDEOS = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/ogg",
+  "video/quicktime",
+  "video/x-m4v",
+])
+
 const imageType = (path: string): string | null => {
   const type = mime.getType(path)
   return type !== null && PREVIEWABLE_IMAGES.has(type) ? type : null
 }
+
+const videoType = (path: string): string | null => {
+  const type = mime.getType(path)
+  return type !== null && PLAYABLE_VIDEOS.has(type) ? type : null
+}
+
+/** The largest file each kind of preview reads, in megabytes. */
+const previewLimit = (image: boolean, video: boolean): number => (video ? 64 : image ? 20 : 2)
 
 export async function readWorkspaceFile(root: string, path: string): Promise<FilePreview> {
   const target = await realpath(resolve(root, path))
@@ -138,7 +155,8 @@ export async function readWorkspaceFile(root: string, path: string): Promise<Fil
     const info = await file.stat()
     if (!info.isFile()) throw new Error("This entry is not a regular file.")
     const image = imageType(path)
-    const limit = (image ? 20 : 2) * 1024 * 1024
+    const video = videoType(path)
+    const limit = previewLimit(image !== null, video !== null) * 1024 * 1024
     if (info.size > limit)
       return {
         kind: "unsupported",
@@ -150,6 +168,7 @@ export async function readWorkspaceFile(root: string, path: string): Promise<Fil
     if (bytesRead > limit) return { kind: "unsupported", content: "File is too large to preview." }
     const data = bytes.subarray(0, bytesRead)
     if (image) return { kind: "image", content: `data:${image};base64,${data.toString("base64")}` }
+    if (video) return { kind: "video", content: `data:${video};base64,${data.toString("base64")}` }
     if (data.includes(0))
       return { kind: "unsupported", content: "Binary file preview is unavailable." }
     const extension = extname(path).toLowerCase()

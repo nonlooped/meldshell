@@ -82,13 +82,16 @@ test("global inputs, CI machinery, and forced runs select every workspace", () =
     assert.deepEqual(scope.tests, [
       "tests/ci-scope.test.mjs",
       "tests/markdown-blocks.test.ts",
+      "tests/file-previews.test.ts",
       "tests/onboarding.test.ts",
       "tests/dictation.test.ts",
       "tests/claude-provider.test.mts",
       "tests/settings.test.ts",
       "tests/pull-requests.test.ts",
+      "tests/issues.test.ts",
       "tests/review-notes.test.ts",
       "tests/content-search.test.ts",
+      "tests/loadouts.test.ts",
       "tests/changelog.test.ts",
       "tests/release-cli.test.mjs",
     ])

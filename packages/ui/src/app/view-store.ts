@@ -32,6 +32,10 @@ interface ViewStore {
   /** A thread whose composer should take focus once it is on screen. */
   readonly composerFocusThreadId: string | null
   readonly focusComposer: (threadId: string | null) => void
+  /** The issue picker lists issues from this workspace, or the active one when it is not set. */
+  readonly issuePicker: { readonly workspaceId?: string } | null
+  readonly openIssuePicker: (workspaceId?: string) => void
+  readonly closeIssuePicker: () => void
 }
 
 export const useViewStore = create<ViewStore>((set) => ({
@@ -66,4 +70,8 @@ export const useViewStore = create<ViewStore>((set) => ({
   closeOnboarding: () => set({ onboardingOpen: false }),
   composerFocusThreadId: null,
   focusComposer: (threadId) => set({ composerFocusThreadId: threadId }),
+  issuePicker: null,
+  openIssuePicker: (workspaceId) =>
+    set({ issuePicker: workspaceId === undefined ? {} : { workspaceId } }),
+  closeIssuePicker: () => set({ issuePicker: null }),
 }))

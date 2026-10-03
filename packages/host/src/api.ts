@@ -52,6 +52,7 @@ import {
   pullRequestPrompt,
 } from "./pull-requests"
 import { readWorkspaceScripts } from "./workspace-scripts"
+import { listIssues } from "./issues"
 import {
   createThread,
   deleteThread,
@@ -354,30 +355,36 @@ hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false,
   generateText(input, commitMessagePrompt),
 )
 
-/** A thread's worktree targets the branch it started from; other checkouts use the default branch. */
-const preferredBase = (scope: WorkspaceScope) =>
+/**
+ * A thread's worktree targets the branch it started from, and a thread started from an issue links
+ * its pull request back to it. Other checkouts use the default branch and link nothing.
+ */
+const pullRequestThread = (scope: WorkspaceScope) =>
   Effect.gen(function* () {
-    if (scope.threadId === undefined) return null
+    if (scope.threadId === undefined) return { base: null, issue: null }
     const core = yield* CoreClient
     const location = yield* core.GetThreadLocation({ threadId: scope.threadId })
-    return location.worktree?.baseBranch ?? null
+    return { base: location.worktree?.baseBranch ?? null, issue: location.issue }
   })
 hostOperations[C.IPC.getPullRequest] = operation(C.WorkspaceScope, true, (input) =>
-  Effect.flatMap(preferredBase(input), (base) =>
-    withWorkspace(input, (path) => getPullRequestStatus(path, base)),
+  Effect.flatMap(pullRequestThread(input), ({ base, issue }) =>
+    withWorkspace(input, (path) => getPullRequestStatus(path, base, issue)),
   ),
 )
 hostOperations[C.IPC.markPullRequestReady] = operation(C.WorkspaceScope, false, (input) =>
-  Effect.flatMap(preferredBase(input), (base) =>
-    withWorkspace(input, (path) => markPullRequestReady(path, base)),
+  Effect.flatMap(pullRequestThread(input), ({ base, issue }) =>
+    withWorkspace(input, (path) => markPullRequestReady(path, base, issue)),
   ),
 )
 hostOperations[C.IPC.generatePullRequest] = operation(C.WorkspaceScope, false, (input) =>
   Effect.gen(function* () {
-    const base = yield* preferredBase(input)
-    const text = yield* generateText(input, (path) => pullRequestPrompt(path, base))
+    const { base, issue } = yield* pullRequestThread(input)
+    const text = yield* generateText(input, (path) => pullRequestPrompt(path, base, issue))
     return yield* attempt(async () => parsePullRequestDraft(text))
   }),
+)
+hostOperations[C.IPC.listIssues] = operation(C.ListIssuesInput, true, (input) =>
+  withWorkspace({ workspaceId: input.workspaceId }, (path) => listIssues(path, input.query)),
 )
 const withDictation = <A>(run: (dictation: Dictation, model: C.DictationModel) => Promise<A>) =>
   Effect.gen(function* () {
@@ -397,8 +404,8 @@ hostOperations[C.IPC.transcribeAudio] = operation(C.TranscribeAudioInput, true, 
   withDictation((dictation, model) => dictation.transcribe(model, input)),
 )
 hostOperations[C.IPC.createPullRequest] = operation(C.CreatePullRequestInput, false, (input) =>
-  Effect.flatMap(preferredBase(input), (base) =>
-    withWorkspace(input, (path) => createPullRequest(path, base, input)),
+  Effect.flatMap(pullRequestThread(input), ({ base, issue }) =>
+    withWorkspace(input, (path) => createPullRequest(path, base, input, issue)),
   ),
 )
 for (const [harness, status, refresh, usage] of [

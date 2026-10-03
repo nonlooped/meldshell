@@ -13,6 +13,11 @@ export interface SettingsSearchEntry {
 
 const ENTRIES: readonly SettingsSearchEntry[] = [
   {
+    label: "Loadouts",
+    section: "threads",
+    keywords: "saved agent model effort speed setup rename reorder delete presets",
+  },
+  {
     label: "Always full permissions",
     section: "threads",
     keywords: "agents approval prompts tools security",
