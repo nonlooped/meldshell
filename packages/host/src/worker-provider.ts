@@ -38,6 +38,12 @@ import { interruptWithRecovery } from "./interrupt-turn"
 import { HostPlatform, type HostProcess } from "./platform"
 import { makeEventQueue } from "./runtime-queue"
 import { logStartupTiming } from "./startup-timing"
+import {
+  captureSnapshot,
+  threadFolder,
+  turnSnapshotRef,
+  type SnapshotPoint,
+} from "./turn-snapshots"
 import { deliverCommand, requestCommands, requestUsage } from "./worker-channel"
 
 export interface ProviderService {
@@ -77,6 +83,15 @@ type ProviderConfig = {
 const decodeEvent = Schema.decodeUnknownResult(WorkerEvent)
 
 const stopPid = (pid: number): Effect.Effect<void, Error> => attempt(() => stopProcessTree(pid))
+
+/** A snapshot that cannot be taken only costs that turn its restore point, so it never fails the turn. */
+const snapshotTurn = (cwd: string, threadId: string, turnId: string, point: SnapshotPoint) =>
+  attempt(() => captureSnapshot(cwd, turnSnapshotRef(threadId, turnId, point))).pipe(
+    Effect.catch((cause) =>
+      Effect.logWarning(`Could not snapshot a turn's files ${point} it ran.`, cause),
+    ),
+    Effect.asVoid,
+  )
 
 const restartSchedule = Schedule.exponential("1 second").pipe(
   Schedule.modifyDelay(({ duration }) =>
@@ -140,6 +155,8 @@ const providerRuntime = (
           typeof message !== "string" && message.type === "start-turn" ? message.dispatch : null
         const child = yield* Ref.get(processRef)
         yield* bindDispatch(dispatch, child)
+        if (dispatch !== null)
+          yield* snapshotTurn(dispatch.workspacePath, dispatch.threadId, dispatch.turnId, "before")
         const refused =
           child === null ||
           (stopping && (typeof message === "string" || message.type !== "shutdown"))
@@ -187,6 +204,18 @@ const providerRuntime = (
     /** Tells clients about a stored event, notifies the user when it needs them, and starts queued input. */
     const announce = (input: RuntimeEventInput, result: RuntimeEventResult) =>
       Effect.gen(function* () {
+        // The finished turn's files are recorded before clients see the turn end
+        // or a queued follow-up can change them.
+        if (input.method === "turn/completed")
+          yield* core.GetThreadLocation({ threadId: input.threadId }).pipe(
+            Effect.flatMap((location) => {
+              const folder = threadFolder(location)
+              return folder === null
+                ? Effect.void
+                : snapshotTurn(folder, input.threadId, input.turnId, "after")
+            }),
+            Effect.catchCause(Effect.logError),
+          )
         // Mid-turn events only extend the transcript, so clients refetch the whole app state only
         // when the core reports a snapshot change: a finished turn, an approval, a rename or mode.
         yield* hostEvents.publish({

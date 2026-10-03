@@ -7,7 +7,8 @@
     ".": "./src/worker.ts",
     "./process-tree": "./src/process-tree.ts",
     "./command": "./src/command.ts",
-    "./line-framer": "./src/line-framer.ts"
+    "./line-framer": "./src/line-framer.ts",
+    "./browser": "./src/browser.ts"
   },
   "dependencies": {
     "@meldshell/contracts": "*",

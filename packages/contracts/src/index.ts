@@ -19,4 +19,7 @@ export {
   GitBulkActionInput,
   GitCommitInput,
   CreatePullRequestInput,
+  TurnSnapshotInput,
+  RestoreTurnSnapshotInput,
+  UndoSnapshotRestoreInput,
 } from "./workspace-inputs"

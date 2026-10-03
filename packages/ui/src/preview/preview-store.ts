@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import type { AgentBrowserActivity } from "@meldshell/contracts/ipc"
 
 /*
  * Each thread's browser preview: whether its panel is shown, the page it last showed, and the
@@ -13,15 +14,23 @@ export interface ThreadPreview {
   readonly size: number
 }
 
+/** The latest thing an agent did in a thread's preview. `id` tells repeated actions apart. */
+interface AgentActivity extends AgentBrowserActivity {
+  readonly id: number
+  readonly at: number
+}
+
 interface PreviewStore {
   readonly threads: Readonly<Record<string, ThreadPreview>>
   /** Local server addresses each thread's terminals printed, newest first. */
   readonly servers: Readonly<Record<string, readonly string[]>>
+  readonly activity: Readonly<Record<string, AgentActivity>>
   readonly toggle: (threadId: string) => void
   /** Records the page a thread's preview shows, opening the panel if it is hidden. */
   readonly show: (threadId: string, url: string) => void
   readonly resize: (threadId: string, size: number) => void
   readonly noteServers: (threadId: string, urls: readonly string[]) => void
+  readonly noteActivity: (threadId: string, activity: AgentBrowserActivity) => void
   readonly forget: (threadId: string) => void
 }
 
@@ -38,9 +47,12 @@ export const previewSupported =
     ? window.meldshell.remotePreview !== undefined
     : window.meldshell.desktop !== undefined
 
+let activityId = 0
+
 export const usePreviewStore = create<PreviewStore>((set) => ({
   threads: {},
   servers: {},
+  activity: {},
   toggle: (threadId) =>
     set((state) => {
       const current = state.threads[threadId] ?? closed
@@ -71,9 +83,24 @@ export const usePreviewStore = create<PreviewStore>((set) => ({
       )
       return { servers: { ...state.servers, [threadId]: next } }
     }),
+  noteActivity: (threadId, activity) =>
+    set((state) => ({
+      activity: {
+        ...state.activity,
+        [threadId]: { ...activity, id: ++activityId, at: Date.now() },
+      },
+    })),
   forget: (threadId) =>
     set((state) => ({
       threads: without(state.threads, threadId),
       servers: without(state.servers, threadId),
+      activity: without(state.activity, threadId),
     })),
 }))
+
+// Agents open pages in a thread's preview and report what they do there, so the user can follow.
+const agentBrowser = window.meldshell.desktop?.agentBrowser
+agentBrowser?.onShow((threadId, url) => usePreviewStore.getState().show(threadId, url))
+agentBrowser?.onActivity((threadId, activity) =>
+  usePreviewStore.getState().noteActivity(threadId, activity),
+)

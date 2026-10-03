@@ -140,3 +140,24 @@ export function paceSummary(label: string, reading: UsageReading, now = Date.now
       : `${label} runs out in ~${durationLabel(reading.runsOutAt - now)}`
   return "On track"
 }
+
+/**
+ * The share of the allowance left for each remaining hour or day, so the user has a rate to stay
+ * under rather than a percentage to interpret. Rounded down to stay on the safe side.
+ */
+export function budgetLabel(
+  reading: UsageReading,
+  resetsAt: number | null | undefined,
+  now = Date.now(),
+): string | null {
+  if (resetsAt == null || reading.used >= 100) return null
+  const remainingMs = resetsAt * 1_000 - now
+  if (remainingMs < 5 * MINUTE) return null
+  const left = 100 - reading.used
+  const perDay = remainingMs >= 2 * DAY
+  const unitMs = perDay ? DAY : HOUR
+  const rate = Math.floor((left / remainingMs) * unitMs * 10) / 10
+  if (rate <= 0) return null
+  const figure = rate >= 10 ? String(Math.floor(rate)) : String(rate)
+  return `≤${figure}% per ${perDay ? "day" : "hour"} keeps it`
+}

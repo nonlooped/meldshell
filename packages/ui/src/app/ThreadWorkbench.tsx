@@ -22,6 +22,7 @@ import { useKeybindings } from "./keybindings"
 import { PreviewPanel } from "../preview/PreviewPanel"
 import { previewSupported, usePreviewStore } from "../preview/preview-store"
 import { useTabStore } from "./tab-store"
+import { DiffReviewScope } from "../ui/DiffNotes"
 import {
   movePane,
   splitPane,
@@ -316,7 +317,9 @@ function ConversationAndTerminal({
       <Panel id={`conversation:${thread.id}`} minSize="160px">
         {/* The conversation's gutters follow its own width, not the window's. */}
         <div className="h-full min-w-0 [container-type:inline-size]">
-          <ThreadView snapshot={snapshot} thread={thread} searchTarget={searchTarget} />
+          <DiffReviewScope threadId={thread.id}>
+            <ThreadView snapshot={snapshot} thread={thread} searchTarget={searchTarget} />
+          </DiffReviewScope>
         </div>
       </Panel>
       <Separator
