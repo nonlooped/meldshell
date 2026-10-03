@@ -34,7 +34,7 @@ import { Check, ChevronDown, X } from "lucide-react"
 
 type ButtonVariant = "default" | "primary" | "ghost"
 
-interface ButtonProps extends React.ComponentPropsWithoutRef<"button"> {
+interface ButtonProps extends React.ComponentProps<"button"> {
   readonly variant?: ButtonVariant
   readonly size?: "md" | "sm"
   readonly block?: boolean
