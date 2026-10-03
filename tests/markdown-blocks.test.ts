@@ -28,7 +28,7 @@ test("finished blocks keep their text as a reply streams", () => {
   }
 })
 
-test("keeps fenced code, math, and HTML blocks whole", () => {
+test("keeps fenced code and math whole, and stops splitting at raw HTML", () => {
   assert.deepEqual(split("```\na\n\nb\n```\n\nafter"), ["```\na\n\nb\n```\n\n", "after"])
   assert.deepEqual(split("~~~~md\n```\n\nx\n~~~~\n\nafter"), [
     "~~~~md\n```\n\nx\n~~~~\n\n",
@@ -36,8 +36,12 @@ test("keeps fenced code, math, and HTML blocks whole", () => {
   ])
   assert.deepEqual(split("$$\nx\n\ny\n$$\n\nafter"), ["$$\nx\n\ny\n$$\n\n", "after"])
   assert.deepEqual(split("$$x$$\n\nafter"), ["$$x$$\n\n", "after"])
-  assert.deepEqual(split("<!--\n\nhidden\n-->\n\nafter"), ["<!--\n\nhidden\n-->\n\n", "after"])
+  assert.deepEqual(split("Intro\n\n<!--\n\nhidden\n-->\n\nafter"), [
+    "Intro\n\n",
+    "<!--\n\nhidden\n-->\n\nafter",
+  ])
   assert.deepEqual(split("```\nunclosed\n\nstill code"), ["```\nunclosed\n\nstill code"])
+  assert.deepEqual(split("<div>\n```\n\n```\na\n\nb\n```"), ["<div>\n```\n\n```\na\n\nb\n```"])
 })
 
 test("keeps lists, list fences, and indented continuations together", () => {
@@ -53,6 +57,14 @@ test("keeps lists, list fences, and indented continuations together", () => {
     "- ```\n  a\n\n  b\n  ```\n\n",
     "after",
   ])
+  // A fence in an item ends with the item; one indented less than the item's content is not in it.
+  assert.deepEqual(split("- a\n\n  ```\n\n````md\n```\n\n```\n````\n\nafter"), [
+    "- a\n\n  ```\n\n````md\n```\n\n```\n````\n\n",
+    "after",
+  ])
+  assert.deepEqual(split("1. a\n\n  ```\n\nstill code\n\nafter"), [
+    "1. a\n\n  ```\n\nstill code\n\nafter",
+  ])
   assert.deepEqual(split("Para\n\n    indented code\n\nafter"), [
     "Para\n\n    indented code\n\n",
     "after",
@@ -60,6 +72,11 @@ test("keeps lists, list fences, and indented continuations together", () => {
 })
 
 test("keeps messages with reference or footnote definitions whole", () => {
-  for (const text of ["See [a].\n\n[a]: https://example.com", "Note[^1]\n\n[^1]: Detail"])
+  for (const text of [
+    "See [a].\n\n[a]: https://example.com",
+    "Note[^1]\n\n[^1]: Detail",
+    "[Foo\n  bar]: /url\n\n[Baz][Foo bar]",
+    "[a\\]b]: /url\n\n[x][a\\]b]",
+  ])
     assert.deepEqual(split(text), [text])
 })

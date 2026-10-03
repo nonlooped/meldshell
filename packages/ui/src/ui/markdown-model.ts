@@ -100,47 +100,26 @@ export function prepareMarkdown(text: string): string {
 }
 
 // Reference and footnote definitions resolve across the whole message, so it stays one block.
-const definition = /^[ \t>*+\-\d.)]*\[[^\]\n]+\]:/m
-const listItem = /^[ \t]*(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)/
+// Labels may span lines and contain escaped brackets.
+const definition = /^[ \t>*+\-\d.)]*\[(?:[^\\\]]|\\[\s\S])+\]:/m
+const listItem = /^( *)([-+*]|\d{1,9}[.)])( +|$)/
 const fence = /^( *)((?:(?:[-+*]|\d{1,9}[.)]) +)*)(`{3,}|~{3,}|\${2,})(.*)$/
-const htmlBlocks: readonly (readonly [RegExp, RegExp])[] = [
-  [/^ {0,3}<(?:script|pre|style|textarea)(?=[\s>]|$)/i, /<\/(?:script|pre|style|textarea)>/i],
-  [/^ {0,3}<!--/, /-->/],
-  [/^ {0,3}<\?/, /\?>/],
-  [/^ {0,3}<!\[CDATA\[/, /\]\]>/],
-  [/^ {0,3}<![a-z]/i, />/],
-]
-
-// Returns the pattern that ends a fenced code, math, or HTML block opened by this line.
-function blockCloser(line: string, inList: boolean): RegExp | undefined {
-  const match = fence.exec(line.replaceAll("\t", "    "))
-  if (match) {
-    const [, indent = "", items = "", marks = "", info = ""] = match
-    const nested = indent.length > 3 || !!items
-    const mark = marks[0] === "$" ? "\\$" : marks[0]
-    // Fences inside list items close at any indentation; top-level ones within three spaces.
-    if ((!nested || inList) && (mark === "~" || !info.includes(marks[0]!)))
-      return new RegExp(`^${nested ? "[ \\t]*" : " {0,3}"}${mark}{${marks.length},}[ \\t]*$`)
-  }
-  for (const [open, close] of htmlBlocks) {
-    const start = open.exec(line)
-    if (start && !close.test(line.slice(start[0].length))) return close
-  }
-  return undefined
-}
+// Raw HTML blocks have several ending rules and are rare in replies, so the rest stays joined.
+const html = /^ {0,3}<[a-z/!?]/i
+const never = /(?!)/
 
 // Splits Markdown into top-level runs that parse identically on their own, so finished runs
 // keep their rendering while a reply streams. Boundaries are blank lines followed by an
-// unindented line that cannot continue a list or an open fenced or HTML block. Ambiguous
-// input stays joined; the concatenated blocks always equal the input.
+// unindented line that cannot continue a list or an open fenced block. Ambiguous input stays
+// joined; the concatenated blocks always equal the input.
 export function markdownBlocks(text: string): string[] {
   if (definition.test(text)) return [text]
   const blocks: string[] = []
-  const scan: BlockScan = { blank: false, inList: false }
+  const scan: BlockScan = { blank: false, items: [], container: 0 }
   let start = 0
   let at = 0
   for (const line of text.split("\n")) {
-    if (startsBlock(line.replace(/\r$/, ""), scan) && at > start) {
+    if (startsBlock(line.replace(/\r$/, "").replaceAll("\t", "    "), scan) && at > start) {
       blocks.push(text.slice(start, at))
       start = at
     }
@@ -152,28 +131,62 @@ export function markdownBlocks(text: string): string[] {
 
 interface BlockScan {
   blank: boolean
-  inList: boolean
+  // Content columns of the open list items, outermost first.
+  items: number[]
   closer?: RegExp | undefined
+  // Lines indented less than this column close the open block along with its list item.
+  container: number
 }
+
+const indentOf = (line: string): number => line.length - line.trimStart().length
 
 // Advances the scan past one line and reports whether that line can begin a new block.
 function startsBlock(line: string, scan: BlockScan): boolean {
   if (scan.closer) {
-    if (scan.closer.test(line)) scan.closer = undefined
-    return false
+    if (!line.trim() || indentOf(line) >= scan.container) {
+      if (scan.closer.test(line)) scan.closer = undefined
+      return false
+    }
+    scan.closer = undefined
   }
   if (!line.trim()) {
     scan.blank = true
     return false
   }
-  const unindented = !/^[ \t]/.test(line)
-  const item = listItem.test(line)
-  const boundary = scan.blank && unindented && !item
-  if (item) scan.inList = true
-  else if (unindented) scan.inList = false
+  const item = trackItems(line, scan)
+  const boundary = scan.blank && indentOf(line) === 0 && !item
   scan.blank = false
-  scan.closer = blockCloser(line, scan.inList)
+  openBlock(line, scan)
   return boundary
+}
+
+// Updates the open list items for this line and reports whether it starts an item.
+function trackItems(line: string, scan: BlockScan): boolean {
+  const indent = indentOf(line)
+  const item = listItem.exec(line)
+  // An item, a line after a blank, or an unindented line leaves items that need more indent.
+  if (item || scan.blank || indent === 0)
+    while ((scan.items.at(-1) ?? -1) > indent) scan.items.pop()
+  if (!item) return false
+  const spaces = item[3]?.length ?? 0
+  scan.items.push(indent + (item[2]?.length ?? 0) + (spaces === 0 || spaces > 4 ? 1 : spaces))
+  return true
+}
+
+// Records the fenced code, math, or HTML block this line opens, if any.
+function openBlock(line: string, scan: BlockScan): void {
+  scan.container = 0
+  scan.closer = html.test(line) ? never : undefined
+  const match = fence.exec(line)
+  if (!match) return
+  const [, indent = "", items = "", marks = "", info = ""] = match
+  const column = indent.length + items.length
+  const container = scan.items.filter((content) => content <= column).at(-1) ?? 0
+  const mark = marks[0] === "$" ? "\\$" : marks[0]
+  if (column - container > 3 || (mark !== "~" && info.includes(marks[0]!))) return
+  // A fence closes within three spaces of the list item, or the message, that contains it.
+  scan.container = container
+  scan.closer = new RegExp(`^ {${container},${container + 3}}${mark}{${marks.length},}[ \\t]*$`)
 }
 
 export function nodeText(node: Root | RootContent): string {
