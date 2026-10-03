@@ -133,6 +133,28 @@ test("the worker leaves when dictation goes quiet, and a crash fails what was wa
   await assert.rejects(waiting, /stopped unexpectedly/)
 })
 
+test("starting a recording loads a downloaded model that went idle, once", async () => {
+  const requests: DictationWorkerRequest[] = []
+  const worker = fakeWorker((request, post) => {
+    requests.push(request)
+    post({ type: "ready", id: request.id })
+  })
+  const dictation = createDictation(worker.fork, cacheDir, 20)
+  await dictation.prepare("fast")
+  await new Promise((resolve) => setTimeout(resolve, 80))
+  assert.equal((await dictation.status("fast")).state, "ready")
+  assert.equal(worker.forks[0]?.killed, true)
+
+  await Promise.all([dictation.prepare("fast"), dictation.prepare("fast")])
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  assert.equal(worker.forks.length, 2)
+  assert.deepEqual(
+    requests.map((request) => request.type),
+    ["prepare", "prepare"],
+  )
+  dictation.shutdown()
+})
+
 test("long recordings split at their quietest moment near fifty seconds", () => {
   const rate = 100
   const samples = new Float32Array(rate * 120).fill(0.5)

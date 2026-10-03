@@ -1,6 +1,6 @@
 # Windows and WSL
 
-The Windows MeldShell app offers **Windows (native)** and **WSL (Linux)** modes in **Settings → General → Execution environment**. Choose a mode, then **Restart and switch**. Restarting closes terminals and interrupts any running agent turns after confirmation. Threads, settings, provider sign-ins, and remote-account identity stay separate in each environment; switching back restores access to that environment’s data. No history is moved or merged.
+The Windows MeldShell app offers **Windows (native)** and **WSL (Linux)** modes in **Settings → App & updates → Execution environment**. Choose a mode, then **Restart and switch**. Restarting closes terminals and interrupts any running agent turns after confirmation. Threads, settings, provider sign-ins, and remote-account identity stay separate in each environment; switching back restores access to that environment’s data. No history is moved or merged.
 
 New installations default to Windows mode, where agents, tools, Git, editors, and terminals run directly on Windows without WSL. Native terminals use PowerShell (with Command Prompt as a fallback). Existing installations with a saved WSL distribution or `MELDSHELL_WSL_DISTRO` retain WSL mode until you choose otherwise. The mode is saved in `environment.json` in the Windows user-data directory; an explicit Windows choice takes precedence over the distribution environment variable.
 

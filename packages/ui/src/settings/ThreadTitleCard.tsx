@@ -36,7 +36,7 @@ export function ThreadTitleCard({
       aria-label="Thread preferences"
     >
       <SettingRow
-        label="Title model"
+        label="Model for thread titles"
         description="Follow each thread's active model, or choose one model for every title."
       >
         <DropdownMenu

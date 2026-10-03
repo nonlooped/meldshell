@@ -84,6 +84,8 @@ test("global inputs, CI machinery, and forced runs select every workspace", () =
       "tests/markdown-blocks.test.ts",
       "tests/onboarding.test.ts",
       "tests/dictation.test.ts",
+      "tests/claude-provider.test.mts",
+      "tests/settings.test.ts",
       "tests/pull-requests.test.ts",
       "tests/issues.test.ts",
       "tests/review-notes.test.ts",

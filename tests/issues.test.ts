@@ -1,3 +1,4 @@
+import "../packages/host/tests/issue-threads.test.ts"
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { issueBranchName, issueBrief, toIssueSummary } from "../packages/host/src/issues"
