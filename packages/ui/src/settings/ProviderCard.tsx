@@ -1,4 +1,6 @@
-import { iconButtonClasses } from "../ui/styles"
+import { iconButtonClasses, segmentClasses, segmentGroupClasses } from "../ui/styles"
+import { Toggle } from "@base-ui-components/react/toggle"
+import { ToggleGroup } from "@base-ui-components/react/toggle-group"
 import { ActivitySpinner, CollapsiblePanel, Pressable } from "../ui/motion"
 import {
   checkProviderUpdate,
@@ -23,24 +25,19 @@ import { errorMessage, REASONING_EFFORTS } from "@meldshell/contracts"
 import {
   ChevronDown,
   CircleArrowUp,
+  Eye,
+  EyeOff,
   MoreHorizontal,
   Pencil,
   Plus,
+  Power,
   RefreshCw,
   Trash2,
 } from "lucide-react"
 import { SettingRow } from "./SettingRow"
 import { effortLabel } from "../data/catalog"
 import { ProviderIcon } from "../ui/ProviderIcon"
-import {
-  Button,
-  ContextMenu,
-  DropdownMenu,
-  MenuAction,
-  SelectField,
-  Switch,
-  TextField,
-} from "../ui/controls"
+import { Button, ContextMenu, DropdownMenu, MenuAction, Switch, TextField } from "../ui/controls"
 
 interface ProviderCardProps {
   readonly provider: Provider
@@ -136,10 +133,15 @@ type Visibility = "shown" | "hidden" | "off"
 const visibilityOf = (model: ProviderModel): Visibility =>
   !model.enabled ? "off" : model.hidden ? "hidden" : "shown"
 
-const VISIBILITY_OPTIONS: ReadonlyArray<{ readonly value: Visibility; readonly label: string }> = [
-  { value: "shown", label: "Shown" },
-  { value: "hidden", label: "Hidden" },
-  { value: "off", label: "Off" },
+const VISIBILITY_OPTIONS: ReadonlyArray<{
+  readonly value: Visibility
+  readonly label: string
+  readonly hint: string
+  readonly icon: typeof Eye
+}> = [
+  { value: "shown", label: "Shown", hint: "Listed in the model menu", icon: Eye },
+  { value: "hidden", label: "Hidden", hint: "Kept for threads that already use it", icon: EyeOff },
+  { value: "off", label: "Off", hint: "Never used", icon: Power },
 ]
 
 const VISIBILITY_PATCH: Record<Visibility, { enabled: boolean; hidden: boolean }> = {
@@ -255,7 +257,17 @@ export function ProviderCard({
             <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
               {provider.displayName}
             </span>
-            <ProviderStatusLine label={statusInfo.label} tone={statusInfo.tone} update={update} />
+            <ProviderStatusLine
+              label={statusInfo.label}
+              tone={statusInfo.tone}
+              update={update}
+              summary={[
+                version,
+                models.length > 0 ? `${shownCount} of ${models.length} models` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            />
           </span>
           <ChevronDown
             className="motion-transform provider-chevron flex-none ml-[2px] text-[var(--text-tertiary)]"
@@ -399,10 +411,13 @@ function ProviderStatusLine({
   label,
   tone,
   update,
+  summary,
 }: {
   readonly label: string
   readonly tone: string
   readonly update: ProviderUpdateStatus | undefined
+  /** Version and model counts, so a closed card answers "is this set up?" on its own. */
+  readonly summary: string
 }): React.JSX.Element {
   const manual = update?.state === "available" && !update.canUpdate
   return (
@@ -413,6 +428,11 @@ function ProviderStatusLine({
         style={{ background: tone }}
       />
       <span className="flex-none">{label}</span>
+      {summary !== "" && (
+        <span className="min-w-0 overflow-hidden text-[var(--text-tertiary)] text-ellipsis whitespace-nowrap tabular-nums">
+          · {summary}
+        </span>
+      )}
       {/* No account email: the settings page is often on screen while streaming or sharing. */}
       {manual && (
         <span className="flex flex-none items-center gap-[3px] text-[var(--color-modified)]">
@@ -553,12 +573,7 @@ function ModelRow({
           >
             {effortRange(model)}
           </span>
-          <SelectField<Visibility>
-            label={`Visibility of ${name}`}
-            value={visibility}
-            options={VISIBILITY_OPTIONS}
-            onValueChange={onChangeVisibility}
-          />
+          <VisibilityToggle name={name} value={visibility} onChange={onChangeVisibility} />
           <DropdownMenu
             align="end"
             trigger={
@@ -601,6 +616,41 @@ function ModelRow({
       ))}
       {!model.builtIn && <MenuAction onClick={onDelete}>Remove from catalog…</MenuAction>}
     </ContextMenu>
+  )
+}
+
+/** Three icon states in place of a select, so a long catalog reads as a column of states. */
+function VisibilityToggle({
+  name,
+  value,
+  onChange,
+}: {
+  readonly name: string
+  readonly value: Visibility
+  readonly onChange: (visibility: Visibility) => void
+}): React.JSX.Element {
+  return (
+    <ToggleGroup
+      aria-label={`Visibility of ${name}`}
+      value={[value]}
+      onValueChange={(next) => {
+        const chosen = VISIBILITY_OPTIONS.find((option) => option.value === next[0])
+        if (chosen !== undefined) onChange(chosen.value)
+      }}
+      className={`${segmentGroupClasses} justify-self-start`}
+    >
+      {VISIBILITY_OPTIONS.map(({ value: option, label, hint, icon: Icon }) => (
+        <Toggle
+          key={option}
+          value={option}
+          aria-label={label}
+          title={`${label}: ${hint}`}
+          className={`${segmentClasses} w-[28px] px-[0]!`}
+        >
+          <Icon size={13} strokeWidth={1.75} aria-hidden="true" />
+        </Toggle>
+      ))}
+    </ToggleGroup>
   )
 }
 

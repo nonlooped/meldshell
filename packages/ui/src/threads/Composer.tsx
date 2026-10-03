@@ -111,6 +111,12 @@ const SANDBOX_LABEL: Readonly<Record<SandboxMode, string>> = {
   "danger-full-access": "Full access",
 }
 
+const SANDBOX_HINT: Readonly<Record<SandboxMode, string>> = {
+  "read-only": "Reads anything; asks before changing files",
+  "workspace-write": "Edits this workspace; asks to go further",
+  "danger-full-access": "No sandbox: any file, any command, network",
+}
+
 const LevelIcon = ({ index, count }: { index: number; count: number }): React.JSX.Element => {
   const activeBars = count <= 1 ? 2 : 1 + Math.round((index / (count - 1)) * 3)
   return (
@@ -447,10 +453,16 @@ function ReasoningSettings({
 
 type ModelSelection = NonNullable<ReturnType<typeof resolveSelection>>
 
-const MODES: Readonly<Record<CollaborationMode, { label: string; icon: typeof Hammer }>> = {
-  default: { label: "Agent", icon: Hammer },
-  plan: { label: "Plan", icon: ListChecks },
-  ask: { label: "Ask", icon: MessageCircleQuestion },
+const MODES: Readonly<
+  Record<CollaborationMode, { label: string; hint: string; icon: typeof Hammer }>
+> = {
+  default: { label: "Agent", hint: "Works through the task and makes changes", icon: Hammer },
+  plan: { label: "Plan", hint: "Proposes a plan before changing anything", icon: ListChecks },
+  ask: {
+    label: "Ask",
+    hint: "Answers questions without making changes",
+    icon: MessageCircleQuestion,
+  },
 }
 
 /** The modes a harness offers; one with only the default mode offers no choice. */
@@ -469,6 +481,7 @@ function permissionOptions(selection: ModelSelection) {
   const options: Array<{
     id: string
     label: string
+    hint: string
     sandbox: SandboxMode
     approvalPolicy: "on-request" | "never"
   }> = toolPermissions
@@ -478,6 +491,7 @@ function permissionOptions(selection: ModelSelection) {
               {
                 id: "read",
                 label: "Read tools only (custom)",
+                hint: "Reads, searches, and browses; never edits or runs commands",
                 sandbox: "read-only" as const,
                 approvalPolicy: "on-request" as const,
               },
@@ -486,6 +500,7 @@ function permissionOptions(selection: ModelSelection) {
         {
           id: "ask",
           label: permissionLabels.ask,
+          hint: isClaude ? "Asks before edits and commands" : "Asks before each tool runs",
           sandbox: "workspace-write",
           approvalPolicy: "on-request",
         },
@@ -494,6 +509,7 @@ function permissionOptions(selection: ModelSelection) {
               {
                 id: "edits",
                 label: "Accept edits",
+                hint: "Edits files freely; asks before commands",
                 sandbox: "danger-full-access" as const,
                 approvalPolicy: "on-request" as const,
               },
@@ -502,12 +518,16 @@ function permissionOptions(selection: ModelSelection) {
         {
           id: "deny",
           label: permissionLabels.deny,
+          hint: isClaude
+            ? "Runs only tools you already allowed; never asks"
+            : "Declines anything that needs approval",
           sandbox: "workspace-write",
           approvalPolicy: "never",
         },
         {
           id: "full",
           label: permissionLabels.full,
+          hint: "Runs everything without asking",
           sandbox: "danger-full-access",
           approvalPolicy: "never",
         },
@@ -515,6 +535,7 @@ function permissionOptions(selection: ModelSelection) {
     : (Object.keys(SANDBOX_LABEL) as SandboxMode[]).map((sandbox) => ({
         id: sandbox,
         label: SANDBOX_LABEL[sandbox],
+        hint: SANDBOX_HINT[sandbox],
         sandbox,
         approvalPolicy: "on-request",
       }))
@@ -624,9 +645,9 @@ function ComposerSettings({
               >
                 <MenuGroup label="Mode">
                   {modes.map((mode) => {
-                    const { label, icon: ModeIcon } = MODES[mode]
+                    const { label, hint, icon: ModeIcon } = MODES[mode]
                     return (
-                      <MenuChoice key={mode} value={mode}>
+                      <MenuChoice key={mode} value={mode} hint={hint}>
                         {label}
                         <span className="grid w-[14px] h-[14px] flex-[0_0_14px] ml-[auto] place-items-center text-[var(--text-secondary)]">
                           <ModeIcon size={14} strokeWidth={1.7} />
@@ -658,6 +679,7 @@ function ComposerSettings({
                     {option === riskiest && <MenuSeparator />}
                     <MenuChoice
                       value={option.id}
+                      hint={option.hint}
                       className={option === riskiest ? "text-[var(--color-modified)]!" : undefined}
                     >
                       {option.label}

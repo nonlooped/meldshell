@@ -81,8 +81,10 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     })
     await archived.click()
     await desktop.page.getByRole("tab", { name: "Appearance", exact: true }).click()
-    await desktop.page.getByRole("combobox", { name: "Theme", exact: true }).click()
-    await desktop.page.getByRole("option", { name: "Light", exact: true }).click()
+    await desktop.page
+      .getByRole("radiogroup", { name: "Theme", exact: true })
+      .getByRole("radio", { name: "Light", exact: true })
+      .click()
     await expect
       .poll(async () => {
         const snapshot = await desktop.call("getSnapshot")

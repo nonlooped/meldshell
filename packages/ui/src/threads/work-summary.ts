@@ -91,3 +91,22 @@ export function primaryWork(events: ReadonlyArray<CanonicalEvent>): Work | null 
   const counts = workCounts(events)
   return significance.find((work) => (counts.get(work) ?? 0) > 0) ?? null
 }
+
+/** Work that only looks things up; runs of it fold into one line in the working log. */
+export type LookupWork = Extract<Work, "read" | "search">
+
+/** What a single event looked up, or null when it did anything else. */
+export function lookupWork(event: CanonicalEvent): LookupWork | null {
+  const item = asRecord(asRecord(event.payload).item)
+  const works =
+    event.kind === "command" ? commandWork(item) : event.kind === "tool" ? [toolWork(item)] : []
+  const first = works[0]
+  if (first !== "read" && first !== "search") return null
+  return works.every((work) => work === first) ? first : null
+}
+
+/** A folded run's line, e.g. "Read 6 files" or "Searched 4 times". */
+export function lookupSummary(work: LookupWork, count: number): string {
+  const phrase = phrases.find(([kind]) => kind === work)?.[1](count) ?? ""
+  return phrase.charAt(0).toUpperCase() + phrase.slice(1)
+}

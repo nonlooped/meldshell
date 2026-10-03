@@ -31,7 +31,14 @@ import { ToolOutput } from "./ToolOutput"
 import { fileChangePatches } from "./file-change-diffs"
 import { toolDetails } from "./tool-details"
 import { commandLabel } from "./command-summary"
-import { primaryWork, workSummary, type Work } from "./work-summary"
+import {
+  lookupSummary,
+  lookupWork,
+  primaryWork,
+  workSummary,
+  type LookupWork,
+  type Work,
+} from "./work-summary"
 import { MessageRail } from "./MessageRail"
 import { AsyncQuestions } from "./AsyncQuestions"
 import { landFlight } from "../ui/flight"
@@ -480,20 +487,76 @@ function WorkingSection({
         </span>
       </Collapsible.Trigger>
       <CollapsiblePanel className="flex flex-col gap-[1px] [margin:3px_0_1px_7px] [padding:3px_0_3px_12px] border-l-[1px] border-l-[color:var(--line-subtle)]">
-        {turn.workingEvents.map((event) => {
-          if (turn.complete && event.method === "turn/diff/updated") return null
-          if (isFailure(event)) return null
-          // Commentary and thinking read as prose, like the rest of the conversation.
-          if (event.kind === "assistant" || event.kind === "reasoning")
-            return (
-              <Markdown
-                key={event.id}
-                text={fallbackText(event)}
-                className={`[padding:6px_8px] text-[11.5px] leading-[1.55] ${event.kind === "reasoning" ? "text-[var(--text-tertiary)]" : "text-[var(--text-secondary)]"}`}
-              />
-            )
-          return <ToolLine key={event.id} event={event} />
-        })}
+        {foldLookups(
+          turn.workingEvents.filter(
+            (event) =>
+              !(turn.complete && event.method === "turn/diff/updated") && !isFailure(event),
+          ),
+        ).map((entry) =>
+          "run" in entry ? (
+            <LookupRun key={entry.run[0]!.id} work={entry.work} events={entry.run} />
+          ) : (
+            <WorkingEvent key={entry.event.id} event={entry.event} />
+          ),
+        )}
+      </CollapsiblePanel>
+    </Collapsible.Root>
+  )
+}
+
+/** One working-log entry: commentary and thinking read as prose, like the rest of the conversation. */
+function WorkingEvent({ event }: { readonly event: CanonicalEvent }): React.JSX.Element {
+  if (event.kind === "assistant" || event.kind === "reasoning")
+    return (
+      <Markdown
+        text={fallbackText(event)}
+        className={`[padding:6px_8px] text-[11.5px] leading-[1.55] ${event.kind === "reasoning" ? "text-[var(--text-tertiary)]" : "text-[var(--text-secondary)]"}`}
+      />
+    )
+  return <ToolLine event={event} />
+}
+
+/** Consecutive lookups of one kind fold into a single line once there are this many. */
+const FOLD_LOOKUPS = 3
+
+type WorkingEntry =
+  | { readonly event: CanonicalEvent }
+  | { readonly work: LookupWork; readonly run: readonly CanonicalEvent[] }
+
+function foldLookups(events: ReadonlyArray<CanonicalEvent>): readonly WorkingEntry[] {
+  const entries: WorkingEntry[] = []
+  let index = 0
+  while (index < events.length) {
+    const work = lookupWork(events[index]!)
+    let end = index + 1
+    if (work !== null) while (end < events.length && lookupWork(events[end]!) === work) end++
+    const run = events.slice(index, end)
+    if (work !== null && run.length >= FOLD_LOOKUPS) entries.push({ work, run })
+    else entries.push(...run.map((event) => ({ event })))
+    index = end
+  }
+  return entries
+}
+
+/** A run of reads or searches as one line that opens to the individual lookups. */
+function LookupRun({
+  work,
+  events,
+}: {
+  readonly work: LookupWork
+  readonly events: readonly CanonicalEvent[]
+}): React.JSX.Element {
+  return (
+    <Collapsible.Root>
+      <Collapsible.Trigger className={`motion-colors ${workItemTriggerClasses}`}>
+        <WorkIcon work={work} />
+        <span className="work-item-title">{lookupSummary(work, events.length)}</span>
+        <ChevronRight className={disclosureChevronClasses} size={13} />
+      </Collapsible.Trigger>
+      <CollapsiblePanel className="flex flex-col gap-[1px] ml-[10px] pl-[8px] border-l-[1px] border-l-[color:var(--line-subtle)]">
+        {events.map((event) => (
+          <ToolLine key={event.id} event={event} />
+        ))}
       </CollapsiblePanel>
     </Collapsible.Root>
   )
