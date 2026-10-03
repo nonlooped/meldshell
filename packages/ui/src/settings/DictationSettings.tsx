@@ -11,6 +11,7 @@ import { RadioGroup } from "@base-ui-components/react/radio-group"
 import { Check, Download, Gauge, Sparkles } from "lucide-react"
 import { ActivitySpinner } from "../ui/motion"
 import { Button } from "../ui/controls"
+import { useViewStore } from "../app/view-store"
 import { SettingRow } from "./SettingRow"
 import { useKeybindings } from "../app/keybindings"
 import { dictationStatusQuery } from "../threads/Dictation"
@@ -100,14 +101,16 @@ export function DictationSettings({
   const current = status.data.model === model ? status.data : null
   return (
     <section className={groupClasses} aria-label="Dictation">
-      <SettingRow
-        label="How it works"
-        description={
-          canRecord()
-            ? `Click the microphone in the composer${shortcut ? ` or press ${shortcut}` : ""}, then speak. What you say is written at the caret. Speech becomes text on the computer running MeldShell, so it is free, needs no account, and recordings never leave it.`
-            : "This browser cannot record audio here. Open MeldShell over HTTPS or in the desktop app."
-        }
-      />
+      <p className="m-0 py-[18px] text-[12px] leading-[1.6] text-[var(--text-secondary)]">
+        {canRecord()
+          ? `Click the microphone in the composer${shortcut ? ` or press ${shortcut}` : ""}, then speak. What you say is written at the caret. Speech becomes text on the computer running MeldShell, so it is free, needs no account, and recordings never leave it.`
+          : "This browser cannot record audio here. Open MeldShell over HTTPS or in the desktop app."}
+      </p>
+      <SettingRow label="Dictation shortcut" description={shortcut || "No shortcut assigned."}>
+        <Button onClick={() => useViewStore.getState().openSettings("keyboard", "shortcuts")}>
+          Change shortcut
+        </Button>
+      </SettingRow>
       <SettingRow
         label="Speech model"
         description="Both are free and run on this computer. You can switch at any time."

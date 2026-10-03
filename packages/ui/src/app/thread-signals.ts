@@ -84,7 +84,7 @@ export function useThreadSignals(
 export function useWatchedThreadIds(): ReadonlyArray<string> {
   const layout = useTabStore((state) => state.layout)
   const fileSelected = useTabStore((state) => state.selectedFileId !== null)
-  const settingsOpen = useViewStore((state) => state.settingsOpen)
+  const settingsOpen = useViewStore((state) => state.settingsOpen || state.schedulesOpen)
   return useMemo(
     () => (fileSelected || settingsOpen ? [] : visibleThreads(layout)),
     [layout, fileSelected, settingsOpen],

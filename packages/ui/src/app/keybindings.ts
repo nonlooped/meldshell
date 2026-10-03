@@ -31,7 +31,7 @@ export type LoadoutAction = (typeof LOADOUT_ACTIONS)[number]
 export interface ShortcutDefinition {
   readonly id: ShortcutAction
   readonly label: string
-  readonly group: "Navigation" | "Tabs" | "Panels" | "Workspace" | "Loadouts"
+  readonly group: "Navigation" | "Tabs" | "Panels" | "Workspace" | "Input" | "Loadouts"
   readonly chord: string
 }
 
@@ -41,7 +41,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   { id: "newThread", label: "New thread", group: "Navigation", chord: "Ctrl+N" },
   { id: "settings", label: "Open settings", group: "Navigation", chord: "Ctrl+," },
   { id: "closeTab", label: "Close tab", group: "Tabs", chord: "Ctrl+W" },
-  { id: "archiveThread", label: "Archive or restore thread", group: "Tabs", chord: "Ctrl+E" },
+  { id: "archiveThread", label: "Archive or restore thread", group: "Navigation", chord: "Ctrl+E" },
   { id: "nextTab", label: "Next tab", group: "Tabs", chord: "Ctrl+Tab" },
   { id: "previousTab", label: "Previous tab", group: "Tabs", chord: "Ctrl+Shift+Tab" },
   { id: "toggleInbox", label: "Show or hide the inbox", group: "Panels", chord: "Ctrl+B" },
@@ -59,7 +59,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     chord: "Ctrl+Shift+B",
   },
   { id: "openInEditor", label: "Open in editor", group: "Workspace", chord: "Ctrl+Shift+E" },
-  { id: "dictate", label: "Start or stop dictation", group: "Workspace", chord: "Ctrl+Shift+D" },
+  { id: "dictate", label: "Start or stop dictation", group: "Input", chord: "Ctrl+Shift+D" },
   ...LOADOUT_ACTIONS.map((id, index) => ({
     id,
     label: `Switch to loadout ${index + 1}`,

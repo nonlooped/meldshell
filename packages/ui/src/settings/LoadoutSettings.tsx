@@ -103,7 +103,7 @@ export function LoadoutSettings({
                     className={`overflow-hidden text-ellipsis whitespace-nowrap pl-[9px] text-[11.5px] ${selection === null ? "text-[var(--color-modified)]" : "text-[var(--text-tertiary)]"}`}
                   >
                     {selection === null
-                      ? "Its model is turned off or removed. Turn it back on in Providers to use this loadout."
+                      ? "Its model is turned off or removed. Turn it back on in Providers & models to use this loadout."
                       : describeLoadout(selection)}
                   </span>
                 </span>

@@ -1,7 +1,9 @@
 import { RemoteAccess } from "./RemoteAccess"
 import { FadeDiv, TabIndicator } from "../ui/motion"
-import { useState } from "react"
+import { useState, useLayoutEffect, useRef } from "react"
 import { Tabs } from "@base-ui-components/react/tabs"
+import { Toggle } from "@base-ui-components/react/toggle"
+import { ToggleGroup } from "@base-ui-components/react/toggle-group"
 import type {
   AppSnapshot,
   Provider,
@@ -9,27 +11,11 @@ import type {
   SetAppSettingsInput,
   UpsertModelInput,
 } from "@meldshell/contracts"
-import {
-  Settings,
-  Palette,
-  AlarmClock,
-  ArrowLeft,
-  Boxes,
-  Gauge,
-  Info,
-  Keyboard,
-  Layers,
-  MessagesSquare,
-  Mic,
-  Monitor,
-} from "lucide-react"
-import { useContext } from "react"
-import { AppInfoContext } from "../app/app-info"
+import { Palette, ArrowLeft, Boxes, Info, Keyboard, MessagesSquare, Monitor } from "lucide-react"
 import { modelsForProvider } from "../data/catalog"
 import { useViewStore, type SettingsSection } from "../app/view-store"
-import { AppDialog, Button, IconButton } from "../ui/controls"
-import { MeldMark } from "../ui/MeldMark"
-import { cx } from "../ui/styles"
+import { AppDialog, Button, IconButton, TextField } from "../ui/controls"
+import { cx, segmentClasses, segmentGroupClasses } from "../ui/styles"
 import { useViewportTier, type ViewportTier } from "../app/viewport"
 import { ModelDialog } from "./ModelDialog"
 import { ProviderCard } from "./ProviderCard"
@@ -39,13 +25,14 @@ import {
   SubscriptionUsage,
   SubscriptionUsageRefresh,
 } from "./SubscriptionUsage"
-import { UpdateSettings } from "./UpdateSettings"
+import { AppSettingsPanel } from "./AppSettingsPanel"
+import { SettingsGroup } from "./SettingsGroup"
+import { searchSettings, type SettingsSearchEntry } from "./settings-search"
 
 import { KeyboardSettings } from "./KeyboardSettings"
-import { ScheduleSettings } from "./ScheduleSettings"
+import { LoadoutSettings } from "./LoadoutSettings"
 import { Preferences } from "./Preferences"
 import { DictationSettings } from "./DictationSettings"
-import { LoadoutSettings } from "./LoadoutSettings"
 
 interface SettingsViewProps {
   readonly settingsPending: boolean
@@ -70,18 +57,11 @@ const SECTIONS: ReadonlyArray<{
   readonly caption: string
 }> = [
   {
-    id: "general",
-    label: "General",
-    icon: <Settings size={16} />,
-    title: "General",
-    caption: "Choose how you send messages and organize your inbox.",
-  },
-  {
-    id: "account",
-    label: "Account & devices",
-    icon: <Monitor size={16} />,
-    title: "Account & devices",
-    caption: "Continue your work from another device.",
+    id: "threads",
+    label: "Threads & agents",
+    icon: <MessagesSquare size={16} />,
+    title: "Threads & agents",
+    caption: "Choose how conversations run, appear, and request your attention.",
   },
   {
     id: "appearance",
@@ -91,67 +71,34 @@ const SECTIONS: ReadonlyArray<{
     caption: "Make MeldShell comfortable to read and use.",
   },
   {
-    id: "providers",
-    label: "Providers",
-    icon: <Boxes size={16} strokeWidth={1.75} />,
-    title: "Providers",
-    caption: "Check each connection and choose which models appear in the composer.",
-  },
-  {
-    id: "usage",
-    label: "Subscription usage",
-    icon: <Gauge size={16} strokeWidth={1.75} />,
-    title: "Subscription usage",
-    caption: "See your remaining allowances and when they reset.",
-  },
-  {
-    id: "threads",
-    label: "Threads",
-    icon: <MessagesSquare size={16} strokeWidth={1.75} />,
-    title: "Threads",
-    caption: "Control how MeldShell names new conversations.",
-  },
-  {
-    id: "loadouts",
-    label: "Loadouts",
-    icon: <Layers size={16} strokeWidth={1.75} />,
-    title: "Loadouts",
-    caption: "Switch agent, model, and effort together with one shortcut.",
-  },
-  {
-    id: "schedules",
-    label: "Scheduled prompts",
-    icon: <AlarmClock size={16} strokeWidth={1.75} />,
-    title: "Scheduled prompts",
-    caption: "Prompts MeldShell sends to threads on a schedule while it runs.",
-  },
-  {
-    id: "dictation",
-    label: "Dictation",
-    icon: <Mic size={16} strokeWidth={1.75} />,
-    title: "Dictation",
-    caption: "Talk to the composer instead of typing, here or on your phone.",
-  },
-  {
     id: "keyboard",
-    label: "Keyboard shortcuts",
-    icon: <Keyboard size={16} strokeWidth={1.75} />,
-    title: "Keyboard shortcuts",
-    caption: "Change the keys that run MeldShell's commands.",
+    label: "Keyboard & dictation",
+    icon: <Keyboard size={16} />,
+    title: "Keyboard & dictation",
+    caption: "Customize shortcuts and speech input.",
   },
   {
-    id: "about",
-    label: "About",
-    icon: <Info size={16} strokeWidth={1.75} />,
-    title: "About MeldShell",
-    caption: "Version and application information.",
+    id: "providers",
+    label: "Providers & models",
+    icon: <Boxes size={16} />,
+    title: "Providers & models",
+    caption: "Configure your agents and model catalogs, and check subscription usage.",
+  },
+  {
+    id: "account",
+    label: "Account & devices",
+    icon: <Monitor size={16} />,
+    title: "Account & devices",
+    caption: "Manage your MeldShell account and continue from another device.",
+  },
+  {
+    id: "app",
+    label: "App & updates",
+    icon: <Info size={16} />,
+    title: "App & updates",
+    caption: "Manage the runtime, external applications, setup, and MeldShell updates.",
   },
 ]
-
-const desktopPlatformLabel = (): string => {
-  if (window.meldshell.platform === "linux") return "Linux desktop"
-  return "Windows desktop"
-}
 
 const settingsColumns = (tier: ViewportTier, sidebarWidth: number) => {
   if (tier === "phone") return "minmax(0, 1fr)"
@@ -204,51 +151,51 @@ function SettingsSidebar({
   )
 }
 
-/** The sections that only read the snapshot and save app settings. */
-function SettingsPage({
-  section,
-  snapshot,
-  pending,
-  onChange,
-}: {
-  readonly section: SettingsSection
-  readonly snapshot: AppSnapshot
-  readonly pending: boolean
-  readonly onChange: (input: SetAppSettingsInput) => void
-}): React.JSX.Element | null {
-  switch (section) {
-    case "account":
-      return <RemoteAccess />
-    case "schedules":
-      return <ScheduleSettings snapshot={snapshot} />
-    case "dictation":
-      return (
-        <DictationSettings settings={snapshot.settings} pending={pending} onChange={onChange} />
-      )
-    case "loadouts":
-      return <LoadoutSettings snapshot={snapshot} pending={pending} onChange={onChange} />
-    case "keyboard":
-      return <KeyboardSettings pending={pending} onChange={onChange} />
-    default:
-      return null
-  }
-}
+export function SettingsView(props: SettingsViewProps): React.JSX.Element {
+  const { snapshot, settingsError, sidebarWidth, onUpsertModel, onDeleteModel, onResetCatalog } =
+    props
 
-export function SettingsView({
-  snapshot,
-  settingsPending,
-  settingsError,
-  sidebarWidth,
-  onUpdateProvider,
-  onUpsertModel,
-  onDeleteModel,
-  onResetCatalog,
-  onChangeAppSettings,
-}: SettingsViewProps): React.JSX.Element {
-  const appInfo = useContext(AppInfoContext)
   const section = useViewStore((state) => state.settingsSection)
   const selectSection = useViewStore((state) => state.selectSettingsSection)
   const closeSettings = useViewStore((state) => state.closeSettings)
+  const subsection = useViewStore((state) => state.settingsSubsection)
+  const [query, setQuery] = useState("")
+  const [searchTarget, setSearchTarget] = useState<string | null>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const searching = query.trim().length > 0
+  const results = searchSettings(query, snapshot.providers, {
+    editor: window.meldshell.desktop?.listEditors !== undefined,
+    environment: window.meldshell.desktop?.environment !== undefined,
+    hostControl: window.meldshell.hostControl !== undefined,
+  })
+  const usage = section === "providers" && subsection === "usage"
+
+  useLayoutEffect(() => {
+    if (searching || !searchTarget) return
+    const content = contentRef.current
+    const focusTarget = () => {
+      const target = Array.from(
+        content?.querySelectorAll<HTMLElement>("[data-setting-label]") ?? [],
+      ).find((element) => element.dataset.settingLabel === searchTarget)
+      if (!target) return false
+      target.scrollIntoView({ block: "center", behavior: "instant" })
+      target.focus({ preventScroll: true })
+      return true
+    }
+    if (focusTarget() || !content) return
+    content.focus({ preventScroll: true })
+    const observer = new MutationObserver(() => {
+      if (focusTarget()) observer.disconnect()
+    })
+    observer.observe(content, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [searchTarget, searching])
+
+  const openResult = (entry: SettingsSearchEntry) => {
+    selectSection(entry.section, entry.subsection)
+    setQuery("")
+    setSearchTarget(entry.target ?? entry.label)
+  }
 
   const [modelDialog, setModelDialog] = useState<{
     readonly providerId: string
@@ -270,7 +217,11 @@ export function SettingsView({
       value={section}
       onValueChange={(value) => {
         const next = SECTIONS.find((entry) => entry.id === value)
-        if (next) selectSection(next.id)
+        if (next) {
+          selectSection(next.id)
+          setQuery("")
+          setSearchTarget(null)
+        }
       }}
       style={{ gridTemplateColumns: settingsColumns(tier, sidebarWidth) }}
     >
@@ -278,114 +229,65 @@ export function SettingsView({
       <SettingsSidebar stacked={stacked} onClose={closeSettings} />
 
       <Tabs.Panel
-        key={section}
         value={section}
-        className="[container-type:inline-size] grid min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)]"
+        className="[container-type:inline-size] grid min-w-0 min-h-0 grid-rows-[auto_auto_minmax(0,_1fr)]"
       >
         <div className={settingsHeaderClasses}>
           <div>
-            <h2>{active?.title}</h2>
-            <p>{active?.caption}</p>
+            <h2>{searching ? "Search settings" : active?.title}</h2>
+            <p>{searching ? "Find a preference and open its location." : active?.caption}</p>
           </div>
-          {section === "usage" && <SubscriptionUsageRefresh providers={usageProviders} />}
+          {usage && !searching && <SubscriptionUsageRefresh providers={usageProviders} />}
+        </div>
+
+        <div className="w-[min(720px,_calc(100%_-_80px))] mx-auto mb-[20px] [@container(max-width:_640px)]:w-[calc(100%_-_48px)] [@container(max-width:_460px)]:w-[calc(100%_-_32px)]">
+          <TextField
+            type="search"
+            aria-label="Search settings"
+            placeholder="Search settings…"
+            value={query}
+            onValueChange={setQuery}
+          />
         </div>
 
         <div
           key={section}
+          ref={contentRef}
+          tabIndex={-1}
           className="min-h-0 [padding:0_40px_48px] [@container(max-width:_640px)]:pr-[24px] [@container(max-width:_640px)]:pl-[24px] [@container(max-width:_460px)]:pr-[16px] [@container(max-width:_460px)]:pl-[16px] overflow-y-auto [scrollbar-gutter:stable]"
         >
           <FadeDiv rise={8} className="w-[min(720px,_100%)] [margin:0_auto]">
             {settingsError && <p role="alert">{settingsError}</p>}
-            {(section === "general" || section === "appearance") && (
-              <Preferences
-                section={section}
-                settings={snapshot.settings}
-                onChange={onChangeAppSettings}
-                pending={settingsPending}
-              />
-            )}
-            <SettingsPage
-              section={section}
-              snapshot={snapshot}
-              pending={settingsPending}
-              onChange={onChangeAppSettings}
-            />
-            {section === "usage" && <SubscriptionUsage providers={usageProviders} />}
-            {section === "threads" && (
-              <ThreadTitleCard
-                snapshot={snapshot}
-                pending={settingsPending}
-                onChangeTitleModel={(titleModelId) => onChangeAppSettings({ titleModelId })}
-              />
-            )}
-            {section === "providers" &&
-              (snapshot.providers.length === 0 ? (
-                <p className="settings-empty [padding:28px_0] text-[var(--text-tertiary)] text-[12.5px] text-center">
-                  No providers are configured.
+            {searching ? (
+              <div aria-label="Settings search results">
+                <p role="status" className="text-[12px] text-[var(--text-secondary)]">
+                  {results.length
+                    ? `${results.length} matching settings`
+                    : "No settings match. Try another term."}
                 </p>
-              ) : (
-                snapshot.providers.map((provider) => (
-                  <ProviderCard
-                    key={provider.id}
-                    provider={provider}
-                    models={modelsForProvider(snapshot, provider.id)}
-                    onRename={(displayName) => onUpdateProvider(provider.id, { displayName })}
-                    onToggleProvider={(enabled) => onUpdateProvider(provider.id, { enabled })}
-                    onToggleModel={(model, patch) =>
-                      onUpsertModel({ providerId: provider.id, modelId: model.id, ...patch })
-                    }
-                    onEditModel={(model) => setModelDialog({ providerId: provider.id, model })}
-                    onDeleteModel={setDeleteTarget}
-                    onAddModel={() => setModelDialog({ providerId: provider.id, model: null })}
-                    onResetCatalog={() => setResetTarget(provider)}
-                  />
-                ))
-              ))}
-            {section === "about" && (
-              <section className="max-w-[720px]">
-                <div className="flex items-center gap-[14px] [padding:4px_0_28px] [&_h3]:m-0 [&_h3]:[font-family:var(--font-display)] [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:[margin:3px_0_0] [&_p]:text-[var(--text-tertiary)] [&_p]:text-[11.5px]">
-                  <MeldMark className="w-[36px] h-[36px] flex-[0_0_36px] text-[var(--text-primary)]" />
-                  <div>
-                    <h3>MeldShell</h3>
-                    <p>A local desktop workspace for coding-agent threads.</p>
-                  </div>
-                </div>
-                <div className="border-t-[1px] border-t-[color:var(--line-subtle)]">
-                  <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
-                    <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
-                      App version
+                {results.map((entry) => (
+                  <Button
+                    key={`${entry.section}:${entry.label}`}
+                    variant="ghost"
+                    block
+                    className="justify-between! min-h-[44px]!"
+                    onClick={() => openResult(entry)}
+                  >
+                    <span>{entry.label}</span>
+                    <span className="text-[11px] text-[var(--text-tertiary)]">
+                      {SECTIONS.find((item) => item.id === entry.section)?.label}
                     </span>
-                    <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
-                      {appInfo.version}
-                    </span>
-                  </div>
-                  <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
-                    <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
-                      Platform
-                    </span>
-                    <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
-                      {desktopPlatformLabel()}
-                    </span>
-                  </div>
-                  <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
-                    <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
-                      Runtime
-                    </span>
-                    <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
-                      {appInfo.electronVersion ? `Electron ${appInfo.electronVersion}` : "Web"}
-                    </span>
-                  </div>
-                  <div className="flex min-h-[48px] items-center justify-between gap-[40px] [padding:12px_0] border-b-[1px] border-b-[color:var(--line-subtle)]">
-                    <span className="setting-label text-[var(--text-primary)] text-[13px] font-medium">
-                      Data
-                    </span>
-                    <span className="max-w-[52%] overflow-hidden text-[var(--text-secondary)] text-[12px] text-right text-ellipsis whitespace-nowrap">
-                      Stored locally
-                    </span>
-                  </div>
-                </div>
-                <UpdateSettings />
-              </section>
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <SettingsContent
+                {...props}
+                onEditModel={(providerId, model) => setModelDialog({ providerId, model })}
+                onRemoveModel={setDeleteTarget}
+                onRestoreCatalog={setResetTarget}
+                onClearSearchTarget={() => setSearchTarget(null)}
+              />
             )}
           </FadeDiv>
         </div>
@@ -458,6 +360,192 @@ export function SettingsView({
         </p>
       </AppDialog>
     </Tabs.Root>
+  )
+}
+
+interface SettingsContentProps extends SettingsViewProps {
+  readonly onEditModel: (providerId: string, model: ProviderModel | null) => void
+  readonly onRemoveModel: (model: ProviderModel) => void
+  readonly onRestoreCatalog: (provider: Provider) => void
+  readonly onClearSearchTarget: () => void
+}
+
+function SettingsContent({
+  snapshot,
+  settingsPending,
+  onChangeAppSettings,
+  onUpdateProvider,
+  onUpsertModel,
+  onEditModel,
+  onRemoveModel,
+  onRestoreCatalog,
+  onClearSearchTarget,
+}: SettingsContentProps): React.JSX.Element {
+  const section = useViewStore((state) => state.settingsSection)
+  const subsection = useViewStore((state) => state.settingsSubsection)
+  const selectSection = useViewStore((state) => state.selectSettingsSection)
+  const dictation = subsection === "dictation"
+  const usage = subsection === "usage"
+  const usageProviders = snapshot.providers.filter(hasSubscriptionUsage)
+  switch (section) {
+    case "appearance":
+      return (
+        <Preferences
+          section="appearance"
+          settings={snapshot.settings}
+          onChange={onChangeAppSettings}
+          pending={settingsPending}
+        />
+      )
+    case "account":
+      return (
+        <SettingsGroup title="Account & devices">
+          <RemoteAccess />
+        </SettingsGroup>
+      )
+    case "keyboard":
+      return (
+        <>
+          <SubsectionNav
+            label="Input settings"
+            value={dictation ? "dictation" : "shortcuts"}
+            options={[
+              { value: "shortcuts", label: "Keyboard shortcuts" },
+              { value: "dictation", label: "Dictation" },
+            ]}
+            onChange={(value) => {
+              selectSection("keyboard", value === "dictation" ? "dictation" : "shortcuts")
+              onClearSearchTarget()
+            }}
+          />
+          {dictation ? (
+            <SettingsGroup title="Dictation">
+              <DictationSettings
+                settings={snapshot.settings}
+                pending={settingsPending}
+                onChange={onChangeAppSettings}
+              />
+            </SettingsGroup>
+          ) : (
+            <SettingsGroup title="Keyboard shortcuts">
+              <KeyboardSettings pending={settingsPending} onChange={onChangeAppSettings} />
+            </SettingsGroup>
+          )}
+        </>
+      )
+    case "threads":
+      return (
+        <>
+          <Preferences
+            section="threads"
+            settings={snapshot.settings}
+            onChange={onChangeAppSettings}
+            pending={settingsPending}
+          />
+          <SettingsGroup title="Loadouts">
+            <LoadoutSettings
+              snapshot={snapshot}
+              pending={settingsPending}
+              onChange={onChangeAppSettings}
+            />
+          </SettingsGroup>
+          <SettingsGroup title="Thread titles">
+            <ThreadTitleCard
+              snapshot={snapshot}
+              pending={settingsPending}
+              onChangeTitleModel={(titleModelId) => onChangeAppSettings({ titleModelId })}
+            />
+          </SettingsGroup>
+        </>
+      )
+    case "app":
+      return (
+        <AppSettingsPanel
+          settings={snapshot.settings}
+          pending={settingsPending}
+          onChange={onChangeAppSettings}
+        />
+      )
+    case "providers":
+      return (
+        <>
+          <SubsectionNav
+            label="Provider settings"
+            value={usage ? "usage" : "configuration"}
+            options={[
+              { value: "configuration", label: "Configuration" },
+              { value: "usage", label: "Subscription usage" },
+            ]}
+            onChange={(value) => {
+              selectSection("providers", value === "usage" ? "usage" : "configuration")
+              onClearSearchTarget()
+            }}
+          />
+          {usage ? (
+            <SettingsGroup title="Subscription usage">
+              <SubscriptionUsage providers={usageProviders} />
+            </SettingsGroup>
+          ) : (
+            <SettingsGroup title="Configuration">
+              {snapshot.providers.length === 0 ? (
+                <p className="settings-empty [padding:28px_0] text-[var(--text-tertiary)] text-[12.5px] text-center">
+                  No providers are configured.
+                </p>
+              ) : (
+                snapshot.providers.map((provider) => (
+                  <ProviderCard
+                    key={provider.id}
+                    provider={provider}
+                    models={modelsForProvider(snapshot, provider.id)}
+                    onRename={(displayName) => onUpdateProvider(provider.id, { displayName })}
+                    onToggleProvider={(enabled) => onUpdateProvider(provider.id, { enabled })}
+                    onToggleModel={(model, patch) =>
+                      onUpsertModel({
+                        providerId: provider.id,
+                        modelId: model.id,
+                        ...patch,
+                      })
+                    }
+                    onEditModel={(model) => onEditModel(provider.id, model)}
+                    onDeleteModel={onRemoveModel}
+                    onAddModel={() => onEditModel(provider.id, null)}
+                    onResetCatalog={() => onRestoreCatalog(provider)}
+                  />
+                ))
+              )}
+            </SettingsGroup>
+          )}
+        </>
+      )
+  }
+}
+
+function SubsectionNav({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  readonly label: string
+  readonly value: string
+  readonly options: readonly { readonly value: string; readonly label: string }[]
+  readonly onChange: (value: string) => void
+}): React.JSX.Element {
+  return (
+    <ToggleGroup
+      aria-label={label}
+      value={[value]}
+      className={cx(segmentGroupClasses, "mb-[24px] flex-wrap")}
+      onValueChange={(next) => {
+        if (next[0]) onChange(next[0])
+      }}
+    >
+      {options.map((option) => (
+        <Toggle key={option.value} value={option.value} className={segmentClasses}>
+          {option.label}
+        </Toggle>
+      ))}
+    </ToggleGroup>
   )
 }
 
