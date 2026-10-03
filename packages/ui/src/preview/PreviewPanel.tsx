@@ -3,12 +3,14 @@ import { useEffect, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { Thread } from "@meldshell/contracts"
+import type { PickedElement } from "@meldshell/contracts/ipc"
 import {
   ArrowLeft,
   ArrowRight,
   Bot,
   ChevronDown,
   Globe,
+  MousePointerClick,
   RotateCw,
   Server,
   SquareArrowOutUpRight,
@@ -26,6 +28,9 @@ import {
 import { Pressable } from "../ui/motion"
 import { centeredStateClasses } from "../ui/styles"
 import { useKeybindings, withShortcut } from "../app/keybindings"
+import { emptyDraft, useThreadDrafts } from "../app/thread-drafts"
+import { useViewStore } from "../app/view-store"
+import { elementAttachment, elementContext } from "./design-mode"
 import { type ThreadPreview, usePreviewStore } from "./preview-store"
 import { previewAddress } from "./server-urls"
 
@@ -78,6 +83,7 @@ const idle: PageState = {
 const ABORTED = -3
 
 const desktopApi = window.meldshell.desktop
+const designMode = desktopApi?.designMode
 
 /** How long the preview keeps showing an agent's last action. */
 const AGENT_ACTIVITY_MS = 4_000
@@ -283,6 +289,8 @@ function PreviewToolbar({
   view,
   suggestions,
   onNavigate,
+  picking = false,
+  onTogglePicking,
 }: {
   thread: Thread
   url: string
@@ -290,7 +298,12 @@ function PreviewToolbar({
   view: React.RefObject<WebviewElement | null> | null
   suggestions: readonly Suggestion[]
   onNavigate: (url: string) => void
+  /** Whether design mode is waiting for the user to click an element in the page. */
+  picking?: boolean
+  /** Starts or stops design mode; absent where pages cannot be inspected. */
+  onTogglePicking?: () => void
 }): React.JSX.Element {
+  const canPick = designMode !== undefined && page !== null && page.failure === null
   const closeChord = useKeybindings((state) => state.bindings.togglePreview)
   const element = () => view?.current ?? null
   return (
@@ -317,6 +330,21 @@ function PreviewToolbar({
           <span className="w-[4px] flex-none" aria-hidden="true" />
           <AddressBar url={url} suggestions={suggestions} onSubmit={onNavigate} />
           <span className="w-[4px] flex-none" aria-hidden="true" />
+          {designMode !== undefined && (
+            <IconButton
+              label={
+                picking
+                  ? "Stop selecting"
+                  : "Select an element to add it to your message (design mode)"
+              }
+              aria-pressed={picking}
+              className="[&[aria-pressed='true']]:bg-[color-mix(in_srgb,_var(--accent)_18%,_transparent)] [&[aria-pressed='true']]:text-[var(--accent)]"
+              disabled={!canPick && !picking}
+              onClick={onTogglePicking}
+            >
+              <MousePointerClick size={14} />
+            </IconButton>
+          )}
           <IconButton
             label={page?.devTools ? "Close developer tools" : "Developer tools"}
             aria-pressed={page?.devTools ?? false}
@@ -361,6 +389,11 @@ function PreviewToolbar({
       <MenuAction disabled={page === null} onClick={() => element()?.reload()}>
         Reload
       </MenuAction>
+      {designMode !== undefined && (
+        <MenuAction disabled={!canPick && !picking} onClick={() => onTogglePicking?.()}>
+          {picking ? "Stop selecting" : "Select an element"}
+        </MenuAction>
+      )}
       <MenuAction disabled={!url} onClick={() => void desktopApi?.openExternal(url)}>
         Open in browser
       </MenuAction>
@@ -527,6 +560,83 @@ function AgentActivityOverlay({ threadId }: { threadId: string }): React.JSX.Ele
   )
 }
 
+/** Says how design mode works while it waits for a click. */
+function DesignModeHint(): React.JSX.Element {
+  return (
+    <div className="pointer-events-none absolute top-[10px] left-[50%] [transform:translateX(-50%)] flex max-w-[calc(100%_-_20px)] items-center gap-[6px] h-[28px] [padding:0_12px_0_9px] rounded-full border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-menu)] text-[var(--text-secondary)] text-[11.5px] whitespace-nowrap [box-shadow:0_4px_14px_rgba(0,_0,_0,_0.25)]">
+      <MousePointerClick size={13} strokeWidth={1.75} className="flex-none text-[var(--accent)]" />
+      <span role="status" className="min-w-0 overflow-hidden text-ellipsis">
+        <span className="font-[550] text-[var(--text-primary)]">Click an element</span> to add it to
+        your message. Shift-click to add several, Esc to stop.
+      </span>
+    </div>
+  )
+}
+
+/** Adds a picked element to the thread's draft: its screenshot carries its HTML and styles. */
+function addPickedElement(threadId: string, element: PickedElement): void {
+  const drafts = useThreadDrafts.getState()
+  const current = drafts.drafts[threadId] ?? emptyDraft
+  const attachment = elementAttachment(element)
+  if (attachment !== null)
+    drafts.update(threadId, { attachments: [...current.attachments, attachment] })
+  else
+    drafts.update(threadId, {
+      text: `${current.text}${current.text ? "\n\n" : ""}${elementContext(element)}\n\n`,
+    })
+}
+
+/** Ends design mode in the page it runs in, which then resolves its pick with nothing. */
+const stopPicking = (active: React.RefObject<number | null>): void => {
+  if (active.current !== null) designMode?.cancel(active.current)
+}
+
+/**
+ * Design mode: the page outlines the element under the pointer, and a click adds that element to
+ * the thread's message. Shift-click keeps picking.
+ */
+function usePicking(view: React.RefObject<WebviewElement | null>, threadId: string) {
+  const [picking, setPicking] = useState(false)
+  const active = useRef<number | null>(null)
+  const start = async () => {
+    const element = view.current
+    if (designMode === undefined || element === null || active.current !== null) return
+    const id = element.getWebContentsId()
+    const accent = getComputedStyle(element).getPropertyValue("--accent").trim()
+    active.current = id
+    setPicking(true)
+    try {
+      let added = false
+      for (;;) {
+        const picked = await designMode.pick(id, accent)
+        if (picked === null) break
+        addPickedElement(threadId, picked)
+        added = true
+        if (!picked.more) break
+      }
+      if (added) useViewStore.getState().focusComposer(threadId)
+    } catch {
+      // A page that goes away mid-pick simply ends design mode.
+    } finally {
+      if (active.current === id) active.current = null
+      setPicking(false)
+    }
+  }
+  // Escape stops picking from the app too, not only from inside the page.
+  useEffect(() => {
+    if (!picking) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      stopPicking(active)
+    }
+    window.addEventListener("keydown", onKey, true)
+    return () => window.removeEventListener("keydown", onKey, true)
+  }, [picking])
+  useEffect(() => () => stopPicking(active), [])
+  return { picking, toggle: () => (picking ? stopPicking(active) : void start()) }
+}
+
 function PreviewPage({
   thread,
   url,
@@ -542,6 +652,7 @@ function PreviewPage({
   // The element navigates itself after mounting; `src` only chooses its first page.
   const [initialUrl] = useState(url)
   const page = usePage(view, thread.id)
+  const { picking, toggle } = usePicking(view, thread.id)
   const navigate = (next: string) => {
     const element = view.current
     if (element === null) return
@@ -567,6 +678,8 @@ function PreviewPage({
         view={view}
         suggestions={suggestions}
         onNavigate={navigate}
+        picking={picking}
+        onTogglePicking={toggle}
       />
       <div className="relative min-w-0 min-h-0 bg-white">
         <webview
@@ -581,6 +694,7 @@ function PreviewPage({
           <PreviewFailure failure={page.failure} onRetry={() => view.current?.reload()} />
         )}
         <AgentActivityOverlay threadId={thread.id} />
+        {picking && <DesignModeHint />}
       </div>
     </section>
   )

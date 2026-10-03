@@ -19,6 +19,7 @@ import { QueuedMessages } from "./QueuedMessages"
 import { ReviewNotes } from "./ReviewNotes"
 import { reviewNotesMessage } from "./review-notes"
 import { skillAttachments } from "./composer-completion"
+import { messageWithContext } from "../preview/design-mode"
 import { Transcript } from "./Transcript"
 import { HandoffNotice } from "./Handoff"
 import { ThreadBranchToggle, ThreadOrigin } from "./ThreadOrigin"
@@ -59,7 +60,7 @@ export function ThreadView({
     try {
       const submitted = await submitTurnMutation.mutateAsync({
         threadId: thread.id,
-        text: sent.text,
+        text: messageWithContext(sent.text, sent.attachments),
         attachments: [
           ...sent.attachments.map(({ type, value, name }) => ({ type, value, name })),
           ...skillAttachments(sent.text, sent.tokens),

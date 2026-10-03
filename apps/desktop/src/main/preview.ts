@@ -1,4 +1,11 @@
-import { type BrowserWindow, ipcMain, shell } from "electron"
+import {
+  type BrowserWindow,
+  ipcMain,
+  session,
+  shell,
+  webContents,
+  type WebContents,
+} from "electron"
 import { IPC } from "@meldshell/contracts/ipc"
 import { threadPort } from "@meldshell/host/workspace-scripts"
 
@@ -13,6 +20,21 @@ export const PREVIEW_PARTITION = "persist:meldshell-preview"
 
 const webAddress = (url: unknown): url is string =>
   typeof url === "string" && /^https?:\/\//i.test(url)
+
+/** The preview page a window names by id, or null unless it is a preview guest of that window. */
+export const previewGuest = (host: WebContents, id: unknown): WebContents | null => {
+  if (typeof id !== "number") return null
+  const page = webContents.fromId(id)
+  if (
+    page === undefined ||
+    page.isDestroyed() ||
+    page.getType() !== "webview" ||
+    page.hostWebContents !== host ||
+    page.session !== session.fromPartition(PREVIEW_PARTITION)
+  )
+    return null
+  return page
+}
 
 export function guardPreviews(window: BrowserWindow): void {
   window.webContents.on("will-attach-webview", (event, webPreferences, params) => {
