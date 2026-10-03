@@ -771,6 +771,8 @@ export type RuntimeEventInput = typeof RuntimeEventInput.Type
 
 export const RuntimeEventResult = Schema.Struct({
   changed: Schema.Boolean,
+  /** Whether the event changed app snapshot state (threads, settings, approvals), not only the transcript. */
+  snapshotChanged: Schema.Boolean,
   nextDispatch: Schema.NullOr(TurnDispatch),
 })
 

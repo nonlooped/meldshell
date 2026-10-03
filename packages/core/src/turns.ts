@@ -281,10 +281,18 @@ export const recordRuntimeEvent = (input: RuntimeEventInput) =>
         input.nativeTurnId !== undefined &&
         active[0]!.native_turn_id !== input.nativeTurnId)
     )
-      return { changed: false, nextDispatch: null } satisfies RuntimeEventResult
+      return {
+        changed: false,
+        snapshotChanged: false,
+        nextDispatch: null,
+      } satisfies RuntimeEventResult
     if (input.validated !== true) {
       yield* appendEvent(input.threadId, input.turnId, "unknown", input.method, null, input.params)
-      return { changed: true, nextDispatch: null } satisfies RuntimeEventResult
+      return {
+        changed: true,
+        snapshotChanged: false,
+        nextDispatch: null,
+      } satisfies RuntimeEventResult
     }
     if (input.nativeTurnId !== undefined) {
       yield* sql`
@@ -303,19 +311,21 @@ export const recordRuntimeEvent = (input: RuntimeEventInput) =>
       input.params,
     )
 
-    yield* updateThreadName(input)
+    // Most mid-turn events only extend the transcript; these writes also change the app snapshot.
+    const renamed = yield* updateThreadName(input)
+    const claudeMode = yield* updateClaudeMode(input)
+    const cursorMode = yield* updateCursorMode(input)
+    const approvalAdded = yield* persistApproval(input)
+    const approvalCleared = yield* clearApproval(input)
+    const finished = input.method === "turn/completed"
+    const nextDispatch = finished ? yield* finishTurn(input) : null
 
-    yield* updateClaudeMode(input)
-
-    yield* updateCursorMode(input)
-
-    yield* persistApproval(input)
-
-    yield* clearApproval(input)
-
-    const nextDispatch = input.method === "turn/completed" ? yield* finishTurn(input) : null
-
-    return { changed: true, nextDispatch } satisfies RuntimeEventResult
+    return {
+      changed: true,
+      snapshotChanged:
+        renamed || claudeMode || cursorMode || approvalAdded || approvalCleared || finished,
+      nextDispatch,
+    } satisfies RuntimeEventResult
   }).pipe(transaction)
 
 export const resolveApproval = (approvalId: string) =>
@@ -430,25 +440,30 @@ const updateThreadName = (input: RuntimeEventInput) =>
         Schema.Struct({ threadName: Schema.optional(Schema.String) }),
       )(input.params)
       if (typeof params.threadName === "string" && params.threadName.trim() !== "") {
-        yield* sql`
+        const rows = yield* sql`
           UPDATE threads SET title = ${params.threadName.trim().slice(0, THREAD_TITLE_LIMIT)}
           WHERE id = ${input.threadId} AND title_locked = 0
+          RETURNING id
         `
+        return rows.length > 0
       }
     }
+    return false
   })
 
 /** An approved plan takes Claude out of plan mode, so the thread's next turn starts working. */
 const updateClaudeMode = (input: RuntimeEventInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    if (input.method !== CLAUDE_PERMISSION_MODE) return
+    if (input.method !== CLAUDE_PERMISSION_MODE) return false
     const { permissionMode: mode } = yield* Schema.decodeUnknownEffect(
       Schema.Struct({ permissionMode: Schema.optional(Schema.String) }),
     )(input.params)
-    if (typeof mode === "string" && mode !== "plan")
-      yield* sql`UPDATE thread_settings SET mode = 'default'
-        WHERE thread_id = ${input.threadId} AND provider_id IN (SELECT id FROM providers WHERE harness = 'claude-code')`
+    if (typeof mode !== "string" || mode === "plan") return false
+    const rows = yield* sql`UPDATE thread_settings SET mode = 'default'
+      WHERE thread_id = ${input.threadId} AND provider_id IN (SELECT id FROM providers WHERE harness = 'claude-code')
+      RETURNING thread_id`
+    return rows.length > 0
   })
 
 const updateCursorMode = (input: RuntimeEventInput) =>
@@ -465,10 +480,14 @@ const updateCursorMode = (input: RuntimeEventInput) =>
               )?.currentValue
             : undefined
       if (nativeMode === "agent" || nativeMode === "plan" || nativeMode === "ask") {
-        yield* sql`UPDATE thread_settings SET mode = ${nativeMode === "agent" ? "default" : nativeMode}
-          WHERE thread_id = ${input.threadId} AND provider_id IN (SELECT id FROM providers WHERE harness = 'cursor')`
+        const rows =
+          yield* sql`UPDATE thread_settings SET mode = ${nativeMode === "agent" ? "default" : nativeMode}
+          WHERE thread_id = ${input.threadId} AND provider_id IN (SELECT id FROM providers WHERE harness = 'cursor')
+          RETURNING thread_id`
+        return rows.length > 0
       }
     }
+    return false
   })
 
 const persistApproval = (input: RuntimeEventInput) =>
@@ -489,15 +508,18 @@ const persistApproval = (input: RuntimeEventInput) =>
       ].includes(input.method)
     ) {
       const copy = approvalCopy(input.method, input.params)
-      yield* sql`
+      const rows = yield* sql`
         INSERT INTO approvals (
           id, thread_id, turn_id, request_id, method, title, detail, request_data, created_at
         ) VALUES (
           ${randomUUID()}, ${input.threadId}, ${input.turnId}, ${String(input.requestId)},
           ${input.method}, ${copy.title}, ${copy.detail}, ${JSON.stringify(input.params)}, ${new Date().toISOString()}
         ) ON CONFLICT(request_id) DO NOTHING
+        RETURNING id
       `
+      return rows.length > 0
     }
+    return false
   })
 
 const clearApproval = (input: RuntimeEventInput) =>
@@ -507,9 +529,13 @@ const clearApproval = (input: RuntimeEventInput) =>
       const params = yield* Schema.decodeUnknownEffect(
         Schema.Struct({ requestId: Schema.optional(Schema.Union([Schema.String, Schema.Number])) }),
       )(input.params)
-      if (typeof params.requestId === "string" || typeof params.requestId === "number")
-        yield* sql`DELETE FROM approvals WHERE turn_id = ${input.turnId} AND request_id = ${String(params.requestId)}`
+      if (typeof params.requestId === "string" || typeof params.requestId === "number") {
+        const rows =
+          yield* sql`DELETE FROM approvals WHERE turn_id = ${input.turnId} AND request_id = ${String(params.requestId)} RETURNING id`
+        return rows.length > 0
+      }
     }
+    return false
   })
 
 const finishTurn = (input: RuntimeEventInput) =>

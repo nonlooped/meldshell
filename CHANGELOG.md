@@ -6,6 +6,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Changed
 
+- Streaming agent activity no longer reloads every thread, model, setting, and schedule on each tool event; mid-turn events refresh only that thread's transcript, and the full app state reloads when a turn finishes, an approval arrives or resolves, or a thread's title or mode changes.
+
 - Remove the unused native SQLite addon from desktop and WSL installations; database access uses the SQLite built into Node.
 
 - Upgrade the app to stable Effect v4, consolidating SQL and RPC modules, explicitly scoping callback fibers, and preserving native provider extensions with open schemas.

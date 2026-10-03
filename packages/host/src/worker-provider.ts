@@ -14,6 +14,7 @@ import {
   type ProviderStatus,
   type ProviderWorkerInput,
   type RuntimeEventInput,
+  type RuntimeEventResult,
   type TurnDispatch,
 } from "@meldshell/contracts"
 import { stopProcessTree } from "@meldshell/provider-runtime/process-tree"
@@ -35,7 +36,6 @@ import { HostEvents } from "./events"
 import { handleGeneratedText } from "./generated-text"
 import { interruptWithRecovery } from "./interrupt-turn"
 import { HostPlatform, type HostProcess } from "./platform"
-import { isRuntimeDelta } from "./runtime-deltas"
 import { makeEventQueue } from "./runtime-queue"
 import { logStartupTiming } from "./startup-timing"
 import { deliverCommand, requestCommands, requestUsage } from "./worker-channel"
@@ -181,19 +181,22 @@ const providerRuntime = (
       })
 
     /** Tells clients about a stored event, notifies the user when it needs them, and starts queued input. */
-    const announce = (input: RuntimeEventInput, nextDispatch: TurnDispatch | null) =>
+    const announce = (input: RuntimeEventInput, result: RuntimeEventResult) =>
       Effect.gen(function* () {
+        // Mid-turn events only extend the transcript, so clients refetch the whole app state only
+        // when the core reports a snapshot change: a finished turn, an approval, a rename or mode.
         yield* hostEvents.publish({
           _tag: "RuntimeChanged",
           threadId: input.threadId,
-          snapshotChanged: !isRuntimeDelta(input),
+          snapshotChanged: result.snapshotChanged,
         })
         if (input.method === "turn/completed" || input.requestId !== undefined)
           yield* core.GetSnapshot().pipe(
             Effect.flatMap((snapshot) => notifyForSnapshot(snapshot, input.threadId, input.method)),
             Effect.catchCause(Effect.logError),
           )
-        if (nextDispatch !== null) yield* send({ type: "start-turn", dispatch: nextDispatch })
+        if (result.nextDispatch !== null)
+          yield* send({ type: "start-turn", dispatch: result.nextDispatch })
       })
 
     const persistRuntimeEvent = (input: RuntimeEventInput): Effect.Effect<void> =>
@@ -205,9 +208,7 @@ const providerRuntime = (
             if (child !== null && input.generation === generations.get(child)) child.kill()
           }),
         ),
-        Effect.tap((result) =>
-          result.changed ? announce(input, result.nextDispatch) : Effect.void,
-        ),
+        Effect.tap((result) => (result.changed ? announce(input, result) : Effect.void)),
         Effect.asVoid,
         Effect.catchCause((cause) =>
           Effect.sync(() => console.error(`Could not persist a ${label} event.`, cause)),
