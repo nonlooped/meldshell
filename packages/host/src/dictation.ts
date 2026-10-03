@@ -154,12 +154,20 @@ export function createDictation(
     }
   }
 
+  // Models being loaded on request, so repeated prepares share one load.
+  const preparing = new Set<DictationModel>()
+
   return {
     status,
     prepare: async (model) => {
-      // Downloading continues in the background; the status reports its progress.
-      if (!progress.has(model) && !(await exists(marker(cacheDir, model))))
-        void ask(model, { type: "prepare" }).catch(() => undefined)
+      // Loading continues in the background, so a model that went idle is back in memory by the
+      // time speech ends. A first use downloads it too, and the status reports the progress.
+      if (!preparing.has(model)) {
+        preparing.add(model)
+        void ask(model, { type: "prepare" })
+          .catch(() => undefined)
+          .finally(() => preparing.delete(model))
+      }
       return status(model)
     },
     transcribe: async (model, input) => {

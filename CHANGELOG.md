@@ -6,6 +6,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Fixed
 
+- Dictation warms a downloaded speech model when recording starts and prevents repeated clicks from starting overlapping recordings. The stop control remains clickable during its transition.
+
 - Claude Code turns no longer stop after tool calls or fail to finish in WSL because absent optional event fields were rejected by the host's JSON protocol. Tool results, approvals, and turn completion now omit those fields while preserving native data.
 
 ### Added
