@@ -34,6 +34,7 @@ import {
   ScheduledPrompt,
   RewindResult,
   UndoRewindResult,
+  TurnHandoff,
 } from "./models"
 import { CoreError } from "./errors"
 
@@ -112,6 +113,12 @@ export class CoreRpcs extends RpcGroup.make(
   Rpc.make("SubmitTurn", {
     payload: SubmitTurnInput,
     success: SubmitTurnResult,
+    error: CoreError,
+  }),
+  /** The summary the thread's next turn would start with; null when its agent has seen everything. */
+  Rpc.make("PreviewHandoff", {
+    payload: Schema.Struct({ threadId: Schema.String }),
+    success: Schema.NullOr(TurnHandoff),
     error: CoreError,
   }),
   /** Takes a turn and every later one out of the conversation; the next turn starts a new session. */

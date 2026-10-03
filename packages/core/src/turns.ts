@@ -148,6 +148,24 @@ const createDispatch = (
     } satisfies TurnDispatch
   })
 
+/** The summary the thread's next turn would carry on its selected harness, if any. */
+export const previewHandoff = (threadId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const [row] = yield* sql<{
+      readonly harness: string
+      readonly native_thread_id: string | null
+    }>`
+      SELECT p.harness, ps.native_thread_id
+      FROM thread_settings s
+      JOIN providers p ON p.id = s.provider_id
+      LEFT JOIN provider_sessions ps ON ps.thread_id = s.thread_id AND ps.harness = p.harness
+      WHERE s.thread_id = ${threadId}
+    `
+    if (row === undefined) return null
+    return yield* missedWork(threadId, row.harness, row.native_thread_id !== null)
+  })
+
 /**
  * The turns a harness's provider session has not seen, summarized. A session has seen everything
  * up to its own latest turn; without a session, which a rewind also clears, it has seen nothing.

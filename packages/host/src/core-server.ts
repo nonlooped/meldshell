@@ -62,6 +62,7 @@ import {
   recordScheduleRun,
   rewindThread,
   undoRewind,
+  previewHandoff,
 } from "@meldshell/core"
 import {
   FiberSet,
@@ -162,6 +163,7 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
         }),
       ),
     SubmitTurn: (input) => exposeCoreError(submitTurn(input)),
+    PreviewHandoff: ({ threadId }) => exposeCoreRead(previewHandoff(threadId)),
     RewindThread: (input) => exposeCoreError(rewindThread(input)),
     UndoRewind: ({ threadId }) => exposeCoreError(undoRewind(threadId)),
     RecordRuntimeEvent: (input) => exposeCoreError(recordRuntimeEvent(input)),

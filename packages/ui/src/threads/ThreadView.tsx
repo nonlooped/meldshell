@@ -12,6 +12,7 @@ import { useAppSettingsMutation, useConversationActions } from "../data/mutation
 import { refreshProviderStatus, useSelectedProvider } from "../data/providers"
 import { workspaceScope } from "../data/workspace-scope"
 import { emptyDraft, useThreadDrafts } from "../app/thread-drafts"
+import { useViewStore } from "../app/view-store"
 import { ErrorToast } from "../ui/Notice"
 import { Composer } from "./Composer"
 import { QueuedMessages } from "./QueuedMessages"
@@ -107,6 +108,8 @@ export function ThreadView({
           onRewound={(text) => {
             const current = useThreadDrafts.getState().drafts[thread.id]?.text ?? ""
             update(thread.id, { text: current === "" ? text : `${text}\n\n${current}` })
+            // The message is back in the composer, ready to be edited and sent again.
+            useViewStore.getState().focusComposer(thread.id)
           }}
           onRewindUndone={(text) => {
             // The rewound message leaves again unless it was edited in the meantime.

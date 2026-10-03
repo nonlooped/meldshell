@@ -8,6 +8,7 @@ import {
   getSnapshot,
   getTranscript,
   initializeDatabase,
+  previewHandoff,
   recordRuntimeEvent,
   rewindThread,
   searchTranscripts,
@@ -91,8 +92,12 @@ test("a turn on another harness starts with a summary of the turns it did not se
       assert.equal(first.context, null)
       assert.equal((yield* userPayload(first.turnId)).handoff, undefined)
 
+      assert.equal(yield* previewHandoff("thread"), null)
+      yield* setThreadSettings({ threadId: "thread", modelId: "claude-code" })
+      const preview = yield* previewHandoff("thread")
       const second = yield* runTurn("claude-code", "Now add tests", { reply: "Tests pass." })
       assert.equal(second.nativeThreadId, null)
+      assert.equal(preview?.brief, second.context)
       assert.match(second.context ?? "", /Codex/)
       assert.match(second.context ?? "", /Add a login page/)
       assert.match(second.context ?? "", /src\/login\.tsx/)

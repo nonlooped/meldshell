@@ -133,6 +133,9 @@ export const hostOperations: Record<string, Operation> = {
   ),
   [C.IPC.removeWorkspace]: operation(Schema.String, false, removeWorkspace),
   [C.IPC.getWorktreeStatus]: operation(Schema.String, true, getWorktreeStatus),
+  [C.IPC.previewHandoff]: coreCall(Schema.String, true, (core, threadId) =>
+    core.PreviewHandoff({ threadId }),
+  ),
   [C.IPC.setDraftLocation]: operation(
     Schema.Struct({
       threadId: Schema.String,
