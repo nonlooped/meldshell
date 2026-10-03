@@ -99,3 +99,40 @@ export function toolDetails(event: CanonicalEvent): {
     parent: typeof item.parentToolUseId === "string" ? item.parentToolUseId : null,
   }
 }
+
+/**
+ * The page title the agent browser's screenshot tool reports beside its image, if any. Tool output
+ * is usually JSON, so the title is read up to its escaped line break and then unescaped.
+ */
+export function screenshotTitle(output: string): string | null {
+  const raw = output.match(/Page: ((?:\\[^n]|[^"\\\n])*)/)?.[1]
+  if (raw === undefined) return null
+  let title = raw
+  try {
+    title = JSON.parse(`"${raw}"`) as string
+  } catch {
+    // Plain-text output holds the title as is.
+  }
+  title = title.trim()
+  return title && title !== "(untitled)" ? title : null
+}
+
+/** Every image a turn's tools returned, such as browser screenshots, in the order they arrived. */
+export function turnImages(
+  events: readonly CanonicalEvent[],
+): readonly { readonly src: string; readonly alt: string }[] {
+  const seen = new Set<string>()
+  const images: { src: string; alt: string }[] = []
+  for (const event of events) {
+    if (event.kind !== "tool") continue
+    const tool = toolDetails(event)
+    if (tool.failed) continue
+    const title = screenshotTitle(tool.output)
+    for (const src of tool.images) {
+      if (seen.has(src)) continue
+      seen.add(src)
+      images.push({ src, alt: title ?? `Screenshot ${images.length + 1}` })
+    }
+  }
+  return images
+}
