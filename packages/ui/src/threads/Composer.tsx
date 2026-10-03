@@ -968,6 +968,7 @@ export function Composer({
                   onDraftChange={onDraftChange}
                   onError={setDictationError}
                   disabled={sending}
+                  model={snapshot.settings.dictationModel}
                 />
                 <PopPresence show={running}>
                   <IconButton

@@ -22,6 +22,7 @@ const bundledMainPackages = [
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin({ exclude: bundledMainPackages })],
+    resolve: { alias: { sharp: resolve("scripts/no-sharp.mjs") } },
     build: {
       rollupOptions: {
         external: ["@anthropic-ai/claude-agent-sdk"],
@@ -32,6 +33,7 @@ export default defineConfig({
           "claude-worker": resolve("src/main/workers/claude.ts"),
           "cursor-worker": resolve("src/main/workers/cursor.ts"),
           "pi-worker": resolve("src/main/workers/pi.ts"),
+          "dictation-worker": resolve("src/main/workers/dictation.ts"),
         },
       },
     },

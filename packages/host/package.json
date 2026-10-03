@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@effect/sql-sqlite-node": "4.0.0",
+    "@huggingface/transformers": "4.3.0",
     "@meldshell/contracts": "*",
     "@meldshell/core": "*",
     "@meldshell/provider-runtime": "*",

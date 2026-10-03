@@ -28,7 +28,7 @@ export type {
 } from "./workspace-inputs"
 
 import type { RemotePreviewInput, RemotePreviewFrame } from "./remote-preview"
-import type { DictationStatus, SetDictationSettingsInput, TranscribeAudioInput } from "./dictation"
+import type { DictationStatus, TranscribeAudioInput } from "./dictation"
 
 import type {
   AppSnapshot,
@@ -401,9 +401,8 @@ export const requests = {
     request<(input: SaveScheduleInput) => Promise<ScheduledPrompt>>("meldshell:save-schedule"),
   deleteSchedule: request<(scheduleId: string) => Promise<void>>("meldshell:delete-schedule"),
   getDictationStatus: request<() => Promise<DictationStatus>>("meldshell:get-dictation-status"),
-  setDictationSettings: request<(input: SetDictationSettingsInput) => Promise<DictationStatus>>(
-    "meldshell:set-dictation-settings",
-  ),
+  /** Downloads and loads the chosen speech model ahead of the first transcription. */
+  prepareDictation: request<() => Promise<DictationStatus>>("meldshell:prepare-dictation"),
   /** Turns a composer recording into text on the host. */
   transcribeAudio: request<(input: TranscribeAudioInput) => Promise<{ readonly text: string }>>(
     "meldshell:transcribe-audio",

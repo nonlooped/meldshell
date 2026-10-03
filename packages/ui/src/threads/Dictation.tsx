@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import type { DictationModel, DictationStatus } from "@meldshell/contracts"
 import { AnimatePresence, motion } from "motion/react"
 import { Check, Mic, X } from "lucide-react"
 import { ActivitySpinner, useMotionPreference } from "../ui/motion"
 import { IconButton } from "../ui/controls"
 import { chipClasses } from "../ui/styles"
-import { useViewStore } from "../app/view-store"
 import { useKeybindings, withShortcut } from "../app/keybindings"
 import {
   canRecord,
@@ -18,13 +18,29 @@ import {
   type Recording,
 } from "./dictation-recorder"
 
-export const dictationStatusQuery = {
-  queryKey: ["dictation-status"],
+const DICTATION_STATUS_KEY = ["dictation-status"] as const
+
+/** Keyed by the chosen model so a change in Settings reads that model's state. */
+export const dictationStatusQuery = (model: DictationModel | undefined) => ({
+  queryKey: [...DICTATION_STATUS_KEY, model ?? "fast"],
   queryFn: () => window.meldshell.getDictationStatus(),
   staleTime: 30_000,
   // Hosts from before dictation do not know the request; the microphone just stays hidden.
   retry: false,
-} as const
+  // A first download reports its progress until the model is in place.
+  refetchInterval: (query: { state: { data?: DictationStatus } }) =>
+    query.state.data?.state === "downloading" ? 700 : false,
+})
+
+/** The device's language, which Whisper is told to expect rather than guess from a few words. */
+const speakerLanguage = (): string | undefined =>
+  navigator.language?.split("-")[0]?.toLowerCase() || undefined
+
+/** What the spinner says while speech becomes text. */
+const transcribingLabel = (status: DictationStatus | undefined): string =>
+  status?.state === "downloading"
+    ? `Downloading the speech model, once (${Math.round((status.progress ?? 0) * 100)}%)…`
+    : "Writing what you said…"
 
 type Phase = "idle" | "starting" | "recording" | "transcribing"
 
@@ -92,11 +108,12 @@ interface DictationButtonProps {
   readonly onDraftChange: (draft: string) => void
   readonly onError: (message: string | null) => void
   readonly disabled: boolean
+  readonly model: DictationModel | undefined
 }
 
 /**
- * Records from the microphone and writes what was said at the caret. The host transcribes, so a
- * phone connected through remote access dictates the same way the desktop does.
+ * Records from the microphone and writes what was said at the caret. A Whisper model on the host
+ * transcribes, so a phone connected through remote access dictates the same way, for free.
  */
 export function DictationButton({
   threadId,
@@ -105,10 +122,12 @@ export function DictationButton({
   onDraftChange,
   onError,
   disabled,
+  model,
 }: DictationButtonProps): React.JSX.Element | null {
-  const status = useQuery(dictationStatusQuery)
+  const statusQuery = dictationStatusQuery(model)
+  const status = useQuery(statusQuery)
   const shortcut = useKeybindings((state) => state.bindings.dictate)
-  const openSettings = useViewStore((state) => state.openSettings)
+  const client = useQueryClient()
   const reduced = useMotionPreference()
   const [phase, setPhase] = useState<Phase>("idle")
   const [recording, setRecording] = useState<Recording | null>(null)
@@ -142,14 +161,20 @@ export function DictationButton({
     setRecording(null)
     setPhase(keep ? "transcribing" : "idle")
     try {
-      const audio = await current.stop(keep)
-      if (audio === null) return
-      const textarea = textareaRef.current
-      const prompt = latest.current.draft.slice(0, textarea?.selectionStart ?? undefined)
-      const { text } = await window.meldshell.transcribeAudio({
-        ...audio,
-        ...(prompt.trim() ? { prompt } : {}),
-      })
+      const pieces = await current.stop(keep)
+      if (pieces === null) return
+      const language = speakerLanguage()
+      const texts: string[] = []
+      // One piece at a time keeps each message small enough to cross a remote connection.
+      for (const pcm of pieces) {
+        const { text } = await window.meldshell.transcribeAudio({
+          pcm,
+          ...(language ? { language } : {}),
+        })
+        if (text) texts.push(text)
+      }
+      void client.invalidateQueries({ queryKey: DICTATION_STATUS_KEY })
+      const text = texts.join(" ")
       if (text) insert(text)
       else latest.current.onError("No speech was heard. Try again a little closer to the mic.")
     } catch (error) {
@@ -161,11 +186,13 @@ export function DictationButton({
 
   const start = async () => {
     if (phase !== "idle" || disabled) return
-    if (!status.data?.ready) {
-      openSettings("dictation")
-      return
-    }
     onError(null)
+    // The first recording also fetches the model, so it is ready by the time speech ends.
+    if (status.data !== undefined && status.data.state !== "ready")
+      void window.meldshell
+        .prepareDictation()
+        .then((next) => client.setQueryData(statusQuery.queryKey, next))
+        .catch(() => undefined)
     setPhase("starting")
     try {
       const next = await startRecording(() => void finish(true))
@@ -210,10 +237,7 @@ export function DictationButton({
 
   if (!canRecord() || status.isError) return null
 
-  const label = withShortcut(
-    status.data?.ready === false ? "Set up dictation" : "Dictate",
-    shortcut,
-  )
+  const label = withShortcut("Dictate", shortcut)
   return (
     <AnimatePresence initial={false} mode="popLayout">
       {phase === "recording" && recording !== null ? (
@@ -263,11 +287,22 @@ export function DictationButton({
           <IconButton
             unstyled
             className={`motion-colors flex-none ${chipClasses}`}
-            label={phase === "transcribing" ? "Writing what you said…" : label}
+            label={phase === "transcribing" ? transcribingLabel(status.data) : label}
             disabled={disabled || phase !== "idle" || status.isPending}
             onClick={toggle}
           >
-            {phase === "idle" ? <Mic size={13} strokeWidth={1.75} /> : <ActivitySpinner />}
+            {phase === "idle" ? (
+              <Mic size={13} strokeWidth={1.75} />
+            ) : (
+              <>
+                <ActivitySpinner />
+                {status.data?.state === "downloading" && (
+                  <span className="text-[11px] tabular-nums">
+                    Model {Math.round((status.data.progress ?? 0) * 100)}%
+                  </span>
+                )}
+              </>
+            )}
           </IconButton>
         </motion.span>
       )}

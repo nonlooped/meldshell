@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { MAX_DICTATION_SECONDS } from "@meldshell/contracts"
+import { DICTATION_SAMPLE_RATE, MAX_DICTATION_SECONDS } from "@meldshell/contracts"
 
 /** The dictation shortcut reaches the composer of the thread in front through this signal. */
 export const useDictationRequests = create<{
@@ -29,8 +29,11 @@ const MIN_RECORDING_MS = 400
 export interface Recording {
   readonly analyser: AnalyserNode
   readonly startedAt: number
-  /** Ends the recording; resolves with its audio, or null when it was cancelled or too short. */
-  readonly stop: (keep: boolean) => Promise<{ audio: string; mimeType: string } | null>
+  /**
+   * Ends the recording. Resolves with its speech as base64 16 kHz PCM pieces short enough for a
+   * remote frame, or null when it was cancelled or too short.
+   */
+  readonly stop: (keep: boolean) => Promise<readonly string[] | null>
 }
 
 /** Explains why the microphone could not start, in terms the person can act on. */
@@ -43,13 +46,63 @@ export function microphoneProblem(error: unknown): string {
   return "Could not start the microphone."
 }
 
-const base64 = (blob: Blob): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ""))
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read the recording."))
-    reader.readAsDataURL(blob)
-  })
+/** Whisper's own window is 30 seconds; pieces end in the quietest moment near this length. */
+const PIECE_SECONDS = 50
+const PIECE_SEARCH_SECONDS = 10
+
+/** Where to end each piece: the quietest tenth of a second before a piece grows too long. */
+export function pieceBounds(samples: Float32Array, rate = DICTATION_SAMPLE_RATE): number[] {
+  const bounds: number[] = []
+  const longest = PIECE_SECONDS * rate
+  const frame = Math.round(rate / 10)
+  let start = 0
+  while (samples.length - start > longest) {
+    let best = start + longest
+    let quietest = Number.POSITIVE_INFINITY
+    for (
+      let at = start + longest - PIECE_SEARCH_SECONDS * rate;
+      at + frame <= start + longest;
+      at += frame
+    ) {
+      let energy = 0
+      for (let index = at; index < at + frame; index++) energy += samples[index]! ** 2
+      if (energy < quietest) {
+        quietest = energy
+        best = at + Math.round(frame / 2)
+      }
+    }
+    bounds.push(best)
+    start = best
+  }
+  bounds.push(samples.length)
+  return bounds
+}
+
+/** Little-endian 16-bit PCM, base64 encoded. */
+export function encodePcm(samples: Float32Array): string {
+  const pcm = new Int16Array(samples.length)
+  for (let index = 0; index < samples.length; index++) {
+    const sample = Math.max(-1, Math.min(1, samples[index]!))
+    pcm[index] = sample < 0 ? sample * 32768 : sample * 32767
+  }
+  const bytes = new Uint8Array(pcm.buffer)
+  let text = ""
+  for (let index = 0; index < bytes.length; index += 0x8000)
+    text += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
+  return btoa(text)
+}
+
+/** Decodes a recording and resamples it to mono at the rate Whisper listens at. */
+async function toSpeechRate(context: AudioContext, blob: Blob): Promise<Float32Array> {
+  const decoded = await context.decodeAudioData(await blob.arrayBuffer())
+  const length = Math.ceil(decoded.duration * DICTATION_SAMPLE_RATE)
+  const offline = new OfflineAudioContext(1, length, DICTATION_SAMPLE_RATE)
+  const source = offline.createBufferSource()
+  source.buffer = decoded
+  source.connect(offline.destination)
+  source.start()
+  return (await offline.startRendering()).getChannelData(0)
+}
 
 /** Starts recording from the default microphone; throws as `getUserMedia` does. */
 export async function startRecording(onLimit: () => void): Promise<Recording> {
@@ -57,11 +110,7 @@ export async function startRecording(onLimit: () => void): Promise<Recording> {
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   })
   const mimeType = RECORDING_TYPES.find((type) => MediaRecorder.isTypeSupported(type))
-  // Speech needs little bandwidth, which keeps long briefs small enough to send from a phone.
-  const recorder = new MediaRecorder(stream, {
-    ...(mimeType ? { mimeType } : {}),
-    audioBitsPerSecond: 32_000,
-  })
+  const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
   const chunks: Blob[] = []
   recorder.addEventListener("dataavailable", (event) => {
     if (event.data.size > 0) chunks.push(event.data)
@@ -75,7 +124,7 @@ export async function startRecording(onLimit: () => void): Promise<Recording> {
   const startedAt = performance.now()
   recorder.start(1000)
 
-  let stopping: Promise<{ audio: string; mimeType: string } | null> | null = null
+  let stopping: Promise<readonly string[] | null> | null = null
   const stop = (keep: boolean) => {
     stopping ??= new Promise<Blob>((resolve) => {
       clearTimeout(limit)
@@ -86,12 +135,20 @@ export async function startRecording(onLimit: () => void): Promise<Recording> {
       )
       if (recorder.state === "inactive") recorder.dispatchEvent(new Event("stop"))
       else recorder.stop()
-    }).then(async (blob) => {
-      for (const track of stream.getTracks()) track.stop()
-      void context.close()
-      if (!keep || performance.now() - startedAt < MIN_RECORDING_MS || blob.size === 0) return null
-      return { audio: await base64(blob), mimeType: blob.type }
     })
+      .then(async (blob) => {
+        for (const track of stream.getTracks()) track.stop()
+        if (!keep || performance.now() - startedAt < MIN_RECORDING_MS || blob.size === 0)
+          return null
+        const samples = await toSpeechRate(context, blob)
+        let start = 0
+        return pieceBounds(samples).map((end) => {
+          const piece = encodePcm(samples.subarray(start, end))
+          start = end
+          return piece
+        })
+      })
+      .finally(() => void context.close())
     return stopping
   }
   return { analyser, startedAt, stop }

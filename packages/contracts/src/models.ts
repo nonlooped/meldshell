@@ -1,4 +1,5 @@
 import { Effect, Schema, Struct } from "effect"
+import { DictationModel } from "./dictation"
 
 export const Workspace = Schema.Struct({
   id: Schema.String,
@@ -369,6 +370,8 @@ export const AppSettings = Schema.Struct({
   reduceMotion: Schema.optional(Schema.Boolean),
   /** Chimes when a thread finishes or needs attention out of view. */
   sounds: Schema.optional(Schema.Boolean),
+  /** The local speech model dictation uses. */
+  dictationModel: Schema.optional(DictationModel),
   /** The external editor that opens a thread's folder; an `ExternalEditor` id. */
   editor: Schema.optional(Schema.String),
   /** Shortcut chords that differ from the defaults, by action; an empty chord removes one. */

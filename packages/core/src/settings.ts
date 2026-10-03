@@ -1,6 +1,7 @@
 import * as SqlClient from "effect/sql/SqlClient"
 import {
   AppOpacity,
+  DictationModel,
   FollowUpDelivery,
   CURRENT_TITLE_MODEL,
   Theme,
@@ -25,6 +26,7 @@ const PREFERENCES = [
   "transcriptSize",
   "reduceMotion",
   "sounds",
+  "dictationModel",
   "editor",
   "onboarded",
 ] as const
@@ -64,6 +66,7 @@ export const readAppSettings = Effect.gen(function* () {
     transcriptSize: stored(TranscriptSize, values.get("transcriptSize")) ?? "medium",
     reduceMotion: stored(StoredBoolean, values.get("reduceMotion")) ?? false,
     sounds: stored(StoredBoolean, values.get("sounds")) ?? true,
+    dictationModel: stored(DictationModel, values.get("dictationModel")) ?? "fast",
     editor: values.get("editor"),
     onboarded: stored(StoredBoolean, values.get("onboarded")) ?? false,
     keybindings: stored(Keybindings, values.get(KEYBINDINGS_SETTING)),

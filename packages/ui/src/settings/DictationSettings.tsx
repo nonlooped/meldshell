@@ -1,171 +1,78 @@
-import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  DEFAULT_DICTATION_ENDPOINT,
-  DEFAULT_DICTATION_MODEL,
+  DICTATION_MODELS,
+  type AppSettings,
+  type DictationModel,
   type DictationStatus,
-  type SetDictationSettingsInput,
+  type SetAppSettingsInput,
 } from "@meldshell/contracts"
+import { Download } from "lucide-react"
 import { ActivitySpinner } from "../ui/motion"
-import { Button, SelectField, TextField } from "../ui/controls"
+import { Button, SelectField } from "../ui/controls"
 import { SettingRow } from "./SettingRow"
 import { dictationStatusQuery } from "../threads/Dictation"
 import { canRecord, dictationError } from "../threads/dictation-recorder"
 
-type Service = "openai" | "custom"
+const MODEL_OPTIONS = (Object.keys(DICTATION_MODELS) as DictationModel[]).map((model) => ({
+  value: model,
+  label: `${DICTATION_MODELS[model].label} · ${DICTATION_MODELS[model].size}`,
+}))
 
-const SERVICES = [
-  { value: "openai", label: "OpenAI" },
-  { value: "custom", label: "Other service" },
-] as const satisfies ReadonlyArray<{ value: Service; label: string }>
-
-const keyDescription = (status: DictationStatus): string => {
-  switch (status.source) {
-    case "settings":
-      return `Using the key you saved, ending ${status.keyHint}. It stays on this computer.`
-    case "environment":
-      return `Using OPENAI_API_KEY from the environment, ending ${status.keyHint}. A key saved here takes its place.`
-    case "codex":
-      return `Using the API key Codex signed in with, ending ${status.keyHint}. A key saved here takes its place.`
-    default:
-      return status.endpoint === DEFAULT_DICTATION_ENDPOINT
-        ? "Dictation needs an OpenAI API key; a ChatGPT sign-in does not include audio. The key stays on this computer."
-        : "Leave empty if the service needs no key."
-  }
-}
-
-function DictationForm({ status }: { status: DictationStatus }): React.JSX.Element {
+function ModelState({ status }: { status: DictationStatus }): React.JSX.Element {
   const client = useQueryClient()
-  const [service, setService] = useState<Service>(
-    status.endpoint === DEFAULT_DICTATION_ENDPOINT ? "openai" : "custom",
-  )
-  const [apiKey, setApiKey] = useState("")
-  const [endpoint, setEndpoint] = useState(
-    status.endpoint === DEFAULT_DICTATION_ENDPOINT ? "" : status.endpoint,
-  )
-  const [model, setModel] = useState(status.model === DEFAULT_DICTATION_MODEL ? "" : status.model)
-  const save = useMutation({
-    mutationFn: (input: SetDictationSettingsInput) => window.meldshell.setDictationSettings(input),
-    onSuccess: (next) => {
-      client.setQueryData(dictationStatusQuery.queryKey, next)
-      setApiKey("")
-    },
+  const prepare = useMutation({
+    mutationFn: () => window.meldshell.prepareDictation(),
+    onSuccess: (next) => client.setQueryData(dictationStatusQuery(next.model).queryKey, next),
   })
-  const custom = service === "custom"
-  const changed =
-    apiKey.trim() !== "" ||
-    (custom ? endpoint.trim() : "") !==
-      (status.endpoint === DEFAULT_DICTATION_ENDPOINT ? "" : status.endpoint) ||
-    model.trim() !== (status.model === DEFAULT_DICTATION_MODEL ? "" : status.model)
-
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        save.mutate({
-          ...(apiKey.trim() ? { apiKey } : {}),
-          endpoint: custom ? endpoint : "",
-          model,
-        })
-      }}
-    >
-      <section className={groupClasses} aria-label="Dictation">
-        <SettingRow
-          label="Status"
-          description={
-            canRecord()
-              ? "Click the microphone in the composer, or press the dictation shortcut, then speak. What you say is written at the caret."
-              : "This browser cannot record audio here. Open MeldShell over HTTPS or in the desktop app."
-          }
+  if (status.state === "ready")
+    return (
+      <span role="status" className={stateClasses}>
+        <span aria-hidden="true" className="w-[7px] h-[7px] rounded-full bg-[var(--color-added)]" />
+        On this computer
+      </span>
+    )
+  if (status.state === "downloading") {
+    const percent = Math.round((status.progress ?? 0) * 100)
+    return (
+      <span role="status" className="flex w-full flex-col items-end gap-[6px]">
+        <span className={stateClasses}>
+          <ActivitySpinner />
+          Downloading {percent}%
+        </span>
+        <span
+          className="block w-full h-[4px] overflow-hidden rounded-full bg-[var(--surface-active)]"
+          aria-hidden="true"
         >
           <span
-            role="status"
-            className="inline-flex items-center gap-[7px] text-[12px] text-[var(--text-secondary)]"
-          >
-            <span
-              aria-hidden="true"
-              className="w-[7px] h-[7px] rounded-full"
-              style={{
-                background: status.ready ? "var(--color-added)" : "var(--color-modified)",
-              }}
-            />
-            {status.ready ? "Ready" : "Needs an API key"}
-          </span>
-        </SettingRow>
-        <SettingRow
-          label="Transcription service"
-          description="OpenAI by default. Any service that speaks OpenAI’s transcription API also works, including a Whisper server on your own network."
-        >
-          <SelectField
-            label="Transcription service"
-            value={service}
-            options={SERVICES}
-            onValueChange={setService}
+            className="block h-full rounded-full bg-[var(--accent)] transition-[width] duration-300"
+            style={{ width: `${percent}%` }}
           />
-        </SettingRow>
-        {custom && (
-          <SettingRow
-            label="Service address"
-            description="The API’s base URL; MeldShell posts recordings to its /audio/transcriptions."
-          >
-            <TextField
-              mono
-              aria-label="Service address"
-              placeholder="http://localhost:8000/v1"
-              value={endpoint}
-              onValueChange={setEndpoint}
-            />
-          </SettingRow>
-        )}
-        <SettingRow label="API key" description={keyDescription(status)}>
-          <TextField
-            mono
-            type="password"
-            aria-label="API key"
-            placeholder={status.source === "settings" ? `Saved, ending ${status.keyHint}` : "sk-…"}
-            value={apiKey}
-            onValueChange={setApiKey}
-          />
-        </SettingRow>
-        <SettingRow
-          label="Model"
-          description={`Leave empty to use ${DEFAULT_DICTATION_MODEL}${custom ? ", or name the model your service offers" : ""}.`}
-        >
-          <TextField
-            mono
-            aria-label="Model"
-            placeholder={DEFAULT_DICTATION_MODEL}
-            value={model}
-            onValueChange={setModel}
-          />
-        </SettingRow>
-      </section>
-      <div className="flex flex-wrap items-center justify-end gap-[8px] [margin:14px_0_0]">
-        {save.error && (
-          <span role="alert" className="mr-auto text-[12px] text-[var(--color-deleted)]">
-            {dictationError(save.error)}
-          </span>
-        )}
-        {status.source === "settings" && (
-          <Button disabled={save.isPending} onClick={() => save.mutate({ apiKey: "" })}>
-            Remove saved key
-          </Button>
-        )}
-        <Button
-          type="submit"
-          variant="primary"
-          icon={save.isPending ? <ActivitySpinner /> : undefined}
-          disabled={save.isPending || !changed}
-        >
-          Save
-        </Button>
-      </div>
-    </form>
+        </span>
+      </span>
+    )
+  }
+  return (
+    <Button
+      icon={prepare.isPending ? <ActivitySpinner /> : <Download size={13} strokeWidth={1.75} />}
+      disabled={prepare.isPending}
+      onClick={() => prepare.mutate()}
+    >
+      {status.state === "error" ? "Try again" : "Download now"}
+    </Button>
   )
 }
 
-export function DictationSettings(): React.JSX.Element {
-  const status = useQuery(dictationStatusQuery)
+export function DictationSettings({
+  settings,
+  pending,
+  onChange,
+}: {
+  readonly settings: AppSettings
+  readonly pending: boolean
+  readonly onChange: (input: SetAppSettingsInput) => void
+}): React.JSX.Element {
+  const model = settings.dictationModel ?? "fast"
+  const status = useQuery(dictationStatusQuery(model))
   if (status.isError)
     return (
       <p role="alert" className="text-[12px] text-[var(--text-secondary)]">
@@ -178,8 +85,44 @@ export function DictationSettings(): React.JSX.Element {
         <ActivitySpinner />
       </div>
     )
-  return <DictationForm status={status.data} />
+  const current = status.data.model === model ? status.data : null
+  return (
+    <section className={groupClasses} aria-label="Dictation">
+      <SettingRow
+        label="How it works"
+        description={
+          canRecord()
+            ? "Click the microphone in the composer, or press the dictation shortcut, then speak. What you say is written at the caret. Speech becomes text on the computer running MeldShell, so it is free, needs no account, and recordings never leave it."
+            : "This browser cannot record audio here. Open MeldShell over HTTPS or in the desktop app."
+        }
+      />
+      <SettingRow
+        label="Speech model"
+        description="Fast suits most dictation. Accurate catches more technical words and accents but takes a few seconds longer."
+      >
+        <SelectField
+          label="Speech model"
+          value={model}
+          options={MODEL_OPTIONS}
+          disabled={pending}
+          onValueChange={(dictationModel) => onChange({ dictationModel })}
+        />
+      </SettingRow>
+      <SettingRow
+        label="Model download"
+        description={
+          current?.state === "error" && current.error
+            ? dictationError(current.error)
+            : "Downloads once from Hugging Face, the first time you dictate. You can fetch it now instead."
+        }
+      >
+        {current ? <ModelState status={current} /> : <ActivitySpinner />}
+      </SettingRow>
+    </section>
+  )
 }
+
+const stateClasses = "inline-flex items-center gap-[7px] text-[12px] text-[var(--text-secondary)]"
 
 const groupClasses =
   "settings-group m-0 border-t-[1px] border-t-[color:var(--line-subtle)] border-b-[1px] border-b-[color:var(--line-subtle)]"

@@ -267,7 +267,13 @@ export function SettingsView({
             )}
             {section === "account" && <RemoteAccess />}
             {section === "schedules" && <ScheduleSettings snapshot={snapshot} />}
-            {section === "dictation" && <DictationSettings />}
+            {section === "dictation" && (
+              <DictationSettings
+                settings={snapshot.settings}
+                pending={settingsPending}
+                onChange={onChangeAppSettings}
+              />
+            )}
             {section === "keyboard" && (
               <KeyboardSettings pending={settingsPending} onChange={onChangeAppSettings} />
             )}
