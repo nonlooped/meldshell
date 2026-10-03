@@ -18,6 +18,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Fixed
 
+- Preserve Markdown formatting for multiline or escaped reference labels, raw HTML, and code fences inside list items when rendering streaming replies block by block.
+
 - Stop retained Pi sessions when switching providers, invoke selected Pi skills through their native slash commands, and reuse Pi’s discovered launcher when updating JavaScript and Windows installs.
 
 ### Added
