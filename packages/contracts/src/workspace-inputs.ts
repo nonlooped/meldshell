@@ -74,6 +74,14 @@ export type GitBulkActionInput = typeof GitBulkActionInput.Type
 export const GitCommitInput = Schema.Struct({ ...WorkspaceScope.fields, message: Schema.String })
 export type GitCommitInput = typeof GitCommitInput.Type
 
+export const CreatePullRequestInput = Schema.Struct({
+  ...WorkspaceScope.fields,
+  title: Schema.String.pipe(Schema.check(Schema.isMaxLength(256))),
+  body: Schema.String.pipe(Schema.check(Schema.isMaxLength(65_536))),
+  draft: Schema.Boolean,
+})
+export type CreatePullRequestInput = ExactOptional<typeof CreatePullRequestInput.Type, "threadId">
+
 export type GenerateCommitMessageInput = ExactOptional<WorkspaceScope, "threadId">
 export type GitFileAction = GitFileActionInput["action"]
 export type GitDiffSide = Exclude<GitDiffInput["side"], undefined>

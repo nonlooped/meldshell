@@ -41,6 +41,13 @@ import {
   undoSnapshotRestore,
 } from "./turn-snapshots"
 import { requestGeneratedText } from "./generated-text"
+import {
+  createPullRequest,
+  getPullRequestStatus,
+  markPullRequestReady,
+  parsePullRequestDraft,
+  pullRequestPrompt,
+} from "./pull-requests"
 import { readWorkspaceScripts } from "./workspace-scripts"
 import {
   createThread,
@@ -293,7 +300,8 @@ export const hostOperations: Record<string, Operation> = {
     }),
   ),
 }
-hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false, (input) =>
+/** Answers a one-off prompt with the Title model, or else the thread's own model. */
+const generateText = (input: WorkspaceScope, prompt: (path: string) => Promise<string>) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
     const snapshot = yield* core.GetSnapshot()
@@ -316,7 +324,7 @@ hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false,
         new Error("Choose an available Title model or a model for this thread."),
       )
     const workspacePath = yield* scopePath(input)
-    const prompt = yield* withWorkspace(input, commitMessagePrompt)
+    const text = yield* withWorkspace(input, prompt)
     const service = yield* providerFor(harness)
     return yield* attempt(() =>
       requestGeneratedText((threadId) =>
@@ -329,13 +337,46 @@ hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false,
               model: model.slug,
               harness,
               reasoningEffort: model.defaultReasoningEffort,
-              prompt,
+              prompt: text,
             },
           }),
         ),
       ),
     )
+  })
+hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false, (input) =>
+  generateText(input, commitMessagePrompt),
+)
+
+/** A thread's worktree targets the branch it started from; other checkouts use the default branch. */
+const preferredBase = (scope: WorkspaceScope) =>
+  Effect.gen(function* () {
+    if (scope.threadId === undefined) return null
+    const core = yield* CoreClient
+    const location = yield* core.GetThreadLocation({ threadId: scope.threadId })
+    return location.worktree?.baseBranch ?? null
+  })
+hostOperations[C.IPC.getPullRequest] = operation(C.WorkspaceScope, true, (input) =>
+  Effect.flatMap(preferredBase(input), (base) =>
+    withWorkspace(input, (path) => getPullRequestStatus(path, base)),
+  ),
+)
+hostOperations[C.IPC.markPullRequestReady] = operation(C.WorkspaceScope, false, (input) =>
+  Effect.flatMap(preferredBase(input), (base) =>
+    withWorkspace(input, (path) => markPullRequestReady(path, base)),
+  ),
+)
+hostOperations[C.IPC.generatePullRequest] = operation(C.WorkspaceScope, false, (input) =>
+  Effect.gen(function* () {
+    const base = yield* preferredBase(input)
+    const text = yield* generateText(input, (path) => pullRequestPrompt(path, base))
+    return yield* attempt(async () => parsePullRequestDraft(text))
   }),
+)
+hostOperations[C.IPC.createPullRequest] = operation(C.CreatePullRequestInput, false, (input) =>
+  Effect.flatMap(preferredBase(input), (base) =>
+    withWorkspace(input, (path) => createPullRequest(path, base, input)),
+  ),
 )
 for (const [harness, status, refresh, usage] of [
   ["codex", C.IPC.getCodexStatus, C.IPC.refreshCodexStatus, C.IPC.getCodexUsage],
