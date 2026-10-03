@@ -5,7 +5,7 @@ import { Radio } from "@base-ui-components/react/radio"
 import { RadioGroup } from "@base-ui-components/react/radio-group"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { ToggleGroup } from "@base-ui-components/react/toggle-group"
-import { CornerDownRight, ListPlus } from "lucide-react"
+import { CornerDownRight, ListPlus, ShieldAlert } from "lucide-react"
 import type { ReactNode } from "react"
 import { Button, Switch } from "../ui/controls"
 import { cx, segmentClasses, segmentGroupClasses } from "../ui/styles"
@@ -192,6 +192,7 @@ export function Preferences({
 }): React.JSX.Element {
   const forceOpaque = window.meldshell.platform === "linux"
   const followUpMode = settings.followUpMode ?? "queue"
+  const fullPermissions = settings.alwaysFullPermissions ?? false
   const opacity =
     settings.opacity ??
     (settings.theme === "light" ||
@@ -208,11 +209,26 @@ export function Preferences({
           <Environment />
           <SettingRow
             label="Always full permissions"
-            description="Use full access without permission prompts for every harness starting with the next turn. Hide permission controls in the composer."
+            description={
+              fullPermissions ? (
+                <span className="inline-flex items-start gap-[6px] text-[var(--color-modified)]">
+                  <ShieldAlert
+                    size={13}
+                    strokeWidth={1.9}
+                    aria-hidden="true"
+                    className="flex-none mt-[3px]"
+                  />
+                  Every agent runs every tool without asking, and the composer hides its permission
+                  controls.
+                </span>
+              ) : (
+                "Skip every permission prompt for all agents, starting with the next turn."
+              )
+            }
           >
             <Switch
               label="Always full permissions"
-              checked={settings.alwaysFullPermissions ?? false}
+              checked={fullPermissions}
               disabled={pending}
               onCheckedChange={(alwaysFullPermissions) => onChange({ alwaysFullPermissions })}
             />

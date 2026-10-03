@@ -63,5 +63,17 @@ export function describeMoment(moment: Date, now: Date): string {
   return `${dayFormat.format(moment)} at ${time}`
 }
 
+const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "short" })
+
+/** A compact moment for a list of runs: `2:00 PM`, `Tomorrow 9:30 AM`, `Fri 9:30 AM`. */
+export function shortMoment(moment: Date, now: Date): string {
+  const dayDifference = differenceInCalendarDays(moment, now)
+  const time = timeFormat.format(moment)
+  if (dayDifference === 0) return time
+  if (dayDifference === 1) return `Tomorrow ${time}`
+  if (dayDifference < 7) return `${weekdayFormat.format(moment)} ${time}`
+  return `${dayFormat.format(moment)} ${time}`
+}
+
 /** A `datetime-local` value for a moment in local time. */
 export const localInputValue = (date: Date): string => format(date, "yyyy-MM-dd'T'HH:mm")

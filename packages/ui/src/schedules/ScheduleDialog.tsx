@@ -2,10 +2,15 @@ import { useState } from "react"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { ToggleGroup } from "@base-ui-components/react/toggle-group"
 import { AlarmClock, CalendarClock, Repeat } from "lucide-react"
-import { firstRun, type ScheduleCadence, type ScheduledPrompt } from "@meldshell/contracts"
+import {
+  firstRun,
+  followingRun,
+  type ScheduleCadence,
+  type ScheduledPrompt,
+} from "@meldshell/contracts"
 import { AppDialog, Button, SelectField } from "../ui/controls"
 import { segmentClasses, segmentGroupClasses, textInputClasses } from "../ui/styles"
-import { describeMoment, localInputValue, WEEKDAYS } from "./schedule-format"
+import { describeMoment, localInputValue, shortMoment, WEEKDAYS } from "./schedule-format"
 import { useMinuteClock, useScheduleActions } from "./schedule-queries"
 
 type Repeat = ScheduleCadence["kind"]
@@ -92,6 +97,53 @@ function firstRunNote(form: Form, now: Date): { text: string; problem: boolean }
   const first = firstRun(cadence, now)
   if (first === null) return { text: "This time has passed. Choose a later one.", problem: true }
   return { text: `First run ${describeMoment(first, now)}`, problem: false }
+}
+
+const UPCOMING = 4
+
+/** The next few runs a valid form describes, so a cadence can be checked at a glance. */
+function upcomingRuns(form: Form, now: Date): readonly Date[] {
+  const cadence = cadenceFrom(form)
+  if (typeof cadence === "string") return []
+  const runs: Date[] = []
+  let next = firstRun(cadence, now)
+  while (next !== null && runs.length < UPCOMING) {
+    runs.push(next)
+    next = followingRun(cadence, next)
+  }
+  return runs
+}
+
+function UpcomingRuns({ runs, now }: { runs: readonly Date[]; now: Date }): React.JSX.Element {
+  return (
+    <div>
+      <span className={labelClasses} id="schedule-upcoming">
+        Next runs
+      </span>
+      <ol
+        aria-labelledby="schedule-upcoming"
+        className="flex flex-wrap items-center gap-[6px] m-0 p-0 list-none"
+      >
+        {runs.map((run, index) => (
+          <li
+            key={run.getTime()}
+            className={`inline-flex h-[24px] items-center [padding:0_9px] rounded-[999px] border-[1px] text-[11.5px] tabular-nums whitespace-nowrap ${
+              index === 0
+                ? "border-[color:color-mix(in_srgb,var(--accent)_45%,transparent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--text-primary)]"
+                : "border-[color:var(--line-subtle)] text-[var(--text-secondary)]"
+            }`}
+          >
+            {shortMoment(run, now)}
+          </li>
+        ))}
+        {runs.length === UPCOMING && (
+          <li className="text-[var(--text-tertiary)] text-[11.5px]" aria-label="and so on">
+            …
+          </li>
+        )}
+      </ol>
+    </div>
+  )
 }
 
 const labelClasses = "block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium"
@@ -277,6 +329,7 @@ export function ScheduleDialog({
     ? { text: "Paused. Resume it from the list to run it again.", problem: false }
     : firstRunNote(form, now)
   const error = problem ?? save.error?.message ?? null
+  const runs = upcomingRuns(form, now)
   return (
     <AppDialog
       open
@@ -339,6 +392,7 @@ export function ScheduleDialog({
           </ToggleGroup>
         </div>
         <CadenceFields form={form} update={update} />
+        {!paused && runs.length > 1 && <UpcomingRuns runs={runs} now={now} />}
         <p className="m-0 text-[var(--text-tertiary)] text-[11.5px] leading-[1.55]">
           Sent to this thread with its current model while MeldShell is running, and queued if the
           thread is busy. A run missed while MeldShell was closed happens once when it starts.
