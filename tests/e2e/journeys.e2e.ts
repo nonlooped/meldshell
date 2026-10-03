@@ -101,6 +101,54 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     await desktop.page.waitForFunction(() => document.documentElement.dataset.theme === "light")
   })
 
+  test("a color theme and a custom one made from it apply across the app and survive restart", async ({
+    desktop,
+  }) => {
+    const page = desktop.page
+    await page.getByRole("button", { name: /^Settings/ }).click()
+    await page
+      .getByRole("navigation", { name: "Settings sections" })
+      .getByRole("button", { name: "Appearance", exact: true })
+      .click()
+    const themes = page.getByRole("radiogroup", { name: "Color theme", exact: true })
+    await themes.getByRole("radio", { name: "Ocean", exact: true }).click()
+    await page.waitForFunction(() =>
+      document.documentElement.dataset.colorTheme?.startsWith("ocean:"),
+    )
+    await page.getByRole("button", { name: "New theme", exact: true }).click()
+    const editor = page.getByRole("dialog", { name: "New theme" })
+    await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Harbor")
+    await editor.getByRole("textbox", { name: "Accent hex code" }).fill("#f0b45a")
+    // The app previews the theme being edited before it is saved.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(),
+        ),
+      )
+      .toBe("#f0b45a")
+    await editor.getByRole("button", { name: "Create theme", exact: true }).click()
+    await expect
+      .poll(async () => {
+        const { settings } = await desktop.call("getSnapshot")
+        const custom = settings.customThemes?.[0]
+        return {
+          name: custom?.name,
+          accent: custom?.dark.accent,
+          selected: settings.colorTheme === custom?.id,
+        }
+      })
+      .toEqual({ name: "Harbor", accent: "#f0b45a", selected: true })
+    await desktop.restart()
+    await expect
+      .poll(() =>
+        desktop.page.evaluate(() =>
+          getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(),
+        ),
+      )
+      .toBe("#f0b45a")
+  })
+
   test("the setup guide applies preferences and hands over to a focused first thread", async ({
     desktop,
   }) => {
