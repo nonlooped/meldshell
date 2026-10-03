@@ -35,6 +35,7 @@ import {
   QueryError,
   TextField,
 } from "../ui/controls"
+import { GitSkeleton, LinesSkeleton } from "../ui/Skeleton"
 import { disclosureChevronClasses } from "../ui/styles"
 import { FileIcon } from "../ui/FileIcon"
 import { useTabStore } from "../app/tab-store"
@@ -294,7 +295,7 @@ export function GitSidebar({
       {!workspace || !scope ? (
         <PanelNote>Select a thread to view its workspace changes and history.</PanelNote>
       ) : query.isPending ? (
-        <PanelNote role="status">Reading repository…</PanelNote>
+        <GitSkeleton />
       ) : query.isError ? (
         <QueryError query={query} action="Refresh">
           <br />
@@ -694,7 +695,7 @@ function CommitDiff({ scope, hash }: { scope: WorkspaceScope; hash: string }): R
     staleTime: Infinity,
     retry: false,
   })
-  if (query.isPending) return <PanelNote role="status">Loading commit changes…</PanelNote>
+  if (query.isPending) return <LinesSkeleton label="Loading commit changes…" />
   if (query.isError) return <QueryError query={query} />
   return <ChangeDiff path={hash.slice(0, 7)} patch={query.data} />
 }

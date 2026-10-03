@@ -6,6 +6,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Changed
 
+- Transcripts, threads, the file tree, and source control show placeholder shapes while they load instead of loading text, and loaded content fades in. Placeholders wait briefly before appearing, so fast loads go straight to their content.
+
 - Long streaming replies stay smooth: finished paragraphs, code blocks, and tables keep their formatting while only the newest block updates.
 
 - Remove the unused native SQLite addon from desktop and WSL installations; database access uses the SQLite built into Node.
