@@ -33,6 +33,12 @@ import {
   workspaceFileAction,
 } from "./workspace-files"
 import { searchWorkspacePaths } from "./workspace-search"
+import {
+  readTurnSnapshot,
+  restoreTurnSnapshot,
+  threadFolder,
+  undoSnapshotRestore,
+} from "./turn-snapshots"
 import { requestGeneratedText } from "./generated-text"
 import { readWorkspaceScripts } from "./workspace-scripts"
 import {
@@ -69,6 +75,37 @@ const coreCall = <A, I>(
 ) => operation(schema, read, (input) => Effect.flatMap(CoreClient, (core) => run(core, input)))
 const withWorkspace = <A>(scope: WorkspaceScope, run: (path: string) => Promise<A>) =>
   Effect.flatMap(scopePath(scope), (path) => attempt(() => run(path)))
+
+/** Restoring rewrites the whole folder, so nothing may be working in it at the time. */
+const idleThreadFolder = (input: { workspaceId: string; threadId: string }) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const location = yield* core.GetThreadLocation({ threadId: input.threadId })
+    if (location.workspaceId !== input.workspaceId)
+      return yield* Effect.fail(new Error("Thread not found in this workspace."))
+    if (location.busy)
+      return yield* Effect.fail(new Error("Stop this thread's turn before restoring its files."))
+    const folder = threadFolder(location)
+    if (folder === null)
+      return yield* Effect.fail(new Error("This thread's worktree is no longer available."))
+    if (location.worktree === null) {
+      const snapshot = yield* core.GetSnapshot()
+      const sharing = snapshot.threads.some(
+        (thread) =>
+          thread.id !== input.threadId &&
+          thread.workspaceId === input.workspaceId &&
+          (thread.worktree === undefined || thread.worktree.state === "removed") &&
+          (thread.activity === "running" || thread.activity === "approval"),
+      )
+      if (sharing)
+        return yield* Effect.fail(
+          new Error(
+            "Another thread is working in this folder. Wait for it before restoring files.",
+          ),
+        )
+    }
+    return folder
+  })
 
 export const hostOperations: Record<string, Operation> = {
   [C.IPC.browseHostFolders]: operation(Schema.String, true, (path) =>
@@ -206,6 +243,19 @@ export const hostOperations: Record<string, Operation> = {
     withWorkspace(input, (path) => gitCommit(path, input.message)),
   ),
   [C.IPC.gitPush]: operation(C.WorkspaceScope, false, (input) => withWorkspace(input, gitPush)),
+  [C.IPC.getTurnSnapshot]: operation(C.TurnSnapshotInput, true, (input) =>
+    withWorkspace(input, (path) => readTurnSnapshot(path, input.threadId, input.turnId)),
+  ),
+  [C.IPC.restoreTurnSnapshot]: operation(C.RestoreTurnSnapshotInput, false, (input) =>
+    Effect.flatMap(idleThreadFolder(input), (path) =>
+      attempt(() => restoreTurnSnapshot(path, input.threadId, input.turnId, input.point)),
+    ),
+  ),
+  [C.IPC.undoSnapshotRestore]: operation(C.UndoSnapshotRestoreInput, false, (input) =>
+    Effect.flatMap(idleThreadFolder(input), (path) =>
+      attempt(() => undoSnapshotRestore(path, input.threadId)),
+    ),
+  ),
 }
 hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false, (input) =>
   Effect.gen(function* () {

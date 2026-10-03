@@ -17,6 +17,7 @@ export async function git(
   args: string[],
   timeout = 15_000,
   maxBytes = MAX_BYTES,
+  env: Readonly<Record<string, string>> = {},
 ): Promise<string> {
   const directory = await stat(cwd).catch(() => null)
   if (!directory?.isDirectory()) throw new Error(`Git working directory is unavailable: ${cwd}`)
@@ -29,7 +30,7 @@ export async function git(
         windowsHide: true,
         timeout,
         maxBuffer: maxBytes,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+        env: { ...process.env, ...env, GIT_TERMINAL_PROMPT: "0" },
       },
       (error, stdout, stderr) => {
         if (!error) resolve(stdout)

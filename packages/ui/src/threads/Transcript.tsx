@@ -27,6 +27,12 @@ import type { CanonicalEvent } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { TurnChanges } from "./TurnChanges"
+import {
+  RestoreBeforeButton,
+  SnapshotMenuActions,
+  TurnSnapshots,
+  useTurnSnapshot,
+} from "./TurnSnapshots"
 import { ToolOutput } from "./ToolOutput"
 import { fileChangePatches } from "./file-change-diffs"
 import { toolDetails } from "./tool-details"
@@ -79,10 +85,16 @@ function Message({
   arrivingIn,
   flash,
   onQuote,
+  actions,
+  menu,
 }: {
   readonly event: CanonicalEvent
   readonly className?: string
   readonly children?: ReactNode
+  /** Extra hover actions after copy and time. */
+  readonly actions?: ReactNode
+  /** Extra context menu entries after the copy actions. */
+  readonly menu?: ReactNode
   /** The thread whose latest composer send may have produced this new user message. */
   readonly arrivingIn?: string
   /** Changes each time the reader jumps to this message, briefly marking where they landed. */
@@ -144,6 +156,7 @@ function Message({
                   : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
               </time>
             </Toggle>
+            {actions}
             <span className="text-[var(--text-secondary)] text-[11px]" role="status">
               {copyStatusText(copyState)}
             </span>
@@ -165,6 +178,7 @@ function Message({
       <MenuAction onClick={() => void navigator.clipboard.writeText(fullTime)}>
         Copy timestamp
       </MenuAction>
+      {menu}
     </ContextMenu>
   )
 }
@@ -602,6 +616,12 @@ function TurnRow({
   readonly entering?: boolean
 }): React.JSX.Element {
   const reduced = useMotionPreference()
+  const snapshot = useTurnSnapshot(turn.id, turn.complete)
+  const prompt = turn.userMessages[0] ? fallbackText(turn.userMessages[0]) : ""
+  const snapshotMenu = <SnapshotMenuActions turnId={turn.id} prompt={prompt} snapshot={snapshot} />
+  const changes = turn.complete && (
+    <TurnChanges events={turn.workingEvents} patch={snapshot?.patch ?? null} />
+  )
   const sources = sourceTitles([
     ...turn.workingEvents.map((event) => event.payload),
     turn.finalResponse?.payload,
@@ -622,6 +642,12 @@ function TurnRow({
               arrivingIn={entering && !reduced && index === 0 ? threadId : undefined}
               flash={index === 0 ? flash : undefined}
               onQuote={onQuote}
+              actions={
+                index === 0 && (
+                  <RestoreBeforeButton turnId={turn.id} prompt={prompt} snapshot={snapshot} />
+                )
+              }
+              menu={index === 0 && snapshotMenu}
               className={
                 "[&_>_.message-actions]:justify-end [&_>_.event-markdown]:[padding:12px_16px] [&_>_.event-markdown]:border-[1px] [&_>_.event-markdown]:border-[color:var(--line-subtle)] [&_>_.event-markdown]:rounded-[var(--radius-lg)] [&_>_.event-markdown]:bg-[var(--surface-hover)] [&_>_.event-markdown]:text-[var(--text-primary)] w-[fit-content] max-w-[min(78%,_680px)] ml-[auto] relative [&_>_.message-actions]:absolute [&_>_.message-actions]:bottom-[0] [&_>_.message-actions]:right-[calc(100%_+_4px)] [&_>_.message-actions]:mt-[0] [&_>_.message-actions]:flex-row-reverse [&_>_.message-actions]:flex-nowrap [&_>_.message-actions]:whitespace-nowrap"
               }
@@ -639,14 +665,15 @@ function TurnRow({
             <Message
               event={turn.finalResponse}
               onQuote={onQuote}
+              menu={snapshotMenu}
               className={
                 "[&_>_.event-markdown]:text-[var(--text-primary)] text-[var(--text-primary)]"
               }
             >
-              {turn.complete && <TurnChanges events={turn.workingEvents} />}
+              {changes}
             </Message>
           ) : (
-            turn.complete && <TurnChanges events={turn.workingEvents} />
+            changes
           )}
           {turn.questions.length > 0 && (
             <AsyncQuestions
@@ -772,80 +799,82 @@ export function Transcript({
   return (
     <MarkdownWorkspace value={scope}>
       <div className="motion-enter @container relative grid min-h-0 min-w-0 grid-rows-[minmax(0,_1fr)]">
-        {query.isError && (
-          <Button variant="ghost" size="sm" onClick={() => void query.refetch()}>
-            Retry transcript updates
-          </Button>
-        )}
-        <div
-          ref={scrollRef}
-          className="transcript min-h-0 [padding:36px_var(--pane-gutter)] overflow-y-auto [scrollbar-gutter:stable] [mask-image:linear-gradient(to_bottom,transparent,black_28px,black_calc(100%_-_28px),transparent)]"
-          aria-live="polite"
-        >
+        <TurnSnapshots workspaceId={scope?.workspaceId} threadId={threadId} running={running}>
+          {query.isError && (
+            <Button variant="ghost" size="sm" onClick={() => void query.refetch()}>
+              Retry transcript updates
+            </Button>
+          )}
           <div
-            className="relative w-full max-w-[720px] [margin:0_auto]"
-            style={{ height: virtualizer.getTotalSize() }}
+            ref={scrollRef}
+            className="transcript min-h-0 [padding:36px_var(--pane-gutter)] overflow-y-auto [scrollbar-gutter:stable] [mask-image:linear-gradient(to_bottom,transparent,black_28px,black_calc(100%_-_28px),transparent)]"
+            aria-live="polite"
           >
-            {virtualizer.getVirtualItems().map((item) => {
-              const turn = turns[item.index]
-              if (turn === undefined) return null
-              return (
-                <div
-                  key={turn.id}
-                  ref={virtualizer.measureElement}
-                  data-index={item.index}
-                  className="absolute top-[0] left-[0] w-full pb-[44px] [&[data-search-match]_.transcript-turn]:border-l-[2px] [&[data-search-match]_.transcript-turn]:border-l-[color:var(--text-secondary)] [&[data-search-match]_.transcript-turn]:pl-[16px]"
-                  data-search-match={turn.id === targetTurnId || undefined}
-                  style={{ transform: `translateY(${item.start}px)` }}
-                >
-                  <TurnRow
-                    threadId={threadId}
-                    turn={turn}
-                    entering={turn.id === enteringTurn}
-                    flash={jump?.turnId === turn.id ? jump.at : undefined}
-                    live={running && item.index === turns.length - 1}
-                    onQuote={onQuote}
-                    onAnswer={
-                      item.index === turns.length - 1 && onAnswer
-                        ? (text) => onAnswer(text, turn.id)
-                        : undefined
-                    }
-                  />
-                </div>
-              )
-            })}
-          </div>
-        </div>
-        <MessageRail
-          turns={turns}
-          readingIndex={
-            // At the end, a short final turn can start below the reading line; it is still the one being read.
-            showLatest
-              ? (virtualizer.getVirtualItemForOffset((virtualizer.scrollOffset ?? 0) + 120)
-                  ?.index ?? 0)
-              : turns.length - 1
-          }
-          onJump={(index) => {
-            virtualizer.scrollToIndex(index, {
-              align: "start",
-              behavior: reduced ? "auto" : "smooth",
-            })
-            const turn = turns[index]
-            if (turn !== undefined) setJump({ turnId: turn.id, at: Date.now() })
-          }}
-        />
-        <div className="absolute z-[2] bottom-[12px] inset-x-[16px] flex justify-center pointer-events-none">
-          <PopPresence show={showLatest}>
-            <BaseButton
-              type="button"
-              className="pointer-events-auto flex items-center gap-[6px] [box-shadow:var(--shadow-raised)] [padding:7px_12px] border-[1px] border-[color:var(--line-strong)] rounded-[999px] bg-[var(--surface-menu)] text-[var(--text-primary)] text-[12px] whitespace-nowrap cursor-pointer [&:hover]:bg-[var(--surface-overlay)]"
-              onClick={() => virtualizer.scrollToEnd()}
+            <div
+              className="relative w-full max-w-[720px] [margin:0_auto]"
+              style={{ height: virtualizer.getTotalSize() }}
             >
-              <ArrowDown size={14} aria-hidden="true" />
-              Scroll to latest
-            </BaseButton>
-          </PopPresence>
-        </div>
+              {virtualizer.getVirtualItems().map((item) => {
+                const turn = turns[item.index]
+                if (turn === undefined) return null
+                return (
+                  <div
+                    key={turn.id}
+                    ref={virtualizer.measureElement}
+                    data-index={item.index}
+                    className="absolute top-[0] left-[0] w-full pb-[44px] [&[data-search-match]_.transcript-turn]:border-l-[2px] [&[data-search-match]_.transcript-turn]:border-l-[color:var(--text-secondary)] [&[data-search-match]_.transcript-turn]:pl-[16px]"
+                    data-search-match={turn.id === targetTurnId || undefined}
+                    style={{ transform: `translateY(${item.start}px)` }}
+                  >
+                    <TurnRow
+                      threadId={threadId}
+                      turn={turn}
+                      entering={turn.id === enteringTurn}
+                      flash={jump?.turnId === turn.id ? jump.at : undefined}
+                      live={running && item.index === turns.length - 1}
+                      onQuote={onQuote}
+                      onAnswer={
+                        item.index === turns.length - 1 && onAnswer
+                          ? (text) => onAnswer(text, turn.id)
+                          : undefined
+                      }
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          <MessageRail
+            turns={turns}
+            readingIndex={
+              // At the end, a short final turn can start below the reading line; it is still the one being read.
+              showLatest
+                ? (virtualizer.getVirtualItemForOffset((virtualizer.scrollOffset ?? 0) + 120)
+                    ?.index ?? 0)
+                : turns.length - 1
+            }
+            onJump={(index) => {
+              virtualizer.scrollToIndex(index, {
+                align: "start",
+                behavior: reduced ? "auto" : "smooth",
+              })
+              const turn = turns[index]
+              if (turn !== undefined) setJump({ turnId: turn.id, at: Date.now() })
+            }}
+          />
+          <div className="absolute z-[2] bottom-[12px] inset-x-[16px] flex justify-center pointer-events-none">
+            <PopPresence show={showLatest}>
+              <BaseButton
+                type="button"
+                className="pointer-events-auto flex items-center gap-[6px] [box-shadow:var(--shadow-raised)] [padding:7px_12px] border-[1px] border-[color:var(--line-strong)] rounded-[999px] bg-[var(--surface-menu)] text-[var(--text-primary)] text-[12px] whitespace-nowrap cursor-pointer [&:hover]:bg-[var(--surface-overlay)]"
+                onClick={() => virtualizer.scrollToEnd()}
+              >
+                <ArrowDown size={14} aria-hidden="true" />
+                Scroll to latest
+              </BaseButton>
+            </PopPresence>
+          </div>
+        </TurnSnapshots>
       </div>
     </MarkdownWorkspace>
   )

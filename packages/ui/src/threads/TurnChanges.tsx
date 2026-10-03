@@ -111,9 +111,25 @@ function FileChangeRow({ path, patch }: { path: string; patch: string }) {
   )
 }
 
-export function TurnChanges({ events }: { events: ReadonlyArray<CanonicalEvent> }) {
+export function TurnChanges({
+  events,
+  patch: snapshotPatch,
+}: {
+  events: ReadonlyArray<CanonicalEvent>
+  /**
+   * The difference between the turn's start and end snapshots. It also covers files changed by
+   * shell commands, so it replaces the provider's reported edits whenever it is known.
+   */
+  patch: string | null
+}) {
   const [showAll, setShowAll] = useState(false)
-  const entries = turnChangePatches(events).flatMap(({ path, patch }) => {
+  const patches =
+    snapshotPatch === null
+      ? turnChangePatches(events)
+      : snapshotPatch.trim() === ""
+        ? []
+        : [{ path: "Turn changes", patch: snapshotPatch }]
+  const entries = patches.flatMap(({ path, patch }) => {
     const files = parseFileDiffs(patch)
     return files.length > 0
       ? files.map((file) => ({

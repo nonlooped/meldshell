@@ -6,6 +6,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
+- Every turn now snapshots the thread's files when it starts and when it finishes, the way T3Code checkpoints do. A turn's changed-files list comes from those snapshots, so it includes edits made by shell commands. Hover a prompt and choose Restore files (or right-click a turn) to return the folder to before that turn or to the end of it; your current files are saved first, and an Undo pill puts them back. Snapshots live under Git refs that stay out of branch history, skip ignored files and folders outside Git, and are removed when their thread is deleted.
+
 - Messages sent while the agent is working can now queue or steer. Enter follows a new default in Settings (queue), Ctrl or Cmd with Enter does the other, and a menu beside the send button picks either for one message or changes the default. Steering goes into the same turn on Codex, and stops the turn and continues with your message on Claude Code and Cursor.
 
 - Queued messages are listed above the composer, where each can be edited, sent now to steer the running turn, or removed, with a Clear all for the lot. Each queued message now starts as its own turn instead of being merged into one, and a queue left behind by an interrupted or failed turn waits for you to send it rather than showing only a count.
