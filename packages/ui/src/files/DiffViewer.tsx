@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { WrapText } from "lucide-react"
+import { MessageSquareText, WrapText } from "lucide-react"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { ToggleGroup } from "@base-ui-components/react/toggle-group"
 import type { GitDiffSide } from "@meldshell/contracts/ipc"
@@ -12,9 +12,22 @@ import { FileIcon } from "../ui/FileIcon"
 import { ContextMenu, MenuAction, PanelNote } from "../ui/controls"
 import { useTabStore } from "../app/tab-store"
 import { RevealFileAction } from "../ui/FileContextActions"
+import { DiffReviewScope } from "../ui/DiffNotes"
+import { useThreadReviewNotes } from "../threads/review-notes"
 
-export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide }) {
+export function DiffViewer({
+  file,
+  side,
+  reviewThreadId,
+}: {
+  file: FileTab
+  side: GitDiffSide
+  /** The thread that notes left on lines go to; without one the diff only reads. */
+  reviewThreadId?: string
+}) {
   const openFile = useTabStore((state) => state.openFile)
+  const openThread = useTabStore((state) => state.openThread)
+  const notes = useThreadReviewNotes(reviewThreadId).length
   const [viewType, setViewType] = useState<DiffViewType>("unified")
   const [wrap, setWrap] = useState(true)
   // The whole file comes back so unchanged runs can be expanded in place. Git is polled, so the
@@ -65,6 +78,22 @@ export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide })
           </span>
         )}
         <span className="flex-1" />
+        {reviewThreadId !== undefined && notes > 0 && (
+          <button
+            type="button"
+            title="Open the thread to send these notes to the agent"
+            className="motion-colors inline-flex shrink-0 items-center gap-[5px] h-[24px] [padding:0_8px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-transparent text-[var(--text-secondary)] text-[11.5px] cursor-default [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
+            onClick={() => openThread(reviewThreadId)}
+          >
+            <MessageSquareText
+              size={13}
+              strokeWidth={1.75}
+              className="text-[var(--accent)]"
+              aria-hidden="true"
+            />
+            {notes} {notes === 1 ? "note" : "notes"}
+          </button>
+        )}
         <ToggleGroup
           aria-label="Diff layout"
           value={[viewType]}
@@ -102,12 +131,17 @@ export function DiffViewer({ file, side }: { file: FileTab; side: GitDiffSide })
               aria-label={`${side} changes to ${file.path}`}
             >
               {query.data.trim() ? (
-                <ChangeDiff
-                  path={file.path}
-                  patch={query.data}
-                  showHeader={false}
-                  viewType={viewType}
-                />
+                <DiffReviewScope
+                  threadId={reviewThreadId}
+                  anchor={`git:${file.workspaceId}:${file.threadId ?? ""}:${side}`}
+                >
+                  <ChangeDiff
+                    path={file.path}
+                    patch={query.data}
+                    showHeader={false}
+                    viewType={viewType}
+                  />
+                </DiffReviewScope>
               ) : (
                 <PanelNote>No {side} changes remain for this file.</PanelNote>
               )}

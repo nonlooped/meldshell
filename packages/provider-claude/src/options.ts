@@ -1,8 +1,23 @@
 import type { Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk"
-import type { TurnDispatch } from "@meldshell/contracts"
+import { promptText, type TurnDispatch } from "@meldshell/contracts"
 import { readFile } from "node:fs/promises"
 import { extname } from "node:path"
 import { referenceText } from "@meldshell/provider-runtime"
+import { BROWSER_SERVER, browserUrl } from "@meldshell/provider-runtime/browser"
+
+/**
+ * The thread's own preview is the user's to watch, so its tools run without asking. Read-only
+ * threads go without them, like every other MCP tool.
+ */
+const browserTools = (dispatch: TurnDispatch): Partial<Options> => {
+  const url = dispatch.sandbox === "read-only" ? null : browserUrl(dispatch.threadId)
+  return url === null
+    ? {}
+    : {
+        mcpServers: { [BROWSER_SERVER]: { type: "http", url } },
+        allowedTools: [`mcp__${BROWSER_SERVER}`],
+      }
+}
 
 /** Claude permission modes are tool policies. They do not provide Codex's OS sandbox. */
 export const claudeOptions = (dispatch: TurnDispatch): Options => {
@@ -37,6 +52,7 @@ export const claudeOptions = (dispatch: TurnDispatch): Options => {
               ? "acceptEdits"
               : "default",
     allowDangerouslySkipPermissions: bypass,
+    ...browserTools(dispatch),
     ...(readOnly
       ? {
           // Plan mode still needs its exit tool so the plan can reach the user for review.
@@ -81,7 +97,8 @@ const localImage = async (value: string): Promise<string> => {
 }
 export const claudePrompt = async (dispatch: TurnDispatch): Promise<SDKUserMessage> => {
   const content: Exclude<SDKUserMessage["message"]["content"], string> = []
-  if (dispatch.text) content.push({ type: "text", text: dispatch.text })
+  const text = promptText(dispatch)
+  if (text) content.push({ type: "text", text })
   for (const attachment of dispatch.attachments) {
     if (attachment.type === "mention" || attachment.type === "skill") {
       content.push({ type: "text", text: referenceText(attachment) })

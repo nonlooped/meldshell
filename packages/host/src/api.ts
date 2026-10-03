@@ -33,9 +33,23 @@ import {
   workspaceFileAction,
 } from "./workspace-files"
 import { searchWorkspacePaths } from "./workspace-search"
+import {
+  hasTurnSnapshot,
+  readTurnSnapshot,
+  restoreTurnSnapshot,
+  threadFolder,
+  undoSnapshotRestore,
+} from "./turn-snapshots"
 import { requestGeneratedText } from "./generated-text"
 import { HostPlatform } from "./platform"
 import { hostDictation, type Dictation } from "./dictation"
+import {
+  createPullRequest,
+  getPullRequestStatus,
+  markPullRequestReady,
+  parsePullRequestDraft,
+  pullRequestPrompt,
+} from "./pull-requests"
 import { readWorkspaceScripts } from "./workspace-scripts"
 import {
   createThread,
@@ -72,6 +86,37 @@ const coreCall = <A, I>(
 const withWorkspace = <A>(scope: WorkspaceScope, run: (path: string) => Promise<A>) =>
   Effect.flatMap(scopePath(scope), (path) => attempt(() => run(path)))
 
+/** Restoring rewrites the whole folder, so nothing may be working in it at the time. */
+const idleThreadFolder = (input: { workspaceId: string; threadId: string }) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const location = yield* core.GetThreadLocation({ threadId: input.threadId })
+    if (location.workspaceId !== input.workspaceId)
+      return yield* Effect.fail(new Error("Thread not found in this workspace."))
+    if (location.busy)
+      return yield* Effect.fail(new Error("Stop this thread's turn before restoring its files."))
+    const folder = threadFolder(location)
+    if (folder === null)
+      return yield* Effect.fail(new Error("This thread's worktree is no longer available."))
+    if (location.worktree === null) {
+      const snapshot = yield* core.GetSnapshot()
+      const sharing = snapshot.threads.some(
+        (thread) =>
+          thread.id !== input.threadId &&
+          thread.workspaceId === input.workspaceId &&
+          (thread.worktree === undefined || thread.worktree.state === "removed") &&
+          (thread.activity === "running" || thread.activity === "approval"),
+      )
+      if (sharing)
+        return yield* Effect.fail(
+          new Error(
+            "Another thread is working in this folder. Wait for it before restoring files.",
+          ),
+        )
+    }
+    return folder
+  })
+
 export const hostOperations: Record<string, Operation> = {
   [C.IPC.browseHostFolders]: operation(Schema.String, true, (path) =>
     attempt(() => browseHostFolders(path)),
@@ -97,6 +142,9 @@ export const hostOperations: Record<string, Operation> = {
   ),
   [C.IPC.removeWorkspace]: operation(Schema.String, false, removeWorkspace),
   [C.IPC.getWorktreeStatus]: operation(Schema.String, true, getWorktreeStatus),
+  [C.IPC.previewHandoff]: coreCall(Schema.String, true, (core, threadId) =>
+    core.PreviewHandoff({ threadId }),
+  ),
   [C.IPC.setDraftLocation]: operation(
     Schema.Struct({
       threadId: Schema.String,
@@ -208,8 +256,54 @@ export const hostOperations: Record<string, Operation> = {
     withWorkspace(input, (path) => gitCommit(path, input.message)),
   ),
   [C.IPC.gitPush]: operation(C.WorkspaceScope, false, (input) => withWorkspace(input, gitPush)),
+  [C.IPC.getTurnSnapshot]: operation(C.TurnSnapshotInput, true, (input) =>
+    withWorkspace(input, (path) => readTurnSnapshot(path, input.threadId, input.turnId)),
+  ),
+  [C.IPC.restoreTurnSnapshot]: operation(C.RestoreTurnSnapshotInput, false, (input) =>
+    Effect.flatMap(idleThreadFolder(input), (path) =>
+      attempt(() => restoreTurnSnapshot(path, input.threadId, input.turnId, input.point)),
+    ),
+  ),
+  [C.IPC.undoSnapshotRestore]: operation(C.UndoSnapshotRestoreInput, false, (input) =>
+    Effect.flatMap(idleThreadFolder(input), (path) =>
+      attempt(() => undoSnapshotRestore(path, input.threadId)),
+    ),
+  ),
+  [C.IPC.rewindThread]: operation(C.TurnSnapshotInput, false, (input) =>
+    Effect.gen(function* () {
+      const core = yield* CoreClient
+      const path = yield* idleThreadFolder(input)
+      // The files go back first, so the conversation never forgets work the folder still holds.
+      const filesRestored = yield* attempt(async () => {
+        if (!(await hasTurnSnapshot(path, input.threadId, input.turnId, "before"))) return false
+        await restoreTurnSnapshot(path, input.threadId, input.turnId, "before")
+        return true
+      })
+      return yield* core
+        .RewindThread({ threadId: input.threadId, turnId: input.turnId, filesRestored })
+        .pipe(
+          Effect.tapError(() =>
+            filesRestored
+              ? attempt(() => undoSnapshotRestore(path, input.threadId)).pipe(
+                  Effect.catch(Effect.logError),
+                )
+              : Effect.void,
+          ),
+        )
+    }),
+  ),
+  [C.IPC.undoRewind]: operation(C.UndoSnapshotRestoreInput, false, (input) =>
+    Effect.gen(function* () {
+      const core = yield* CoreClient
+      const path = yield* idleThreadFolder(input)
+      const result = yield* core.UndoRewind({ threadId: input.threadId })
+      if (result.filesRestored) yield* attempt(() => undoSnapshotRestore(path, input.threadId))
+      return result
+    }),
+  ),
 }
-hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false, (input) =>
+/** Answers a one-off prompt with the Title model, or else the thread's own model. */
+const generateText = (input: WorkspaceScope, prompt: (path: string) => Promise<string>) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
     const snapshot = yield* core.GetSnapshot()
@@ -232,7 +326,7 @@ hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false,
         new Error("Choose an available Title model or a model for this thread."),
       )
     const workspacePath = yield* scopePath(input)
-    const prompt = yield* withWorkspace(input, commitMessagePrompt)
+    const text = yield* withWorkspace(input, prompt)
     const service = yield* providerFor(harness)
     return yield* attempt(() =>
       requestGeneratedText((threadId) =>
@@ -245,12 +339,40 @@ hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false,
               model: model.slug,
               harness,
               reasoningEffort: model.defaultReasoningEffort,
-              prompt,
+              prompt: text,
             },
           }),
         ),
       ),
     )
+  })
+hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false, (input) =>
+  generateText(input, commitMessagePrompt),
+)
+
+/** A thread's worktree targets the branch it started from; other checkouts use the default branch. */
+const preferredBase = (scope: WorkspaceScope) =>
+  Effect.gen(function* () {
+    if (scope.threadId === undefined) return null
+    const core = yield* CoreClient
+    const location = yield* core.GetThreadLocation({ threadId: scope.threadId })
+    return location.worktree?.baseBranch ?? null
+  })
+hostOperations[C.IPC.getPullRequest] = operation(C.WorkspaceScope, true, (input) =>
+  Effect.flatMap(preferredBase(input), (base) =>
+    withWorkspace(input, (path) => getPullRequestStatus(path, base)),
+  ),
+)
+hostOperations[C.IPC.markPullRequestReady] = operation(C.WorkspaceScope, false, (input) =>
+  Effect.flatMap(preferredBase(input), (base) =>
+    withWorkspace(input, (path) => markPullRequestReady(path, base)),
+  ),
+)
+hostOperations[C.IPC.generatePullRequest] = operation(C.WorkspaceScope, false, (input) =>
+  Effect.gen(function* () {
+    const base = yield* preferredBase(input)
+    const text = yield* generateText(input, (path) => pullRequestPrompt(path, base))
+    return yield* attempt(async () => parsePullRequestDraft(text))
   }),
 )
 const withDictation = <A>(run: (dictation: Dictation, model: C.DictationModel) => Promise<A>) =>
@@ -269,6 +391,11 @@ hostOperations[C.IPC.prepareDictation] = operation(noInput, true, () =>
 )
 hostOperations[C.IPC.transcribeAudio] = operation(C.TranscribeAudioInput, true, (input) =>
   withDictation((dictation, model) => dictation.transcribe(model, input)),
+)
+hostOperations[C.IPC.createPullRequest] = operation(C.CreatePullRequestInput, false, (input) =>
+  Effect.flatMap(preferredBase(input), (base) =>
+    withWorkspace(input, (path) => createPullRequest(path, base, input)),
+  ),
 )
 for (const [harness, status, refresh, usage] of [
   ["codex", C.IPC.getCodexStatus, C.IPC.refreshCodexStatus, C.IPC.getCodexUsage],

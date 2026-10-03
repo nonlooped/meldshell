@@ -37,6 +37,12 @@ const api: MeldShellApi = {
     revealFile: (input) => ipcRenderer.invoke(IPC.revealFile, input),
     threadPort: (threadId) => ipcRenderer.invoke(IPC.threadPort, threadId),
     openExternal: (url) => ipcRenderer.invoke(IPC.openExternal, url),
+    agentBrowser: {
+      attach: (threadId, webContentsId) =>
+        ipcRenderer.send(IPC.agentBrowserAttach, threadId, webContentsId),
+      onShow: on(IPC.agentBrowserShow),
+      onActivity: on(IPC.agentBrowserActivity),
+    },
   },
   terminal: {
     open: (input) => ipcRenderer.invoke(IPC.terminalOpen, input),

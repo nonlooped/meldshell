@@ -6,6 +6,7 @@ import type { Thread } from "@meldshell/contracts"
 import {
   ArrowLeft,
   ArrowRight,
+  Bot,
   ChevronDown,
   Globe,
   RotateCw,
@@ -40,6 +41,7 @@ interface WebviewElement extends HTMLElement {
   isDevToolsOpened(): boolean
   openDevTools(): void
   closeDevTools(): void
+  getWebContentsId(): number
 }
 
 type WebviewEvent = Event & {
@@ -76,6 +78,9 @@ const idle: PageState = {
 const ABORTED = -3
 
 const desktopApi = window.meldshell.desktop
+
+/** How long the preview keeps showing an agent's last action. */
+const AGENT_ACTIVITY_MS = 4_000
 
 /** An address the preview can offer, and where MeldShell learned it. */
 interface Suggestion {
@@ -133,7 +138,11 @@ function usePage(view: React.RefObject<WebviewElement | null>, threadId: string)
     }
     const onDevTools = (open: boolean) => () =>
       setPage((current) => ({ ...current, devTools: open }))
+    // Agents act on the page the user sees, so the thread's tools follow this element's page.
+    const onAttach = () => desktopApi?.agentBrowser?.attach(threadId, element.getWebContentsId())
     const listeners: [string, (event: WebviewEvent) => void][] = [
+      ["did-attach", onAttach],
+      ["dom-ready", onAttach],
       ["did-start-loading", onStart],
       ["did-stop-loading", onStop],
       ["did-navigate", onNavigate],
@@ -388,7 +397,7 @@ function PreviewStart({
       <p>
         Open a server this thread started, or type an address above. Pages printed in the thread's
         terminals appear here as they start, and run scripts receive this thread's port in{" "}
-        <code>MELDSHELL_PORT</code>.
+        <code>MELDSHELL_PORT</code>. Agents in this thread can open and use pages here too.
       </p>
       {suggestions.length > 0 && (
         <ul className="flex w-[min(360px,_100%)] flex-col m-0 p-[4px] list-none border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-lg)] text-left">
@@ -473,6 +482,51 @@ function PreviewFailure({
   )
 }
 
+/**
+ * While an agent works in the preview, a ring frames the page, a label names the last action, and
+ * each click or field it touches ripples where it happened.
+ */
+function AgentActivityOverlay({ threadId }: { threadId: string }): React.JSX.Element | null {
+  const activity = usePreviewStore((state) => state.activity[threadId])
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (activity === undefined) return
+    setNow(Date.now())
+    const timer = setTimeout(
+      () => setNow(Date.now()),
+      Math.max(0, activity.at + AGENT_ACTIVITY_MS - Date.now()),
+    )
+    return () => clearTimeout(timer)
+  }, [activity])
+  if (activity === undefined || now - activity.at >= AGENT_ACTIVITY_MS) return null
+  return (
+    <div className="pointer-events-none absolute [inset:0] overflow-hidden">
+      <div
+        aria-hidden="true"
+        className="absolute [inset:0] [box-shadow:inset_0_0_0_2px_var(--accent)] opacity-70"
+      />
+      {activity.point !== undefined && (
+        <span
+          key={activity.id}
+          aria-hidden="true"
+          className="agent-ping absolute w-[28px] h-[28px] [margin:-14px_0_0_-14px] rounded-full border-[2px] border-[color:var(--accent)] [background:color-mix(in_srgb,_var(--accent)_25%,_transparent)]"
+          style={{ left: activity.point.x, top: activity.point.y }}
+        />
+      )}
+      <div
+        role="status"
+        className="absolute left-[10px] bottom-[10px] flex max-w-[calc(100%_-_20px)] items-center gap-[6px] h-[26px] [padding:0_10px_0_8px] rounded-full border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-menu)] text-[var(--text-secondary)] text-[11.5px] [box-shadow:0_4px_14px_rgba(0,_0,_0,_0.25)]"
+      >
+        <Bot size={13} strokeWidth={1.75} className="flex-none text-[var(--accent)]" />
+        <span className="flex-none font-[550] text-[var(--text-primary)]">Agent</span>
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+          {activity.label}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function PreviewPage({
   thread,
   url,
@@ -526,6 +580,7 @@ function PreviewPage({
         {page.failure !== null && (
           <PreviewFailure failure={page.failure} onRetry={() => view.current?.reload()} />
         )}
+        <AgentActivityOverlay threadId={thread.id} />
       </div>
     </section>
   )

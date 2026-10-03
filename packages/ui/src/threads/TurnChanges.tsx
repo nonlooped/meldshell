@@ -7,7 +7,7 @@ import { diffLineCounts, parseFileDiffs } from "../ui/diff-model"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { FileIcon } from "../ui/FileIcon"
 import { disclosureChevronClasses } from "../ui/styles"
-import { useContext, useState } from "react"
+import { useContext, useState, type ReactNode } from "react"
 import { MarkdownWorkspace } from "../ui/MarkdownReference"
 import { useTabStore } from "../app/tab-store"
 import { ContextMenu, MenuAction } from "../ui/controls"
@@ -111,9 +111,28 @@ function FileChangeRow({ path, patch }: { path: string; patch: string }) {
   )
 }
 
-export function TurnChanges({ events }: { events: ReadonlyArray<CanonicalEvent> }) {
+export function TurnChanges({
+  events,
+  patch: snapshotPatch,
+  action,
+}: {
+  /** A control at the end of the summary line, such as restoring the turn's snapshot. */
+  action?: ReactNode
+  events: ReadonlyArray<CanonicalEvent>
+  /**
+   * The difference between the turn's start and end snapshots. It also covers files changed by
+   * shell commands, so it replaces the provider's reported edits whenever it is known.
+   */
+  patch: string | null
+}) {
   const [showAll, setShowAll] = useState(false)
-  const entries = turnChangePatches(events).flatMap(({ path, patch }) => {
+  const patches =
+    snapshotPatch === null
+      ? turnChangePatches(events)
+      : snapshotPatch.trim() === ""
+        ? []
+        : [{ path: "Turn changes", patch: snapshotPatch }]
+  const entries = patches.flatMap(({ path, patch }) => {
     const files = parseFileDiffs(patch)
     return files.length > 0
       ? files.map((file) => ({
@@ -136,6 +155,7 @@ export function TurnChanges({ events }: { events: ReadonlyArray<CanonicalEvent> 
           {count} {count === 1 ? "file" : "files"} changed
         </strong>
         {files.length === entries.length && <Counts {...diffLineCounts(files)} />}
+        {action}
       </div>
       {entries.slice(0, folded ? SHOWN_FILES : undefined).map(({ path, patch }, index) => (
         <FileChangeRow key={`${index}:${path}`} path={path} patch={patch} />

@@ -41,6 +41,7 @@ export {
   openProviderTurn,
   reconcileWorker,
   finishShutdown,
+  previewHandoff,
 } from "./turns"
 export {
   listSchedules,
@@ -49,3 +50,4 @@ export {
   claimDueSchedules,
   recordScheduleRun,
 } from "./schedules"
+export { rewindThread, undoRewind } from "./rewind"

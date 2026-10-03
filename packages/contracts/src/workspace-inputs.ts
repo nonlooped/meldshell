@@ -74,6 +74,35 @@ export type GitBulkActionInput = typeof GitBulkActionInput.Type
 export const GitCommitInput = Schema.Struct({ ...WorkspaceScope.fields, message: Schema.String })
 export type GitCommitInput = typeof GitCommitInput.Type
 
+export const CreatePullRequestInput = Schema.Struct({
+  ...WorkspaceScope.fields,
+  title: Schema.String.pipe(Schema.check(Schema.isMaxLength(256))),
+  body: Schema.String.pipe(Schema.check(Schema.isMaxLength(65_536))),
+  draft: Schema.Boolean,
+})
+export type CreatePullRequestInput = ExactOptional<typeof CreatePullRequestInput.Type, "threadId">
+
 export type GenerateCommitMessageInput = ExactOptional<WorkspaceScope, "threadId">
 export type GitFileAction = GitFileActionInput["action"]
 export type GitDiffSide = Exclude<GitDiffInput["side"], undefined>
+
+/** One turn of a thread, whose files were snapshotted when it started and when it finished. */
+export const TurnSnapshotInput = Schema.Struct({
+  workspaceId: Schema.String,
+  threadId: Schema.String,
+  turnId: Schema.String,
+})
+export type TurnSnapshotInput = typeof TurnSnapshotInput.Type
+
+export const RestoreTurnSnapshotInput = Schema.Struct({
+  ...TurnSnapshotInput.fields,
+  /** `before` undoes the turn and everything after it; `after` returns to where it finished. */
+  point: Schema.Literals(["before", "after"]),
+})
+export type RestoreTurnSnapshotInput = typeof RestoreTurnSnapshotInput.Type
+
+export const UndoSnapshotRestoreInput = Schema.Struct({
+  workspaceId: Schema.String,
+  threadId: Schema.String,
+})
+export type UndoSnapshotRestoreInput = typeof UndoSnapshotRestoreInput.Type
