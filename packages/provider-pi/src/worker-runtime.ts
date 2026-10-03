@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { Result } from "effect"
 import {
@@ -25,7 +26,12 @@ type Emit = (method: string, params: unknown, validated?: boolean, requestId?: s
 
 /** One thread's Pi, kept running between turns as Pi's RPC mode intends. */
 interface Session {
+  readonly threadId: string
   rpc: PiRpc
+  /** The model the thread last chose, which a run Pi starts on its own also uses. */
+  model: string
+  /** Pi is between `agent_start` and `agent_settled`, however the run began. */
+  running: boolean
   /** Reports to the running turn; null between turns, when Pi's records belong to no turn. */
   emit: Emit | null
   /** Ends the running turn's wait once Pi will not continue on its own. */
@@ -36,7 +42,7 @@ interface Session {
 }
 
 interface RunningTurn {
-  readonly dispatch: TurnDispatch
+  readonly threadId: string
   session?: Session
   interrupted: boolean
   task: Promise<void>
@@ -217,14 +223,27 @@ export const runPiWorker = (
     session.emit("pi/extension_ui_request", record, true, dialog.id)
   }
 
-  /** Forwards Pi's records unchanged, noting how each assistant message ended. */
-  const onRecord = (session: Session, record: UnknownRecord): void => {
-    if (record.type === "agent_settled") session.settle?.()
+  /** Follows Pi's run state and how each assistant message ended, whoever started the run. */
+  const trackRun = (session: Session, record: UnknownRecord): void => {
+    if (record.type === "agent_start") {
+      session.running = true
+      // An extension started this run, so no MeldShell turn is waiting for it yet.
+      if (!session.emit && !stopping) openTurn(session)
+    }
+    if (record.type === "agent_settled") {
+      session.running = false
+      session.settle?.()
+    }
     const message = record.type === "message_end" ? asRecord(record.message) : {}
     if (message.role === "assistant") {
       session.stopReason = asText(message.stopReason) || null
       session.stopError = asText(message.errorMessage) || null
     }
+  }
+
+  /** Forwards Pi's records unchanged. */
+  const onRecord = (session: Session, record: UnknownRecord): void => {
+    trackRun(session, record)
     const dialog = record.type === "extension_ui_request" ? decodeDialog(record) : null
     if (dialog !== null) return openDialog(session, dialog, record)
     const decoded = decodePiPayload(record)
@@ -254,7 +273,10 @@ export const runPiWorker = (
     }
     const args = dispatch.nativeThreadId ? ["--session", dispatch.nativeThreadId] : []
     const session: Session = {
+      threadId: dispatch.threadId,
       rpc: undefined as unknown as PiRpc,
+      model: dispatch.model,
+      running: false,
       emit: null,
       settle: null,
       stopReason: null,
@@ -278,9 +300,13 @@ export const runPiWorker = (
   }
 
   /** Sends the turn's prompt and waits until Pi will not continue on its own. */
-  const runPrompt = async (turn: RunningTurn, session: Session): Promise<void> => {
-    const { dispatch } = turn
+  const runPrompt = async (
+    turn: RunningTurn,
+    dispatch: TurnDispatch,
+    session: Session,
+  ): Promise<void> => {
     const state = await configure(session, dispatch)
+    session.model = dispatch.model
     publish({
       type: "provider-session",
       threadId: dispatch.threadId,
@@ -294,8 +320,10 @@ export const runPiWorker = (
       session.settle = resolve
     })
     const accepted = asRecord(await session.rpc.request("prompt", prompt, 0))
-    // An extension command or input handler consumed the prompt; no run started.
-    if (accepted.disposition !== "handled") await untilSettled(session.rpc, settled)
+    // An extension command or input handler consumed the prompt. A run the command started
+    // before answering belongs to this turn; one it starts later opens a turn of its own.
+    if (accepted.disposition !== "handled" || session.running)
+      await untilSettled(session.rpc, settled)
   }
 
   const completion = (turn: RunningTurn, session: Session) =>
@@ -305,46 +333,46 @@ export const runPiWorker = (
         ? { status: "failed", error: session.stopError ?? "Pi's model request failed." }
         : { status: "completed" }
 
-  const startTurn = (dispatch: TurnDispatch): void => {
-    if (dispatch.harness !== "pi") throw new Error("Turn routed to the wrong provider.")
-    if (
-      turns.has(dispatch.turnId) ||
-      [...turns.values()].some((turn) => turn.dispatch.threadId === dispatch.threadId)
-    )
+  /** Registers a turn and the emitter that reports its events. */
+  const beginTurn = (threadId: string, turnId: string) => {
+    if (turns.has(turnId) || [...turns.values()].some((turn) => turn.threadId === threadId))
       throw new Error("This Pi thread is already running.")
-    const turn: RunningTurn = { dispatch, interrupted: false, task: Promise.resolve() }
-    turns.set(dispatch.turnId, turn)
+    const turn: RunningTurn = { threadId, interrupted: false, task: Promise.resolve() }
+    turns.set(turnId, turn)
     const emit: Emit = (method, params, validated = true, requestId) =>
       publish({
         type: "runtime-event",
         input: {
-          threadId: dispatch.threadId,
-          turnId: dispatch.turnId,
-          nativeTurnId: dispatch.turnId,
+          threadId,
+          turnId,
+          nativeTurnId: turnId,
           method,
           params,
           validated,
           ...(requestId === undefined ? {} : { requestId }),
         },
       })
-    emit("turn/started", { turn: { id: dispatch.turnId } })
-    turn.task = (async () => {
+    return { turn, emit }
+  }
+
+  /** Runs a turn's work, then settles it once Pi is idle; a Pi that failed is replaced. */
+  const runTurn = (
+    turnId: string,
+    turn: RunningTurn,
+    emit: Emit,
+    work: () => Promise<Session>,
+  ): Promise<void> =>
+    (async () => {
       let result: { status: string; error?: string }
       try {
-        const session = await sessionFor(dispatch)
-        turn.session = session
-        session.emit = emit
-        if (turn.interrupted) throw new Error("Pi turn interrupted.")
-        await runPrompt(turn, session)
-        result = completion(turn, session)
+        result = completion(turn, await work())
       } catch (cause) {
         result = {
           status: turn.interrupted || stopping ? "interrupted" : "failed",
           error: errorMessage(cause),
         }
-        // A Pi that failed mid-turn is replaced on the thread's next turn.
         if (turn.session) {
-          sessions.delete(dispatch.threadId)
+          sessions.delete(turn.threadId)
           await closeSession(turn.session)
         }
       }
@@ -353,9 +381,42 @@ export const runPiWorker = (
         turn.session.emit = null
         turn.session.settle = null
       }
-      turns.delete(dispatch.turnId)
+      turns.delete(turnId)
       emit("turn/completed", { turn: result })
     })()
+
+  const startTurn = (dispatch: TurnDispatch): void => {
+    if (dispatch.harness !== "pi") throw new Error("Turn routed to the wrong provider.")
+    const { turn, emit } = beginTurn(dispatch.threadId, dispatch.turnId)
+    emit("turn/started", { turn: { id: dispatch.turnId } })
+    turn.task = runTurn(dispatch.turnId, turn, emit, async () => {
+      const session = await sessionFor(dispatch)
+      turn.session = session
+      session.emit = emit
+      if (turn.interrupted) throw new Error("Pi turn interrupted.")
+      await runPrompt(turn, dispatch, session)
+      return session
+    })
+  }
+
+  /** Opens a turn for a run Pi started on its own, such as one an extension began. */
+  const openTurn = (session: Session): void => {
+    if ([...turns.values()].some((turn) => turn.threadId === session.threadId)) return
+    const turnId = randomUUID()
+    const { turn, emit } = beginTurn(session.threadId, turnId)
+    publish({ type: "turn-opened", threadId: session.threadId, turnId, model: session.model })
+    turn.session = session
+    session.emit = emit
+    session.stopReason = null
+    session.stopError = null
+    const settled = new Promise<void>((resolve) => {
+      session.settle = resolve
+    })
+    emit("turn/started", { turn: { id: turnId } })
+    turn.task = runTurn(turnId, turn, emit, async () => {
+      await untilSettled(session.rpc, settled)
+      return session
+    })
   }
 
   const interruptTurn = (nativeTurnId: string, ack: (error?: string) => void): void => {

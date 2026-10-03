@@ -271,6 +271,31 @@ const providerRuntime = (
       )
     }
 
+    /** The harness started work on its own; open its turn before the events that follow it. */
+    const handleTurnOpened = (
+      event: Extract<WorkerEvent, { type: "turn-opened" }>,
+      owner: HostProcess,
+    ) => {
+      queue.flush()
+      queue.enqueue(
+        core
+          .OpenProviderTurn({
+            harness: config.harness,
+            threadId: event.threadId,
+            turnId: event.turnId,
+            model: event.model,
+            generation: generations.get(owner)!,
+          })
+          .pipe(
+            Effect.tap((opened) => (opened ? publishChange(event.threadId) : Effect.void)),
+            Effect.asVoid,
+            Effect.catch((cause) =>
+              Effect.sync(() => console.error(`Could not open a ${label} turn.`, cause)),
+            ),
+          ),
+      )
+    }
+
     const handleTurnStartFailure = (event: Extract<WorkerEvent, { type: "turn-start-failed" }>) => {
       const failure = { threadId: event.threadId, turnId: event.turnId }
       queue.enqueue(
@@ -337,6 +362,8 @@ const providerRuntime = (
             event.threadId,
             `Could not store the ${label} thread id.`,
           )
+        case "turn-opened":
+          return handleTurnOpened(event, owner)
         case "turn-start-failed":
           return handleTurnStartFailure(event)
         case "protocol-error":

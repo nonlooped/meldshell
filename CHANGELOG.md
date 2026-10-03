@@ -12,7 +12,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Added
 
-- Pi (pi.dev) is the fourth native provider. MeldShell drives your installed Pi through its RPC mode in a separate worker, keeps one Pi session per thread and resumes it from Pi's own session file, and offers every model Pi has credentials for with its thinking levels. Pi's tools run as they do in Pi itself, dialogs from your Pi extensions appear as questions, and Pi can be updated from Settings.
+- Pi (pi.dev) is the fourth native provider. MeldShell drives your installed Pi through its RPC mode in a separate worker, keeps one Pi session per thread and resumes it from Pi's own session file, and offers every model Pi has credentials for with its thinking levels. Pi's tools run as they do in Pi itself. Work your Pi extensions start on their own, such as after one of their commands or from a timer, appears as its own turn, and their dialogs appear as questions. Pi can be updated from Settings.
 
 ## [0.13.0] - 2026-10-02
 

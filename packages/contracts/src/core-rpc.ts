@@ -23,6 +23,7 @@ import {
   RuntimeEventInput,
   RuntimeEventResult,
   ProviderSessionInput,
+  OpenProviderTurnInput,
   InterruptedTurn,
   RenameWorkspaceInput,
   SetThreadPinnedInput,
@@ -111,6 +112,12 @@ export class CoreRpcs extends RpcGroup.make(
     error: CoreError,
   }),
   snapshotRpc("SetProviderSession", ProviderSessionInput),
+  /** False when the thread is gone, already running a turn, or MeldShell is shutting down. */
+  Rpc.make("OpenProviderTurn", {
+    payload: OpenProviderTurnInput,
+    success: Schema.Boolean,
+    error: CoreError,
+  }),
   snapshotRpc("ResolveApproval", Schema.Struct({ approvalId: Schema.String })),
   Rpc.make("GetApprovalHarness", {
     payload: Schema.Struct({ approvalId: Schema.String }),

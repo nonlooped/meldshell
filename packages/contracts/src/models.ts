@@ -789,6 +789,21 @@ export const RuntimeEventResult = Schema.Struct({
 
 export type RuntimeEventResult = typeof RuntimeEventResult.Type
 
+/**
+ * A turn the harness started on its own, such as a run a Pi extension began. The worker that
+ * reported it owns it, so its events land in the turn and its exit settles it.
+ */
+export const OpenProviderTurnInput = Schema.Struct({
+  harness: Harness,
+  threadId: Schema.String,
+  turnId: Schema.String,
+  /** The model the harness is running, in the harness's own catalog form. */
+  model: Schema.String,
+  generation: Schema.String,
+})
+
+export type OpenProviderTurnInput = typeof OpenProviderTurnInput.Type
+
 export const ProviderSessionInput = Schema.Struct({
   harness: DispatchHarness,
   threadId: Schema.String,

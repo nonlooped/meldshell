@@ -12,7 +12,9 @@ import {
   type RuntimeEventInput,
   type RuntimeEventResult,
   type TurnDispatch,
+  type OpenProviderTurnInput,
   CoreProtocolError,
+  HARNESSES,
   isHarness,
   ProviderConfigurationError,
   supportsMode,
@@ -376,6 +378,40 @@ export const beginShutdown = Effect.gen(function* () {
     SELECT t.thread_id AS threadId, t.id AS turnId, t.harness, COALESCE(ps.native_thread_id, CASE WHEN t.harness IN ('claude-code', 'cursor', 'pi') THEN t.id END) AS nativeThreadId, t.native_turn_id AS nativeTurnId
     FROM turns t LEFT JOIN provider_sessions ps ON ps.thread_id = t.thread_id AND ps.harness = t.harness WHERE t.status = 'running'`
 }).pipe(transaction)
+
+/**
+ * Records a turn the harness started on its own, such as a run a Pi extension began. It is bound
+ * to the reporting worker from the start, so that worker's events land in it and its exit
+ * settles it. A thread that is already running keeps its turn; the harness's work is not recorded.
+ */
+export const openProviderTurn = (input: OpenProviderTurnInput) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    if (yield* isShuttingDown) return false
+    const threads = yield* sql`SELECT id FROM threads WHERE id = ${input.threadId}`
+    const running = yield* sql`
+      SELECT id FROM turns WHERE thread_id = ${input.threadId} AND status = 'running' LIMIT 1
+    `
+    if (threads.length === 0 || running.length > 0) return false
+    const timestamp = new Date().toISOString()
+    yield* sql`
+      INSERT INTO turns (
+        id, thread_id, provider, harness, model, reasoning_effort, speed,
+        status, native_turn_id, worker_generation, started_at, completed_at, error
+      ) VALUES (
+        ${input.turnId}, ${input.threadId}, ${HARNESSES[input.harness].provider}, ${input.harness},
+        ${input.model}, NULL, 'standard', 'running', ${input.turnId}, ${input.generation},
+        ${timestamp}, NULL, NULL
+      )
+    `
+    // New work returns an archived thread to the inbox, as a submitted turn does.
+    yield* sql`
+      UPDATE threads SET updated_at = ${timestamp},
+        status = CASE WHEN status = 'settled' THEN 'active' ELSE status END
+      WHERE id = ${input.threadId}
+    `
+    return true
+  }).pipe(transaction)
 
 export const bindTurnWorker = (turnId: string, generation: string) =>
   Effect.gen(function* () {

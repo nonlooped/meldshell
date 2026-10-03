@@ -170,6 +170,8 @@ export const preparePiEvents = (events: ReadonlyArray<CanonicalEvent>): Canonica
   const messages = new Map<string, number>()
   const blockEvents = new Map<string, number>()
   const tools = new Map<string, { index: number; state: ToolState }>()
+  /** Turns MeldShell started with a prompt of its own. */
+  const prompted = new Set<string>()
 
   const blockKey = (turn: string, index: number | undefined) =>
     `${turn}:${messages.get(turn) ?? 0}:${index ?? 0}`
@@ -257,8 +259,14 @@ export const preparePiEvents = (events: ReadonlyArray<CanonicalEvent>): Canonica
         if (text) result.push(statusEvent(event, text, `pi/${message.role}`))
         return
       }
+      case "user": {
+        // MeldShell records the prompts it sends; a turn Pi started has only Pi's own message.
+        const text = contentText(message.content)
+        if (!prompted.has(turn) && text)
+          result.push({ ...event, kind: "user", text, payload: { native: event.payload } })
+        return
+      }
       default:
-        // The prompt and system messages: MeldShell records the prompt itself.
         return
     }
   }
@@ -344,6 +352,7 @@ export const preparePiEvents = (events: ReadonlyArray<CanonicalEvent>): Canonica
 
   for (const event of events) {
     if (!event.method.startsWith("pi/")) {
+      if (event.kind === "user") prompted.add(event.turnId ?? event.threadId)
       result.push(event)
       continue
     }

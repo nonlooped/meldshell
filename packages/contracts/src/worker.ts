@@ -86,6 +86,13 @@ export const WorkerEvent = Schema.Union([
     threadId: Schema.String,
     nativeThreadId: Schema.String,
   }),
+  /** The harness started work on its own; its runtime events follow under this turn. */
+  Schema.Struct({
+    type: Schema.Literal("turn-opened"),
+    threadId: Schema.String,
+    turnId: Schema.String,
+    model: Schema.String,
+  }),
   Schema.Struct({
     type: Schema.Literal("turn-start-failed"),
     threadId: Schema.String,
