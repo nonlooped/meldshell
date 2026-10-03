@@ -1,4 +1,6 @@
 import type {
+  InterruptedTurn,
+  QueuedInputContent,
   ResolveApprovalInput,
   SetThreadSettingsInput,
   SubmitTurnInput,
@@ -41,6 +43,43 @@ const answerActiveTurn = (input: SubmitTurnInput) =>
     return null
   })
 
+/**
+ * Redirects the running turn with a queued follow-up. Codex takes it into the same turn; the other
+ * harnesses cannot, so their turn is interrupted and the follow-up runs right after. A turn that
+ * cannot be redirected (a Codex review, say) leaves it queued ahead of the rest.
+ */
+const steerActiveTurn = (
+  queuedInputId: number,
+  content: QueuedInputContent,
+  active: InterruptedTurn,
+) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const provider = yield* providerFor(active.harness)
+    if (active.harness === "codex") {
+      if (active.native_thread_id === null || active.native_turn_id === null)
+        return "queued" as const
+      yield* provider.send({
+        type: "steer-turn",
+        nativeThreadId: active.native_thread_id,
+        nativeTurnId: active.native_turn_id,
+        text: content.text,
+        attachments: content.attachments,
+      })
+      yield* core.RemoveQueuedInput({ id: queuedInputId })
+      return "steered" as const
+    }
+    yield* core.PrioritizeQueuedInput({ id: queuedInputId })
+    yield* provider.interrupt(content.threadId, active.id)
+    return "steered" as const
+  }).pipe(
+    Effect.catch((cause) =>
+      Effect.logError("Could not steer the running turn; the message stays queued.", cause).pipe(
+        Effect.as("queued" as const),
+      ),
+    ),
+  )
+
 export const submitTurn = (input: SubmitTurnInput) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
@@ -48,7 +87,21 @@ export const submitTurn = (input: SubmitTurnInput) =>
       const steered = yield* answerActiveTurn(input)
       if (steered !== null) return steered
     }
-    const result = yield* core.SubmitTurn(input)
+    let result = yield* core.SubmitTurn(input)
+    if (
+      input.delivery === "steer" &&
+      result.disposition === "queued" &&
+      result.queuedInputId !== undefined
+    ) {
+      const queuedInputId = result.queuedInputId
+      const content = yield* core.GetQueuedInput({ id: queuedInputId })
+      const active = yield* core.InterruptTurn({ threadId: input.threadId })
+      const disposition =
+        content === null || active === null
+          ? ("queued" as const)
+          : yield* steerActiveTurn(queuedInputId, content, active)
+      result = { ...result, disposition, snapshot: yield* core.GetSnapshot() }
+    }
     if (result.dispatch !== null) {
       const provider = yield* providerFor(result.dispatch.harness)
       yield* provider.send({ type: "start-turn", dispatch: result.dispatch })
@@ -117,3 +170,28 @@ export const resolveApproval = (input: ResolveApprovalInput) =>
       return true
     }),
   )
+
+export const removeQueuedInput = (id: number) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const threadId = yield* core.RemoveQueuedInput({ id })
+    if (threadId !== null) yield* publishChange(threadId)
+    return yield* core.GetSnapshot()
+  })
+
+/** Sends a waiting follow-up now: into the running turn, or as a new turn when none is running. */
+export const steerQueuedInput = (id: number) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const content = yield* core.GetQueuedInput({ id })
+    if (content === null) return yield* core.GetSnapshot()
+    const active = yield* core.InterruptTurn({ threadId: content.threadId })
+    if (active === null) {
+      const started = yield* submitTurn(content)
+      yield* core.RemoveQueuedInput({ id })
+      return started.snapshot
+    }
+    yield* steerActiveTurn(id, content, active)
+    yield* publishChange(content.threadId)
+    return yield* core.GetSnapshot()
+  })

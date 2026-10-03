@@ -685,17 +685,17 @@ export function Transcript({
 
   if (query.isLoading)
     return (
-      <TranscriptSkeleton className="transcript-loading min-h-0 overflow-hidden [padding:36px_clamp(24px,_7vw,_104px)]" />
+      <TranscriptSkeleton className="transcript-loading min-h-0 overflow-hidden [padding:36px_var(--pane-gutter)]" />
     )
   if (query.isError && !query.data)
     return (
-      <div className="transcript-loading min-h-0 [padding:36px_clamp(24px,_7vw,_104px)] text-[var(--text-tertiary)] text-[12px]">
+      <div className="transcript-loading min-h-0 [padding:36px_var(--pane-gutter)] text-[var(--text-tertiary)] text-[12px]">
         This transcript could not be read from disk.
       </div>
     )
   if (turns.length === 0)
     return (
-      <div className="transcript-origin [padding:0_clamp(24px,_7vw,_104px)_24px]">
+      <div className="transcript-origin [padding:0_var(--pane-gutter)_24px]">
         <FadeDiv className="w-full max-w-[680px] [margin:0_auto]">{origin}</FadeDiv>
       </div>
     )
@@ -710,7 +710,7 @@ export function Transcript({
         )}
         <div
           ref={scrollRef}
-          className="transcript min-h-0 [padding:36px_clamp(24px,_7vw,_104px)] overflow-y-auto [scrollbar-gutter:stable] [mask-image:linear-gradient(to_bottom,transparent,black_28px,black_calc(100%_-_28px),transparent)]"
+          className="transcript min-h-0 [padding:36px_var(--pane-gutter)] overflow-y-auto [scrollbar-gutter:stable] [mask-image:linear-gradient(to_bottom,transparent,black_28px,black_calc(100%_-_28px),transparent)]"
           aria-live="polite"
         >
           <div

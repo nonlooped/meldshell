@@ -188,7 +188,7 @@ export const deleteModel = (modelId: string) =>
 export const syncProviderCatalog = (input: SyncProviderCatalogInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    if (input.models.length === 0) return yield* getSnapshot
+    if (input.models.length === 0) return
     const providers = yield* readRows(
       ProviderRow,
       sql`
@@ -197,7 +197,7 @@ export const syncProviderCatalog = (input: SyncProviderCatalogInput) =>
     `,
     )
     const provider = providers[0]
-    if (provider === undefined) return yield* getSnapshot
+    if (provider === undefined) return
 
     yield* sql.withTransaction(
       Effect.gen(function* () {
@@ -280,7 +280,6 @@ export const syncProviderCatalog = (input: SyncProviderCatalogInput) =>
         `
       }),
     )
-    return yield* getSnapshot
   })
 
 /** Restores one provider's built-in models to their discovered names, options, and visibility. */

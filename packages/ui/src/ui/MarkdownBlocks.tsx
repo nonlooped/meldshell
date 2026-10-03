@@ -14,13 +14,12 @@ import { ChangeDiff } from "./ChangeDiff"
 import { FileIcon } from "./FileIcon"
 import { tableDelimited } from "./markdown-model"
 import { copyableText } from "./MarkdownTools"
-import { cx, markdownInlineClasses, markdownProseClasses } from "./styles"
+import { cx, markdownInlineClasses, markdownProseClasses, syntaxTokenClasses } from "./styles"
 import { ImageContextMenu } from "./ImageContextMenu"
 import { MarkdownWorkspace } from "./MarkdownContexts"
 import { useTabStore } from "../app/tab-store"
 
 export const MarkdownStreaming = createContext(false)
-export const MarkdownSearch = createContext("")
 
 function CopyButton({
   value,
@@ -141,22 +140,18 @@ export function CodeBlock({
   language = "",
   path = "",
   startLine = 1,
-  children,
 }: {
   text: string
   language?: string
   path?: string
   startLine?: number
-  children?: ReactNode
 }) {
   const [expanded, setExpanded] = useState(false)
   const scope = useContext(MarkdownWorkspace)
   const openFile = useTabStore((state) => state.openFile)
-  const query = useContext(MarkdownSearch)
   const streaming = useContext(MarkdownStreaming)
   const lines = text.replace(/\n$/, "").split("\n")
   const long = lines.length > 24
-  const showAll = expanded || !!query
   const diff = /^(diff|patch)$/.test(language)
   const diagram = language === "mermaid"
   return (
@@ -169,34 +164,29 @@ export function CodeBlock({
             <CopyButton value={text} label="Copy code" />
           </header>
           {diagram && <Diagram text={text} />}
-          {diff && !streaming && !query ? (
+          {diff && !streaming ? (
             <ChangeDiff path={path} patch={text} />
           ) : (
             <div
-              className="markdown-code-scroll flex max-h-[65vh] overflow-auto [&[data-folded]]:max-h-[300px] [&[data-folded]]:overflow-y-hidden"
-              data-folded={(long && !showAll) || undefined}
+              className="markdown-code-scroll flex max-h-[calc(var(--viewport-h)_*_0.65)] overflow-auto [&[data-folded]]:max-h-[300px] [&[data-folded]]:overflow-y-hidden"
+              data-folded={(long && !expanded) || undefined}
             >
               <pre className="markdown-line-numbers" aria-hidden="true">
                 {lines.map((_, i) => startLine + i).join("\n")}
               </pre>
               <pre tabIndex={0}>
-                {query ? (
-                  children
-                ) : (
-                  <SourceCode text={text} path={path} language={language || undefined} />
-                )}
+                <SourceCode text={text} path={path} language={language || undefined} />
               </pre>
             </div>
           )}
-          {long && !(diff && !streaming && !query) && (
+          {long && !(diff && !streaming) && (
             <Button
               size="sm"
               variant="ghost"
-              aria-expanded={showAll}
+              aria-expanded={expanded}
               onClick={() => setExpanded(!expanded)}
-              disabled={!!query}
             >
-              {showAll ? "Show less" : `Show all ${lines.length} lines`}
+              {expanded ? "Show less" : `Show all ${lines.length} lines`}
             </Button>
           )}
         </section>
@@ -216,8 +206,8 @@ export function CodeBlock({
         Copy selection or code
       </MenuAction>
       {long && (
-        <MenuAction disabled={!!query} onClick={() => setExpanded((value) => !value)}>
-          {showAll ? "Show less" : "Show all lines"}
+        <MenuAction onClick={() => setExpanded((value) => !value)}>
+          {expanded ? "Show less" : "Show all lines"}
         </MenuAction>
       )}
     </ContextMenu>
@@ -237,7 +227,7 @@ export function MarkdownTable({ children }: { children?: ReactNode }) {
   return (
     <ContextMenu
       trigger={
-        <div className="[&[data-expanded]_.markdown-table]:max-h-[80vh]">
+        <div className="[&[data-expanded]_.markdown-table]:max-h-[calc(var(--viewport-h)_*_0.8)]">
           <div className="flex items-center flex-wrap gap-[4px] [margin:4px_0_8px] [font-family:var(--font-text)] [&_.button]:text-[11px] [&_.text-input]:flex-1 [&_.text-input]:min-w-[120px]">
             <CopyButton label="Copy CSV" value={() => tableText(",")} />
             <CopyButton label="Copy TSV" value={() => tableText("\t")} />
@@ -295,7 +285,6 @@ export function MarkdownTable({ children }: { children?: ReactNode }) {
 export function FoldedQuote({ children, length }: { children: ReactNode; length: number }) {
   const [expanded, setExpanded] = useState(false)
   const quoteRef = useRef<HTMLQuoteElement>(null)
-  const query = useContext(MarkdownSearch)
   return (
     <div>
       <ContextMenu
@@ -303,7 +292,7 @@ export function FoldedQuote({ children, length }: { children: ReactNode; length:
           <blockquote
             ref={quoteRef}
             className="[&[data-folded]]:max-h-[180px] [&[data-folded]]:overflow-hidden"
-            data-folded={(length > 1200 && !expanded && !query) || undefined}
+            data-folded={(length > 1200 && !expanded) || undefined}
           >
             {children}
           </blockquote>
@@ -319,7 +308,7 @@ export function FoldedQuote({ children, length }: { children: ReactNode; length:
           Copy quote
         </MenuAction>
         {length > 1200 && (
-          <MenuAction disabled={!!query} onClick={() => setExpanded((value) => !value)}>
+          <MenuAction onClick={() => setExpanded((value) => !value)}>
             {expanded ? "Show less" : "Show full quote"}
           </MenuAction>
         )}
@@ -328,8 +317,7 @@ export function FoldedQuote({ children, length }: { children: ReactNode; length:
         <Button
           size="sm"
           variant="ghost"
-          aria-expanded={expanded || !!query}
-          disabled={!!query}
+          aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
         >
           {expanded ? "Show less" : "Show full quote"}
@@ -402,7 +390,7 @@ export function ImageLightbox({
         </>
       }
     >
-      <div className="markdown-lightbox max-h-[65vh] overflow-auto">
+      <div className="markdown-lightbox max-h-[calc(var(--viewport-h)_*_0.65)] overflow-auto">
         {image && (
           <ImageContextMenu
             source={image.src}
@@ -462,23 +450,20 @@ export function ToolImageGallery({ images }: { images: readonly string[] }) {
   )
 }
 
-const markdownCodeClasses = [
-  "[&_.token.comment]:text-[var(--text-tertiary)] [&_.token.prolog]:text-[var(--text-tertiary)]",
-  "[&_.token.doctype]:text-[var(--text-tertiary)] [&_.token.keyword]:text-[var(--color-renamed)]",
-  "[&_.token.tag]:text-[var(--color-renamed)] [&_.token.boolean]:text-[var(--color-renamed)]",
-  "[&_.token.string]:text-[var(--color-added)] [&_.token.attr-value]:text-[var(--color-added)]",
-  "[&_.token.number]:text-[var(--color-modified)] [&_.token.function]:text-[var(--color-modified)]",
-  "[&_.token.class-name]:text-[var(--color-modified)] [&_.token.property]:text-[var(--color-info)]",
-  "[&_.token.attr-name]:text-[var(--color-info)] [margin:12px_0] border-[1px] border-[color:var(--line)]",
-  "rounded-[var(--radius)] overflow-hidden [&_>_header]:flex [&_>_header]:items-center",
-  "[&_>_header]:gap-[6px] [&_>_header]:[padding:5px_10px] [&_>_header]:bg-[var(--surface-hover)]",
-  "[&_>_header]:border-b-[1px] [&_>_header]:border-b-[color:var(--line)] [&_>_header]:text-[var(--text-secondary)]",
-  "[&_>_header]:[font:12px_var(--font-mono)] [&_>_header_>_span]:flex-1",
-  "[&_>_header_>_span]:[overflow-wrap:anywhere]",
-].join(" ")
+const markdownCodeClasses = cx(
+  syntaxTokenClasses,
+  [
+    "[margin:12px_0] border-[1px] border-[color:var(--line)]",
+    "rounded-[var(--radius)] overflow-hidden [&_>_header]:flex [&_>_header]:items-center",
+    "[&_>_header]:gap-[6px] [&_>_header]:[padding:5px_10px] [&_>_header]:bg-[var(--surface-hover)]",
+    "[&_>_header]:border-b-[1px] [&_>_header]:border-b-[color:var(--line)] [&_>_header]:text-[var(--text-secondary)]",
+    "[&_>_header]:[font:12px_var(--font-mono)] [&_>_header_>_span]:flex-1",
+    "[&_>_header_>_span]:[overflow-wrap:anywhere]",
+  ].join(" "),
+)
 
 const eventMarkdownClasses = cx(
-  "markdown-table-expanded [&_.markdown-table]:max-h-[70vh]",
+  "markdown-table-expanded [&_.markdown-table]:max-h-[calc(var(--viewport-h)_*_0.7)]",
   markdownInlineClasses,
   markdownProseClasses,
 )

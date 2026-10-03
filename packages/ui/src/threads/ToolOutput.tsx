@@ -1,3 +1,4 @@
+import { cx, syntaxTokenClasses } from "../ui/styles"
 import { useMemo, useState } from "react"
 import { CopyIconButton, copyStatusText, useCopy } from "../ui/CopyButton"
 import { Toggle } from "@base-ui-components/react/toggle"
@@ -103,17 +104,14 @@ export function ToolOutput({
   )
 }
 
-const toolOutputClasses = [
-  "[&_.token.comment]:text-[var(--text-tertiary)] [&_.token.prolog]:text-[var(--text-tertiary)]",
-  "[&_.token.doctype]:text-[var(--text-tertiary)] [&_.token.keyword]:text-[var(--color-renamed)]",
-  "[&_.token.tag]:text-[var(--color-renamed)] [&_.token.boolean]:text-[var(--color-renamed)]",
-  "[&_.token.string]:text-[var(--color-added)] [&_.token.attr-value]:text-[var(--color-added)]",
-  "[&_.token.number]:text-[var(--color-modified)] [&_.token.function]:text-[var(--color-modified)]",
-  "[&_.token.class-name]:text-[var(--color-modified)] [&_.token.property]:text-[var(--color-info)]",
-  "[&_.token.attr-name]:text-[var(--color-info)] min-w-0 overflow-hidden border-[1px] border-[color:var(--line)]",
-  "rounded-[var(--radius)] [&[data-error]]:[border-color:color-mix(in_srgb,var(--color-deleted)_45%,transparent)]",
-  "[&[data-error]_.tool-output-label]:text-[var(--color-deleted)]",
-].join(" ")
+const toolOutputClasses = cx(
+  syntaxTokenClasses,
+  [
+    "min-w-0 overflow-hidden border-[1px] border-[color:var(--line)]",
+    "rounded-[var(--radius)] [&[data-error]]:[border-color:color-mix(in_srgb,var(--color-deleted)_45%,transparent)]",
+    "[&[data-error]_.tool-output-label]:text-[var(--color-deleted)]",
+  ].join(" "),
+)
 
 const toolOutputHeaderClasses = [
   "flex items-center gap-[8px] min-h-[32px] [padding:3px_8px_3px_12px]",

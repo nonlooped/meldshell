@@ -65,7 +65,7 @@ export function ModelPicker({
         <ChevronDown
           size={13}
           strokeWidth={1.75}
-          className="flex-none text-[var(--text-tertiary)]"
+          className="chip-chevron flex-none text-[var(--text-tertiary)]"
         />
       </Combobox.Trigger>
       <Combobox.Portal>

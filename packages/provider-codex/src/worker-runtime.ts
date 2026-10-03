@@ -525,7 +525,9 @@ export const runCodexWorker = (
             server.request("turn/steer", {
               threadId: input.nativeThreadId,
               expectedTurnId: input.nativeTurnId,
-              input: [{ type: "text", text: input.text, text_elements: [] }],
+              input: input.attachments?.length
+                ? inputItems({ text: input.text, attachments: input.attachments })
+                : [{ type: "text", text: input.text, text_elements: [] }],
             }),
           )
           .then(

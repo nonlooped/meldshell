@@ -6,7 +6,7 @@ import type { FileTab } from "../app/tab-store"
 import { useTabStore } from "../app/tab-store"
 import { FileIcon } from "../ui/FileIcon"
 import { Button, ContextMenu, MenuAction, PanelNote } from "../ui/controls"
-import { cx, markdownProseClasses } from "../ui/styles"
+import { cx, markdownProseClasses, syntaxTokenClasses } from "../ui/styles"
 import { useEffect, useRef } from "react"
 import { RevealFileAction } from "../ui/FileContextActions"
 import { ImageContextMenu } from "../ui/ImageContextMenu"
@@ -226,17 +226,14 @@ export function FileViewer({ file }: { file: FileTab }) {
   )
 }
 
-const fileSourceClasses = [
-  "[&_.token.comment]:text-[var(--text-tertiary)] [&_.token.prolog]:text-[var(--text-tertiary)]",
-  "[&_.token.doctype]:text-[var(--text-tertiary)] [&_.token.keyword]:text-[var(--color-renamed)]",
-  "[&_.token.tag]:text-[var(--color-renamed)] [&_.token.boolean]:text-[var(--color-renamed)]",
-  "[&_.token.string]:text-[var(--color-added)] [&_.token.attr-value]:text-[var(--color-added)]",
-  "[&_.token.number]:text-[var(--color-modified)] [&_.token.function]:text-[var(--color-modified)]",
-  "[&_.token.class-name]:text-[var(--color-modified)] [&_.token.property]:text-[var(--color-info)]",
-  "[&_.token.attr-name]:text-[var(--color-info)] flex-1 overflow-auto m-0 p-[20px]",
-  "[font-family:var(--font-mono)] text-[13px] leading-[1.6] [tab-size:4] overflow-y-auto",
-  "[scrollbar-gutter:stable]",
-].join(" ")
+const fileSourceClasses = cx(
+  syntaxTokenClasses,
+  [
+    "flex-1 overflow-auto m-0 p-[20px]",
+    "[font-family:var(--font-mono)] text-[13px] leading-[1.6] [tab-size:4] overflow-y-auto",
+    "[scrollbar-gutter:stable]",
+  ].join(" "),
+)
 
 const eventMarkdownClasses = cx(
   "flex-1 overflow-auto p-[24px] [overflow-wrap:anywhere] text-[var(--text-secondary)]",

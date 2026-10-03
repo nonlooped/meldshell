@@ -86,7 +86,7 @@ export function ErrorToast({
   return (
     <FadeDiv
       duration={0.2}
-      className={`${toastClasses} items-start gap-[10px] [padding:10px_10px_10px_14px] max-w-[min(560px,_80vw)]`}
+      className={`${toastClasses} items-start gap-[10px] [padding:10px_10px_10px_14px] max-w-[min(560px,_calc(var(--viewport-w)_*_0.8))]`}
       role="alert"
     >
       <CircleAlert size={15} className="flex-none mt-[4px] text-[var(--color-deleted)]" />
@@ -125,7 +125,7 @@ export function ActionToast({
   return (
     <FadeDiv
       duration={0.2}
-      className={`${toastClasses} items-center gap-[8px] [padding:6px_6px_6px_14px] max-w-[min(480px,_80vw)]`}
+      className={`${toastClasses} items-center gap-[8px] [padding:6px_6px_6px_14px] max-w-[min(480px,_calc(var(--viewport-w)_*_0.8))]`}
       role="status"
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}

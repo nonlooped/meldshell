@@ -15,6 +15,7 @@ import {
   SetThreadSettingsInput,
   SetAppSettingsInput,
   SubmitTurnInput,
+  QueuedInputContent,
   TranscriptQuery,
   TranscriptPage,
   ThreadPageQuery,
@@ -38,6 +39,11 @@ const snapshotRpc = <const Tag extends string, Payload extends Schema.Top>(
   tag: Tag,
   payload: Payload,
 ) => Rpc.make(tag, { payload, success: AppSnapshot, error: CoreError })
+
+const completionRpc = <const Tag extends string, Payload extends Schema.Top>(
+  tag: Tag,
+  payload: Payload,
+) => Rpc.make(tag, { payload, success: Schema.Void, error: CoreError })
 
 export class CoreRpcs extends RpcGroup.make(
   snapshotRpc("RenameWorkspace", RenameWorkspaceInput),
@@ -73,7 +79,7 @@ export class CoreRpcs extends RpcGroup.make(
     "SetWorktreeState",
     Schema.Struct({ threadId: Schema.String, state: ThreadWorktree.fields.state }),
   ),
-  snapshotRpc(
+  completionRpc(
     "SetWorktreeSetup",
     Schema.Struct({
       threadId: Schema.String,
@@ -81,14 +87,14 @@ export class CoreRpcs extends RpcGroup.make(
     }),
   ),
   snapshotRpc("SetThreadStatus", SetThreadStatusInput),
-  snapshotRpc("SetThreadTitle", SetThreadTitleInput),
+  completionRpc("SetThreadTitle", SetThreadTitleInput),
   snapshotRpc("RenameThread", RenameThreadInput),
   snapshotRpc("DeleteThread", Schema.Struct({ threadId: Schema.String })),
   snapshotRpc("UpdateProvider", UpdateProviderInput),
   snapshotRpc("UpsertModel", UpsertModelInput),
   snapshotRpc("DeleteModel", Schema.Struct({ modelId: Schema.String })),
   snapshotRpc("ResetProviderCatalog", Schema.Struct({ providerId: Schema.String })),
-  snapshotRpc("SyncProviderCatalog", SyncProviderCatalogInput),
+  completionRpc("SyncProviderCatalog", SyncProviderCatalogInput),
   snapshotRpc("SetThreadSettings", SetThreadSettingsInput),
   snapshotRpc("SetAppSettings", SetAppSettingsInput),
   Rpc.make("GetTranscript", {
@@ -111,19 +117,30 @@ export class CoreRpcs extends RpcGroup.make(
     success: RuntimeEventResult,
     error: CoreError,
   }),
-  snapshotRpc("SetProviderSession", ProviderSessionInput),
+  completionRpc("SetProviderSession", ProviderSessionInput),
   /** False when the thread is gone, already running a turn, or MeldShell is shutting down. */
   Rpc.make("OpenProviderTurn", {
     payload: OpenProviderTurnInput,
     success: Schema.Boolean,
     error: CoreError,
   }),
-  snapshotRpc("ResolveApproval", Schema.Struct({ approvalId: Schema.String })),
+  completionRpc("ResolveApproval", Schema.Struct({ approvalId: Schema.String })),
   Rpc.make("GetApprovalHarness", {
     payload: Schema.Struct({ approvalId: Schema.String }),
     success: Schema.NullOr(Schema.String),
     error: CoreError,
   }),
+  Rpc.make("GetQueuedInput", {
+    payload: Schema.Struct({ id: Schema.Number }),
+    success: Schema.NullOr(QueuedInputContent),
+    error: CoreError,
+  }),
+  Rpc.make("RemoveQueuedInput", {
+    payload: Schema.Struct({ id: Schema.Number }),
+    success: Schema.NullOr(Schema.String),
+    error: CoreError,
+  }),
+  completionRpc("PrioritizeQueuedInput", Schema.Struct({ id: Schema.Number })),
   Rpc.make("InterruptTurn", {
     payload: Schema.Struct({ threadId: Schema.String }),
     success: Schema.NullOr(InterruptedTurn),

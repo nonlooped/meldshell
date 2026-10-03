@@ -1,3 +1,4 @@
+import { cx, syntaxTokenClasses } from "./styles"
 import { useMemo, useState } from "react"
 import { Decoration, Diff, Hunk, getChangeKey } from "react-diff-view"
 import { ErrorBoundary } from "react-error-boundary"
@@ -173,33 +174,29 @@ const unchangedLines = (lines: number): string =>
 const gapClasses =
   "block [padding:4px_10px] bg-[var(--surface-hover)] text-[var(--text-tertiary)] [font-family:var(--font-text)] text-[11px]"
 
-const eventDiffClasses = [
-  "event-diff [--diff-background-color:transparent] [--diff-text-color:var(--text-primary)]",
-  "[--diff-font-family:var(--font-mono)] [--diff-selection-background-color:var(--surface-active)]",
-  "[--diff-selection-text-color:var(--text-primary)]",
-  "[--diff-code-insert-background-color:color-mix(in_srgb,_var(--color-added)_10%,_transparent)]",
-  "[--diff-code-delete-background-color:color-mix(in_srgb,_var(--color-deleted)_10%,_transparent)]",
-  "[--diff-gutter-insert-background-color:var(--diff-code-insert-background-color)]",
-  "[--diff-gutter-delete-background-color:var(--diff-code-delete-background-color)]",
-  "[--diff-gutter-insert-text-color:var(--color-added)]",
-  "[--diff-gutter-delete-text-color:var(--color-deleted)]",
-  "[--diff-code-insert-edit-background-color:color-mix(in_srgb,_var(--color-added)_24%,_transparent)]",
-  "[--diff-code-delete-edit-background-color:color-mix(_in_srgb,_var(--color-deleted)_24%,_transparent_)]",
-  "min-w-0 overflow-x-auto border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] text-[12px]",
-  "font-normal [&_+_.event-diff]:mt-[8px] [&_pre.work-item-output]:m-0",
-  "[&_pre.work-item-output]:whitespace-pre-wrap [&_pre.work-item-output]:[overflow-wrap:anywhere]",
-  "[&_.diff]:text-[inherit] [&_.diff]:font-normal [&_.diff-line]:leading-[1.65]",
-  "[&_.diff-gutter-col]:w-[4.5ch] [&_.diff-gutter]:px-[0.5ch] [&_.diff-gutter]:cursor-default",
-  "[&_.diff-gutter-normal]:text-[var(--text-tertiary)] [&_.diff-code]:relative",
-  "[&_.diff-code]:[padding-inline:10px_8px] [&_.diff-code]:whitespace-pre [&_.diff-code]:[overflow-wrap:normal]",
-  "[&_.diff-code]:[word-break:normal] [&_.diff-code]:font-normal [&_.diff-code]:[tab-size:2]",
-  "[&_.diff-code-insert]:border-l-[2px] [&_.diff-code-insert]:border-l-[color:var(--color-added)]",
-  "[&_.diff-code-delete]:border-l-[2px] [&_.diff-code-delete]:border-l-[color:var(--color-deleted)]",
-  "[&_.token.comment]:text-[var(--text-tertiary)] [&_.token.prolog]:text-[var(--text-tertiary)]",
-  "[&_.token.doctype]:text-[var(--text-tertiary)] [&_.token.keyword]:text-[var(--color-renamed)]",
-  "[&_.token.tag]:text-[var(--color-renamed)] [&_.token.boolean]:text-[var(--color-renamed)]",
-  "[&_.token.string]:text-[var(--color-added)] [&_.token.attr-value]:text-[var(--color-added)]",
-  "[&_.token.number]:text-[var(--color-modified)] [&_.token.function]:text-[var(--color-modified)]",
-  "[&_.token.class-name]:text-[var(--color-modified)] [&_.token.property]:text-[var(--color-info)]",
-  "[&_.token.attr-name]:text-[var(--color-info)]",
-].join(" ")
+const eventDiffClasses = cx(
+  syntaxTokenClasses,
+  [
+    "event-diff [--diff-background-color:transparent] [--diff-text-color:var(--text-primary)]",
+    "[--diff-font-family:var(--font-mono)] [--diff-selection-background-color:var(--surface-active)]",
+    "[--diff-selection-text-color:var(--text-primary)]",
+    "[--diff-code-insert-background-color:color-mix(in_srgb,_var(--color-added)_10%,_transparent)]",
+    "[--diff-code-delete-background-color:color-mix(in_srgb,_var(--color-deleted)_10%,_transparent)]",
+    "[--diff-gutter-insert-background-color:var(--diff-code-insert-background-color)]",
+    "[--diff-gutter-delete-background-color:var(--diff-code-delete-background-color)]",
+    "[--diff-gutter-insert-text-color:var(--color-added)]",
+    "[--diff-gutter-delete-text-color:var(--color-deleted)]",
+    "[--diff-code-insert-edit-background-color:color-mix(in_srgb,_var(--color-added)_24%,_transparent)]",
+    "[--diff-code-delete-edit-background-color:color-mix(_in_srgb,_var(--color-deleted)_24%,_transparent_)]",
+    "min-w-0 overflow-x-auto border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] text-[12px]",
+    "font-normal [&_+_.event-diff]:mt-[8px] [&_pre.work-item-output]:m-0",
+    "[&_pre.work-item-output]:whitespace-pre-wrap [&_pre.work-item-output]:[overflow-wrap:anywhere]",
+    "[&_.diff]:text-[inherit] [&_.diff]:font-normal [&_.diff-line]:leading-[1.65]",
+    "[&_.diff-gutter-col]:w-[4.5ch] [&_.diff-gutter]:px-[0.5ch] [&_.diff-gutter]:cursor-default",
+    "[&_.diff-gutter-normal]:text-[var(--text-tertiary)] [&_.diff-code]:relative",
+    "[&_.diff-code]:[padding-inline:10px_8px] [&_.diff-code]:whitespace-pre [&_.diff-code]:[overflow-wrap:normal]",
+    "[&_.diff-code]:[word-break:normal] [&_.diff-code]:font-normal [&_.diff-code]:[tab-size:2]",
+    "[&_.diff-code-insert]:border-l-[2px] [&_.diff-code-insert]:border-l-[color:var(--color-added)]",
+    "[&_.diff-code-delete]:border-l-[2px] [&_.diff-code-delete]:border-l-[color:var(--color-deleted)]",
+  ].join(" "),
+)

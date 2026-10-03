@@ -9,6 +9,7 @@ import {
   type SandboxMode,
   type SubmitTurnInput,
   type SubmitTurnResult,
+  type QueuedInputContent,
   type RuntimeEventInput,
   type RuntimeEventResult,
   type TurnDispatch,
@@ -147,18 +148,20 @@ const queueInput = (
 ) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`
-        INSERT INTO queued_inputs (thread_id, text, attachments, created_at)
+    const [row] = yield* sql<{ readonly id: number }>`
+        INSERT INTO queued_inputs (thread_id, text, attachments, steer, created_at)
         VALUES (
           ${input.threadId}, ${text}, ${JSON.stringify(input.attachments ?? [])},
-          ${new Date().toISOString()}
+          ${input.delivery === "steer" ? 1 : 0}, ${new Date().toISOString()}
         )
+        RETURNING id
       `
     return {
       snapshot: yield* getSnapshot,
       disposition: "queued",
       dispatch: null,
       titleRequest,
+      queuedInputId: row!.id,
     } satisfies SubmitTurnResult
   })
 
@@ -242,32 +245,60 @@ export const submitTurn = (input: SubmitTurnInput) =>
     } satisfies SubmitTurnResult
   }).pipe(transaction)
 
+/** Starts the next queued follow-up on its own turn; steering ones go first, then oldest first. */
 const promoteQueue = (threadId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (yield* isShuttingDown) return null
-    const queued = yield* sql<{
+    const [next] = yield* sql<{
       readonly id: number
       readonly text: string
       readonly attachments: string
     }>`
       SELECT id, text, attachments FROM queued_inputs
-      WHERE thread_id = ${threadId} ORDER BY id
+      WHERE thread_id = ${threadId} ORDER BY steer DESC, id LIMIT 1
     `
-    if (queued.length === 0) return null
-    const text = queued
-      .map((entry) => entry.text)
-      .filter(Boolean)
-      .join("\n\n")
-    const decodedAttachments = yield* Effect.forEach(queued, (entry) =>
-      Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Array(InputAttachment)))(
-        entry.attachments,
-      ),
-    )
-    const attachments = decodedAttachments.flat()
-    const dispatch = yield* createDispatch(threadId, text, attachments)
-    yield* sql`DELETE FROM queued_inputs WHERE thread_id = ${threadId}`
+    if (next === undefined) return null
+    const attachments = yield* Schema.decodeUnknownEffect(
+      Schema.fromJsonString(Schema.Array(InputAttachment)),
+    )(next.attachments)
+    const dispatch = yield* createDispatch(threadId, next.text, attachments)
+    yield* sql`DELETE FROM queued_inputs WHERE id = ${next.id}`
     return dispatch
+  })
+
+export const getQueuedInput = (id: number) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const [row] = yield* sql<{
+      readonly thread_id: string
+      readonly text: string
+      readonly attachments: string
+    }>`SELECT thread_id, text, attachments FROM queued_inputs WHERE id = ${id}`
+    if (row === undefined) return null
+    return {
+      threadId: row.thread_id,
+      text: row.text,
+      attachments: yield* Schema.decodeUnknownEffect(
+        Schema.fromJsonString(Schema.Array(InputAttachment)),
+      )(row.attachments),
+    } satisfies QueuedInputContent
+  })
+
+export const removeQueuedInput = (id: number) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const [row] = yield* sql<{
+      readonly thread_id: string
+    }>`DELETE FROM queued_inputs WHERE id = ${id} RETURNING thread_id`
+    return row?.thread_id ?? null
+  })
+
+/** Moves a follow-up ahead of the queue and lets it start as soon as the running turn ends. */
+export const prioritizeQueuedInput = (id: number) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`UPDATE queued_inputs SET steer = 1 WHERE id = ${id}`
   })
 
 export const recordRuntimeEvent = (input: RuntimeEventInput) =>
@@ -335,7 +366,6 @@ export const resolveApproval = (approvalId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`DELETE FROM approvals WHERE id = ${approvalId}`
-    return yield* getSnapshot
   })
 
 /** The harness of the turn that raised an approval, independent of later model selection. */
@@ -610,7 +640,12 @@ const finishTurn = (input: RuntimeEventInput) =>
       `
     yield* sql`DELETE FROM approvals WHERE turn_id = ${input.turnId}`
     yield* sql`UPDATE threads SET updated_at = ${timestamp} WHERE id = ${input.threadId}`
-    if (input.promoteQueue !== false && status === "completed")
+    // An interrupted turn leaves the queue alone unless a steering message is why it stopped.
+    const steering =
+      status === "interrupted" &&
+      (yield* sql`SELECT 1 FROM queued_inputs WHERE thread_id = ${input.threadId} AND steer = 1 LIMIT 1`)
+        .length > 0
+    if (input.promoteQueue !== false && (status === "completed" || steering))
       nextDispatch = yield* promoteQueue(input.threadId).pipe(
         transaction,
         Effect.catch((cause) =>

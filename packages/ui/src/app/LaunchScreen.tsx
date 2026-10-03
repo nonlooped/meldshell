@@ -164,7 +164,7 @@ export function LaunchScreen({ launch }: { launch: Launch }): React.JSX.Element 
                   ))}
                 </div>
               )}
-              <div className="w-[320px] text-[12px] text-[var(--text-tertiary)]">
+              <div className="w-[min(320px,_calc(var(--viewport-w)_-_48px))] text-[12px] text-[var(--text-tertiary)]">
                 <Swap id={message}>
                   <Shimmer>{message}</Shimmer>
                 </Swap>

@@ -9,7 +9,9 @@ export const threadSettings = (dispatch: TurnDispatch) => ({
   serviceTier: dispatch.serviceTier,
 })
 
-export const inputItems = (dispatch: TurnDispatch): ReadonlyArray<Record<string, unknown>> => [
+export const inputItems = (
+  dispatch: Pick<TurnDispatch, "text" | "attachments">,
+): ReadonlyArray<Record<string, unknown>> => [
   ...(dispatch.text === "" ? [] : [{ type: "text", text: dispatch.text }]),
   ...dispatch.attachments.map((attachment) => {
     switch (attachment.type) {

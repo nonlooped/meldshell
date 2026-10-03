@@ -1,0 +1,79 @@
+import { Schema } from "effect"
+
+/** Resolves the workspace checkout, or a thread's isolated worktree. */
+export const WorkspaceScope = Schema.Struct({
+  workspaceId: Schema.String,
+  threadId: Schema.optional(Schema.String),
+})
+export type WorkspaceScope = typeof WorkspaceScope.Type
+
+export const WorkspaceFileInput = Schema.Struct({ ...WorkspaceScope.fields, path: Schema.String })
+export type WorkspaceFileInput = typeof WorkspaceFileInput.Type
+
+// Public callers retain exact optional properties where the IPC API required them;
+// decoders continue accepting explicit undefined from existing wire clients.
+type ExactOptional<T, K extends keyof T> = Omit<T, K> & {
+  readonly [P in K]?: Exclude<T[P], undefined>
+}
+
+export const SearchWorkspacePathsInput = Schema.Struct({
+  ...WorkspaceScope.fields,
+  query: Schema.String.pipe(Schema.check(Schema.isMaxLength(1024))),
+  limit: Schema.optional(
+    Schema.Number.pipe(
+      Schema.check(Schema.isInt()),
+      Schema.check(Schema.isBetween({ minimum: 1, maximum: 200 })),
+    ),
+  ),
+})
+export type SearchWorkspacePathsInput = ExactOptional<
+  typeof SearchWorkspacePathsInput.Type,
+  "threadId" | "limit"
+>
+
+export const WorkspaceFileActionInput = Schema.Struct({
+  ...WorkspaceFileInput.fields,
+  action: Schema.Literals(["create-file", "create-folder", "rename", "delete"]),
+  /** A single entry name, required for creation and rename. */
+  name: Schema.optional(Schema.String),
+})
+export type WorkspaceFileActionInput = typeof WorkspaceFileActionInput.Type
+
+export const GitSnapshotInput = Schema.Struct({
+  ...WorkspaceScope.fields,
+  limit: Schema.Number.pipe(
+    Schema.check(Schema.isInt()),
+    Schema.check(Schema.isBetween({ minimum: 1, maximum: 2000 })),
+  ),
+})
+export type GitSnapshotInput = typeof GitSnapshotInput.Type
+
+export const GitDiffInput = Schema.Struct({
+  ...WorkspaceFileInput.fields,
+  side: Schema.optional(Schema.Literals(["staged", "unstaged"])),
+  /** Includes every unchanged line so a viewer can fold and expand context itself. */
+  context: Schema.optional(Schema.Literal("full")),
+})
+export type GitDiffInput = ExactOptional<typeof GitDiffInput.Type, "side" | "context">
+
+export const GitCommitDiffInput = Schema.Struct({ ...WorkspaceScope.fields, hash: Schema.String })
+export type GitCommitDiffInput = typeof GitCommitDiffInput.Type
+
+export const GitFileActionInput = Schema.Struct({
+  ...WorkspaceFileInput.fields,
+  action: Schema.Literals(["stage", "unstage", "restore"]),
+})
+export type GitFileActionInput = typeof GitFileActionInput.Type
+
+export const GitBulkActionInput = Schema.Struct({
+  ...WorkspaceScope.fields,
+  action: Schema.Literals(["stage", "unstage"]),
+})
+export type GitBulkActionInput = typeof GitBulkActionInput.Type
+
+export const GitCommitInput = Schema.Struct({ ...WorkspaceScope.fields, message: Schema.String })
+export type GitCommitInput = typeof GitCommitInput.Type
+
+export type GenerateCommitMessageInput = ExactOptional<WorkspaceScope, "threadId">
+export type GitFileAction = GitFileActionInput["action"]
+export type GitDiffSide = Exclude<GitDiffInput["side"], undefined>

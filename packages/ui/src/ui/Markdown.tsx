@@ -87,7 +87,7 @@ function codeProperties(node?: Element) {
 const components: Components = {
   a: MarkdownLink,
   img: MarkdownImage,
-  pre: ({ node, children }) => <CodeBlock {...codeProperties(node)}>{children}</CodeBlock>,
+  pre: ({ node }) => <CodeBlock {...codeProperties(node)} />,
   code: ({ children, className, node }) => {
     const value = node ? nodeText(node) : typeof children === "string" ? children : ""
     const reference =
@@ -127,7 +127,7 @@ const MarkdownBlock = memo(function MarkdownBlock({
   const markdownProps: Options = {
     components,
     remarkPlugins,
-    rehypePlugins: [[enrichMarkdown, { prefix, query: "" }]],
+    rehypePlugins: [[enrichMarkdown, { prefix }]],
     urlTransform,
     children: prepared,
   }

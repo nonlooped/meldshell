@@ -10,6 +10,7 @@ const emptySnapshot: AppSnapshot = {
   models: [],
   threadSettings: [],
   approvals: [],
+  queuedInputs: [],
   settings: { titleModelId: CURRENT_TITLE_MODEL },
 }
 

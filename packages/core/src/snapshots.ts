@@ -10,6 +10,7 @@ import {
   ThreadSettingsFromRow,
   WorkspaceFromRow,
   ApprovalFromRow,
+  QueuedInputFromRow,
   modelColumns,
   providerColumns,
   threadColumns,
@@ -77,6 +78,14 @@ export const getSnapshot = Effect.gen(function* () {
     FROM approvals ORDER BY created_at
   `,
   )
+  // Steering entries run first, so the list shows them in the order they will start.
+  const queuedInputs = yield* readRows(
+    QueuedInputFromRow,
+    sql`
+    SELECT id, thread_id, text, attachments, steer, created_at
+    FROM queued_inputs ORDER BY thread_id, steer DESC, id
+  `,
+  )
   const settings = yield* readAppSettings
 
   return {
@@ -86,6 +95,7 @@ export const getSnapshot = Effect.gen(function* () {
     models: models,
     threadSettings: threadSettings,
     approvals: approvals,
+    queuedInputs,
     settings,
   } satisfies AppSnapshot
 }).pipe(transaction)

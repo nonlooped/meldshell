@@ -230,29 +230,6 @@ export function sourceTitles(payloads: readonly unknown[]): ReadonlyMap<string, 
   return titles
 }
 
-export function highlightText(value: string, query: string): RootContent[] {
-  if (!query) return [{ type: "text", value }]
-  const parts: RootContent[] = []
-  const lower = value.toLowerCase()
-  let start = 0
-  let at = lower.indexOf(query.toLowerCase())
-  while (at !== -1) {
-    parts.push(
-      { type: "text", value: value.slice(start, at) },
-      {
-        type: "element",
-        tagName: "mark",
-        properties: { "data-match": true },
-        children: [{ type: "text", value: value.slice(at, at + query.length) }],
-      },
-    )
-    start = at + query.length
-    at = lower.indexOf(query.toLowerCase(), start)
-  }
-  parts.push({ type: "text", value: value.slice(start) })
-  return parts
-}
-
 function decorateElement(
   node: Element,
   parent: Root | Element,
@@ -270,25 +247,15 @@ function decorateElement(
   return headingIndex
 }
 
-function searchableElement(node: Element): boolean {
-  const classes = node.properties.className
-  return (
-    !["math", "svg"].includes(node.tagName) &&
-    !(Array.isArray(classes) && classes.includes("katex"))
-  )
-}
-
-export function enrichMarkdown({ prefix, query }: { prefix: string; query: string }) {
+export function enrichMarkdown({ prefix }: { prefix: string }) {
   return (tree: Root) => {
     let headingIndex = 0
-    const visit = (parent: Root | Element, searchable = true) => {
-      parent.children = parent.children.flatMap((node): RootContent[] => {
-        if (node.type === "text") return searchable ? highlightText(node.value, query) : [node]
-        if (node.type !== "element") return [node]
+    const visit = (parent: Root | Element) => {
+      for (const node of parent.children) {
+        if (node.type !== "element") continue
         headingIndex = decorateElement(node, parent, prefix, headingIndex)
-        visit(node, searchable && searchableElement(node))
-        return [node]
-      }) as typeof parent.children
+        visit(node)
+      }
     }
     visit(tree)
   }

@@ -114,7 +114,7 @@ export function ThreadBranchToggle({ thread }: { thread: Thread }): React.JSX.El
           ? "Moving the thread…"
           : undefined
   return (
-    <div className="thread-branch-toggle [padding:10px_clamp(24px,_7vw,_104px)_0]">
+    <div className="thread-branch-toggle [padding:10px_var(--pane-gutter)_0]">
       <div className="flex w-full max-w-[680px] min-w-0 items-center justify-center gap-[10px] [margin:0_auto]">
         <ToggleGroup
           aria-label="Where the thread works"

@@ -190,7 +190,6 @@ export const setProviderSession = (
       )
       ON CONFLICT(thread_id, harness) DO UPDATE SET native_thread_id = excluded.native_thread_id
     `
-    return yield* getSnapshot
   })
 
 const LocationRow = Schema.Struct({
@@ -298,5 +297,4 @@ export const setWorktreeSetup = (threadId: string, setup: WorktreeSetup | null) 
     const sql = yield* SqlClient.SqlClient
     yield* sql`UPDATE threads SET worktree_setup = ${setup}
       WHERE id = ${threadId} AND worktree_path IS NOT NULL`
-    return yield* getSnapshot
   })

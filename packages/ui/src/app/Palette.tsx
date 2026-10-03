@@ -98,7 +98,7 @@ export function PaletteSearch<Item>({
       </div>
       {items.length > 0 && (
         <Combobox.List
-          className="flex max-h-[min(360px,_60vh)] flex-col gap-[1px] overflow-y-auto p-[6px] border-t-[1px] border-t-[color:var(--line-subtle)]"
+          className="flex max-h-[min(360px,_calc(var(--viewport-h)_*_0.6))] flex-col gap-[1px] overflow-y-auto p-[6px] border-t-[1px] border-t-[color:var(--line-subtle)]"
           aria-label="Results"
         >
           {(item: Item) => {
@@ -152,7 +152,7 @@ export function PaletteRow({
 // The top edge stays put while results change: it sits where a full list (45px input plus the
 // list's max height) would be centred, so typing never makes the input jump.
 const popupClasses = [
-  "fixed z-[101] top-[max(52px,_calc(50vh_-_(45px_+_min(360px,_60vh))_/_2))] left-0 right-0 mx-auto w-[min(600px,_calc(100vw_-_32px))] overflow-hidden",
+  "fixed z-[101] top-[max(52px,_calc(var(--viewport-h)_*_0.5_-_(45px_+_min(360px,_var(--viewport-h)_*_0.6))_/_2))] left-0 right-0 mx-auto w-[min(600px,_calc(var(--viewport-w)_-_32px))] overflow-hidden",
   "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-lg)] bg-[var(--surface-menu)]",
   "[backdrop-filter:blur(32px)] [box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
   "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",

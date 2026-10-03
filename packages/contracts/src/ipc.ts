@@ -1,3 +1,32 @@
+import type {
+  WorkspaceScope,
+  WorkspaceFileInput,
+  WorkspaceFileActionInput,
+  SearchWorkspacePathsInput,
+  GitFileActionInput,
+  GitBulkActionInput,
+  GitCommitInput,
+  GenerateCommitMessageInput,
+  GitCommitDiffInput,
+  GitSnapshotInput,
+  GitDiffInput,
+} from "./workspace-inputs"
+export type {
+  WorkspaceScope,
+  WorkspaceFileInput,
+  WorkspaceFileActionInput,
+  SearchWorkspacePathsInput,
+  GitFileActionInput,
+  GitBulkActionInput,
+  GitCommitInput,
+  GenerateCommitMessageInput,
+  GitCommitDiffInput,
+  GitSnapshotInput,
+  GitDiffInput,
+  GitFileAction,
+  GitDiffSide,
+} from "./workspace-inputs"
+
 import type { RemotePreviewInput, RemotePreviewFrame } from "./remote-preview"
 
 import type {
@@ -34,22 +63,6 @@ import type {
 
 export type ComposerAttachment = InputAttachment & { readonly previewUrl?: string }
 
-/**
- * The folder a file or Git request reads. A thread with its own worktree names itself so the host
- * resolves that checkout; every other request reads the workspace folder.
- */
-export interface WorkspaceScope {
-  readonly workspaceId: string
-  readonly threadId?: string | undefined
-}
-export interface WorkspaceFileInput extends WorkspaceScope {
-  readonly path: string
-}
-export interface WorkspaceFileActionInput extends WorkspaceFileInput {
-  readonly action: "create-file" | "create-folder" | "rename" | "delete"
-  /** A single entry name, required for creation and rename. */
-  readonly name?: string | undefined
-}
 export interface HostFolders {
   readonly path: string
   readonly parent: string | null
@@ -207,9 +220,6 @@ interface DesktopApi {
   readonly openExternal: (url: string) => Promise<void>
 }
 
-export type GitFileAction = "stage" | "unstage" | "restore"
-export type GitDiffSide = "staged" | "unstaged"
-
 interface Request<Invoke> {
   readonly channel: string
   readonly invoke?: Invoke
@@ -245,12 +255,7 @@ export const requests = {
     "meldshell:list-directory",
   ),
   searchWorkspacePaths: request<
-    (input: {
-      workspaceId: string
-      threadId?: string
-      query: string
-      limit?: number
-    }) => Promise<readonly WorkspacePathMatch[]>
+    (input: SearchWorkspacePathsInput) => Promise<readonly WorkspacePathMatch[]>
   >("meldshell:search-workspace-paths"),
   listComposerCommands: request<
     (input: WorkspaceScope & { harness: string }) => Promise<readonly ComposerCommand[]>
@@ -264,35 +269,20 @@ export const requests = {
   workspaceFileAction: request<(input: WorkspaceFileActionInput) => Promise<void>>(
     "meldshell:workspace-file-action",
   ),
-  gitFileAction: request<
-    (input: WorkspaceScope & { path: string; action: GitFileAction }) => Promise<void>
-  >("meldshell:git-file-action"),
-  gitBulkAction: request<
-    (input: WorkspaceScope & { action: "stage" | "unstage" }) => Promise<void>
-  >("meldshell:git-bulk-action"),
-  gitCommit:
-    request<(input: WorkspaceScope & { message: string }) => Promise<void>>("meldshell:git-commit"),
+  gitFileAction: request<(input: GitFileActionInput) => Promise<void>>("meldshell:git-file-action"),
+  gitBulkAction: request<(input: GitBulkActionInput) => Promise<void>>("meldshell:git-bulk-action"),
+  gitCommit: request<(input: GitCommitInput) => Promise<void>>("meldshell:git-commit"),
   gitPush: request<(input: WorkspaceScope) => Promise<void>>("meldshell:git-push"),
-  generateCommitMessage: request<
-    (input: { workspaceId: string; threadId?: string }) => Promise<string>
-  >("meldshell:generate-commit-message"),
-  getGitCommitDiff: request<(input: WorkspaceScope & { hash: string }) => Promise<string>>(
+  generateCommitMessage: request<(input: GenerateCommitMessageInput) => Promise<string>>(
+    "meldshell:generate-commit-message",
+  ),
+  getGitCommitDiff: request<(input: GitCommitDiffInput) => Promise<string>>(
     "meldshell:get-git-commit-diff",
   ),
-  getGitSnapshot: request<(input: WorkspaceScope & { limit: number }) => Promise<GitSnapshot>>(
+  getGitSnapshot: request<(input: GitSnapshotInput) => Promise<GitSnapshot>>(
     "meldshell:get-git-snapshot",
   ),
-  getGitDiff:
-    request<
-      (
-        input: WorkspaceScope & {
-          path: string
-          side?: GitDiffSide
-          /** Includes every unchanged line so a viewer can fold and expand context itself. */
-          context?: "full"
-        },
-      ) => Promise<string>
-    >("meldshell:get-git-diff"),
+  getGitDiff: request<(input: GitDiffInput) => Promise<string>>("meldshell:get-git-diff"),
   renameWorkspace: request<(input: { workspaceId: string; name: string }) => Promise<AppSnapshot>>(
     "meldshell:rename-workspace",
   ),
@@ -392,6 +382,8 @@ export const requests = {
   ),
   submitTurn:
     request<(input: SubmitTurnInput) => Promise<SubmitTurnResult>>("meldshell:submit-turn"),
+  removeQueuedInput: request<(id: number) => Promise<AppSnapshot>>("meldshell:remove-queued-input"),
+  steerQueuedInput: request<(id: number) => Promise<AppSnapshot>>("meldshell:steer-queued-input"),
   interruptTurn: request<(threadId: string) => Promise<boolean>>("meldshell:interrupt-turn"),
   resolveApproval: request<(input: ResolveApprovalInput) => Promise<boolean>>(
     "meldshell:resolve-approval",

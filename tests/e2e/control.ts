@@ -1,40 +1,19 @@
-import { execFileSync } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { resolve } from "node:path"
 import { test as base } from "e2e"
 import { defineEngine } from "e2e/engine"
-import { unstable_startWorker } from "wrangler"
+import { createTestHarness, type TestHarness } from "wrangler"
 
 const origin = "http://localhost:4321"
 // The first request boots local auth, D1, and Durable Objects; Windows CI can exceed 10 seconds.
 const REQUEST_TIMEOUT_MS = 30_000
 
 export class Control {
-  private worker: Awaited<ReturnType<typeof unstable_startWorker>> | undefined
-  private directory = ""
+  private harness: TestHarness | undefined
   private url = ""
   readonly token = randomUUID()
 
   async start() {
-    this.directory = await mkdtemp(join(tmpdir(), "meldshell-control-e2e-"))
-    const cli = resolve("node_modules/wrangler/bin/wrangler.js")
-    const run = (...args: string[]) =>
-      execFileSync(
-        process.execPath,
-        [cli, "d1", ...args, "--local", "--persist-to", this.directory],
-        { cwd: resolve("apps/control"), stdio: "pipe" },
-      )
-    run("migrations", "apply", "meldshell")
-    const seed = join(this.directory, "seed.sql")
-    const now = new Date().toISOString()
-    const expires = new Date(Date.now() + 86_400_000).toISOString()
-    await writeFile(
-      seed,
-      `INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt) VALUES ('e2e-user','E2E','e2e@example.invalid',1,'${now}','${now}');\nINSERT INTO "session" (id,expiresAt,token,createdAt,updatedAt,userId) VALUES ('e2e-session','${expires}','${this.token}','${now}','${now}','e2e-user');`,
-    )
-    run("execute", "meldshell", "--file", seed)
     const vars = {
       BETTER_AUTH_URL: origin,
       BETTER_AUTH_SECRET: "offline-e2e-secret-".repeat(4),
@@ -43,14 +22,29 @@ export class Control {
       DISCORD_CLIENT_ID: "offline-discord-client",
       DISCORD_CLIENT_SECRET: "offline-discord-secret",
     }
-    this.worker = await unstable_startWorker({
-      config: resolve("apps/control/wrangler.jsonc"),
-      bindings: Object.fromEntries(
-        Object.entries(vars).map(([name, value]) => [name, { type: "plain_text" as const, value }]),
-      ),
-      dev: { persist: this.directory, server: { port: 0 }, inspector: false, logLevel: "none" },
+    const harness = createTestHarness({
+      workers: [{ configPath: resolve("apps/control/wrangler.jsonc"), vars, secrets: vars }],
     })
-    this.url = (await this.worker.url).origin
+    this.harness = harness
+    try {
+      this.url = (await harness.listen()).url.origin
+      const worker = harness.getWorker()
+      await worker.applyD1Migrations("DB")
+      const { DB } = await worker.getEnv()
+      const now = new Date().toISOString()
+      const expires = new Date(Date.now() + 86_400_000).toISOString()
+      await DB.batch([
+        DB.prepare(
+          'INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt) VALUES (?,?,?,?,?,?)',
+        ).bind("e2e-user", "E2E", "e2e@example.invalid", 1, now, now),
+        DB.prepare(
+          'INSERT INTO "session" (id,expiresAt,token,createdAt,updatedAt,userId) VALUES (?,?,?,?,?,?)',
+        ).bind("e2e-session", expires, this.token, now, now, "e2e-user"),
+      ])
+    } catch (error) {
+      await this.stop()
+      throw error
+    }
   }
 
   async request(
@@ -71,11 +65,10 @@ export class Control {
   }
 
   async stop() {
-    try {
-      await this.worker?.dispose()
-    } finally {
-      await rm(this.directory, { recursive: true, force: true })
-    }
+    const harness = this.harness
+    this.harness = undefined
+    this.url = ""
+    await harness?.close()
   }
 }
 

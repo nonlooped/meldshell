@@ -10,7 +10,6 @@ import {
 } from "@meldshell/contracts"
 import { Effect } from "effect"
 import { enabledModel } from "./catalog"
-import { getSnapshot } from "./snapshots"
 import { readAppSettings } from "./settings"
 
 export const DEFAULT_THREAD_TITLE = "New thread"
@@ -121,7 +120,6 @@ export const setThreadTitle = (input: SetThreadTitleInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const title = sanitizeGeneratedTitle(input.title)
-    if (title === null) return yield* getSnapshot
+    if (title === null) return
     yield* sql`UPDATE threads SET title = ${title} WHERE id = ${input.threadId} AND title_manual = 0`
-    return yield* getSnapshot
   })

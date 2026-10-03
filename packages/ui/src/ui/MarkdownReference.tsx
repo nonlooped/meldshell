@@ -1,3 +1,4 @@
+import { cx, syntaxTokenClasses } from "./styles"
 import { useContext, useState, type ReactNode } from "react"
 import type { Element } from "hast"
 import { useQuery } from "@tanstack/react-query"
@@ -8,34 +9,10 @@ import { useTabStore } from "../app/tab-store"
 import { scopeKey } from "../data/workspace-scope"
 import { FileIcon } from "./FileIcon"
 import { SourceCode } from "./SourceCode"
-import {
-  fileReference,
-  highlightText,
-  nodeText,
-  webLinkLabel,
-  type FileReference,
-} from "./markdown-model"
-import { MarkdownSearch } from "./MarkdownBlocks"
+import { fileReference, nodeText, webLinkLabel, type FileReference } from "./markdown-model"
 import { MarkdownWorkspace, MarkdownSources } from "./MarkdownContexts"
 
 export { MarkdownWorkspace, MarkdownSources } from "./MarkdownContexts"
-
-function SearchText({ text }: { text: string }) {
-  const query = useContext(MarkdownSearch)
-  return (
-    <>
-      {highlightText(text, query).map((node, index) =>
-        node.type === "text" ? (
-          node.value
-        ) : (
-          <mark key={index} data-match>
-            {nodeText(node)}
-          </mark>
-        ),
-      )}
-    </>
-  )
-}
 
 function ReferenceExcerpt({
   reference,
@@ -80,11 +57,7 @@ export function ReferenceChip({ reference, label }: { reference: FileReference; 
   const content = (
     <>
       {reference.skill ? <BookOpen size={13} /> : <FileIcon path={reference.path} size={13} />}
-      <span>
-        <SearchText
-          text={reference.skill ? label || reference.path.split("/").at(-2) || "Skill" : name}
-        />
-      </span>
+      <span>{reference.skill ? label || reference.path.split("/").at(-2) || "Skill" : name}</span>
       {reference.line && (
         <span className="text-[var(--text-secondary)]">
           · L{reference.line}
@@ -243,7 +216,7 @@ function WebPageLink({
           rel="noreferrer"
         >
           <Globe size={12} aria-hidden="true" />
-          <SearchText text={title} />
+          {title}
         </a>
       }
     >
@@ -267,14 +240,11 @@ const referenceChipClasses = [
   "[&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]",
 ].join(" ")
 
-const referencePreviewClasses = [
-  "[&_.token.comment]:text-[var(--text-tertiary)] [&_.token.prolog]:text-[var(--text-tertiary)]",
-  "[&_.token.doctype]:text-[var(--text-tertiary)] [&_.token.keyword]:text-[var(--color-renamed)]",
-  "[&_.token.tag]:text-[var(--color-renamed)] [&_.token.boolean]:text-[var(--color-renamed)]",
-  "[&_.token.string]:text-[var(--color-added)] [&_.token.attr-value]:text-[var(--color-added)]",
-  "[&_.token.number]:text-[var(--color-modified)] [&_.token.function]:text-[var(--color-modified)]",
-  "[&_.token.class-name]:text-[var(--color-modified)] [&_.token.property]:text-[var(--color-info)]",
-  "[&_.token.attr-name]:text-[var(--color-info)] max-w-[min(620px,_85vw)] whitespace-normal",
-  "[overflow-wrap:anywhere] [&_>_span]:block [&_>_span]:mb-[6px] [&_pre]:m-0 [&_pre]:max-h-[240px]",
-  "[&_pre]:overflow-auto [&_pre]:[font:12px_var(--font-mono)] [&_pre]:whitespace-pre [&_pre]:text-left",
-].join(" ")
+const referencePreviewClasses = cx(
+  syntaxTokenClasses,
+  [
+    "max-w-[min(620px,_calc(var(--viewport-w)_*_0.85))] whitespace-normal",
+    "[overflow-wrap:anywhere] [&_>_span]:block [&_>_span]:mb-[6px] [&_pre]:m-0 [&_pre]:max-h-[240px]",
+    "[&_pre]:overflow-auto [&_pre]:[font:12px_var(--font-mono)] [&_pre]:whitespace-pre [&_pre]:text-left",
+  ].join(" "),
+)

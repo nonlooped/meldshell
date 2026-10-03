@@ -4,7 +4,7 @@ import "@meldshell/ui/styles.css"
 
 <!doctype html>
 <html lang="en" data-platform="web">
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex" /><title>MeldShell</title><link rel="icon" href="/favicon.svg" /></head>
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" /><meta name="robots" content="noindex" /><title>MeldShell</title><link rel="icon" href="/favicon.svg" /></head>
   <body>
     <nav id="remote-bar" aria-label="Remote connection">
       <a href="/dashboard" class="remote-back" aria-label="Back to your devices">
@@ -88,7 +88,7 @@ import "@meldshell/ui/styles.css"
     </script>
     <style is:global>
       html[data-platform=web] { --remote-bar: 36px; }
-      #remote-bar { height: var(--remote-bar); display: flex; align-items: center; gap: 10px; padding: 0 10px 0 6px; font-size: 12px; border-bottom: 1px solid var(--line); background: var(--surface-overlay); color: var(--text-secondary); min-width: 0; }
+      #remote-bar { height: var(--remote-bar); display: flex; align-items: center; gap: 10px; padding: 0 max(10px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left)); font-size: 12px; border-bottom: 1px solid var(--line); background: var(--surface-overlay); color: var(--text-secondary); min-width: 0; }
       #remote-bar .remote-back { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px 0 4px; border-radius: var(--radius-sm); color: var(--text-primary); flex-shrink: 0; }
       #remote-bar .remote-back:hover { background: var(--surface-hover); }
       #remote-bar .remote-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -125,11 +125,6 @@ import "@meldshell/ui/styles.css"
         html[data-platform=web] { --text-base: 14px; }
         html[data-platform=web] input, html[data-platform=web] textarea { font-size: 16px; }
         html[data-platform=web] [role=dialog] { max-width: calc(100vw - 24px); }
-        html[data-platform=web] [data-settings-layout] { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: auto minmax(0, 1fr); }
-        html[data-platform=web] [data-settings-layout] > aside { padding: 8px; display: flex; gap: 8px; align-items: center; }
-        html[data-platform=web] [data-settings-layout] > aside > div:first-child { display: none; }
-        html[data-platform=web] [data-settings-layout] [role=tablist] { display: flex; overflow-x: auto; flex: 1; }
-        html[data-platform=web] [data-settings-layout] [role=tab] { flex-shrink: 0; }
       }
     </style>
   </body>
