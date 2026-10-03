@@ -7,6 +7,7 @@ export type SettingsSection =
   | "providers"
   | "usage"
   | "threads"
+  | "loadouts"
   | "schedules"
   | "keyboard"
   | "dictation"

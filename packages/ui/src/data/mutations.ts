@@ -107,11 +107,14 @@ export function useThreadManagementActions(
   }
 }
 
-export function useConversationActions() {
-  const client = useQueryClient()
-  const threadSettingsMutation = useSnapshotMutation((input: Input<"setThreadSettings">) =>
+export const useThreadSettingsMutation = () =>
+  useSnapshotMutation((input: Input<"setThreadSettings">) =>
     window.meldshell.setThreadSettings(input),
   )
+
+export function useConversationActions() {
+  const client = useQueryClient()
+  const threadSettingsMutation = useThreadSettingsMutation()
   const submitTurnMutation = useMutation({
     mutationFn: (input: Input<"submitTurn">) => window.meldshell.submitTurn(input),
     onSuccess: (result, input) => {

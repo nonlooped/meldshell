@@ -18,6 +18,7 @@ import {
   Gauge,
   Info,
   Keyboard,
+  Layers,
   MessagesSquare,
   Mic,
   Monitor,
@@ -44,6 +45,7 @@ import { KeyboardSettings } from "./KeyboardSettings"
 import { ScheduleSettings } from "./ScheduleSettings"
 import { Preferences } from "./Preferences"
 import { DictationSettings } from "./DictationSettings"
+import { LoadoutSettings } from "./LoadoutSettings"
 
 interface SettingsViewProps {
   readonly settingsPending: boolean
@@ -108,6 +110,13 @@ const SECTIONS: ReadonlyArray<{
     icon: <MessagesSquare size={16} strokeWidth={1.75} />,
     title: "Threads",
     caption: "Control how MeldShell names new conversations.",
+  },
+  {
+    id: "loadouts",
+    label: "Loadouts",
+    icon: <Layers size={16} strokeWidth={1.75} />,
+    title: "Loadouts",
+    caption: "Switch agent, model, effort, and permissions together with one shortcut.",
   },
   {
     id: "schedules",
@@ -195,6 +204,36 @@ function SettingsSidebar({
   )
 }
 
+/** The sections that only read the snapshot and save app settings. */
+function SettingsPage({
+  section,
+  snapshot,
+  pending,
+  onChange,
+}: {
+  readonly section: SettingsSection
+  readonly snapshot: AppSnapshot
+  readonly pending: boolean
+  readonly onChange: (input: SetAppSettingsInput) => void
+}): React.JSX.Element | null {
+  switch (section) {
+    case "account":
+      return <RemoteAccess />
+    case "schedules":
+      return <ScheduleSettings snapshot={snapshot} />
+    case "dictation":
+      return (
+        <DictationSettings settings={snapshot.settings} pending={pending} onChange={onChange} />
+      )
+    case "loadouts":
+      return <LoadoutSettings snapshot={snapshot} pending={pending} onChange={onChange} />
+    case "keyboard":
+      return <KeyboardSettings pending={pending} onChange={onChange} />
+    default:
+      return null
+  }
+}
+
 export function SettingsView({
   snapshot,
   settingsPending,
@@ -265,18 +304,12 @@ export function SettingsView({
                 pending={settingsPending}
               />
             )}
-            {section === "account" && <RemoteAccess />}
-            {section === "schedules" && <ScheduleSettings snapshot={snapshot} />}
-            {section === "dictation" && (
-              <DictationSettings
-                settings={snapshot.settings}
-                pending={settingsPending}
-                onChange={onChangeAppSettings}
-              />
-            )}
-            {section === "keyboard" && (
-              <KeyboardSettings pending={settingsPending} onChange={onChangeAppSettings} />
-            )}
+            <SettingsPage
+              section={section}
+              snapshot={snapshot}
+              pending={settingsPending}
+              onChange={onChangeAppSettings}
+            />
             {section === "usage" && <SubscriptionUsage providers={usageProviders} />}
             {section === "threads" && (
               <ThreadTitleCard
