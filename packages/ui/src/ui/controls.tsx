@@ -452,6 +452,8 @@ interface MenuChoiceProps {
   readonly value: string
   readonly children: ReactNode
   readonly detail?: ReactNode
+  /** One short line under the label that says what choosing it does. */
+  readonly hint?: string
   readonly disabled?: boolean
   readonly className?: string
 }
@@ -467,12 +469,18 @@ export function MenuChoice({
   value,
   children,
   detail,
+  hint,
   disabled = false,
   className,
 }: MenuChoiceProps): React.JSX.Element {
   return (
     <Menu.RadioItem
-      className={cx("motion-colors", menuItemClasses, className)}
+      className={cx(
+        "motion-colors",
+        menuItemClasses,
+        hint !== undefined && "h-auto! min-h-[30px] [padding:5px_9px]!",
+        className,
+      )}
       value={value}
       disabled={disabled}
       closeOnClick
@@ -482,7 +490,16 @@ export function MenuChoice({
           <Check size={13} strokeWidth={2.5} />
         </Menu.RadioItemIndicator>
       </span>
-      {children}
+      {hint === undefined ? (
+        children
+      ) : (
+        <span className="flex min-w-0 flex-1 flex-col gap-[1px]">
+          <span className="flex items-center gap-[9px]">{children}</span>
+          <span className="max-w-[240px] text-[var(--text-tertiary)] text-[11px] leading-[1.35]">
+            {hint}
+          </span>
+        </span>
+      )}
       {detail !== undefined && (
         <span className="ml-[auto] pl-[16px] text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.5px]">
           {detail}

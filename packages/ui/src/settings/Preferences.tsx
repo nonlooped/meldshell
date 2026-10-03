@@ -1,10 +1,129 @@
 import type { AppSettings, SetAppSettingsInput } from "@meldshell/contracts"
 import { useEffect, useState } from "react"
 import { Slider } from "@base-ui-components/react/slider"
-import { Button, SelectField, Switch } from "../ui/controls"
+import { Radio } from "@base-ui-components/react/radio"
+import { RadioGroup } from "@base-ui-components/react/radio-group"
+import { Toggle } from "@base-ui-components/react/toggle"
+import { ToggleGroup } from "@base-ui-components/react/toggle-group"
+import { CornerDownRight, ListPlus } from "lucide-react"
+import type { ReactNode } from "react"
+import { Button, Switch } from "../ui/controls"
+import { cx, segmentClasses, segmentGroupClasses } from "../ui/styles"
+import { TEXT_SIZES, THEMES, ThemePreview } from "../ui/ThemePreview"
 import { useViewStore } from "../app/view-store"
 import { Environment } from "./Environment"
 import { SettingRow } from "./SettingRow"
+
+type FollowUpMode = NonNullable<AppSettings["followUpMode"]>
+type TextSize = NonNullable<AppSettings["transcriptSize"]>
+
+interface SegmentOption<Value extends string> {
+  readonly value: Value
+  readonly label: string
+  readonly content: ReactNode
+}
+
+/** Only the chosen behavior is explained, so the row stays short until it matters. */
+const FOLLOW_UPS: Readonly<
+  Record<FollowUpMode, { readonly label: string; readonly detail: string }>
+> = {
+  queue: {
+    label: "Queue",
+    detail: "A message sent mid-turn waits, then starts its own turn when the agent finishes.",
+  },
+  steer: {
+    label: "Steer",
+    detail:
+      "A message sent mid-turn redirects the agent now: Codex takes it into the same turn, Claude Code and Cursor stop and continue.",
+  },
+}
+
+const FOLLOW_UP_OPTIONS: ReadonlyArray<SegmentOption<FollowUpMode>> = [
+  {
+    value: "queue",
+    label: FOLLOW_UPS.queue.label,
+    content: (
+      <>
+        <ListPlus size={13} strokeWidth={1.75} aria-hidden="true" />
+        {FOLLOW_UPS.queue.label}
+      </>
+    ),
+  },
+  {
+    value: "steer",
+    label: FOLLOW_UPS.steer.label,
+    content: (
+      <>
+        <CornerDownRight size={13} strokeWidth={1.75} aria-hidden="true" />
+        {FOLLOW_UPS.steer.label}
+      </>
+    ),
+  },
+]
+
+/** Each size previews itself, so the choice reads at a glance. */
+const TEXT_SIZE_OPTIONS: ReadonlyArray<SegmentOption<TextSize>> = TEXT_SIZES.map((option) => ({
+  value: option.value,
+  label: `${option.label} text`,
+  content: (
+    <span
+      aria-hidden="true"
+      className="[font-family:var(--font-display)] font-semibold leading-none"
+      style={{ fontSize: Math.round(option.size * 0.72) }}
+    >
+      Aa
+    </span>
+  ),
+}))
+
+/** A short row of exclusive choices that are all visible at once, unlike a select. */
+function Segments<Value extends string>({
+  label,
+  value,
+  options,
+  disabled,
+  onValueChange,
+}: {
+  readonly label: string
+  readonly value: Value
+  readonly options: ReadonlyArray<SegmentOption<Value>>
+  readonly disabled: boolean
+  readonly onValueChange: (value: Value) => void
+}): React.JSX.Element {
+  return (
+    <ToggleGroup
+      aria-label={label}
+      value={[value]}
+      disabled={disabled}
+      onValueChange={(next) => {
+        const chosen = options.find((option) => option.value === next[0])
+        if (chosen !== undefined) onValueChange(chosen.value)
+      }}
+      className={cx(segmentGroupClasses, "w-full")}
+    >
+      {options.map((option) => (
+        <Toggle
+          key={option.value}
+          value={option.value}
+          aria-label={option.label}
+          className={cx(segmentClasses, "flex-1 h-[28px]!")}
+        >
+          {option.content}
+        </Toggle>
+      ))}
+    </ToggleGroup>
+  )
+}
+
+const themeTileClasses = [
+  "motion-colors relative grid gap-[8px] p-[6px] pb-[8px] border-[1px] border-[color:var(--line)]",
+  "rounded-[var(--radius-lg)] bg-transparent text-[var(--text-secondary)] cursor-default",
+  "[&:hover]:[border-color:var(--line-strong)] [&:hover]:text-[var(--text-primary)]",
+  "[&[data-checked]]:[border-color:var(--accent)] [&[data-checked]]:text-[var(--text-primary)]",
+  "[&[data-checked]]:[box-shadow:0_0_0_3px_color-mix(in_srgb,var(--accent)_18%,transparent)]",
+  "[&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]",
+  "[&[data-disabled]]:opacity-[0.6]",
+].join(" ")
 
 function OpacitySlider({
   value,
@@ -72,6 +191,7 @@ export function Preferences({
   readonly pending: boolean
 }): React.JSX.Element {
   const forceOpaque = window.meldshell.platform === "linux"
+  const followUpMode = settings.followUpMode ?? "queue"
   const opacity =
     settings.opacity ??
     (settings.theme === "light" ||
@@ -99,19 +219,14 @@ export function Preferences({
           </SettingRow>
           <SettingRow
             label="Follow-ups while the agent works"
-            description="What Enter does with a message sent mid-turn. Queue waits for the turn to finish; Steer redirects it now (Codex takes it into the same turn, Claude Code and Cursor stop and continue). Ctrl or Cmd with Enter does the other."
-            controlId="follow-up-mode"
+            description={`${FOLLOW_UPS[followUpMode].detail} Ctrl or Cmd with Enter does the other.`}
           >
-            <SelectField<NonNullable<AppSettings["followUpMode"]>>
-              id="follow-up-mode"
+            <Segments<FollowUpMode>
               label="Follow-ups while the agent works"
-              value={settings.followUpMode ?? "queue"}
+              value={followUpMode}
               disabled={pending}
-              options={[
-                { value: "queue", label: "Queue" },
-                { value: "steer", label: "Steer" },
-              ]}
-              onValueChange={(followUpMode) => onChange({ followUpMode })}
+              options={FOLLOW_UP_OPTIONS}
+              onValueChange={(next) => onChange({ followUpMode: next })}
             />
           </SettingRow>
           <SettingRow
@@ -136,23 +251,29 @@ export function Preferences({
         </>
       ) : (
         <>
-          <SettingRow
-            label="Theme"
-            description="Choose a light or dark appearance, or follow Windows."
-            controlId="theme"
-          >
-            <SelectField<NonNullable<AppSettings["theme"]>>
-              id="theme"
-              label="Theme"
+          <SettingRow label="Theme" description="Choose a look, or follow your system." stacked>
+            <RadioGroup
+              aria-label="Theme"
               value={settings.theme ?? "dark"}
               disabled={pending}
-              options={[
-                { value: "dark", label: "Dark" },
-                { value: "light", label: "Light" },
-                { value: "system", label: "System" },
-              ]}
-              onValueChange={(theme) => onChange({ theme })}
-            />
+              onValueChange={(value) => {
+                const theme = THEMES.find((option) => option.value === value)?.value
+                if (theme !== undefined) onChange({ theme })
+              }}
+              className="grid grid-cols-3 gap-[10px]"
+            >
+              {THEMES.map((option) => (
+                <Radio.Root key={option.value} value={option.value} className={themeTileClasses}>
+                  <span className="block h-[64px] overflow-hidden rounded-[6px] border-[1px] border-[color:var(--line-subtle)]">
+                    <ThemePreview theme={option.value} />
+                  </span>
+                  <span className="flex items-center justify-center gap-[6px] text-[12px] font-medium">
+                    {option.icon}
+                    {option.label}
+                  </span>
+                </Radio.Root>
+              ))}
+            </RadioGroup>
           </SettingRow>
           <SettingRow
             label="App opacity"
@@ -172,18 +293,12 @@ export function Preferences({
           <SettingRow
             label="Transcript text size"
             description="Adjust message and reply text for comfortable reading."
-            controlId="transcript-size"
           >
-            <SelectField<NonNullable<AppSettings["transcriptSize"]>>
-              id="transcript-size"
+            <Segments<TextSize>
               label="Transcript text size"
               value={settings.transcriptSize ?? "medium"}
               disabled={pending}
-              options={[
-                { value: "small", label: "Small" },
-                { value: "medium", label: "Medium" },
-                { value: "large", label: "Large" },
-              ]}
+              options={TEXT_SIZE_OPTIONS}
               onValueChange={(transcriptSize) => onChange({ transcriptSize })}
             />
           </SettingRow>
