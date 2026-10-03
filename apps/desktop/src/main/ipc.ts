@@ -14,6 +14,7 @@ import { registerTerminalIpc } from "./terminals"
 import { registerEditorIpc } from "./editors"
 import { registerRemoteAdministration } from "./remote-administration"
 import { registerPreviewIpc } from "./preview"
+import { registerAgentBrowserIpc } from "./agent-browser"
 
 // The site serves the account API; development uses the site dev server, which proxies it.
 const controlURL =
@@ -134,4 +135,5 @@ export const registerIpc = (): void => {
   registerTerminalIpc()
   registerEditorIpc()
   registerPreviewIpc()
+  registerAgentBrowserIpc()
 }
