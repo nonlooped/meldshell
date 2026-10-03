@@ -17,6 +17,7 @@ import { ProviderIcon } from "../ui/ProviderIcon"
 import { Button } from "../ui/controls"
 import { Notice } from "../ui/Notice"
 import {
+  budgetLabel,
   monthlyWindowMins,
   mostConstrained,
   paceSummary,
@@ -194,6 +195,7 @@ function UsageRow({
   const left = leftLabel(reading.used)
   const reset = resetLabel(row.resetsAt, now)
   const flagged = reading.pace !== "ok"
+  const budget = budgetLabel(reading, row.resetsAt, now)
   return (
     <Meter.Root
       className={usageRowClasses}
@@ -243,11 +245,16 @@ function UsageRow({
         {flagged && <TriangleAlert size={12} strokeWidth={2} aria-hidden="true" />}
         {left}%<span className={flagged ? "" : "text-[var(--text-tertiary)]"}>left</span>
       </span>
-      <span
-        className="text-right text-[var(--text-secondary)] text-[12px] tabular-nums whitespace-nowrap [@container(max-width:_540px)]:text-left [@container(max-width:_540px)]:col-span-2 [@container(max-width:_540px)]:row-start-3"
-        title={resetTitle(row.resetsAt)}
-      >
-        {reset}
+      <span className="flex flex-col text-right text-[var(--text-secondary)] text-[12px] tabular-nums whitespace-nowrap [@container(max-width:_540px)]:text-left [@container(max-width:_540px)]:col-span-2 [@container(max-width:_540px)]:row-start-3">
+        <span title={resetTitle(row.resetsAt)}>{reset}</span>
+        {budget && (
+          <span
+            className="text-[var(--text-tertiary)] text-[11.5px] leading-[1.4]"
+            title="Average share of the allowance you can spend per unit of time and still reach the reset"
+          >
+            {budget}
+          </span>
+        )}
       </span>
     </Meter.Root>
   )
@@ -272,7 +279,7 @@ interface UsageGroupData {
 }
 
 function usageGroups(limits: CodexUsage["limits"], now: number): ReadonlyArray<UsageGroupData> {
-  return limits.map(({ id, limit }) => {
+  return limits.map(({ id, limit }, index) => {
     const name = groupName(id, limit)
     // A lone group is the provider's whole allowance, so its name (often just "Plan limits") adds nothing.
     const showHeading = limits.length > 1
@@ -309,7 +316,8 @@ function usageGroups(limits: CodexUsage["limits"], now: number): ReadonlyArray<U
       })
     return {
       id,
-      heading: showHeading && !single ? name : null,
+      // The first group is the plan's own allowance, so its name says nothing the card's header does not.
+      heading: showHeading && !single && index > 0 ? name : null,
       notice: limit.spendControlReached || limit.rateLimitReachedType ? limitNotice(limit) : null,
       rows,
     }
