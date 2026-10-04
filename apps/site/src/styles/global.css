@@ -221,6 +221,8 @@ html.js [data-reveal][data-in] {
   --surface-selected: rgba(255, 255, 255, 0.0558);
   --surface-menu: rgba(35, 35, 35, 0.96);
   --surface-composer: rgba(255, 255, 255, 0.015);
+  --surface-raised: rgba(31, 31, 33, 0.774);
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.28), 0 12px 36px rgba(0, 0, 0, 0.24);
   --line-subtle: rgba(255, 255, 255, 0.055);
   --line: rgba(255, 255, 255, 0.09);
   --line-strong: rgba(255, 255, 255, 0.17);
@@ -539,6 +541,9 @@ html.js [data-reveal][data-in] {
   border-radius: 999px;
   background: var(--color-modified);
 }
+.ui-thread[data-attention="done"]::before {
+  background: var(--color-info);
+}
 .ui-thread-title {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -625,15 +630,19 @@ html.js [data-reveal][data-in] {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 10px;
   width: 100%;
   max-width: 720px;
   margin: 0 auto;
-  padding: 30px 28px 16px;
+  padding: 36px 30px 16px;
   overflow: hidden;
   font-size: 14px;
   line-height: 1.65;
   color: var(--text-primary);
+  mask-image: linear-gradient(to bottom, transparent, black 28px, black calc(100% - 28px), transparent);
+}
+.ui-transcript > * {
+  flex-shrink: 0;
 }
 .ui-transcript p {
   margin: 0;
@@ -647,6 +656,7 @@ html.js [data-reveal][data-in] {
   border-radius: var(--r-lg);
   background: var(--surface-hover);
 }
+/* A turn's working log: one summary line, open while the turn runs and folded once it ends. */
 .ui-work {
   display: flex;
   align-items: center;
@@ -654,19 +664,57 @@ html.js [data-reveal][data-in] {
   min-height: 28px;
   padding: 3px 6px 3px 2px;
   border-radius: var(--r-sm);
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   font-size: 11px;
   font-weight: 500;
   line-height: 1.4;
+  white-space: nowrap;
 }
-.ui-work .chev {
-  color: var(--text-tertiary);
+.ui-work[data-open] .chev {
+  transform: rotate(90deg);
 }
 .ui-work .duration {
   font-weight: 400;
-  color: var(--text-tertiary);
   opacity: 0.8;
   font-variant-numeric: tabular-nums;
+}
+.ui-log {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 3px 0 1px 7px;
+  padding: 3px 0 3px 12px;
+  border-left: 1px solid var(--line-subtle);
+  color: var(--text-tertiary);
+}
+.ui-log-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 7px;
+  font: 10.75px/1.4 var(--font-mono);
+  white-space: nowrap;
+}
+.ui-log-row .title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ui-log-row .target {
+  color: var(--text-secondary);
+}
+.ui-log-row .status {
+  flex: none;
+  font: 11px var(--font-sans);
+}
+.ui-log-note {
+  padding: 6px 8px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.55;
 }
 .ui-shimmer {
   background-image: linear-gradient(
@@ -681,45 +729,144 @@ html.js [data-reveal][data-in] {
   color: transparent;
   animation: var(--animate-shimmer);
 }
+/* A request from the agent, raised above the composer with an accent edge. */
 .ui-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--line-subtle);
+  display: grid;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto 8px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
   border-radius: var(--r-lg);
-  background: var(--surface-hover);
-  font-size: 13px;
-  line-height: 1.5;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
 }
 .ui-card-head {
   display: flex;
   align-items: center;
+  gap: 8px;
+  padding: 10px 14px 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.ui-card-head svg {
+  color: var(--accent);
+}
+.ui-card-body {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+  padding: 8px 14px 12px;
+}
+.ui-card-kicker {
+  display: block;
+  margin-bottom: 4px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ui-card-question {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13.5px;
   font-weight: 500;
+  line-height: 1.45;
+}
+.ui-card-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line-subtle);
+  background: var(--surface-hover);
 }
 .ui-option {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
   width: 100%;
   padding: 9px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-subtle);
   border-radius: var(--r);
-  background: rgba(255, 255, 255, 0.027);
   color: var(--text-primary);
   font-size: 12.5px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 .ui-option[data-selected] {
   border-color: var(--line-strong);
-  background: var(--surface-active);
+  background: var(--surface-selected);
 }
-.ui-option small {
+.ui-radio {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface-hover);
+}
+[data-selected] > .ui-radio {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+[data-selected] > .ui-radio::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-foreground);
+}
+
+/* Follow-ups waiting for the running turn, listed above the composer. */
+.ui-queue {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto 6px;
+  padding-bottom: 4px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-lg);
+  background: var(--surface-hover);
+}
+.ui-queue-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 6px 0 10px;
   color: var(--text-tertiary);
-  font-size: 11.5px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.ui-queue-head span,
+.ui-queue-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ui-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 4px;
+  padding: 3px 4px 3px 6px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.ui-queue-row span {
+  flex: 1;
+}
+.ui-queue-row i {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--text-tertiary);
 }
 .ui-button {
   display: inline-flex;
@@ -764,7 +911,6 @@ html.js [data-reveal][data-in] {
 .ui-code-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 6px;
   padding: 5px 10px;
   border-bottom: 1px solid var(--line);
@@ -772,9 +918,8 @@ html.js [data-reveal][data-in] {
   font: 12px var(--font-mono);
   color: var(--text-secondary);
 }
-.ui-code-head .copy {
-  font: 500 11px var(--font-sans);
-  color: var(--text-secondary);
+.ui-code-head span {
+  flex: 1;
 }
 .ui-code-body {
   display: grid;
@@ -809,9 +954,85 @@ html.js [data-reveal][data-in] {
   color: var(--text-tertiary);
 }
 
+/* The files a finished turn changed, under its reply. */
+.ui-changes {
+  padding-top: 10px;
+  border-top: 1px solid var(--line-subtle);
+}
+.ui-changes-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 0.9em;
+}
+.ui-changes-head strong {
+  font-weight: 500;
+}
+.ui-changes-head .restore {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  color: var(--text-tertiary);
+}
+.ui-change {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.ui-change > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-change > svg:first-child {
+  color: var(--text-tertiary);
+}
+.ui-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.ui-counts .add {
+  color: var(--color-added);
+}
+.ui-counts .del {
+  color: var(--color-deleted);
+}
+/* Five blocks showing the balance of added and removed lines. */
+.ui-diffbar {
+  display: inline-flex;
+  gap: 1px;
+}
+.ui-diffbar i {
+  width: 6px;
+  height: 6px;
+  border-radius: 1.5px;
+  background: var(--line-strong);
+}
+.ui-diffbar i[data-add] {
+  background: var(--color-added);
+}
+.ui-diffbar i[data-del] {
+  background: var(--color-deleted);
+}
+
 /* Composer */
 .ui-composer {
   position: relative;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -822,7 +1043,7 @@ html.js [data-reveal][data-in] {
   background: var(--surface-composer);
 }
 .ui-composer-zone {
-  padding: 0 24px 18px;
+  padding: 0 30px 18px;
 }
 .ui-textarea {
   min-height: 72px;
@@ -836,10 +1057,44 @@ html.js [data-reveal][data-in] {
 }
 .ui-bar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   padding: 2px 8px 8px;
+}
+.ui-bar .ui-chip {
+  min-width: 0;
+  flex-shrink: 1;
+}
+.ui-bar .ui-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ui-bar .actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+/* As the composer narrows its chips drop their chevrons, then keep only their icons. */
+@container (max-width: 620px) {
+  .ui-bar {
+    gap: 4px;
+  }
+  .ui-bar .ui-chip {
+    padding: 0 6px;
+  }
+}
+@container (max-width: 520px) {
+  .ui-chip .chev {
+    display: none;
+  }
+}
+@container (max-width: 440px) {
+  .ui-chip .label {
+    display: none;
+  }
 }
 .ui-bar .spacer {
   flex: 1 1 auto;
@@ -871,14 +1126,6 @@ html.js [data-reveal][data-in] {
   font-size: 10.5px;
   line-height: 1.3;
 }
-.ui-queued {
-  display: inline-flex;
-  gap: 3px;
-  color: var(--text-tertiary);
-  font-size: 10.5px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 .ui-interrupt {
   display: grid;
   place-items: center;
@@ -901,20 +1148,30 @@ html.js [data-reveal][data-in] {
   background: var(--surface-active);
   color: var(--text-tertiary);
 }
-/* Reasoning level glyph: three bars, filled to the effort. */
+/* While a turn runs, a chevron beside send chooses between queueing and steering. */
+.ui-delivery {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 28px;
+  margin-left: -6px;
+  color: var(--text-tertiary);
+}
+/* Reasoning level glyph: four bars, filled to the effort. */
 .ui-level {
   display: inline-flex;
   align-items: flex-end;
-  gap: 2px;
+  justify-content: center;
+  gap: 1px;
   width: 14px;
   height: 14px;
-  padding-bottom: 2px;
+  color: var(--text-tertiary);
 }
 .ui-level i {
-  flex: 1;
+  width: 2px;
   border-radius: 1px;
   background: currentColor;
-  opacity: 0.35;
+  opacity: 0.22;
 }
 .ui-level i:nth-child(1) {
   height: 4px;
@@ -925,70 +1182,116 @@ html.js [data-reveal][data-in] {
 .ui-level i:nth-child(3) {
   height: 10px;
 }
-.ui-level[data-fill="3"] i {
-  opacity: 1;
+.ui-level i:nth-child(4) {
+  height: 13px;
+}
+.ui-level[data-fill="3"] i:nth-child(-n + 3) {
+  opacity: 0.9;
 }
 
 /* Menus */
 .ui-menu {
   display: flex;
   flex-direction: column;
-  padding: 5px;
+  border: 1px solid var(--line-subtle);
   border-radius: var(--r-lg);
   background: var(--surface-menu);
   box-shadow:
-    0 1px 1px rgba(0, 0, 0, 0.35),
-    0 8px 28px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
+    0 4px 16px rgba(0, 0, 0, 0.16),
+    0 18px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 var(--line-subtle);
+  overflow: hidden;
 }
 .ui-menu-search {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: -5px -5px 4px;
+  gap: 9px;
   padding: 11px 14px;
   border-bottom: 1px solid var(--line-subtle);
   color: var(--text-tertiary);
   font-size: 12.5px;
 }
+.ui-menu-list {
+  padding: 4px 6px 8px;
+}
 .ui-menu-group {
   display: flex;
   align-items: center;
   gap: 7px;
+  margin: 0 -6px;
   padding: 8px 14px 6px;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 11px;
   font-weight: 500;
 }
-.ui-menu-group + .ui-menu-group,
 .ui-menu-item + .ui-menu-group {
   margin-top: 8px;
-  padding-top: 8px;
+  padding-top: 16px;
   border-top: 1px solid var(--line);
 }
 .ui-menu-group .harness {
-  margin-left: 2px;
+  margin-left: auto;
   color: var(--text-tertiary);
+  font-size: 10px;
   font-weight: 400;
 }
 .ui-menu-item {
-  position: relative;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   min-height: 33px;
   padding: 7px 10px 7px 29px;
   border-radius: var(--r-sm);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-size: 12.5px;
 }
 .ui-menu-item[data-selected] {
   background: var(--surface-active);
+  color: var(--text-primary);
 }
-.ui-menu-item .check {
-  position: absolute;
-  left: 9px;
-  top: 50%;
-  translate: 0 -50%;
+/* Saved model and effort pairs, under the model list. */
+.ui-loadouts {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 10px 10px;
+  border-top: 1px solid var(--line-subtle);
+}
+.ui-loadouts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+}
+.ui-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.ui-pill[data-active] {
+  border-color: var(--line-strong);
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+.ui-pill kbd {
+  color: var(--text-tertiary);
+  font: 10px var(--font-mono);
 }
 
 /* Keys */

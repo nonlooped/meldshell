@@ -27,6 +27,13 @@ const groups: {
   { agent: "cursor", provider: "Cursor", models: [{ name: "Auto" }] },
 ]
 
+/* Saved model and effort pairs, each switched to with its own shortcut. */
+const loadouts = [
+  { name: "Deep work", chord: "Ctrl+1", active: true },
+  { name: "Quick edits", chord: "Ctrl+2" },
+  { name: "Review", chord: "Ctrl+3" },
+]
+
 const pinned: {
   title: string
   agent: Agent
@@ -87,34 +94,52 @@ const inbox: typeof pinned = [
           <div class="ui composer-frag">
             <div class="ui-menu menu">
               <div class="ui-menu-search"><Lucide name="Search" size={14} /> Search models…</div>
-              {
-                groups.map((group) => (
-                  <>
-                    <div class="ui-menu-group">
-                      <BrandIcon name={group.agent} size={14} />
-                      {group.provider}
-                      {group.harness && <span class="harness">{group.harness}</span>}
-                    </div>
-                    {group.models.map((model) => (
-                      <div class="ui-menu-item" data-selected={model.selected || undefined}>
-                        {model.selected && <Lucide name="Check" size={13} strokeWidth={2.5} class="check" />}
-                        {model.name}
+              <div class="ui-menu-list">
+                {
+                  groups.map((group) => (
+                    <>
+                      <div class="ui-menu-group">
+                        <BrandIcon name={group.agent} size={14} />
+                        {group.provider}
+                        {group.harness && <span class="harness">{group.harness}</span>}
                       </div>
-                    ))}
-                  </>
-                ))
-              }
+                      {group.models.map((model) => (
+                        <div class="ui-menu-item" data-selected={model.selected || undefined}>
+                          {model.name}
+                          {model.selected && <Lucide name="Check" size={13} />}
+                        </div>
+                      ))}
+                    </>
+                  ))
+                }
+              </div>
+              <div class="ui-loadouts">
+                <div class="ui-loadouts-head">Loadouts <Lucide name="Settings2" size={13} /></div>
+                <div class="ui-pills">
+                  {
+                    loadouts.map((loadout) => (
+                      <span class="ui-pill" data-active={loadout.active || undefined}>
+                        {loadout.name}
+                        <kbd>{loadout.chord}</kbd>
+                      </span>
+                    ))
+                  }
+                </div>
+              </div>
             </div>
             <div class="ui-composer">
               <div class="ui-textarea" data-live>Refactor the queue so retries preserve order.</div>
               <div class="ui-bar">
                 <span class="ui-chip"><Lucide name="Paperclip" size={13} /></span>
                 <span class="ui-chip"><Lucide name="AlarmClock" size={13} /></span>
-                <span class="ui-chip" style="background:var(--surface-active);color:var(--text-primary)"><BrandIcon name="openai" size={13} /> GPT 5.4 <Lucide name="ChevronDown" size={13} class="chev" /></span>
-                <span class="ui-chip"><span class="ui-level" data-fill="3"><i></i><i></i><i></i></span> High effort <Lucide name="ChevronDown" size={13} class="chev" /></span>
-                <span class="ui-chip"><Lucide name="FolderPen" size={14} strokeWidth={1.7} /> Workspace write <Lucide name="ChevronDown" size={13} class="chev" /></span>
+                <span class="ui-chip" style="background:var(--surface-active);color:var(--text-primary)"><BrandIcon name="openai" size={13} /> <span>GPT 5.4</span> <Lucide name="ChevronDown" size={13} class="chev" /></span>
+                <span class="ui-chip"><span class="ui-level" data-fill="3"><i></i><i></i><i></i><i></i></span> <span class="label">High effort</span> <Lucide name="ChevronDown" size={13} class="chev" /></span>
+                <span class="ui-chip"><Lucide name="FolderPen" size={14} strokeWidth={1.7} /> <span class="label">Workspace write</span> <Lucide name="ChevronDown" size={13} class="chev" /></span>
                 <span class="spacer"></span>
-                <span class="ui-send"><Lucide name="ArrowUp" size={16} strokeWidth={2.25} /></span>
+                <span class="actions">
+                  <span class="ui-chip"><Lucide name="Mic" size={13} /></span>
+                  <span class="ui-send"><Lucide name="ArrowUp" size={16} strokeWidth={2.25} /></span>
+                </span>
               </div>
             </div>
           </div>
@@ -146,7 +171,7 @@ const inbox: typeof pinned = [
                   <div
                     class="ui-thread"
                     data-selected={row.selected || undefined}
-                    data-attention={row.state === "approval" || undefined}
+                    data-attention={row.state === "approval" ? "" : row.state === "done" ? "done" : undefined}
                   >
                     <span class="ui-thread-title">{row.title}</span>
                     <span class="ui-thread-ctx">

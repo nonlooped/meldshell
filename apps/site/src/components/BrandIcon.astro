@@ -1,6 +1,7 @@
 ---
-/* Official marks. Codex and Claude use the same icons as the desktop's ProviderIcon; the rest
-   come from the same packs. Marks keep their brand colours unless `mono` asks for currentColor. */
+/* Official marks. Codex and Claude use the same icons as the desktop's ProviderIcon, and file
+   types the same icons as its FileIcon; the rest come from the same packs. Marks keep their brand
+   colours unless `mono` asks for currentColor. */
 import claudeCode from "@iconify-icons/logos/claude-code"
 import claude from "@iconify-icons/logos/claude-icon"
 import cursor from "@iconify-icons/logos/cursor-icon"
@@ -8,8 +9,9 @@ import windows from "@iconify-icons/logos/microsoft-windows-icon"
 import openai from "@iconify-icons/logos/openai-icon"
 import github from "@iconify-icons/simple-icons/github"
 import linux from "@iconify-icons/simple-icons/linux"
+import typescript from "@iconify-icons/material-icon-theme/typescript"
 
-const icons = { claude, claudeCode, cursor, github, linux, openai, windows } as const
+const icons = { claude, claudeCode, cursor, github, linux, openai, typescript, windows } as const
 
 interface Props {
   name: keyof typeof icons
