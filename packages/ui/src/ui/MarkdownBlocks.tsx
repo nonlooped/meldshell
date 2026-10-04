@@ -419,9 +419,11 @@ export function ToolImageGallery({ images }: { images: readonly string[] }) {
 export function ImageGallery({
   images,
   screenshots = false,
+  caption = "Image result",
 }: {
   readonly images: readonly { readonly src: string; readonly alt: string }[]
   readonly screenshots?: boolean
+  readonly caption?: string
 }) {
   const [index, setIndex] = useState<number>()
   const single = images.length === 1
@@ -453,7 +455,10 @@ export function ImageGallery({
             }
           >
             {!screenshots && (
-              <figcaption>Image result{images.length > 1 ? ` ${i + 1}` : ""}</figcaption>
+              <figcaption>
+                {caption}
+                {images.length > 1 ? ` ${i + 1}` : ""}
+              </figcaption>
             )}
             <ImageContextMenu
               source={image.src}

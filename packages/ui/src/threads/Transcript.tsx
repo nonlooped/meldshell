@@ -80,10 +80,11 @@ import {
 import { Markdown } from "../ui/Markdown"
 import { CopyIconButton, copyStatusText, useCopy } from "../ui/CopyButton"
 import { MarkdownWorkspace, MarkdownSources, ReferenceChip } from "../ui/MarkdownReference"
-import { MarkdownStreaming, ToolImageGallery } from "../ui/MarkdownBlocks"
+import { ImageGallery, MarkdownStreaming, ToolImageGallery } from "../ui/MarkdownBlocks"
 import { fileReference, sourceTitles } from "../ui/markdown-model"
 import { useTabStore } from "../app/tab-store"
 import type { TranscriptTurn } from "@meldshell/projection"
+import { messageImages } from "./message-images"
 
 const fallbackText = (event: CanonicalEvent): string =>
   event.text ?? event.method.replaceAll("/", " · ")
@@ -194,23 +195,33 @@ function Message({
 }
 
 function MessageAttachments({ payload }: { payload: unknown }) {
+  const images = messageImages(payload)
   const attachments =
     payload && typeof payload === "object" && "attachments" in payload ? payload.attachments : null
   if (!Array.isArray(attachments)) return null
   return (
-    <div className="flex flex-wrap gap-[6px] mt-[8px]">
-      {attachments.map((attachment, index) => {
-        if (!attachment || typeof attachment.value !== "string") return null
-        if (attachment.type !== "mention" && attachment.type !== "skill") return null
-        const reference = fileReference(attachment.value)
-        return reference ? (
-          <ReferenceChip
-            key={index}
-            reference={{ ...reference, skill: attachment.type === "skill" }}
-            label={typeof attachment.name === "string" ? attachment.name : undefined}
-          />
-        ) : null
-      })}
+    <div className="mt-[8px] grid gap-[8px]">
+      {images.length > 0 && <ImageGallery images={images} caption="Attached image" />}
+      <div className="flex flex-wrap gap-[6px]">
+        {attachments.map((attachment, index) => {
+          if (!attachment || typeof attachment.value !== "string") return null
+          if (attachment.type === "localImage")
+            return (
+              <span key={index} className="text-[var(--text-secondary)] text-[12px]">
+                Image: {typeof attachment.name === "string" ? attachment.name : attachment.value}
+              </span>
+            )
+          if (attachment.type !== "mention" && attachment.type !== "skill") return null
+          const reference = fileReference(attachment.value)
+          return reference ? (
+            <ReferenceChip
+              key={index}
+              reference={{ ...reference, skill: attachment.type === "skill" }}
+              label={typeof attachment.name === "string" ? attachment.name : undefined}
+            />
+          ) : null
+        })}
+      </div>
     </div>
   )
 }

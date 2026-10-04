@@ -8,6 +8,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Archiving a thread closes its tab, including its pane in a split view.
 
+- Images pasted into the composer now appear with the sent user message in the transcript, including after reopening the thread.
+
 ### Added
 
 - The website's download button shows the Windows or Linux logo for your system instead of the generic download arrow. Its neighbouring button now opens Your devices, which asks you to sign in first when you are signed out, in place of the Source link. On narrow screens the gap between the hero and What's in the window is smaller. The sign-in page now matches the landing page: it uses the landing page's header and large heading, with the Google and Discord options in a window-style panel beside it instead of a centered card, and the options appear immediately rather than after a "Loading sign-in options" notice. Your devices matches too: the landing page's header with your email and Sign out, a large heading, each computer as a small window with its status and Open button, and the connect-a-computer steps in a matching window. A long computer name no longer pushes its Online badge and Remove button out of the card.
