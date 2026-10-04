@@ -9,6 +9,11 @@ if (platform) {
   for (const link of links) {
     const label = link.querySelector<HTMLElement>("[data-download-label]")
     if (label) label.textContent = `Download for ${platform.name}`
+    for (const icon of link.querySelectorAll<HTMLElement>("[data-download-icon]")) {
+      const active = icon.dataset.downloadIcon === platform.name
+      icon.classList.toggle("hidden", !active)
+      icon.classList.toggle("contents", active)
+    }
   }
 }
 

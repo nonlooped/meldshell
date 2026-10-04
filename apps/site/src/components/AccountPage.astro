@@ -1,23 +1,39 @@
 ---
-/* Shell for the account pages. `card` centers a single task (sign in, connect, reset);
-   `page` gives the device list a wider working column. */
+/* Shell for the account pages. `card` centers a single task (connect, reset); `site` uses the
+   landing page's header and width with no card, for sign-in and the device list. */
 import Layout from "../layouts/Layout.astro"
+import Header from "./Header.astro"
 import Wordmark from "./Wordmark.astro"
 
 interface Props {
   title: string
   description: string
-  variant?: "card" | "page"
+  variant?: "card" | "site"
 }
 const { title, description, variant = "card" } = Astro.props
+const repo = "https://github.com/nonlooped/meldshell"
 ---
 
 <Layout title={`${title} — MeldShell`} description={description}>
   <div class="account" data-variant={variant}>
-    <header class="account-header">
-      <a href="/" class="brand" aria-label="MeldShell home"><Wordmark size={20} /><span>MeldShell</span></a>
-      <nav aria-label="Account"><slot name="nav" /></nav>
-    </header>
+    {
+      variant === "site" ? (
+        <div>
+          {Astro.slots.has("nav") ? (
+            <Header repo={repo}>
+              <slot name="nav" slot="nav" />
+            </Header>
+          ) : (
+            <Header repo={repo} />
+          )}
+        </div>
+      ) : (
+        <header class="account-header">
+          <a href="/" class="brand" aria-label="MeldShell home"><Wordmark size={20} /><span>MeldShell</span></a>
+          <nav aria-label="Account"><slot name="nav" /></nav>
+        </header>
+      )
+    }
     <main>
       {variant === "card" ? <div class="card"><slot /></div> : <slot />}
       <slot name="after" />
@@ -27,6 +43,9 @@ const { title, description, variant = "card" } = Astro.props
 
 <style is:global>
   .account { min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; }
+  .account[data-variant=site] { position: relative; isolation: isolate; overflow: clip; }
+  .account[data-variant=site] main { max-width: 1200px; display: grid; padding: 2rem 1.25rem clamp(3rem, 12vh, 8rem); }
+  @media (min-width: 640px) { .account[data-variant=site] main { padding-left: 2rem; padding-right: 2rem; } }
   .account [hidden] { display: none !important; }
   .account-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: 100%; max-width: 64rem; margin: 0 auto; padding: 1.25rem 1rem; }
   @media (min-width: 640px) { .account-header { padding: 1.5rem 1.5rem; } }
@@ -38,17 +57,15 @@ const { title, description, variant = "card" } = Astro.props
 
   .account main { width: 100%; margin: 0 auto; padding: 1rem 1rem 4rem; }
   .account[data-variant=card] main { max-width: 27rem; display: grid; align-content: start; gap: 1.25rem; padding-top: clamp(1rem, 8vh, 5rem); }
-  .account[data-variant=page] main { max-width: 64rem; }
   @media (min-width: 640px) { .account main { padding-left: 1.5rem; padding-right: 1.5rem; } }
 
   .account .card { display: grid; gap: 1.25rem; padding: clamp(1.25rem, 5vw, 2rem); border: 1px solid var(--color-line); border-radius: var(--radius-window); background: var(--color-raised); box-shadow: inset 0 1px 0 rgb(255 255 255 / .04), 0 24px 60px rgb(0 0 0 / .25); }
   .account h1 { font: 600 clamp(1.5rem, 4vw, 1.9rem)/1.2 var(--font-display); letter-spacing: -.02em; }
-  .account[data-variant=page] h1 { font-size: clamp(1.75rem, 4vw, 2.4rem); }
   .account h2 { font: 600 1.05rem/1.3 var(--font-display); }
   .account .lede { color: var(--color-ink-2); line-height: 1.6; font-size: .9375rem; margin-top: .5rem; }
   .account .muted { color: var(--color-ink-3); font-size: .8125rem; line-height: 1.6; }
-  .account .muted a, .account .link { color: var(--color-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--color-ink-4); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
-  .account .muted a:hover, .account .link:hover { text-decoration-color: var(--color-ink); }
+  .account .muted a, .account main .link { color: var(--color-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--color-ink-4); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+  .account .muted a:hover, .account main .link:hover { text-decoration-color: var(--color-ink); }
 
   .account form { display: grid; gap: 1rem; }
   .account .field { display: grid; gap: .45rem; font-size: .8125rem; font-weight: 500; color: var(--color-ink-2); }

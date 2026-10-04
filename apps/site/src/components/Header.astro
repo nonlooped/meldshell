@@ -1,5 +1,6 @@
 ---
-/* Not a bar: the mark on the left, three quiet actions on the right, sitting on the page itself. */
+/* Not a bar: the mark on the left, three quiet actions on the right, sitting on the page itself.
+   Account pages pass their own actions in the `nav` slot. */
 import BrandIcon from "./BrandIcon.astro"
 import Lucide from "./Lucide.astro"
 import Wordmark from "./Wordmark.astro"
@@ -15,7 +16,8 @@ const { repo } = Astro.props
     <Wordmark size={22} />
     <span class="font-display font-medium tracking-[-0.02em] text-[17px]">MeldShell</span>
   </a>
-  <nav class="flex items-center gap-1 text-[13.5px]" aria-label="Site">
+  <nav class="flex min-w-0 items-center gap-1 text-[13.5px]" aria-label="Site">
+    <slot name="nav">
     <a href={repo} class="link" title="Source on GitHub">
       <BrandIcon name="github" size={15} />
       <span class="hidden sm:inline">GitHub</span>
@@ -25,6 +27,7 @@ const { repo } = Astro.props
       <Lucide name="ArrowDownToLine" size={14} strokeWidth={2} />
       Download
     </a>
+    </slot>
   </nav>
 </header>
 

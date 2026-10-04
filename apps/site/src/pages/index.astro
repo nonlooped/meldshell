@@ -18,7 +18,7 @@ const releases = `${repo}/releases`
   <Header {repo} />
 
   <main>
-    <section class="hero relative flex min-h-svh flex-col" aria-labelledby="hero-heading" data-hero>
+    <section class="hero relative flex flex-col sm:min-h-svh" aria-labelledby="hero-heading" data-hero>
       <script is:inline>
         /* Start hidden before first paint so the meld plays from the beginning. */
         document.currentScript.parentElement.dataset.meld = matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -36,18 +36,20 @@ const releases = `${repo}/releases`
           </p>
           <div class="flex flex-wrap items-center gap-3 shrink-0">
             <a href={`${releases}/latest`} data-download class="btn btn-primary" data-motion-link="download">
-              <Lucide name="ArrowDownToLine" size={16} strokeWidth={2} />
+              <span data-download-icon="default" class="contents"><Lucide name="ArrowDownToLine" size={16} strokeWidth={2} /></span>
+              <span data-download-icon="Windows" class="hidden"><BrandIcon name="windows" size={16} mono /></span>
+              <span data-download-icon="Linux" class="hidden"><BrandIcon name="linux" size={16} mono /></span>
               <span data-download-label>View downloads</span>
             </a>
-            <a href={repo} class="btn btn-secondary">
-              <BrandIcon name="github" size={16} />
-              Source
+            <a href="/dashboard" class="btn btn-secondary">
+              <Lucide name="MonitorSmartphone" size={16} strokeWidth={2} />
+              Your devices
             </a>
           </div>
         </div>
       </div>
 
-      <div class="relative mt-12 sm:mt-16 flex-1 px-3 sm:px-8 pb-6" aria-label="The MeldShell window">
+      <div class="relative mt-12 sm:mt-16 flex-1 px-3 sm:px-8 pb-0 sm:pb-6" aria-label="The MeldShell window">
         <div
           aria-hidden="true"
           class="glow pointer-events-none absolute inset-x-0 top-[8%] mx-auto h-[70%] max-w-[1100px] rounded-full blur-[110px] [background:conic-gradient(from_200deg,var(--color-spin-top),var(--color-spin-middle),var(--color-spin-bottom),var(--color-spin-top))]"
@@ -58,7 +60,7 @@ const releases = `${repo}/releases`
       </div>
     </section>
 
-    <Features class="mt-28 sm:mt-36 mb-24 sm:mb-32" />
+    <Features class="mt-8 sm:mt-36 mb-24 sm:mb-32" />
   </main>
   <script>
     import "../scripts/release"
