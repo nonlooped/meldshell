@@ -33,11 +33,6 @@ const legacySchema = Effect.gen(function* () {
   if (!threadColumns.some((column) => column.name === "title_locked")) {
     yield* sql`ALTER TABLE threads ADD COLUMN title_locked INTEGER NOT NULL DEFAULT 0`
   }
-  if (!threadColumns.some((column) => column.name === "seen_at")) {
-    // Existing threads count as seen, so an upgrade does not mark every finished one as new.
-    yield* sql`ALTER TABLE threads ADD COLUMN seen_at TEXT`
-    yield* sql`UPDATE threads SET seen_at = updated_at`
-  }
   yield* sql`
     CREATE INDEX IF NOT EXISTS threads_status_updated_idx
     ON threads(status, updated_at DESC)
@@ -350,6 +345,17 @@ export const runMigrations = Effect.gen(function* () {
         // Until the fork's first turn, which reads the copied turns as a summary.
         yield* sql`ALTER TABLE threads ADD COLUMN fork_fresh INTEGER NOT NULL DEFAULT 0
           CHECK (fork_fresh IN (0, 1))`
+      }),
+    },
+    {
+      version: 16,
+      apply: Effect.gen(function* () {
+        // Nightlies briefly added this column in the legacy step, which upgraded databases skip.
+        const columns = yield* sql<{ readonly name: string }>`PRAGMA table_info(threads)`
+        if (columns.some((column) => column.name === "seen_at")) return
+        // Existing threads count as seen, so an upgrade does not mark every finished one as new.
+        yield* sql`ALTER TABLE threads ADD COLUMN seen_at TEXT`
+        yield* sql`UPDATE threads SET seen_at = updated_at`
       }),
     },
   ]

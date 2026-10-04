@@ -14,6 +14,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Fixed
 
+- MeldShell no longer fails to start after upgrading with existing thread data. The nightly that tracks which threads you have looked at could not read threads saved by earlier versions.
+
 - Pi ignores idle notifications received before a new agent run starts. Cursor and Pi retained sessions now close when their thread is deleted or rewound, and Cursor sessions close when switching providers.
 
 - Claude Code keeps its session and background commands alive between turns. Resumed task notifications no longer finish a new request prematurely, and background shell tasks no longer appear as subagents.
