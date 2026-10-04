@@ -4,6 +4,22 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- Color themes. Settings > Appearance offers nine built-in themes (MeldShell, Graphite, Midnight, Arctic, Ocean, Forest, Ember, Rose, and Dusk), each with a dark and a light version that follow the Dark, Light, or System mode. New theme, or Duplicate and edit on any theme, opens an editor with a color picker and hex code for the background, text, accent, and status colors of each version; the whole app previews the theme as you edit, and it warns when text or accent contrast is low. Your themes can be edited, duplicated, and deleted from their tile, and the first-run guide can pick a theme too. Terminals follow the theme's colors.
+
+- Approvals are readable. A request to edit or write a file shows the diff it would make, with real line numbers, instead of the tool's raw JSON; other tool requests list their inputs (the URL, path, or pattern) as labelled lines, and Claude Code's shell commands show its one-line description above the command. Requests now sit above the composer of every pane that shows the thread, so a split never hides one waiting, and Decline takes an optional reason that goes back to the agent so it can try something else (Claude Code reads it with the denial, and Codex receives it in the running turn).
+
+- Fork a thread from any message to try another direction without losing the original. The fork icon on a prompt (or Fork from this message in its menu) starts a new thread on its own branch and worktree with the turns before that message, the files as they were before it, and the message waiting in the composer to rewrite; Fork from this reply on an agent's answer keeps that whole turn and its files instead. Uncommitted work at that point comes along, the original thread and folder stay as they were, and the fork can be made while the original is still working. The fork's first message starts a fresh agent session from a summary of the copied turns, which the composer can preview. The inbox marks forks, and the fork links back to the thread it came from.
+
+- Design mode in the browser preview. Click the pointer button in the preview's toolbar (or Select an element in its menu), hover the page to outline any element with its tag and size, and click to add it to your message. It lands in the composer as a screenshot of the element, and the message carries its HTML, a selector, its size and text, and its computed styles, ready for "make this look like…". Shift-click adds several elements, and Esc or a right-click stops. The picker runs apart from the page's own scripts and blocks the click from reaching the page.
+
+- Ask a side question about a thread with `/btw`, as in Claude Code, without it entering the agent's context. Type `/btw what does this function do?` and press Enter, even while the agent is working: the thread's own model answers in a sheet that floats over the foot of the transcript, from a written account of the conversation, in a separate read-only request, so the thread and the agent's session never see the question or the answer. Follow-up questions stack in the same sheet, each answer can be copied or turned into a real message for the agent, and Escape closes it. It works with every agent and uses the account the agent is already signed in with.
+
+- The working log says what each step worked on. Claude's tool rows name the file and lines read, the pattern searched and where, the page fetched, or the subagent's task, with the full path in the tooltip, and each gets an icon for what it did. Codex web searches show the query, page, or text they looked for instead of "webSearch". A Claude subagent's own reads, searches, and messages nest under the call that started it, with a count of its steps, instead of mixing into the main log.
+
+## [0.15.0] - 2026-10-04
+
 ### Fixed
 
 - Dictation warms a downloaded speech model when recording starts and prevents repeated clicks from starting overlapping recordings. The stop control remains clickable during its transition.
@@ -11,8 +27,6 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Claude Code turns no longer stop after tool calls or fail to finish in WSL because absent optional event fields were rejected by the host's JSON protocol. Tool results, approvals, and turn completion now omit those fields while preserving native data.
 
 ### Added
-
-- Color themes. Settings > Appearance offers nine built-in themes (MeldShell, Graphite, Midnight, Arctic, Ocean, Forest, Ember, Rose, and Dusk), each with a dark and a light version that follow the Dark, Light, or System mode. New theme, or Duplicate and edit on any theme, opens an editor with a color picker and hex code for the background, text, accent, and status colors of each version; the whole app previews the theme as you edit, and it warns when text or accent contrast is low. Your themes can be edited, duplicated, and deleted from their tile, and the first-run guide can pick a theme too. Terminals follow the theme's colors.
 
 - Search file contents across the workspace with Ctrl+Shift+F. It opens a Search tab in the files sidebar (starting from any selected text), with toggles to match case and to use a regular expression. Results are grouped by file with each match highlighted, and clicking a line opens the file there. The search covers the thread's own worktree when it has one, skips ignored, binary, and very large files, and runs in the background so the app stays responsive.
 
@@ -335,7 +349,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/nonlooped/meldshell/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/nonlooped/meldshell/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/nonlooped/meldshell/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/nonlooped/meldshell/compare/v0.11.0...v0.12.0

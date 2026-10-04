@@ -43,6 +43,11 @@ const api: MeldShellApi = {
       onShow: on(IPC.agentBrowserShow),
       onActivity: on(IPC.agentBrowserActivity),
     },
+    designMode: {
+      pick: (webContentsId, accent) =>
+        ipcRenderer.invoke(IPC.designModePick, webContentsId, accent),
+      cancel: (webContentsId) => ipcRenderer.send(IPC.designModeCancel, webContentsId),
+    },
   },
   terminal: {
     open: (input) => ipcRenderer.invoke(IPC.terminalOpen, input),

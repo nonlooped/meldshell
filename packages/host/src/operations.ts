@@ -158,15 +158,25 @@ export const resolveApproval = (input: ResolveApprovalInput) =>
       const harness = yield* core.GetApprovalHarness({ approvalId: input.approvalId })
       if (harness === null) return false
       const provider = yield* providerFor(harness)
+      const reason = input.decision === "decline" ? (input.reason?.trim() ?? "") : ""
       yield* provider.send({
         type: "resolve-approval",
         requestId: approval.requestId,
         decision: input.decision,
         answers: input.answers,
         optionId: input.optionId,
+        ...(reason === "" ? {} : { reason }),
       })
       yield* core.ResolveApproval({ approvalId: input.approvalId })
       yield* publishChange(approval.threadId)
+      // Claude Code reads the reason with the denial itself; the others hear it as a message,
+      // which Codex takes into the running turn.
+      if (reason !== "" && harness !== "claude-code")
+        yield* submitTurn({
+          threadId: approval.threadId,
+          text: `I declined that request. ${reason}`,
+          delivery: harness === "codex" ? "steer" : "queue",
+        })
       return true
     }),
   )

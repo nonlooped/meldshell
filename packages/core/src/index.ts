@@ -42,6 +42,7 @@ export {
   reconcileWorker,
   finishShutdown,
   previewHandoff,
+  sideQuestionPrompt,
 } from "./turns"
 export {
   listSchedules,
@@ -51,3 +52,4 @@ export {
   recordScheduleRun,
 } from "./schedules"
 export { rewindThread, undoRewind } from "./rewind"
+export { forkThread } from "./fork"

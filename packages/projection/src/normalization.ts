@@ -147,7 +147,11 @@ export const approvalCopy = (
       detail: nonEmptyText(record.reason) ?? `${provider} wants to edit files in this workspace.`,
     }
   }
-  return { title: `${provider} needs your input`, detail: nonEmptyText(record.reason) ?? method }
+  const tool = nonEmptyText(record.toolName)
+  return {
+    title: tool === null ? `${provider} needs your input` : `Allow ${tool}?`,
+    detail: nonEmptyText(record.reason) ?? method,
+  }
 }
 
 const cursorApprovalCopy = (method: string, record: CursorPayload) => {

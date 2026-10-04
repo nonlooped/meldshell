@@ -14,6 +14,7 @@ import {
   Folder,
   FolderPlus,
   GitBranch,
+  GitFork,
   CircleAlert,
   CircleX,
   Hourglass,
@@ -88,6 +89,28 @@ interface InboxProps {
   readonly canLoadMore: boolean
   readonly loadingMore: boolean
   readonly onLoadMore: () => void
+}
+
+/** Marks a fork, or a thread on its own branch, beside its agent. */
+function ThreadPlace({ thread }: { readonly thread: Thread }): React.JSX.Element | null {
+  const fork = thread.fork
+  const branch = thread.worktree?.branch
+  if (fork === undefined && branch === undefined) return null
+  const label =
+    fork === undefined
+      ? `Works on its own branch: ${branch}`
+      : branch === undefined
+        ? `Forked from ${fork.title}`
+        : `Forked from ${fork.title}, on its own branch: ${branch}`
+  return (
+    <span className="inline-flex shrink-0" role="img" aria-label={label} title={label}>
+      {fork === undefined ? (
+        <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
+      ) : (
+        <GitFork size={12} strokeWidth={1.75} aria-hidden="true" />
+      )}
+    </span>
+  )
 }
 
 function InboxThread({
@@ -181,16 +204,7 @@ function InboxThread({
                     <span className={`${threadContextClasses} ${railLabelClasses}`}>
                       <ProviderIcon provider={provider} size={13} />
                       <span className="flex min-w-0 flex-1 items-center gap-[6px] overflow-visible!">
-                        {thread.worktree !== undefined && (
-                          <span
-                            className="inline-flex shrink-0"
-                            role="img"
-                            aria-label={`Own branch ${thread.worktree.branch}`}
-                            title={`Works on its own branch: ${thread.worktree.branch}`}
-                          >
-                            <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
-                          </span>
-                        )}
+                        <ThreadPlace thread={thread} />
                         {scheduled && (
                           <span
                             className="inline-flex shrink-0"

@@ -60,6 +60,9 @@ export const ThreadRow = Schema.Struct({
   issue_url: NullableText,
   last_harness: NullableText,
   rewound: Flag,
+  fork_thread_id: NullableText,
+  fork_title: NullableText,
+  fork_fresh: Flag,
 })
 export type ThreadRow = typeof ThreadRow.Type
 
@@ -220,6 +223,9 @@ export const threadColumns = columnList([
   "issue_number",
   "issue_title",
   "issue_url",
+  "fork_thread_id",
+  "fork_title",
+  "fork_fresh",
 ] satisfies ReadonlyArray<keyof ThreadRow>)
 
 const fromWorkspaceRow = (row: WorkspaceRow): Workspace => ({
@@ -254,6 +260,15 @@ export const fromThreadRow = (row: ThreadRow): Thread => {
             number: Number(row.issue_number),
             title: row.issue_title ?? "",
             url: row.issue_url ?? "",
+          },
+        }),
+    ...(row.fork_title === null
+      ? {}
+      : {
+          fork: {
+            threadId: row.fork_thread_id,
+            title: row.fork_title,
+            fresh: row.fork_fresh === 1,
           },
         }),
   }

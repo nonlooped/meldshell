@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { fencedCode } from "../ui/markdown-code"
 
 /** A note left on a line or a run of lines in a diff, waiting to go back to the thread's agent. */
 export interface ReviewNote {
@@ -61,12 +62,6 @@ export const noteLocation = (note: Pick<ReviewNote, "path" | "startLine" | "line
   return note.side === "old" ? `${location} (${removed})` : location
 }
 
-/** A fence longer than any backtick run in the text, so quoted code cannot close it early. */
-function fence(text: string): string {
-  const longest = Math.max(0, ...Array.from(text.matchAll(/`+/g), (match) => match[0].length))
-  return "`".repeat(Math.max(3, longest + 1))
-}
-
 /**
  * All of a thread's notes as one follow-up, in file and line order, each with the line it is about
  * so the agent does not have to find it again.
@@ -78,16 +73,9 @@ export function reviewNotesMessage(notes: ReadonlyArray<ReviewNote>): string {
       left.startLine - right.startLine ||
       Number(left.side === "new") - Number(right.side === "new"),
   )
-  const sections = sorted.map((note) => {
-    const ticks = fence(note.snippet)
-    return [
-      `**${noteLocation(note)}**`,
-      `${ticks}diff`,
-      note.snippet,
-      ticks,
-      note.body.trim(),
-    ].join("\n")
-  })
+  const sections = sorted.map((note) =>
+    [`**${noteLocation(note)}**`, fencedCode("diff", note.snippet), note.body.trim()].join("\n"),
+  )
   const count = notes.length === 1 ? "a review note" : `${notes.length} review notes`
   return [
     `I left ${count} on your changes. Please address ${notes.length === 1 ? "it" : "each one"}.`,

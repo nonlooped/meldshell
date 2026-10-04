@@ -16,6 +16,7 @@ import {
   type CompletionTrigger,
   type TokenRange,
 } from "./composer-completion"
+import { withSideQuestionCommand } from "./side-questions"
 
 type CompletionItem =
   | { readonly kind: "path"; readonly match: WorkspacePathMatch }
@@ -32,8 +33,9 @@ function completionItems(
   if (trigger === null) return []
   if (trigger.kind === "path") return (paths ?? []).map((match) => ({ kind: "path", match }))
   const kind = trigger.kind
+  const offered = kind === "command" ? withSideQuestionCommand(commands) : (commands ?? [])
   return filterCommands(
-    (commands ?? []).filter((command) => command.kind === kind),
+    offered.filter((command) => command.kind === kind),
     trigger.query,
   ).map((command) => ({ kind, command }))
 }
