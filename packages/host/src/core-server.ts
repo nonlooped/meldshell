@@ -64,6 +64,7 @@ import {
   undoRewind,
   forkThread,
   previewHandoff,
+  sideQuestionPrompt,
 } from "@meldshell/core"
 import {
   FiberSet,
@@ -165,6 +166,8 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
       ),
     SubmitTurn: (input) => exposeCoreError(submitTurn(input)),
     PreviewHandoff: ({ threadId }) => exposeCoreRead(previewHandoff(threadId)),
+    SideQuestionPrompt: ({ threadId, question }) =>
+      exposeCoreRead(sideQuestionPrompt(threadId, question)),
     RewindThread: (input) => exposeCoreError(rewindThread(input)),
     UndoRewind: ({ threadId }) => exposeCoreError(undoRewind(threadId)),
     ForkThread: (input) => exposeCoreError(forkThread(input)),

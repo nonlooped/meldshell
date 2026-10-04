@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto"
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
-import { BrowserWindow, ipcMain, session, shell, webContents, type WebContents } from "electron"
+import { BrowserWindow, ipcMain, shell, type WebContents } from "electron"
 import { IPC } from "@meldshell/contracts/ipc"
 import { asRecord, asText, type UnknownRecord } from "@meldshell/contracts"
 import {
@@ -10,7 +10,7 @@ import {
   type BrowserActivity,
   type ToolPage,
 } from "./agent-browser-tools"
-import { PREVIEW_PARTITION } from "./preview"
+import { PREVIEW_PARTITION, previewGuest } from "./preview"
 import { getMainWindow } from "./window"
 
 /*
@@ -221,17 +221,10 @@ export const stopAgentBrowser = (): void => {
 /** Lets the renderer name the page each thread's preview attached. */
 export const registerAgentBrowserIpc = (): void => {
   ipcMain.on(IPC.agentBrowserAttach, (event, threadId: unknown, id: unknown) => {
-    if (typeof threadId !== "string" || typeof id !== "number") return
-    const page = webContents.fromId(id)
+    if (typeof threadId !== "string") return
     // Only a preview guest of this window may stand for a thread's browser.
-    if (
-      page === undefined ||
-      page.getType() !== "webview" ||
-      page.hostWebContents !== event.sender ||
-      page.session !== session.fromPartition(PREVIEW_PARTITION)
-    )
-      return
-    attach(threadId, page)
+    const page = previewGuest(event.sender, id)
+    if (page !== null) attach(threadId, page)
   })
 }
 

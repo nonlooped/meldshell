@@ -111,6 +111,17 @@ export const ListIssuesInput = Schema.Struct({
 })
 export type ListIssuesInput = typeof ListIssuesInput.Type
 
+/** A quick question about a thread, answered apart from it so its agent never sees it. */
+export const SideQuestionInput = Schema.Struct({
+  workspaceId: Schema.String,
+  threadId: Schema.String,
+  question: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(4_000)),
+  ),
+})
+export type SideQuestionInput = typeof SideQuestionInput.Type
+
 export type GenerateCommitMessageInput = ExactOptional<WorkspaceScope, "threadId">
 export type GitFileAction = GitFileActionInput["action"]
 export type GitDiffSide = Exclude<GitDiffInput["side"], undefined>

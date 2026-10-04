@@ -25,7 +25,7 @@ import { Effect, Schema, Struct } from "effect"
 import { appendEvent } from "./database/persistence"
 import { transaction } from "./database/transaction"
 import { EventFromRow, readRows } from "./database/rows"
-import { buildHandoff } from "./handoff"
+import { buildHandoff, buildSideQuestionPrompt } from "./handoff"
 import {
   DEFAULT_THREAD_TITLE,
   THREAD_TITLE_LIMIT,
@@ -224,6 +224,48 @@ const missedWork = (threadId: string, harness: string, hasSession: boolean) =>
         events: events.filter((event) => event.turnId === turn.id),
       })),
       fork?.fork_title ?? null,
+    )
+  })
+
+/**
+ * The prompt that answers a side question about a thread: every turn still in its conversation,
+ * including one that is running, written out for a separate request the agent never sees.
+ */
+export const sideQuestionPrompt = (threadId: string, question: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const [thread] = yield* sql<{ readonly harness: string | null }>`
+      SELECT p.harness FROM threads t
+      LEFT JOIN thread_settings s ON s.thread_id = t.id
+      LEFT JOIN providers p ON p.id = s.provider_id
+      WHERE t.id = ${threadId}
+    `
+    if (thread === undefined)
+      return yield* Effect.fail(new CoreProtocolError({ message: "Thread not found." }))
+    const turns = yield* sql<{
+      readonly id: string
+      readonly harness: string
+      readonly status: string
+    }>`
+      SELECT id, harness, status FROM turns
+      WHERE thread_id = ${threadId} AND rewound_at IS NULL
+      ORDER BY started_at, rowid
+    `
+    const events =
+      turns.length === 0
+        ? []
+        : yield* readRows(
+            EventFromRow,
+            sql`SELECT * FROM events WHERE thread_id = ${threadId}
+              AND turn_id IN ${sql.in(turns.map((turn) => turn.id))} ORDER BY sequence`,
+          )
+    return buildSideQuestionPrompt(
+      thread.harness ?? turns.at(-1)?.harness ?? "",
+      turns.map((turn) => ({
+        ...turn,
+        events: events.filter((event) => event.turnId === turn.id),
+      })),
+      question,
     )
   })
 

@@ -309,8 +309,15 @@ export const hostOperations: Record<string, Operation> = {
     }),
   ),
 }
-/** Answers a one-off prompt with the Title model, or else the thread's own model. */
-const generateText = (input: WorkspaceScope, prompt: (path: string) => Promise<string>) =>
+/**
+ * Answers a one-off prompt with the Title model, or else the thread's own model. A side question
+ * prefers the thread's model, which knows the work best.
+ */
+const generateText = (
+  input: WorkspaceScope,
+  prompt: (path: string) => Promise<string>,
+  prefer: "title" | "thread" = "title",
+) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
     const snapshot = yield* core.GetSnapshot()
@@ -323,14 +330,18 @@ const generateText = (input: WorkspaceScope, prompt: (path: string) => Promise<s
         entry.enabled &&
         snapshot.providers.some((provider) => provider.id === entry.providerId && provider.enabled),
     )
-    const model =
-      available.find((entry) => entry.id === snapshot.settings.titleModelId) ??
-      available.find((entry) => entry.id === selected)
+    const title = available.find((entry) => entry.id === snapshot.settings.titleModelId)
+    const own = available.find((entry) => entry.id === selected)
+    const model = prefer === "thread" ? (own ?? title) : (title ?? own)
     const provider = snapshot.providers.find((entry) => entry.id === model?.providerId)
     const harness = provider?.harness
     if (!model || !C.isHarness(harness))
       return yield* Effect.fail(
-        new Error("Choose an available Title model or a model for this thread."),
+        new Error(
+          prefer === "thread"
+            ? "Choose a model for this thread to ask a side question."
+            : "Choose an available Title model or a model for this thread.",
+        ),
       )
     const workspacePath = yield* scopePath(input)
     const text = yield* withWorkspace(input, prompt)
@@ -353,6 +364,16 @@ const generateText = (input: WorkspaceScope, prompt: (path: string) => Promise<s
       ),
     )
   })
+// The answer stays out of the thread and its provider session, so no stored state changes.
+hostOperations[C.IPC.askSideQuestion] = operation(C.SideQuestionInput, true, (input) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const question = input.question.trim()
+    if (question === "") return yield* Effect.fail(new Error("Type a question to ask."))
+    const prompt = yield* core.SideQuestionPrompt({ threadId: input.threadId, question })
+    return yield* generateText(input, async () => prompt, "thread")
+  }),
+)
 hostOperations[C.IPC.generateCommitMessage] = operation(C.WorkspaceScope, false, (input) =>
   generateText(input, commitMessagePrompt),
 )
