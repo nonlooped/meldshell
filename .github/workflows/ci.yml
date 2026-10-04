@@ -48,7 +48,8 @@ jobs:
       - name: Select affected checks
         id: scope
         env:
-          CI_FULL: ${{ inputs.full == true || github.event_name == 'workflow_dispatch' }}
+          # Main pushes certify releases, so they run every check; pull requests run the affected ones.
+          CI_FULL: ${{ inputs.full == true || github.event_name != 'pull_request' }}
         run: node scripts/ci-scope.mjs
       - name: Test check selection
         run: node --test tests/ci-scope.test.mjs
