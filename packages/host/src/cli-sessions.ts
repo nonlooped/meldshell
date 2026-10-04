@@ -2,6 +2,7 @@ import {
   CliHarness,
   cliLabel,
   cliResumeCommand,
+  cliSessionArgument,
   errorMessage,
   HARNESSES,
   type CliSession,
@@ -15,7 +16,7 @@ import { scopePath } from "./thread-worktrees"
 import { providerFor } from "./worker-provider"
 
 /*
- * Sessions started in the Claude Code and Codex CLIs come in as threads, and a thread goes back
+ * Sessions started in the Claude Code, Codex, Cursor and Pi CLIs come in as threads, and a thread goes back
  * out to its harness's CLI in the thread's terminal.
  */
 
@@ -55,7 +56,7 @@ const harnessSessions = (harness: CliHarness, workspacePath: string) =>
     ),
   )
 
-/** The sessions Claude Code and Codex stored for a workspace's folder, newest first. */
+/** The sessions each harness's CLI stored for a workspace's folder, newest first. */
 export const listCliSessions = (workspaceId: string) =>
   Effect.gen(function* () {
     const workspacePath = yield* scopePath({ workspaceId })
@@ -97,10 +98,10 @@ export const cliResumeScript = (threadId: string) =>
     if (session === null)
       return yield* Effect.fail(
         new Error(
-          "This thread has no Claude Code or Codex session to continue yet. Send a message first.",
+          "This thread has no session its agent's CLI can continue yet. Send a message first.",
         ),
       )
-    if (!SAFE_SESSION_ID.test(session.nativeThreadId))
+    if (!SAFE_SESSION_ID.test(cliSessionArgument(session.harness, session.nativeThreadId)))
       return yield* Effect.fail(new Error("This thread's session ID cannot be passed to a shell."))
     return {
       name: cliLabel(session.harness),

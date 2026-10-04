@@ -16,7 +16,7 @@ import { Palette, PaletteSearch } from "./Palette"
 
 const sessionKey = (session: CliSession) => `${session.harness}:${session.nativeThreadId}`
 
-/** Brings a Claude Code or Codex session started in a terminal into MeldShell as a thread. */
+/** Brings an agent session started in a terminal into MeldShell as a thread. */
 export function SessionPalette({
   open,
   onOpenChange,
@@ -89,7 +89,7 @@ function SessionSearch({
         placeholder={
           workspace === undefined
             ? "Bring in a terminal session"
-            : `Bring in a Claude Code or Codex session from ${workspace.name}`
+            : `Bring in a terminal session from ${workspace.name}`
         }
         itemKey={sessionKey}
         itemLabel={(session) => session.title}
@@ -156,7 +156,7 @@ function sessionNotice({
   if (problems.length > 0) return <span className="[overflow-wrap:anywhere]">{problems[0]}</span>
   return searched
     ? "No terminal sessions match."
-    : `No Claude Code or Codex sessions were started in ${workspace.name} yet.`
+    : `No Claude Code, Codex, Cursor or Pi sessions were started in ${workspace.name} yet.`
 }
 
 function SessionRow({

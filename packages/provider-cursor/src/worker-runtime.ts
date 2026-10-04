@@ -6,8 +6,11 @@ import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { RequestError } from "@agentclientprotocol/sdk"
 import {
+  asRecord,
+  asText,
   decodeCursorPayload,
   CursorContent,
+  type CliSessionSummary,
   errorMessage,
   type CursorStatus,
   type TitleRequest,
@@ -15,6 +18,7 @@ import {
   type UnknownRecord,
 } from "@meldshell/contracts"
 import { readCursorUsage } from "./usage"
+import { cursorSessionSummaries, cursorTurns, listsSessions } from "./sessions"
 import { cursorCommands, discoverCursorSkills } from "./skills"
 import {
   CursorClient,
@@ -46,6 +50,9 @@ import {
   type ToolQuestion,
   type ToolResult,
 } from "./question-server"
+
+/** As many chats as Claude Code's and Codex's lists show. */
+const SESSION_LIMIT = 100
 
 type Emit = (method: string, params: unknown, validated?: boolean, requestId?: string) => void
 interface Session extends ConfigurableSession {
@@ -534,6 +541,74 @@ export const runCursorWorker = (
       usageRequests.delete(requestId)
     }
   }
+  /** Every chat `session/list` names for the folder, newest first, or null when it cannot list. */
+  const savedChats = async (workspacePath: string): Promise<CliSessionSummary[] | null> => {
+    const session = await createSession(workspacePath, null, null, undefined, {
+      catalogOnly: true,
+    })
+    try {
+      if (!listsSessions(session.init)) return null
+      const now = new Date().toISOString()
+      const chats: CliSessionSummary[] = []
+      let cursor: string | null = null
+      do {
+        const after: string | null = cursor
+        const page: unknown = await session.client.run((agent) =>
+          agent.request("session/list", {
+            cwd: workspacePath,
+            ...(after ? { cursor: after } : {}),
+          }),
+        )
+        chats.push(...cursorSessionSummaries(page, workspacePath, now))
+        cursor = asText(asRecord(page).nextCursor) || null
+      } while (cursor !== null && chats.length < SESSION_LIMIT)
+      return chats.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, SESSION_LIMIT)
+    } finally {
+      await closeSession(session)
+    }
+  }
+  const listSessions = async (requestId: string, workspacePath: string): Promise<void> => {
+    try {
+      const sessions = await savedChats(workspacePath)
+      if (sessions === null)
+        throw new Error(
+          "This Cursor CLI release does not list its saved chats. Update it, then try again.",
+        )
+      if (!stopping) publish({ type: "sessions-result", requestId, sessions })
+    } catch (cause) {
+      if (!stopping) publish({ type: "sessions-result", requestId, error: errorMessage(cause) })
+    }
+  }
+  /** Loads a saved chat, collecting the history Cursor replays before it answers. */
+  const readSession = async (
+    requestId: string,
+    workspacePath: string,
+    sessionId: string,
+  ): Promise<void> => {
+    let session: Session | undefined
+    try {
+      const listed = (await savedChats(workspacePath))?.find(
+        (chat) => chat.nativeThreadId === sessionId,
+      )
+      const updates: UnknownRecord[] = []
+      session = await createSession(workspacePath, sessionId, (method, params) => {
+        if (method === "cursor/acp/session/replay") updates.push(asRecord(asRecord(params).update))
+      })
+      const turns = cursorTurns(sessionId, updates, listed?.updatedAt ?? new Date().toISOString())
+      if (turns.length === 0) throw new Error("Cursor has no stored conversation in this chat.")
+      if (!stopping)
+        publish({
+          type: "session-history-result",
+          requestId,
+          history: { title: listed?.title ?? (turns[0]?.text || "Cursor chat"), turns },
+        })
+    } catch (cause) {
+      if (!stopping)
+        publish({ type: "session-history-result", requestId, error: errorMessage(cause) })
+    } finally {
+      if (session) await closeSession(session)
+    }
+  }
   /** Cursor only advertises commands on a live session, so open a throwaway one in the workspace. */
   const listCommands = async (requestId: string, workspacePath: string): Promise<void> => {
     let session: Session | undefined
@@ -645,18 +720,10 @@ export const runCursorWorker = (
           void listCommands(message.requestId, message.workspacePath)
           break
         case "list-sessions":
-          publish({
-            type: "sessions-result",
-            requestId: message.requestId,
-            error: "Cursor sessions cannot be imported.",
-          })
+          void listSessions(message.requestId, message.workspacePath)
           break
         case "read-session":
-          publish({
-            type: "session-history-result",
-            requestId: message.requestId,
-            error: "Cursor sessions cannot be imported.",
-          })
+          void readSession(message.requestId, message.workspacePath, message.nativeThreadId)
           break
         case "shutdown":
           void shutdown().then(

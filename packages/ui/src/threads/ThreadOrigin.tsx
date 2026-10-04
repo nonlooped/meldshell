@@ -237,7 +237,7 @@ export function ThreadBranchToggle({ thread }: { thread: Thread }): React.JSX.El
           <BaseButton
             type="button"
             disabled={busy}
-            title="Continue a Claude Code or Codex session started in a terminal"
+            title="Continue a Claude Code, Codex, Cursor or Pi session started in a terminal"
             onClick={() => useViewStore.getState().openSessionPicker(thread.workspaceId)}
             className={originActionClasses}
           >

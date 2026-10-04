@@ -434,7 +434,7 @@ export const requests = {
     "meldshell:create-pull-request",
   ),
   listIssues: request<(input: ListIssuesInput) => Promise<IssueList>>("meldshell:list-issues"),
-  /** The Claude Code and Codex sessions started in a terminal in a workspace's folder. */
+  /** The agent CLI sessions started in a terminal in a workspace's folder. */
   listCliSessions: request<(workspaceId: string) => Promise<CliSessionList>>(
     "meldshell:list-cli-sessions",
   ),

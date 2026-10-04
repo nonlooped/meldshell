@@ -7,15 +7,36 @@ import { AppSnapshot, HARNESSES } from "./models"
  */
 
 /** The harnesses whose terminal sessions MeldShell can bring in and continue in their CLI. */
-export const CliHarness = Schema.Literals(["claude-code", "codex"])
+export const CliHarness = Schema.Literals(["claude-code", "codex", "cursor", "pi"])
 
 export type CliHarness = typeof CliHarness.Type
 
 export const isCliHarness = Schema.is(CliHarness)
 
+/**
+ * The ID each harness's CLI takes to resume a session. Pi sessions are kept by file path, named
+ * `<time>_<id>.jsonl`, and Pi finds one by its ID.
+ */
+export const cliSessionArgument = (harness: CliHarness, nativeThreadId: string): string => {
+  if (harness !== "pi" || !nativeThreadId.endsWith(".jsonl")) return nativeThreadId
+  const name = nativeThreadId.split(/[\\/]/).at(-1) ?? ""
+  return name.slice(name.indexOf("_") + 1, -".jsonl".length)
+}
+
 /** The command that starts each harness's CLI on a stored session. */
-export const cliResumeCommand = (harness: CliHarness, nativeThreadId: string): string =>
-  harness === "claude-code" ? `claude --resume ${nativeThreadId}` : `codex resume ${nativeThreadId}`
+export const cliResumeCommand = (harness: CliHarness, nativeThreadId: string): string => {
+  const id = cliSessionArgument(harness, nativeThreadId)
+  switch (harness) {
+    case "claude-code":
+      return `claude --resume ${id}`
+    case "codex":
+      return `codex resume ${id}`
+    case "cursor":
+      return `cursor-agent --resume ${id}`
+    case "pi":
+      return `pi --session ${id}`
+  }
+}
 
 export const cliLabel = (harness: CliHarness): string => `${HARNESSES[harness].label} CLI`
 

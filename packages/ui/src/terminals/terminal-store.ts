@@ -71,7 +71,7 @@ interface TerminalStore {
   /** Ends the shell running the named run script, stopping its servers. */
   readonly stopRun: (threadId: string, name: string) => void
   /**
-   * Continues the thread's Claude Code or Codex session in its CLI in a new shell, or shows the
+   * Continues the thread's agent session in that agent's CLI in a new shell, or shows the
    * shell already running it.
    */
   readonly continueInCli: (threadId: string) => void
