@@ -124,7 +124,7 @@ const toolOutputHeaderClasses = [
   "[&_button]:inline-flex [&_button]:items-center [&_button]:justify-center [&_button]:min-w-[26px]",
   "[&_button]:min-h-[26px] [&_button]:[padding:3px_6px] [&_button]:border-0",
   "[&_button]:rounded-[var(--radius-sm)] [&_button]:bg-transparent",
-  "[&_button]:text-[var(--text-secondary)] [&_button]:[font:inherit] [&_button]:cursor-pointer",
+  "[&_button]:text-[var(--text-secondary)] [&_button]:[font:inherit] [&_button]:cursor-default",
   "[&_button:hover]:bg-[var(--surface-hover)] [&_button:hover]:text-[var(--text-primary)]",
   "[&_button:focus-visible]:[outline:1px_solid_var(--focus-ring)]",
   "[&_button:focus-visible]:[outline-offset:-2px]",

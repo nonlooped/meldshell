@@ -179,7 +179,7 @@ export function TurnChanges({
 
 const turnChangeTriggerClasses = [
   "flex items-center gap-[8px] min-h-[32px] w-full [padding:4px_6px] border-0 bg-transparent text-left",
-  "cursor-pointer rounded-[var(--radius-sm)] text-[var(--text-secondary)] text-[12px]",
+  "cursor-default rounded-[var(--radius-sm)] text-[var(--text-secondary)] text-[12px]",
   "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]",
   "[&:focus-visible]:[outline:1px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:2px]",
   "[&_>_svg]:shrink-0 [&_.file-icon]:shrink-0",

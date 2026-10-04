@@ -15,7 +15,7 @@ export const settingsCardSurfaceClasses =
 
 /** A small caption above one of several cards in a group, such as a shortcut category. */
 export const settingsCaptionClasses =
-  "m-0 [padding:0_2px_8px] text-[var(--text-tertiary)] text-[11.5px] font-medium"
+  "m-0 [padding:0_2px_8px] text-[var(--text-tertiary)] text-[12px] font-medium"
 
 /**
  * One titled part of a settings page. The page's outline and search both find groups by
@@ -51,7 +51,7 @@ export function SettingsGroup({
         <div className="flex min-w-0 flex-col gap-[3px]">
           <h3
             id={id}
-            className="m-0 [font-family:var(--font-display)] text-[var(--text-primary)] text-[13.5px] font-semibold tracking-[-0.005em]"
+            className="m-0 [font-family:var(--font-display)] text-[var(--text-primary)] text-[14px] font-semibold tracking-[-0.005em]"
           >
             {title}
           </h3>

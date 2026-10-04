@@ -14,7 +14,7 @@ import { modelLabel } from "../data/model-label"
 import { queryKeys } from "../data/cache"
 import { Collapsible } from "@base-ui-components/react/collapsible"
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type {
   Provider,
   ProviderModel,
@@ -23,6 +23,7 @@ import type {
 } from "@meldshell/contracts"
 import { errorMessage, REASONING_EFFORTS } from "@meldshell/contracts"
 import {
+  Check,
   ChevronDown,
   CircleArrowUp,
   Eye,
@@ -206,6 +207,12 @@ export function ProviderCard({
   const [checking, setChecking] = useState(false)
   const [filter, setFilter] = useState("")
   const { actionError, run } = useHarnessUpdate(provider.harness, setOpenChoice)
+  const [renamed, setRenamed] = useState(false)
+  useEffect(() => {
+    if (!renamed) return
+    const timer = window.setTimeout(() => setRenamed(false), 1800)
+    return () => window.clearTimeout(timer)
+  }, [renamed])
 
   // Commit on blur; key the input by the stored name to pick up external renames.
   const commitName = (input: HTMLInputElement): void => {
@@ -215,6 +222,7 @@ export function ProviderCard({
       return
     }
     onRename(trimmed)
+    setRenamed(true)
   }
 
   const checkAgain = (): void => {
@@ -324,7 +332,19 @@ export function ProviderCard({
         )}
         <SettingRow
           label="Display name"
-          description="The name shown in menus and thread controls."
+          description={
+            renamed ? (
+              <span
+                className="inline-flex items-center gap-[5px] text-[var(--color-added)]"
+                role="status"
+              >
+                <Check size={12} strokeWidth={2.25} aria-hidden="true" />
+                Saved
+              </span>
+            ) : (
+              "The name shown in menus and thread controls."
+            )
+          }
           controlId={`provider-name-${provider.id}`}
         >
           <TextField
@@ -368,11 +388,11 @@ export function ProviderCard({
           </div>
 
           {models.length === 0 ? (
-            <p className="settings-empty m-0 [padding:24px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-tertiary)] text-[12.5px] text-center">
+            <p className="settings-empty m-0 [padding:24px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-tertiary)] text-[13px] text-center">
               This provider has no models. Add one to make it selectable in the composer.
             </p>
           ) : visibleModels.length === 0 ? (
-            <p className="settings-empty m-0 [padding:24px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-tertiary)] text-[12.5px] text-center">
+            <p className="settings-empty m-0 [padding:24px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-tertiary)] text-[13px] text-center">
               No models match “{filter.trim()}”.
             </p>
           ) : (
@@ -550,7 +570,7 @@ function ModelRow({
           <div className="flex min-w-0 flex-col gap-[2px] [padding:10px_0]">
             <span className="flex min-w-0 items-center gap-[6px]">
               <span
-                className="model-name overflow-hidden text-[var(--text-primary)] text-[12.5px] text-ellipsis whitespace-nowrap"
+                className="model-name overflow-hidden text-[var(--text-primary)] text-[13px] text-ellipsis whitespace-nowrap"
                 title={name}
               >
                 {name}
@@ -560,14 +580,14 @@ function ModelRow({
               {model.supportsFast && <Badge>Fast</Badge>}
             </span>
             <span
-              className="model-slug overflow-hidden text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.5px] text-ellipsis whitespace-nowrap"
+              className="model-slug overflow-hidden text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[11px] text-ellipsis whitespace-nowrap"
               title={model.slug}
             >
               {model.slug}
             </span>
           </div>
           <span
-            className="overflow-hidden text-[var(--text-secondary)] text-[11.5px] text-ellipsis whitespace-nowrap [@container(max-width:_540px)]:hidden"
+            className="overflow-hidden text-[var(--text-secondary)] text-[12px] text-ellipsis whitespace-nowrap [@container(max-width:_540px)]:hidden"
             title={
               model.reasoningEfforts.length === 0
                 ? "No reasoning efforts"

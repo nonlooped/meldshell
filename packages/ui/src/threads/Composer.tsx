@@ -1,5 +1,5 @@
 import { chipClasses } from "../ui/styles"
-import { PopPresence, Pressable, Swap, useMotionPreference } from "../ui/motion"
+import { ActivitySpinner, PopPresence, Pressable, Swap, useMotionPreference } from "../ui/motion"
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { Notice } from "../ui/Notice"
@@ -18,6 +18,7 @@ import { knownHarness } from "../data/providers"
 import {
   AlarmClock,
   ChevronDown,
+  CircleAlert,
   Eye,
   ImageIcon,
   FolderPen,
@@ -269,6 +270,43 @@ function ComposerAttachments({
   )
 }
 
+/**
+ * One line above the message box that says what the composer is doing or what went wrong. Every
+ * status takes the same shape, so a failure never looks like a quiet note.
+ */
+function ComposerStatus({
+  tone = "status",
+  icon,
+  onDismiss,
+  children,
+}: {
+  tone?: "status" | "error"
+  icon: React.ReactNode
+  onDismiss?: () => void
+  children: React.ReactNode
+}): React.JSX.Element {
+  const error = tone === "error"
+  return (
+    <div
+      className={`flex items-center gap-[7px] [padding:6px_6px_2px_10px] text-[12px] ${error ? "text-[var(--color-deleted)]" : "text-[var(--text-secondary)]"}`}
+      role={error ? "alert" : "status"}
+    >
+      <span className={`flex flex-none ${error ? "" : "text-[var(--text-tertiary)]"}`}>{icon}</span>
+      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{children}</span>
+      {onDismiss && (
+        <IconButton
+          unstyled
+          className="motion-colors grid w-[20px] h-[20px] flex-none place-items-center rounded-full border-0 bg-transparent p-0 text-[var(--text-tertiary)] cursor-default [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
+          label="Dismiss"
+          onClick={onDismiss}
+        >
+          <X size={11} strokeWidth={2} />
+        </IconButton>
+      )}
+    </div>
+  )
+}
+
 function ComposerTextActions({
   input,
   onAttach,
@@ -452,7 +490,7 @@ function ReasoningSettings({
               : `${effortLabel(selection.reasoningEffort)} effort`}
           </span>
           {efforts.length > 0 && supportsFast && selection.speed === "fast" && (
-            <span className="chip-label flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[10.5px] leading-[1.3]">
+            <span className="chip-label flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[11px] leading-[1.3]">
               Fast
             </span>
           )}
@@ -640,8 +678,15 @@ function ComposerSettings({
 }): React.JSX.Element {
   if (selection === null)
     return (
-      <span className="text-[var(--text-tertiary)] text-[10.5px] tabular-nums whitespace-nowrap">
-        No model is enabled. Add one in Settings.
+      <span className="flex items-center gap-[4px] text-[var(--text-tertiary)] text-[11px] whitespace-nowrap">
+        No model is enabled.
+        <BaseButton
+          type="button"
+          className="motion-colors inline [padding:0] border-0 bg-transparent text-[var(--text-secondary)] [font:inherit] cursor-default underline [text-decoration-color:var(--line-strong)] [text-underline-offset:2px] [&:hover]:text-[var(--text-primary)] [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)]"
+          onClick={() => useViewStore.getState().openSettings("providers")}
+        >
+          Add one in Settings
+        </BaseButton>
       </span>
     )
   const { isClaude, toolPermissions, options, selected } = permissionOptions(selection)
@@ -693,7 +738,7 @@ function ComposerSettings({
               {!fullPermissions &&
                 selection.mode !== "default" &&
                 modes.includes(selection.mode) && (
-                  <span className="chip-label flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[10.5px] leading-[1.3]">
+                  <span className="chip-label flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[11px] leading-[1.3]">
                     {MODES[selection.mode].label}
                   </span>
                 )}
@@ -909,35 +954,25 @@ export function Composer({
         {completion.menu}
         <ComposerAttachments attachments={attachments} onRemoveAttachment={onRemoveAttachment} />
         {loadingAttachments && (
-          <div className="text-[var(--text-tertiary)] text-[11px] p-[8px]" role="status">
-            Adding attachments…
-          </div>
+          <ComposerStatus icon={<ActivitySpinner />}>Adding attachments…</ComposerStatus>
         )}
         {attachmentError && (
-          <div className="text-[var(--text-tertiary)] text-[11px] p-[8px]" role="alert">
+          <ComposerStatus
+            tone="error"
+            icon={<CircleAlert size={12} strokeWidth={1.75} />}
+            onDismiss={() => setAttachmentError(null)}
+          >
             {attachmentError}
-          </div>
+          </ComposerStatus>
         )}
         {dictationError && (
-          <div
-            className="flex items-center gap-[7px] text-[var(--text-secondary)] text-[11.5px] [padding:6px_6px_2px_8px]"
-            role="alert"
+          <ComposerStatus
+            tone="error"
+            icon={<MicOff size={12} strokeWidth={1.75} />}
+            onDismiss={() => setDictationError(null)}
           >
-            <MicOff
-              size={12}
-              strokeWidth={1.75}
-              className="flex-none text-[var(--text-tertiary)]"
-            />
-            <span className="min-w-0 flex-1">{dictationError}</span>
-            <IconButton
-              unstyled
-              className="motion-colors grid w-[20px] h-[20px] flex-none place-items-center rounded-full border-0 bg-transparent p-0 text-[var(--text-tertiary)] cursor-default [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
-              label="Dismiss"
-              onClick={() => setDictationError(null)}
-            >
-              <X size={11} strokeWidth={2} />
-            </IconButton>
-          </div>
+            {dictationError}
+          </ComposerStatus>
         )}
         <div className="relative grid">
           {completion.highlight}
@@ -1029,15 +1064,6 @@ export function Composer({
               >
                 <Paperclip size={13} strokeWidth={1.75} />
               </IconButton>
-              <IconButton
-                unstyled
-                className={`motion-colors flex-none ${chipClasses}`}
-                label="Schedule this prompt"
-                disabled={sending}
-                onClick={onSchedule}
-              >
-                <AlarmClock size={13} strokeWidth={1.75} />
-              </IconButton>
               <ComposerSettings
                 snapshot={snapshot}
                 threadId={threadId}
@@ -1093,57 +1119,68 @@ export function Composer({
                     <SendIcon sideQuestion={sideQuestion} running={running} delivery={followUp} />
                   </IconButton>
                 </span>
-                <PopPresence show={running}>
-                  <DropdownMenu
-                    align="end"
-                    side="top"
-                    trigger={
-                      <BaseButton
-                        render={<Pressable />}
-                        type="button"
-                        className="motion-colors grid w-[20px] h-[28px] flex-none p-0 border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover]:text-[var(--text-primary)]"
-                        aria-label="Choose how to send while the agent works"
-                      >
-                        <ChevronDown size={13} strokeWidth={2} />
-                      </BaseButton>
-                    }
+                <DropdownMenu
+                  align="end"
+                  side="top"
+                  tooltip="More ways to send"
+                  trigger={
+                    <BaseButton
+                      render={<Pressable />}
+                      type="button"
+                      className="motion-colors grid w-[20px] h-[28px] flex-none p-0 border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover]:text-[var(--text-primary)]"
+                      aria-label="More ways to send"
+                    >
+                      <ChevronDown size={13} strokeWidth={2} />
+                    </BaseButton>
+                  }
+                >
+                  <MenuAction
+                    icon={<AlarmClock size={14} strokeWidth={1.75} />}
+                    disabled={sending}
+                    onClick={onSchedule}
                   >
-                    <MenuGroup label="Send this message">
-                      {DELIVERIES.map((delivery) => (
-                        <MenuAction
-                          key={delivery}
-                          disabled={!canSend}
-                          icon={<FollowUpIcon delivery={delivery} size={14} strokeWidth={1.75} />}
-                          onClick={() => send(delivery)}
-                        >
-                          {FOLLOW_UP[delivery].label}
-                        </MenuAction>
-                      ))}
-                    </MenuGroup>
-                    <MenuSeparator />
-                    <MenuGroup label="Enter while working">
-                      <MenuRadioGroup
-                        value={followUp}
-                        onValueChange={(value) =>
-                          onFollowUpChange(value === "steer" ? "steer" : "queue")
-                        }
-                      >
+                    Schedule this prompt…
+                  </MenuAction>
+                  {running && (
+                    <>
+                      <MenuSeparator />
+                      <MenuGroup label="Send this message">
                         {DELIVERIES.map((delivery) => (
-                          <MenuChoice
+                          <MenuAction
                             key={delivery}
-                            value={delivery}
-                            detail={FOLLOW_UP[delivery].short}
+                            disabled={!canSend}
+                            icon={<FollowUpIcon delivery={delivery} size={14} strokeWidth={1.75} />}
+                            onClick={() => send(delivery)}
                           >
                             {FOLLOW_UP[delivery].label}
-                          </MenuChoice>
+                          </MenuAction>
                         ))}
-                      </MenuRadioGroup>
-                      <div className="[padding:4px_9px_6px] text-[var(--text-tertiary)] text-[10.5px] leading-[1.4]">
-                        {MODIFIER_KEY}+Enter does the other.
-                      </div>
-                    </MenuGroup>
-                  </DropdownMenu>
-                </PopPresence>
+                      </MenuGroup>
+                      <MenuSeparator />
+                      <MenuGroup label="Enter while working">
+                        <MenuRadioGroup
+                          value={followUp}
+                          onValueChange={(value) =>
+                            onFollowUpChange(value === "steer" ? "steer" : "queue")
+                          }
+                        >
+                          {DELIVERIES.map((delivery) => (
+                            <MenuChoice
+                              key={delivery}
+                              value={delivery}
+                              detail={FOLLOW_UP[delivery].short}
+                            >
+                              {FOLLOW_UP[delivery].label}
+                            </MenuChoice>
+                          ))}
+                        </MenuRadioGroup>
+                        <div className="[padding:4px_9px_6px] text-[var(--text-tertiary)] text-[11px] leading-[1.4]">
+                          {MODIFIER_KEY}+Enter does the other.
+                        </div>
+                      </MenuGroup>
+                    </>
+                  )}
+                </DropdownMenu>
               </div>
             </div>
           }
@@ -1169,7 +1206,7 @@ export function Composer({
 const attachmentChipClasses = [
   "inline-flex flex-[0_0_210px] max-w-[min(240px,_100%)] items-center gap-[8px] p-[6px]",
   "border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-[var(--surface-hover)]",
-  "text-[var(--text-secondary)] text-[10.5px]",
+  "text-[var(--text-secondary)] text-[11px]",
   "[&_button]:grid [&_button]:w-[20px] [&_button]:h-[20px] [&_button]:flex-[0_0_20px] [&_button]:p-0",
   "[&_button]:border-0 [&_button]:rounded-[3px] [&_button]:text-inherit [&_button]:bg-transparent",
   "[&_button]:cursor-default [&_button]:place-items-center [&_button:hover]:bg-[var(--surface-active)]",

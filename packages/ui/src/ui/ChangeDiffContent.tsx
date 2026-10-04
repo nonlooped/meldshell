@@ -48,7 +48,7 @@ function FileChanges({
           ) : (
             <button
               type="button"
-              className={`${gapClasses} w-full border-0 text-left cursor-pointer [&:hover]:text-[var(--text-primary)] [&:hover]:bg-[var(--surface-active)]`}
+              className={`${gapClasses} w-full border-0 text-left cursor-default [&:hover]:text-[var(--text-primary)] [&:hover]:bg-[var(--surface-active)]`}
               onClick={() => {
                 const key = segment.key
                 if (key !== null) setExpanded((previous) => new Set(previous).add(key))
@@ -99,7 +99,7 @@ function FileChanges({
             </div>
           )}
           {file.hunks.length === 0 ? (
-            <pre className="work-item-output max-h-[220px] m-0 overflow-auto text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[10.75px] leading-[1.55] whitespace-pre-wrap">
+            <pre className="work-item-output max-h-[220px] m-0 overflow-auto text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[11px] leading-[1.55] whitespace-pre-wrap">
               {file.patch}
             </pre>
           ) : (

@@ -170,7 +170,7 @@ export function DelimitedTable({ rows: parsed }: { rows: readonly (readonly stri
 }
 
 const scrollClasses = [
-  "flex-1 min-h-0 overflow-auto [scrollbar-gutter:stable] text-[12.5px]",
+  "flex-1 min-h-0 overflow-auto [scrollbar-gutter:stable] text-[13px]",
   "[&:focus-visible]:[outline:1px_solid_var(--focus-ring)] [&:focus-visible]:[outline-offset:-1px]",
 ].join(" ")
 
@@ -180,7 +180,7 @@ const tableClasses = [
   "[&_th]:border-b-[1px] [&_th]:border-b-[color:var(--line)] [&_th]:text-left [&_th]:font-semibold",
   "[&_th]:text-[var(--text-primary)] [&_th_button]:flex [&_th_button]:w-full [&_th_button]:h-full",
   "[&_th_button]:items-center [&_th_button]:gap-[4px] [&_th_button]:[padding:0_12px] [&_th_button]:border-0",
-  "[&_th_button]:bg-transparent [&_th_button]:text-inherit [&_th_button]:[font:inherit] [&_th_button]:cursor-pointer",
+  "[&_th_button]:bg-transparent [&_th_button]:text-inherit [&_th_button]:[font:inherit] [&_th_button]:cursor-default",
   "[&_th_button:hover]:bg-[var(--surface-hover)] [&_th_button:focus-visible]:[outline:1.5px_solid_var(--focus-ring)]",
   "[&_th_button:focus-visible]:[outline-offset:-2px] [&_th_button_span]:min-w-0 [&_th_button_span]:overflow-hidden",
   "[&_th_button_span]:text-ellipsis [&_th_button_span]:whitespace-nowrap",

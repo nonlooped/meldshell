@@ -197,6 +197,7 @@ function RunButton({
   return (
     <DropdownMenu
       align="end"
+      tooltip={label}
       trigger={
         <BaseButton
           render={<Pressable />}
@@ -205,7 +206,6 @@ function RunButton({
             running.length > 0 ? "text-[var(--text-primary)]" : ""
           }`}
           aria-label={label}
-          title={label}
         >
           <Play size={15} />
           {running.length > 0 && <RunningDot />}
@@ -247,7 +247,7 @@ function EditorMenuItems({
       <span className="flex min-w-[200px] flex-1 items-baseline justify-between gap-[16px]">
         <span className="text-[var(--text-primary)]">{editor.name}</span>
         {first && shortcut !== "" && (
-          <span className="text-[var(--text-tertiary)] [font:10.5px_var(--font-mono)]">
+          <span className="text-[var(--text-tertiary)] [font:11px_var(--font-mono)]">
             {shortcut}
           </span>
         )}
@@ -286,13 +286,13 @@ function OpenInEditorButton({
   return (
     <DropdownMenu
       align="end"
+      tooltip={withShortcut("Open in editor", shortcut)}
       trigger={
         <BaseButton
           render={<Pressable />}
           type="button"
           className={`motion-colors ${iconButtonClasses} ${noDrag}`}
           aria-label="Open in editor"
-          title={withShortcut("Open in editor", shortcut)}
         >
           <FolderCode size={15} />
         </BaseButton>
@@ -391,13 +391,13 @@ function ThreadToolsMenu({
   return (
     <DropdownMenu
       align="end"
+      tooltip="Thread tools"
       trigger={
         <BaseButton
           render={<Pressable />}
           type="button"
           className={`motion-colors relative ${iconButtonClasses} ${noDrag}`}
           aria-label="Thread tools"
-          title="Thread tools"
         >
           <MoreHorizontal size={16} />
           {runningScripts.length > 0 && <RunningDot />}
@@ -668,7 +668,7 @@ function TabStrip({
             label={`Close ${file.path}`}
             onClick={(event) => closeTab(event.currentTarget, file.id)}
           >
-            <X size={12} />
+            <X size={12} strokeWidth={2} />
           </IconButton>
         </div>
       ))}

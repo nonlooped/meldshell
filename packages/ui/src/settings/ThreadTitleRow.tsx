@@ -65,7 +65,7 @@ export function ThreadTitleRow({
               className="h-auto [padding:7px_9px] items-start"
             >
               <span className="flex min-w-0 flex-1 flex-col gap-[1px]">
-                <span className="model-item-name text-inherit text-[12.5px]">
+                <span className="model-item-name text-inherit text-[13px]">
                   {CURRENT_MODEL_LABEL}
                 </span>
                 <span className="text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10px]">
@@ -86,7 +86,7 @@ export function ThreadTitleRow({
                   className="h-auto [padding:7px_9px] items-start"
                 >
                   <span className="flex min-w-0 flex-1 flex-col gap-[1px]">
-                    <span className="model-item-name text-inherit text-[12.5px]">
+                    <span className="model-item-name text-inherit text-[13px]">
                       {modelLabel(model.displayName)}
                     </span>
                     <span className="flex items-center gap-[5px] text-[var(--text-tertiary)] text-[11px]">

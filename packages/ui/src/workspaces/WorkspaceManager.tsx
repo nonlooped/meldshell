@@ -44,7 +44,7 @@ export function WorkspaceManager({
       </div>
       {error && !editing && !removing && <p role="alert">{error}</p>}
       {workspaces.length === 0 && (
-        <p className="settings-empty [padding:28px_0] text-[var(--text-tertiary)] text-[12.5px] text-center">
+        <p className="settings-empty [padding:28px_0] text-[var(--text-tertiary)] text-[13px] text-center">
           Add a folder to start a workspace.
         </p>
       )}
@@ -158,7 +158,7 @@ export function WorkspaceManager({
               Cancel
             </Button>
             <Button
-              variant="primary"
+              variant="danger"
               disabled={pending}
               onClick={() => {
                 if (removing) void run(() => onRemove(removing.id))

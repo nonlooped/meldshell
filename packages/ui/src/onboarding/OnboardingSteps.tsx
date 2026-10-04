@@ -58,14 +58,14 @@ function StepTitle({ title, hint }: { title: string; hint: string }) {
       <h1 className="m-0 [font-family:var(--font-display)] text-[30px] font-semibold tracking-[-0.022em] leading-[1.15]">
         {title}
       </h1>
-      <p className="m-0 text-[var(--text-secondary)] text-[13.5px]">{hint}</p>
+      <p className="m-0 text-[var(--text-secondary)] text-[14px]">{hint}</p>
     </Stagger>
   )
 }
 
 /** Raised tiles share one surface so every step reads as part of the same canvas. */
 const tileClasses = [
-  "motion-colors relative border-[1px] border-[color:var(--line)] rounded-[var(--radius-xl)]",
+  "motion-colors relative border-[1px] border-[color:var(--line)] rounded-[var(--radius-lg)]",
   "bg-[var(--surface-raised)] [box-shadow:inset_0_1px_0_var(--edge-highlight)] text-[var(--text-primary)]",
   "cursor-default [&:hover:not(:disabled)]:[border-color:var(--line-strong)]",
   "[&[data-checked]]:[border-color:var(--accent)]",
@@ -148,7 +148,7 @@ function StatusDot({ status }: { status: ProviderStatus | undefined }) {
   const state = AGENT_STATES[availability]
   return (
     <span
-      className="inline-flex items-center gap-[6px] [padding:3px_9px] rounded-[999px] bg-[var(--surface-hover)] text-[11.5px] font-medium whitespace-nowrap"
+      className="inline-flex items-center gap-[6px] [padding:3px_9px] rounded-[999px] bg-[var(--surface-hover)] text-[12px] font-medium whitespace-nowrap"
       style={{ color: state.tone }}
     >
       {availability === "probing" ? (
@@ -184,7 +184,7 @@ export function AgentsStep({
         title="Your agents"
         hint="Signed in with your own accounts. Tap one to turn it off."
       />
-      <div className="grid grid-cols-4 gap-[12px] [@media(max-width:_760px)]:grid-cols-2">
+      <div className="grid grid-cols-4 gap-[12px] [@container(max-width:_760px)]:grid-cols-2">
         {providers.map((provider, index) => {
           const status = statuses.get(provider.id)
           const ready = status?.availability === "ready"
@@ -212,7 +212,7 @@ export function AgentsStep({
                 {provider.enabled ? (
                   <StatusDot status={status} />
                 ) : (
-                  <span className="[padding:3px_9px] text-[var(--text-tertiary)] text-[11.5px] font-medium">
+                  <span className="[padding:3px_9px] text-[var(--text-tertiary)] text-[12px] font-medium">
                     Off
                   </span>
                 )}
@@ -350,7 +350,7 @@ function ToggleTile({
       </span>
       <span className="grid gap-[1px]">
         <span className="text-[13px] font-semibold">{label}</span>
-        <span className="text-[var(--text-tertiary)] text-[11.5px]">{hint}</span>
+        <span className="text-[var(--text-tertiary)] text-[12px]">{hint}</span>
       </span>
     </button>
   )
@@ -390,7 +390,7 @@ export function LookStep({
                 <span className="block h-[92px] overflow-hidden rounded-[9px] border-[1px] border-[color:var(--line-subtle)]">
                   <ThemePreview theme={option.value} colors={colors} />
                 </span>
-                <span className="flex items-center justify-center gap-[6px] text-[12.5px] font-medium">
+                <span className="flex items-center justify-center gap-[6px] text-[13px] font-medium">
                   {option.icon}
                   {option.label}
                 </span>
@@ -432,7 +432,7 @@ export function LookStep({
         </Stagger>
         <Stagger
           index={3}
-          className="grid grid-cols-[1.15fr_1fr_1fr] gap-[12px] [@media(max-width:_760px)]:grid-cols-1"
+          className="grid grid-cols-[1.15fr_1fr_1fr] gap-[12px] [@container(max-width:_760px)]:grid-cols-1"
         >
           <RadioGroup
             aria-label="Transcript text size"

@@ -92,7 +92,7 @@ function FileActionDialog({
             Cancel
           </Button>
           <Button
-            variant="primary"
+            variant={operation === "delete" ? "danger" : "primary"}
             disabled={busy || (operation !== "delete" && !name.trim())}
             onClick={() => void submit()}
           >
@@ -220,7 +220,7 @@ function FileRow({
       role="treeitem"
       aria-level={depth + 1}
       className={
-        "flex items-center gap-[6px] w-full h-[24px] [padding:0_10px] border-0 bg-transparent text-inherit text-left cursor-pointer [&:hover]:bg-[var(--surface-hover)] [&_>_svg]:shrink-0 [&_>_svg]:w-[12px] [&_>_.file-icon]:w-[16px]"
+        "flex items-center gap-[6px] w-full h-[24px] [padding:0_10px] border-0 bg-transparent text-inherit text-left cursor-default [&:hover]:bg-[var(--surface-hover)] [&_>_svg]:shrink-0 [&_>_svg]:w-[12px] [&_>_.file-icon]:w-[16px]"
       }
       style={{ paddingLeft: 10 + depth * 14, ...indentGuides(depth) }}
       title={`${entry.path}${entry.status ? ` (${kind})` : ""}`}
@@ -248,7 +248,7 @@ function FileRow({
           />
         ) : (
           <span
-            className={`${statusMarkClasses} w-[14px] text-center [font:500_10.5px_var(--font-mono)]`}
+            className={`${statusMarkClasses} w-[14px] text-center [font:500_11px_var(--font-mono)]`}
             data-kind={kind}
             aria-hidden="true"
           >

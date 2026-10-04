@@ -12,6 +12,17 @@ export const panelNoteClasses =
 export const disclosureChevronClasses =
   "motion-transform motion-duration-200 disclosure-chevron flex-none [[data-panel-open]_>_&]:[transform:rotate(90deg)]"
 
+/**
+ * A floating pill over content, such as Scroll to latest or a snapshot's Undo. Toasts share the
+ * surface, so every floating control reads as one family.
+ */
+export const floatingPillClasses = [
+  "flex items-center gap-[8px] border-[1px] border-[color:var(--line)] rounded-[999px]",
+  "bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] text-[var(--text-primary)] text-[12px]",
+  "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
+  "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
+].join(" ")
+
 /** An inbox control whose right edge follows the sidebar panel's live width. Collapsed to the
  * rail it becomes a square around its icon; its left edge and icon never move. */
 export const railControlClasses = "max-w-[calc(100cqw_-_16px)]"
@@ -24,7 +35,7 @@ export const railLabelClasses =
 export const menuItemClasses = [
   "menu-item flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)]",
   "[@media(pointer:coarse)]:h-[38px]",
-  "text-[var(--text-secondary)] cursor-default text-[12.5px] outline-none select-none",
+  "text-[var(--text-secondary)] cursor-default text-[13px] outline-none select-none",
   "[&[data-highlighted]]:bg-[var(--surface-active)] [&[data-highlighted]]:text-[var(--text-primary)]",
   "[&[data-disabled]]:text-[var(--text-disabled)]",
 ].join(" ")
@@ -36,7 +47,7 @@ export const menuGutterClasses =
 export const tooltipPopupClasses = [
   "[padding:5px_8px] border-[1px] border-[color:var(--line)] rounded-[var(--radius-sm)]",
   "bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] [box-shadow:var(--shadow-popup)]",
-  "text-[var(--text-primary)] text-[11.5px]",
+  "text-[var(--text-primary)] text-[12px]",
   "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
 ].join(" ")
 
@@ -108,7 +119,7 @@ export const centeredStateClasses = [
   "[&_.brand-mark]:mb-[16px] [&_.brand-mark]:text-[var(--text-tertiary)] [&_h2]:m-0",
   "[&_h2]:[font-family:var(--font-display)] [&_h2]:text-[20px] [&_h2]:font-semibold",
   "[&_h2]:tracking-[-0.01em] [&_p]:max-w-[380px] [&_p]:[margin:8px_0_20px]",
-  "[&_p]:text-[var(--text-secondary)] [&_p]:text-[12.5px] [&_p]:leading-[1.6]",
+  "[&_p]:text-[var(--text-secondary)] [&_p]:text-[13px] [&_p]:leading-[1.6]",
 ].join(" ")
 
 export const threadContentClasses = [
@@ -123,13 +134,46 @@ export const threadContentClasses = [
 
 export const textInputClasses = [
   "text-input w-full h-[32px] [padding:0_10px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)]",
-  "[background:rgba(0,_0,_0,_0.198)] text-[var(--text-primary)] text-[12.5px] outline-none",
+  "bg-[var(--surface-input)] text-[var(--text-primary)] text-[13px] outline-none",
   "[&::placeholder]:text-[var(--text-tertiary)] [&:focus]:[border-color:var(--line-strong)]",
-  "[&:focus]:[box-shadow:0_0_0_3px_rgba(255,_255,_255,_0.045)]",
-  "[&[data-mono='true']]:[font-family:var(--font-mono)] [&[data-mono='true']]:text-[11.5px]",
-  "[:root[data-theme='light']_&]:bg-[var(--surface-raised)] [select&]:[font-family:var(--font-text)]",
-  "[select&]:text-[12px] [select&]:text-[var(--text-primary)] [select&]:bg-[var(--surface-raised)]",
-  "[select&]:cursor-pointer",
+  "[&:focus]:[box-shadow:0_0_0_3px_var(--focus-glow)]",
+  "[&[data-mono='true']]:[font-family:var(--font-mono)] [&[data-mono='true']]:text-[12px]",
+  "[select&]:[font-family:var(--font-text)] [select&]:text-[12px] [select&]:text-[var(--text-primary)]",
+  "[select&]:cursor-default",
+].join(" ")
+
+/** A multi-line field: the text input's surface, grown to its rows and resizable downward. */
+export const textAreaClasses = [
+  "text-area block w-full min-h-[72px] [padding:8px_10px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)]",
+  "bg-[var(--surface-input)] text-[var(--text-primary)] text-[13px] leading-[1.55] outline-none",
+  "[resize:vertical] [font-family:inherit] [&::placeholder]:text-[var(--text-tertiary)]",
+  "[&:focus]:[border-color:var(--line-strong)] [&:focus]:[box-shadow:0_0_0_3px_var(--focus-glow)]",
+  "[&[data-mono='true']]:[font-family:var(--font-mono)] [&[data-mono='true']]:text-[12px]",
+].join(" ")
+
+/** The field-shaped trigger of a select: the text input's surface with a chevron at its end. */
+export const selectTriggerClasses = [
+  "select-trigger inline-flex h-[32px] items-center justify-between gap-[8px] [padding:0_8px_0_10px]",
+  "border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-[var(--surface-input)]",
+  "text-[var(--text-primary)] text-[13px] text-left cursor-default whitespace-nowrap",
+  "[&:hover:not(:disabled)]:[border-color:var(--line-strong)]",
+  "[&[data-popup-open]]:[border-color:var(--line-strong)] [&[data-popup-open]]:[box-shadow:0_0_0_3px_var(--focus-glow)]",
+  "[&:disabled]:text-[var(--text-disabled)] [&:disabled]:opacity-[0.7]",
+].join(" ")
+
+/** A small icon button inside a dense row, such as a queued message or a review note. */
+export const rowIconButtonClasses = [
+  "motion-colors grid w-[22px] h-[22px] flex-none p-0 border-0 rounded-[var(--radius-sm)] bg-transparent",
+  "text-[var(--text-tertiary)] cursor-default place-items-center",
+  "[&:hover:not(:disabled)]:bg-[var(--surface-active)] [&:hover:not(:disabled)]:text-[var(--text-primary)]",
+  "[&:disabled]:opacity-40",
+].join(" ")
+
+/** A quiet text button in a row's header, such as Clear all or Discard. */
+export const rowTextButtonClasses = [
+  "motion-colors [padding:2px_6px] border-0 rounded-[var(--radius-sm)] bg-transparent text-inherit text-[11px]",
+  "cursor-default [&:hover:not(:disabled)]:bg-[var(--surface-active)] [&:hover:not(:disabled)]:text-[var(--text-primary)]",
+  "[&:disabled]:opacity-40",
 ].join(" ")
 
 export const iconButtonClasses = [
@@ -157,8 +201,8 @@ export const chipClasses = [
 export const buttonClasses = [
   "button inline-flex h-[30px] items-center justify-center gap-[7px] [padding:0_11px]",
   "[@media(pointer:coarse)]:h-[38px]",
-  "border-[1px] border-[color:var(--line)] rounded-[var(--radius)] [background:rgba(255,_255,_255,_0.027)]",
-  "text-[var(--text-primary)] cursor-default text-[12.5px] font-medium whitespace-nowrap",
+  "border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-[var(--surface-button)]",
+  "text-[var(--text-primary)] cursor-default text-[13px] font-medium whitespace-nowrap",
   "[&:hover:not(:disabled)]:bg-[var(--surface-hover)]",
   "[&:hover:not(:disabled)]:[border-color:var(--line-strong)]",
   "[&:active:not(:disabled)]:bg-[var(--surface-active)] [&:disabled]:text-[var(--text-disabled)]",
@@ -176,6 +220,13 @@ export const buttonClasses = [
   "[&[data-variant='ghost']:hover:not(:disabled)]:bg-[var(--surface-hover)]",
   "[&[data-variant='ghost']:hover:not(:disabled)]:[border-color:transparent]",
   "[&[data-variant='ghost']:hover:not(:disabled)]:text-[var(--text-primary)]",
+  // Destructive confirms: tinted from the deleted colour, so Delete never reads as Send.
+  "[&[data-variant='danger']]:[border-color:color-mix(in_srgb,_var(--color-deleted)_40%,_transparent)]",
+  "[&[data-variant='danger']]:[background:color-mix(in_srgb,_var(--color-deleted)_12%,_transparent)]",
+  "[&[data-variant='danger']]:text-[var(--color-deleted)]",
+  "[&[data-variant='danger']:hover:not(:disabled)]:[background:color-mix(in_srgb,_var(--color-deleted)_20%,_transparent)]",
+  "[&[data-variant='danger']:hover:not(:disabled)]:[border-color:color-mix(in_srgb,_var(--color-deleted)_60%,_transparent)]",
+  "[&[data-variant='danger']:disabled]:text-[var(--text-disabled)]",
   "[&[data-size='sm']]:h-[26px] [&[data-size='sm']]:[padding:0_9px] [&[data-size='sm']]:text-[12px]",
   "[&[data-block='true']]:w-full",
 ].join(" ")
@@ -228,22 +279,22 @@ export const paneSeparatorClasses = [
 export const questionOptionClasses = [
   "motion-colors flex w-full items-start gap-[10px] [padding:9px_12px] text-left",
   "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-transparent",
-  "text-[var(--text-primary)] text-[12.5px] leading-[1.45] [font-family:inherit] cursor-pointer",
+  "text-[var(--text-primary)] text-[13px] leading-[1.45] [font-family:inherit] cursor-default",
   "[&:hover]:bg-[var(--surface-hover)] [&:hover]:[border-color:var(--line)]",
   "[&:has([data-checked])]:bg-[var(--surface-selected)] [&:has([data-checked])]:[border-color:var(--line-strong)]",
   "[&[aria-pressed='true']]:bg-[var(--surface-selected)] [&[aria-pressed='true']]:[border-color:var(--line-strong)]",
-  "[&:focus-visible]:outline-[2px] [&:focus-visible]:outline-[color:var(--focus-ring)] [&:focus-visible]:outline-offset-[1px]",
+  "[&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] [&:focus-visible]:outline-offset-[1px]",
   "[&[data-disabled]]:opacity-[0.5] [&:disabled]:opacity-[0.55] [&:disabled]:cursor-default",
   "[&:disabled:hover]:bg-transparent [&:disabled:hover]:[border-color:var(--line-subtle)]",
 ].join(" ")
 
 /** The short label a provider puts above a question. */
 export const questionHeaderClasses =
-  "block mb-[4px] text-[var(--text-tertiary)] text-[10.5px] font-semibold uppercase tracking-[0.06em]"
+  "block mb-[4px] text-[var(--text-tertiary)] text-[11px] font-semibold uppercase tracking-[0.06em]"
 
 /** The question itself. */
 export const questionTextClasses =
-  "block m-0 text-[var(--text-primary)] text-[13.5px] font-medium leading-[1.45] [overflow-wrap:anywhere]"
+  "block m-0 text-[var(--text-primary)] text-[14px] font-medium leading-[1.45] [overflow-wrap:anywhere]"
 
 /** Syntax token colours shared by code, diffs, and reference previews. */
 export const syntaxTokenClasses = [

@@ -11,7 +11,7 @@ import { type SideQuestion, useSideQuestions, useThreadSideQuestions } from "./s
 
 const actionClasses = [
   "motion-colors inline-flex items-center gap-[5px] [padding:2px_7px] border-0 rounded-[999px]",
-  "bg-transparent text-[var(--text-tertiary)] text-[11px] [font-family:inherit] cursor-pointer",
+  "bg-transparent text-[var(--text-tertiary)] text-[11px] [font-family:inherit] cursor-default",
   "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]",
 ].join(" ")
 
@@ -29,11 +29,11 @@ function Exchange({
   const [copyState, copy] = useCopy()
   return (
     <div className="grid gap-[8px]">
-      <p className="m-0 justify-self-end max-w-[80%] [padding:7px_12px] rounded-[14px] rounded-br-[5px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[12.5px] whitespace-pre-wrap [overflow-wrap:anywhere]">
+      <p className="m-0 justify-self-end max-w-[80%] [padding:7px_12px] rounded-[14px] rounded-br-[5px] bg-[var(--surface-active)] text-[var(--text-primary)] text-[13px] whitespace-pre-wrap [overflow-wrap:anywhere]">
         {entry.question}
       </p>
       {entry.status === "asking" && (
-        <p className="m-0 text-[12.5px]" role="status">
+        <p className="m-0 text-[13px]" role="status">
           <Shimmer>Thinking about the conversation…</Shimmer>
         </p>
       )}
@@ -62,7 +62,7 @@ function Exchange({
       )}
       {entry.status === "failed" && (
         <div
-          className="flex items-center gap-[8px] text-[var(--text-secondary)] text-[12.5px]"
+          className="flex items-center gap-[8px] text-[var(--text-secondary)] text-[13px]"
           role="alert"
         >
           <span className="min-w-0 flex-1">{entry.error}</span>

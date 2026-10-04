@@ -69,7 +69,8 @@ const labelClasses = "setting-label text-[var(--text-primary)] text-[13px] font-
 const descriptionClasses = "m-0 text-[var(--text-secondary)] text-[12px] leading-[1.6]"
 
 const settingControlClasses = [
-  "flex w-[220px] flex-[0_0_220px] justify-end [&_>_.text-input]:w-full [&_>_.text-input]:min-w-0",
+  // Fields and selects take the full column; a lone switch or button hugs its own width.
+  "flex min-w-[220px] max-w-[320px] flex-none justify-end [&_>_.text-input]:w-full [&_>_.text-input]:min-w-0",
   "[&_>_.field]:w-full [&_>_.field]:min-w-0 [&_>_.button]:w-full [&_>_.button]:min-w-0",
   "[&_.button]:min-h-[32px] [&_.switch]:shrink-0 [@container(max-width:_540px)]:w-[min(100%,_220px)]",
   "[@container(max-width:_540px)]:basis-[auto] [@container(max-width:_540px)]:justify-start",

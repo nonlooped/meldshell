@@ -247,7 +247,7 @@ function Onboarding({
         aria-hidden="true"
         className="pointer-events-none absolute left-[50%] top-[46%] w-[760px] h-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[110px] opacity-[0.1] [background:conic-gradient(from_200deg,var(--spin-top),var(--spin-middle),var(--spin-bottom),var(--spin-top))]"
       />
-      <div className="relative grid min-h-0 overflow-y-auto overflow-x-hidden [padding:16px_32px]">
+      <div className="relative grid min-h-0 overflow-y-auto overflow-x-hidden [padding:16px_32px] [container-type:inline-size]">
         <AnimatePresence initial={false} mode="wait" custom={direction}>
           <motion.div
             key={step}
@@ -287,7 +287,7 @@ function Onboarding({
           <Button
             variant="primary"
             autoFocus
-            className="h-[36px]! [padding:0_18px]! rounded-[999px]!"
+            className="h-[36px]! [padding:0_18px]!"
             disabled={!canContinue || busy}
             onClick={() => (last ? void finish() : go(1))}
           >

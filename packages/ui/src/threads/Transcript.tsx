@@ -22,7 +22,7 @@ import { Collapsible } from "@base-ui-components/react/collapsible"
 import { Toggle } from "@base-ui-components/react/toggle"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Button, ContextMenu, MenuAction } from "../ui/controls"
-import { disclosureChevronClasses } from "../ui/styles"
+import { disclosureChevronClasses, floatingPillClasses } from "../ui/styles"
 import { asRecord, messageHandoff, type CanonicalEvent } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { ChangeDiff } from "../ui/ChangeDiff"
@@ -333,7 +333,7 @@ function ToolBody({
       </>
     )
   return (
-    <div className="work-item-output max-h-[220px] m-0 overflow-auto text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[10.75px] leading-[1.55] whitespace-pre-wrap">
+    <div className="work-item-output max-h-[220px] m-0 overflow-auto text-[var(--text-secondary)] [font-family:var(--font-mono)] text-[11px] leading-[1.55] whitespace-pre-wrap">
       {text}
     </div>
   )
@@ -440,7 +440,7 @@ function ToolLine({
     return (
       <ContextMenu
         trigger={
-          <div className="flex min-w-0 min-h-[28px] items-center gap-[7px] [padding:4px_7px] rounded-[var(--radius-sm)] text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.75px] [&_span]:min-w-0 [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap [&_.work-item-target]:text-[var(--text-secondary)]">
+          <div className="flex min-w-0 min-h-[28px] items-center gap-[7px] [padding:4px_7px] rounded-[var(--radius-sm)] text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[11px] [&_span]:min-w-0 [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap [&_.work-item-target]:text-[var(--text-secondary)]">
             {iconFor(event)}
             <ToolTitle event={event} />
           </div>
@@ -563,7 +563,7 @@ function WorkingSection({
 
   return (
     <Collapsible.Root className="text-[var(--text-tertiary)]" open={open} onOpenChange={setOpen}>
-      <Collapsible.Trigger className="motion-colors [list-style:none] flex min-h-[28px] items-center gap-[6px] [padding:3px_6px_3px_2px] rounded-[var(--radius-sm)] cursor-pointer text-[11px] font-medium w-full border-0 bg-transparent text-inherit [font:inherit] text-left [&::-webkit-details-marker]:hidden [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)]">
+      <Collapsible.Trigger className="motion-colors [list-style:none] flex min-h-[28px] items-center gap-[6px] [padding:3px_6px_3px_2px] rounded-[var(--radius-sm)] cursor-default text-[11px] font-medium w-full border-0 bg-transparent text-inherit [font:inherit] text-left [&::-webkit-details-marker]:hidden [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)]">
         <ChevronRight className={disclosureChevronClasses} size={14} />
         {/* Finishing swaps the spinner for what the turn mostly did. */}
         <Swap
@@ -643,7 +643,7 @@ function WorkingEvent({
     return (
       <Markdown
         text={fallbackText(event)}
-        className={`[padding:6px_8px] text-[11.5px] leading-[1.55] ${event.kind === "reasoning" ? "text-[var(--text-tertiary)]" : "text-[var(--text-secondary)]"}`}
+        className={`[padding:6px_8px] text-[12px] leading-[1.55] ${event.kind === "reasoning" ? "text-[var(--text-tertiary)]" : "text-[var(--text-secondary)]"}`}
       />
     )
   return <ToolLine event={event} steps={steps} nested={nested} />
@@ -964,8 +964,14 @@ export function Transcript({
     )
   if (query.isError && !query.data)
     return (
-      <div className="transcript-loading min-h-0 [padding:36px_var(--pane-gutter)] text-[var(--text-tertiary)] text-[12px]">
-        This transcript could not be read from disk.
+      <div className="transcript-loading min-h-0 [padding:36px_var(--pane-gutter)]">
+        <div className="w-full max-w-[720px] [margin:0_auto]">
+          <Notice title="This transcript could not be read from disk" message={query.error.message}>
+            <Button size="sm" onClick={() => void query.refetch()}>
+              Try again
+            </Button>
+          </Notice>
+        </div>
       </div>
     )
   if (turns.length === 0)
@@ -1061,7 +1067,7 @@ export function Transcript({
             <PopPresence show={showLatest}>
               <BaseButton
                 type="button"
-                className="pointer-events-auto flex items-center gap-[6px] [box-shadow:var(--shadow-raised)] [padding:7px_12px] border-[1px] border-[color:var(--line-strong)] rounded-[999px] bg-[var(--surface-menu)] text-[var(--text-primary)] text-[12px] whitespace-nowrap cursor-pointer [&:hover]:bg-[var(--surface-overlay)]"
+                className={`motion-colors pointer-events-auto ${floatingPillClasses} [padding:7px_12px] whitespace-nowrap cursor-default [&:hover]:bg-[var(--surface-menu)]`}
                 onClick={() => virtualizer.scrollToEnd()}
               >
                 <ArrowDown size={14} aria-hidden="true" />
@@ -1077,7 +1083,7 @@ export function Transcript({
 
 const turnChangesActionClasses = [
   "motion-colors grid place-items-center w-[24px] h-[24px] ml-[auto] border-0 rounded-[var(--radius-sm)]",
-  "bg-transparent text-[var(--text-tertiary)] cursor-pointer",
+  "bg-transparent text-[var(--text-tertiary)] cursor-default",
   "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)] [&:disabled]:opacity-[0.4]",
 ].join(" ")
 
@@ -1087,13 +1093,13 @@ const workingSectionClasses = [
   "[&_button]:[padding:4px_6px] [&_button]:border-0 [&_button]:rounded-[4px] [&_button]:bg-transparent",
   "[&_button]:text-[var(--text-tertiary)] [&_button]:[font-family:inherit]",
   "[&_button]:[line-height:inherit] [&_button]:[font-weight:inherit] [&_button]:text-[11px]",
-  "[&_button]:cursor-pointer [&_button:hover]:bg-[var(--surface-hover)]",
+  "[&_button]:cursor-default [&_button:hover]:bg-[var(--surface-hover)]",
   "[&_button:hover]:text-[var(--text-primary)] [@media(hover:_none)]:opacity-[1]",
 ].join(" ")
 
 const workItemTriggerClasses = [
   "[list-style:none] flex min-w-0 min-h-[28px] items-center gap-[7px] [padding:4px_7px]",
-  "rounded-[var(--radius-sm)] [font-family:var(--font-mono)] text-[10.75px] cursor-pointer w-full",
+  "rounded-[var(--radius-sm)] [font-family:var(--font-mono)] text-[11px] cursor-default w-full",
   "border-0 bg-transparent text-inherit [font:inherit] text-left [&::-webkit-details-marker]:hidden",
   "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)] [&_span]:min-w-0",
   "[&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap",

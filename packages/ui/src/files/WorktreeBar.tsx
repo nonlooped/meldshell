@@ -64,7 +64,7 @@ function RemoveWorktreeDialog({
         <>
           <Button onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
-            variant="primary"
+            variant="danger"
             disabled={remove.isPending || status.isFetching}
             onClick={() => remove.mutate()}
           >
@@ -78,12 +78,10 @@ function RemoveWorktreeDialog({
         no longer start turns.
       </p>
       {status.data !== undefined && status.data.changes > 0 && (
-        <p className="text-[var(--color-deleted)]!">
-          {plural(status.data.changes, "uncommitted change")} will be lost.
-        </p>
+        <p role="alert">{plural(status.data.changes, "uncommitted change")} will be lost.</p>
       )}
       {status.isError && <p role="alert">{status.error.message}</p>}
-      <label className="flex items-start gap-[8px] [padding:12px_20px_0] text-[12.5px] leading-[1.5]">
+      <label className="flex items-start gap-[8px] [padding:12px_20px_0] text-[13px] leading-[1.5]">
         <span className="flex pt-[2px]">
           <Checkbox checked={deleteBranch} onCheckedChange={setDeleteBranch} />
         </span>
@@ -96,11 +94,7 @@ function RemoveWorktreeDialog({
           )}
         </span>
       </label>
-      {remove.isError && (
-        <p role="alert" className="text-[var(--color-deleted)]!">
-          {remove.error.message}
-        </p>
-      )}
+      {remove.isError && <p role="alert">{remove.error.message}</p>}
     </AppDialog>
   )
 }
@@ -172,7 +166,7 @@ export function WorktreeBar({ thread }: { thread: Thread }): React.JSX.Element |
           )}
         </ContextMenu>
         <span
-          className={`shrink-0 text-[10.5px] ${ready ? "text-[var(--text-tertiary)]" : "text-[var(--color-modified)]"}`}
+          className={`shrink-0 text-[11px] ${ready ? "text-[var(--text-tertiary)]" : "text-[var(--color-modified)]"}`}
         >
           {stateNote(worktree)}
         </span>

@@ -246,7 +246,7 @@ export function KeyboardSettings({
                       {rowNotice !== null && (
                         <p
                           role={rowNotice.tone === "error" ? "alert" : "status"}
-                          className={`flex items-center gap-[8px] [margin:4px_0_0] text-[11.5px] ${
+                          className={`flex items-center gap-[8px] [margin:4px_0_0] text-[12px] ${
                             rowNotice.tone === "error"
                               ? "text-[var(--color-deleted)]"
                               : "text-[var(--text-secondary)]"

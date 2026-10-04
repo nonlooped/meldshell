@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react"
 import type { Thread } from "@meldshell/contracts"
 import { Group, Panel, Separator } from "react-resizable-panels"
-import { ChevronDown, Columns2, Rows2, SquareTerminal, Trash2, X } from "lucide-react"
-import { ContextMenu, IconButton, MenuAction } from "../ui/controls"
+import { ChevronDown, Columns2, Rows2, SquareTerminal, X } from "lucide-react"
+import { ContextMenu, IconButton, MenuAction, MenuSeparator } from "../ui/controls"
 import { paneSeparatorClasses } from "../ui/styles"
 import { useKeybindings, withShortcut } from "../app/keybindings"
 import type { TerminalLayout } from "./terminal-layout"
@@ -98,14 +98,14 @@ function TerminalPane({
         <MenuAction onClick={() => useTerminalStore.getState().split(threadId, "vertical")}>
           Split down
         </MenuAction>
+        <MenuSeparator />
         <MenuAction onClick={() => useTerminalStore.getState().close(threadId, id)}>
-          Close this terminal
+          End this terminal
         </MenuAction>
       </ContextMenu>
       {multiple && (
         <IconButton
-          unstyled
-          className="motion-colors terminal-pane-close absolute top-[6px] right-[10px] z-[12] grid w-[20px] h-[20px] p-0 border-0 rounded-[4px] bg-[var(--surface-menu)] text-[var(--text-tertiary)] cursor-default place-items-center opacity-[0] [&:focus-visible]:opacity-[1] [&:hover]:bg-[var(--surface-active)] [&:hover]:text-[var(--text-primary)]"
+          className="terminal-pane-close absolute! top-[6px] right-[10px] z-[12] w-[22px]! h-[22px]! flex-[0_0_22px]! bg-[var(--surface-menu)]! opacity-[0] [&:focus-visible]:opacity-[1]"
           label="Close this terminal"
           onClick={() => useTerminalStore.getState().close(threadId, id)}
         >
@@ -189,12 +189,6 @@ export function TerminalPanel({
         </IconButton>
         <IconButton label="Split down" onClick={() => store().split(thread.id, "vertical")}>
           <Rows2 size={14} />
-        </IconButton>
-        <IconButton
-          label="End this terminal"
-          onClick={() => store().close(thread.id, terminals.focusedId)}
-        >
-          <Trash2 size={14} />
         </IconButton>
         <IconButton
           label={withShortcut("Hide terminal", toggleChord)}

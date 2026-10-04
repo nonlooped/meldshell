@@ -333,7 +333,7 @@ function NoteCard({
       <article
         id={`review-note-${note.id}`}
         aria-label={`Note on ${noteLocation(note)}`}
-        className="group/note [padding:6px_6px_8px_10px] border-[1px] border-[color:var(--line-subtle)] border-l-[2px] border-l-[color:var(--accent)] rounded-[var(--radius)] bg-[var(--surface-raised)] text-[12.5px] leading-[1.5] text-[var(--text-primary)] scroll-m-[80px] [&[data-flash]]:[box-shadow:0_0_0_3px_color-mix(in_srgb,_var(--accent)_30%,_transparent)] motion-colors"
+        className="group/note [padding:6px_6px_8px_10px] border-[1px] border-[color:var(--line-subtle)] border-l-[2px] border-l-[color:var(--accent)] rounded-[var(--radius)] bg-[var(--surface-raised)] text-[13px] leading-[1.5] text-[var(--text-primary)] scroll-m-[80px] [&[data-flash]]:[box-shadow:0_0_0_3px_color-mix(in_srgb,_var(--accent)_30%,_transparent)] motion-colors"
       >
         <header className="flex h-[22px] items-center gap-[6px] text-[var(--text-tertiary)] text-[11px]">
           <MessageSquareText
@@ -409,7 +409,7 @@ function NoteEditor({
           rows={2}
           aria-label="Note for the agent"
           placeholder="What should the agent change here?"
-          className="min-h-[44px] max-h-[200px] resize-none [field-sizing:content] [padding:4px_6px] border-0 bg-transparent text-[var(--text-primary)] text-[12.5px] leading-[1.5] [font-family:inherit] outline-none placeholder:text-[var(--text-tertiary)]"
+          className="min-h-[44px] max-h-[200px] resize-none [field-sizing:content] [padding:4px_6px] border-0 bg-transparent text-[var(--text-primary)] text-[13px] leading-[1.5] [font-family:inherit] outline-none placeholder:text-[var(--text-tertiary)]"
           onChange={(event) => setBody(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") {

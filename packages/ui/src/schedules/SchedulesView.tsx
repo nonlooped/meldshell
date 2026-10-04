@@ -14,10 +14,10 @@ export function SchedulesView({ snapshot }: { readonly snapshot: AppSnapshot }):
           <ArrowLeft size={16} />
         </IconButton>
         <div>
-          <h1 className="m-0 text-[23px] font-semibold [font-family:var(--font-display)]">
+          <h1 className="m-0 text-[22px] font-semibold tracking-[-0.015em] leading-[1.25] [font-family:var(--font-display)]">
             Scheduled prompts
           </h1>
-          <p className="[margin:6px_0_0] text-[12.5px] text-[var(--text-secondary)]">
+          <p className="[margin:6px_0_0] text-[13px] text-[var(--text-secondary)]">
             Manage prompts sent to your threads on a schedule while MeldShell runs.
           </p>
         </div>

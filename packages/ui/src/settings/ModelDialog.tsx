@@ -91,7 +91,7 @@ export function ModelDialog({
         />
         {(duplicate || slugLocked) && (
           <p
-            className="[margin:6px_0_14px] text-[11.5px] leading-[1.5]"
+            className="[margin:6px_0_14px] text-[12px] leading-[1.5]"
             style={{ color: duplicate ? "var(--color-deleted)" : "var(--text-tertiary)" }}
           >
             {duplicate
@@ -107,7 +107,7 @@ export function ModelDialog({
         />
 
         <div className="field block [&_+_.field]:mt-[14px]">
-          <span className="block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium">
+          <span className="block mb-[6px] text-[var(--text-secondary)] text-[12px] font-medium">
             Reasoning efforts
           </span>
           <ToggleGroup
@@ -123,7 +123,7 @@ export function ModelDialog({
               <Toggle
                 key={effort}
                 value={effort}
-                className="motion-colors h-[26px] [padding:0_10px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-transparent text-[var(--text-tertiary)] cursor-default text-[11.5px] [&:hover]:text-[var(--text-secondary)] [&[data-pressed]]:[border-color:transparent] [&[data-pressed]]:bg-[var(--accent)] [&[data-pressed]]:text-[var(--accent-foreground)] [&[data-pressed]]:font-medium"
+                className="motion-colors h-[26px] [padding:0_10px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-transparent text-[var(--text-tertiary)] cursor-default text-[12px] [&:hover]:text-[var(--text-secondary)] [&[data-pressed]]:[border-color:transparent] [&[data-pressed]]:bg-[var(--accent)] [&[data-pressed]]:text-[var(--accent-foreground)] [&[data-pressed]]:font-medium"
               >
                 {effortLabel(effort)}
               </Toggle>
@@ -131,7 +131,7 @@ export function ModelDialog({
           </ToggleGroup>
         </div>
 
-        <div className="flex items-center gap-[10px] mt-[16px] text-[var(--text-secondary)] text-[12.5px]">
+        <div className="flex items-center gap-[10px] mt-[16px] text-[var(--text-secondary)] text-[13px]">
           <Switch
             checked={supportsFast}
             onCheckedChange={setSupportsFast}

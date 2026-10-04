@@ -3,9 +3,7 @@ import { CornerDownRight, ListPlus, Pencil, X } from "lucide-react"
 import type { QueuedInput } from "@meldshell/contracts"
 import { IconButton } from "../ui/controls"
 import { useMotionPreference } from "../ui/motion"
-
-const rowButtonClasses =
-  "grid w-[22px] h-[22px] flex-none p-0 border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover:not(:disabled)]:bg-[var(--surface-active)] [&:hover:not(:disabled)]:text-[var(--text-primary)] disabled:opacity-40"
+import { rowIconButtonClasses, rowTextButtonClasses } from "../ui/styles"
 
 /**
  * The follow-ups waiting on this thread, in the order they will start. Each can be sent into the
@@ -46,7 +44,7 @@ export function QueuedMessages({
         {items.length > 1 && (
           <button
             type="button"
-            className="motion-colors [padding:2px_6px] border-0 rounded-[var(--radius-sm)] bg-transparent text-inherit text-[11px] cursor-default [&:hover:not(:disabled)]:bg-[var(--surface-active)] [&:hover:not(:disabled)]:text-[var(--text-primary)] disabled:opacity-40"
+            className={rowTextButtonClasses}
             disabled={pending}
             onClick={onClear}
           >
@@ -97,24 +95,24 @@ function QueuedRow({
       animate={{ opacity: 1, height: "auto" }}
       exit={{ opacity: 0, height: reduced ? "auto" : 0 }}
       transition={{ duration: reduced ? 0 : 0.16 }}
-      className="flex min-w-0 items-center gap-[6px] [padding:3px_4px_3px_6px] rounded-[var(--radius)] overflow-hidden text-[12.5px] [&:hover]:bg-[var(--surface-active)]"
+      className="flex min-w-0 items-center gap-[6px] [padding:3px_4px_3px_6px] rounded-[var(--radius)] overflow-hidden text-[13px] [&:hover]:bg-[var(--surface-active)]"
     >
       <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-primary)]">
         {item.text === "" ? "Attachments only" : item.text.replace(/\s+/g, " ")}
       </span>
       {item.attachmentCount > 0 && (
-        <span className="flex-none text-[var(--text-tertiary)] text-[10.5px] tabular-nums">
+        <span className="flex-none text-[var(--text-tertiary)] text-[11px] tabular-nums">
           {item.attachmentCount} {item.attachmentCount === 1 ? "file" : "files"}
         </span>
       )}
       {item.steer && (
-        <span className="flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--accent)] text-[10.5px] leading-[1.3]">
+        <span className="flex-none [padding:1px_5px] rounded-[4px] bg-[var(--surface-active)] text-[var(--accent)] text-[11px] leading-[1.3]">
           Next
         </span>
       )}
       <IconButton
         unstyled
-        className={rowButtonClasses}
+        className={rowIconButtonClasses}
         label={
           item.attachmentCount > 0 ? "Remove and re-send to change attachments" : "Edit in composer"
         }
@@ -126,7 +124,7 @@ function QueuedRow({
       {!(item.steer && running) && (
         <IconButton
           unstyled
-          className={rowButtonClasses}
+          className={rowIconButtonClasses}
           label={running ? "Steer the current turn with this now" : "Send now"}
           disabled={pending}
           onClick={() => onSteer(item)}
@@ -136,7 +134,7 @@ function QueuedRow({
       )}
       <IconButton
         unstyled
-        className={rowButtonClasses}
+        className={rowIconButtonClasses}
         label="Remove from queue"
         disabled={pending}
         onClick={() => onRemove(item)}

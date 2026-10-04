@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import { Check, CircleAlert, Copy, TriangleAlert, X } from "lucide-react"
 import { FadeDiv } from "./motion"
 import { Button, IconButton } from "./controls"
+import { floatingPillClasses } from "./styles"
 
 const tones = {
   error: "var(--color-deleted)",
@@ -55,7 +56,7 @@ export function Notice({
         <IconButton
           unstyled
           label={copied ? "Copied" : "Copy details"}
-          className="absolute top-[6px] right-[6px] grid w-[22px] h-[22px] place-items-center border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-pointer [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
+          className="absolute top-[6px] right-[6px] grid w-[22px] h-[22px] place-items-center border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
           onClick={() => {
             void navigator.clipboard.writeText(message).then(() => setCopied(true))
           }}
@@ -68,13 +69,7 @@ export function Notice({
 }
 
 /** A floating panel at the bottom of the window. It rises from below as it appears. */
-const toastClasses = [
-  "motion-rise [--motion-rise:12px] fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] flex w-max",
-  "bg-[var(--surface-overlay)] [backdrop-filter:blur(24px)] text-[var(--text-primary)]",
-  "border-[1px] border-[color:var(--line)] rounded-[var(--radius-lg)] text-[12px] leading-[1.5]",
-  "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
-  "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
-].join(" ")
+const toastClasses = `motion-rise [--motion-rise:12px] fixed z-[110] bottom-[16px] left-[50%] [transform:translateX(-50%)] w-max leading-[1.5] ${floatingPillClasses} rounded-[var(--radius-lg)]!`
 
 /** A floating failure from an action that has no control of its own to sit beside. */
 export function ErrorToast({

@@ -170,7 +170,7 @@ function PreviewMode({
   return (
     <>
       {!showSource && summary && (
-        <small className="flex-none text-[var(--text-tertiary)] text-[11.5px] [font-variant-numeric:tabular-nums]">
+        <small className="flex-none text-[var(--text-tertiary)] text-[12px] [font-variant-numeric:tabular-nums]">
           {summary}
         </small>
       )}

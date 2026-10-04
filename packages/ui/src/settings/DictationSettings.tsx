@@ -150,7 +150,7 @@ export function DictationSettings({
         >
           {MODELS.map((option) => (
             <Radio.Root key={option} value={option} className={modelTileClasses}>
-              <span className="flex items-center gap-[7px] text-[12.5px] font-medium text-[var(--text-primary)]">
+              <span className="flex items-center gap-[7px] text-[13px] font-medium text-[var(--text-primary)]">
                 {MODEL_DETAILS[option].icon}
                 {DICTATION_MODELS[option].label}
                 <span className="ml-auto text-[11px] font-normal tabular-nums text-[var(--text-tertiary)]">
@@ -164,7 +164,7 @@ export function DictationSettings({
                   )}
                 </span>
               </span>
-              <span className="text-[11.5px] leading-[16px]">{MODEL_DETAILS[option].blurb}</span>
+              <span className="text-[12px] leading-[16px]">{MODEL_DETAILS[option].blurb}</span>
             </Radio.Root>
           ))}
         </RadioGroup>

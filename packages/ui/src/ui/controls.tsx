@@ -7,6 +7,8 @@ import {
   menuItemClasses,
   menuPopupClasses,
   panelNoteClasses,
+  selectTriggerClasses,
+  textAreaClasses,
   textInputClasses,
   tooltipPopupClasses,
 } from "./styles"
@@ -32,7 +34,7 @@ import { Check, ChevronDown, X } from "lucide-react"
  * repeats the portal/positioner/popup scaffolding.
  */
 
-type ButtonVariant = "default" | "primary" | "ghost"
+type ButtonVariant = "default" | "primary" | "ghost" | "danger"
 
 interface ButtonProps extends React.ComponentProps<"button"> {
   readonly variant?: ButtonVariant
@@ -224,10 +226,48 @@ export function TextField({
   if (label === undefined) return input
   return (
     <Field.Root className="field block [&_+_.field]:mt-[14px]">
-      <Field.Label className="block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium">
+      <Field.Label className="block mb-[6px] text-[var(--text-secondary)] text-[12px] font-medium">
         {label}
       </Field.Label>
       {input}
+    </Field.Root>
+  )
+}
+
+interface TextAreaProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange"> {
+  readonly label?: string
+  readonly mono?: boolean
+  readonly onValueChange?: (value: string) => void
+}
+
+/** A multi-line field that matches `TextField`; it grows with its rows and resizes downward. */
+export function TextArea({
+  label,
+  mono = false,
+  onValueChange,
+  className,
+  onChange,
+  ...rest
+}: TextAreaProps & { readonly onChange?: React.ChangeEventHandler<HTMLTextAreaElement> }) {
+  const field = (
+    <textarea
+      spellCheck={false}
+      className={cx("motion-colors motion-duration-200", textAreaClasses, className)}
+      data-mono={mono}
+      onChange={(event) => {
+        onChange?.(event)
+        onValueChange?.(event.currentTarget.value)
+      }}
+      {...rest}
+    />
+  )
+  if (label === undefined) return field
+  return (
+    <Field.Root className="field block [&_+_.field]:mt-[14px]">
+      <Field.Label className="block mb-[6px] text-[var(--text-secondary)] text-[12px] font-medium">
+        {label}
+      </Field.Label>
+      {field}
     </Field.Root>
   )
 }
@@ -260,7 +300,7 @@ export function SelectField<Value extends string>({
       }}
     >
       <Select.Trigger
-        className={`motion-colors ${className ?? buttonClasses} w-full min-w-0 min-h-[34px] justify-between!`}
+        className={`motion-colors ${className ?? selectTriggerClasses} w-full min-w-0 justify-between!`}
         aria-label={label}
       >
         <Select.Value className="overflow-hidden text-ellipsis whitespace-nowrap" />
@@ -372,6 +412,28 @@ interface MenuRootProps {
   readonly align?: "start" | "center" | "end"
   readonly side?: "top" | "bottom" | "left" | "right"
   readonly className?: string
+  /** Names the trigger in the same tooltip an `IconButton` gets, instead of a native title. */
+  readonly tooltip?: string
+}
+
+/** The menu's trigger, with the app's tooltip around it when the menu is named. */
+function MenuTrigger({
+  trigger,
+  tooltip,
+}: Pick<MenuRootProps, "trigger" | "tooltip">): React.JSX.Element {
+  if (tooltip === undefined) return <Menu.Trigger render={trigger} />
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger render={<Menu.Trigger render={trigger} />} />
+      <Tooltip.Portal>
+        <Tooltip.Positioner className="z-[300]" side="bottom" sideOffset={6}>
+          <Tooltip.Popup render={<MotionSurface kind="tooltip" />} className={tooltipPopupClasses}>
+            {tooltip}
+          </Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  )
 }
 
 export function DropdownMenu({
@@ -380,10 +442,11 @@ export function DropdownMenu({
   align = "start",
   side = "bottom",
   className,
+  tooltip,
 }: MenuRootProps): React.JSX.Element {
   return (
     <Menu.Root>
-      <Menu.Trigger render={trigger} />
+      <MenuTrigger trigger={trigger} tooltip={tooltip} />
       <Menu.Portal>
         <Menu.Positioner
           className="z-[200]"
@@ -440,9 +503,10 @@ export function MenuAction({
   children,
   disabled = false,
 }: MenuActionProps): React.JSX.Element {
+  // The gutter is always drawn, so labels line up whether or not their neighbours carry icons.
   return (
     <Menu.Item className={`motion-colors ${menuItemClasses}`} disabled={disabled} onClick={onClick}>
-      {icon !== undefined && <span className={menuGutterClasses}>{icon}</span>}
+      <span className={menuGutterClasses}>{icon}</span>
       {children}
     </Menu.Item>
   )
@@ -501,7 +565,7 @@ export function MenuChoice({
         </span>
       )}
       {detail !== undefined && (
-        <span className="ml-[auto] pl-[16px] text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.5px]">
+        <span className="ml-[auto] pl-[16px] text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[11px]">
           {detail}
         </span>
       )}
@@ -557,7 +621,7 @@ export function AppDialog({
       <Primitive.Portal>
         <Primitive.Backdrop
           render={<MotionSurface kind="backdrop" />}
-          className="fixed z-[100] [inset:0] [background:rgba(0,_0,_0,_0.45)] [backdrop-filter:blur(2px)]"
+          className="fixed z-[100] [inset:0] bg-[var(--backdrop)] [backdrop-filter:blur(2px)]"
         />
         <Primitive.Popup render={<MotionSurface kind="dialog" />} className={dialogClasses}>
           <Primitive.Close
@@ -580,7 +644,7 @@ export function AppDialog({
             {title}
           </Primitive.Title>
           {children}
-          <div className="flex flex-wrap items-center justify-end gap-[8px] [padding:14px_20px] border-t-[1px] border-t-[color:var(--line-subtle)] mt-[18px] bg-[var(--surface-hover)] [border-end-start-radius:var(--radius-xl)] [border-end-end-radius:var(--radius-xl)] [&_.button]:min-w-[80px] [&_.button]:h-[32px]">
+          <div className="flex flex-wrap items-center justify-end gap-[8px] [padding:14px_20px] border-t-[1px] border-t-[color:var(--line-subtle)] mt-[18px] bg-[var(--surface-hover)] [border-end-start-radius:var(--radius-xl)] [border-end-end-radius:var(--radius-xl)] [&_.button]:min-w-[80px]">
             {actions}
           </div>
         </Primitive.Popup>
@@ -591,7 +655,7 @@ export function AppDialog({
 
 const switchClasses = [
   "switch relative w-[34px] h-[19px] flex-[0_0_34px] p-0 border-[1px] border-[color:var(--line-strong)]",
-  "rounded-[20px] [background:rgba(0,_0,_0,_0.27)] [:root[data-theme='light']_&:not([data-checked])]:bg-[var(--surface-active)]",
+  "rounded-[20px] bg-[var(--surface-track)]",
   "cursor-default",
   "[&[data-checked]]:[border-color:transparent] [&[data-checked]]:bg-[var(--accent)]",
   "[&:disabled]:opacity-[0.45] [&[data-checked]_.switch-thumb]:bg-[var(--accent-foreground)]",
@@ -621,9 +685,13 @@ const dialogClasses = [
   "bg-[var(--surface-overlay)] [backdrop-filter:blur(32px)_saturate(120%)]",
   "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)] text-[var(--text-primary)]",
   "outline-none [transform:translate(-50%,_-50%)] [&_>_p]:m-0 [&_>_p]:[padding:8px_20px_0]",
-  "[&_>_p]:text-[var(--text-secondary)] [&_>_p]:text-[12.5px] [&_>_p]:leading-[1.6]",
+  "[&_>_p]:text-[var(--text-secondary)] [&_>_p]:text-[13px] [&_>_p]:leading-[1.6]",
+  // A failure inside the dialog reads as one wherever it is placed.
+  "[&_[role='alert']]:text-[var(--color-deleted)] [&_>_form_>_[role='alert']]:m-0",
+  "[&_>_p[role='alert']]:[overflow-wrap:anywhere]",
   "[&_.plan-review]:[margin:0_20px_20px] [&_.plan-review]:max-h-[calc(var(--viewport-h)_*_0.5)] [&_.plan-review]:overflow-auto",
   "[&_>_.text-input]:w-[calc(100%_-_40px)] [&_>_.text-input]:[margin:12px_20px_0]",
+  "[&_>_.text-area]:w-[calc(100%_-_40px)] [&_>_.text-area]:[margin:12px_20px_0]",
   "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
   "[&:has(.workspace-manager)]:w-[640px] [&:has(.setup-log)]:w-[680px] [&_>_.field]:[margin:18px_20px_0]",
   "[&:has(.search-controls)]:w-[680px] [&:has(.theme-editor)]:w-[720px] [&:has(.pull-request-form)]:w-[600px] [&:has(.markdown-lightbox)]:w-[min(1100px,_calc(var(--viewport-w)_*_0.9))]",

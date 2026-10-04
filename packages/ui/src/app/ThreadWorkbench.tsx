@@ -1,4 +1,4 @@
-import { textInputClasses, iconButtonClasses, paneSeparatorClasses } from "../ui/styles"
+import { iconButtonClasses, paneSeparatorClasses } from "../ui/styles"
 import { Pressable, useMotionPreference } from "../ui/motion"
 import { useLayoutEffect, useRef, useState } from "react"
 import { useElementWidth } from "./viewport"
@@ -22,6 +22,7 @@ import {
   DropdownMenu,
   IconButton,
   MenuAction,
+  TextField,
 } from "../ui/controls"
 import { ThreadView } from "../threads/ThreadView"
 import { ThreadSkeleton } from "../ui/Skeleton"
@@ -94,12 +95,12 @@ function SplitPicker({
       title={edgeLabels[edge]}
       actions={<Button onClick={onClose}>Cancel</Button>}
     >
-      <input
-        className={`motion-colors motion-duration-200 ${textInputClasses}`}
+      <TextField
+        autoFocus
         aria-label="Find a thread to open beside this one"
         placeholder="Find a thread…"
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onValueChange={setQuery}
       />
       <div className="grid max-h-[320px] gap-[4px] mt-[12px] [&_.button]:justify-start [&_.button]:[overflow-wrap:anywhere] overflow-y-auto [scrollbar-gutter:stable]">
         {candidates.map((candidate) => (
@@ -184,6 +185,7 @@ function ThreadTileHeader({
       </ContextMenu>
       <DropdownMenu
         align="end"
+        tooltip="Pane layout"
         trigger={
           <BaseButton
             render={<Pressable />}

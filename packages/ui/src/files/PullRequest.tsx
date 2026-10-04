@@ -32,10 +32,10 @@ import {
   Sparkles,
   TriangleAlert,
 } from "lucide-react"
-import { AppDialog, Button, Checkbox, IconButton, TextField } from "../ui/controls"
+import { AppDialog, Button, Checkbox, IconButton, TextArea, TextField } from "../ui/controls"
 import { ActivitySpinner, CollapsiblePanel, Shimmer, Swap, useMotionPreference } from "../ui/motion"
 import { Markdown } from "../ui/Markdown"
-import { segmentClasses, segmentGroupClasses, textInputClasses } from "../ui/styles"
+import { segmentClasses, segmentGroupClasses } from "../ui/styles"
 import { scopeKey, workspaceScope } from "../data/workspace-scope"
 
 const pullRequestKey = (scope: WorkspaceScope) => ["pull-request", ...scopeKey(scope)]
@@ -172,7 +172,7 @@ function Pill({
   return (
     <span
       style={{ "--tone": color } as React.CSSProperties}
-      className="inline-flex flex-none items-center gap-[4px] h-[18px] [padding:0_7px] rounded-[999px] whitespace-nowrap text-[10.5px] font-medium text-[color:var(--tone)] [background:color-mix(in_srgb,var(--tone)_13%,transparent)]"
+      className="inline-flex flex-none items-center gap-[4px] h-[18px] [padding:0_7px] rounded-[999px] whitespace-nowrap text-[11px] font-medium text-[color:var(--tone)] [background:color-mix(in_srgb,var(--tone)_13%,transparent)]"
     >
       {children}
     </span>
@@ -253,7 +253,7 @@ function StatusPills({ pullRequest }: { pullRequest: PullRequest }): React.JSX.E
 }
 
 const rowClasses =
-  "motion-colors flex min-w-0 items-center gap-[8px] h-[26px] [padding:0_8px] rounded-[var(--radius-sm)] text-[11.5px] text-[var(--text-secondary)] no-underline"
+  "motion-colors flex min-w-0 items-center gap-[8px] h-[26px] [padding:0_8px] rounded-[var(--radius-sm)] text-[12px] text-[var(--text-secondary)] no-underline"
 
 /** Each check with a link to its run, then who has reviewed, then what you can do next. */
 function PullRequestDetails({
@@ -269,7 +269,7 @@ function PullRequestDetails({
   return (
     <div className="flex flex-col [padding:4px_0]">
       {pullRequest.checks.length > 0 && (
-        <span className="[padding:4px_8px_2px] text-[10.5px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+        <span className="[padding:4px_8px_2px] text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
           Checks
         </span>
       )}
@@ -286,7 +286,7 @@ function PullRequestDetails({
           <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
             {check.name}
           </span>
-          <span className="flex-none text-[10.5px] text-[var(--text-tertiary)]">
+          <span className="flex-none text-[11px] text-[var(--text-tertiary)]">
             {checkStyles[check.state].label}
           </span>
           <ExternalLink
@@ -297,7 +297,7 @@ function PullRequestDetails({
         </a>
       ))}
       {reviewed.length > 0 && (
-        <span className="[padding:8px_8px_2px] text-[10.5px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+        <span className="[padding:8px_8px_2px] text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
           Reviews
         </span>
       )}
@@ -414,7 +414,7 @@ export function ThreadPullRequest({ thread }: { thread: Thread }): React.JSX.Ele
 }
 
 const labelRowClasses =
-  "flex items-center justify-between gap-[8px] min-h-[24px] mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium"
+  "flex items-center justify-between gap-[8px] min-h-[24px] mb-[6px] text-[var(--text-secondary)] text-[12px] font-medium"
 const TITLE_LIMIT = 72
 
 function BranchChip({ name }: { name: string }): React.JSX.Element {
@@ -441,7 +441,7 @@ function BranchSummary({ status }: { status: PullRequestStatus }): React.JSX.Ele
           {count} commit{count === 1 ? "" : "s"}
         </Collapsible.Trigger>
         {status.unpushed > 0 && (
-          <span className="text-[11.5px]">
+          <span className="text-[12px]">
             · {status.published ? `pushes ${status.unpushed} first` : "publishes the branch first"}
           </span>
         )}
@@ -469,7 +469,7 @@ function BranchSummary({ status }: { status: PullRequestStatus }): React.JSX.Ele
         </p>
       )}
       <CollapsiblePanel>
-        <ol className="m-0 mt-[8px] max-h-[120px] overflow-y-auto [padding:4px_10px] list-none border-l-[2px] border-l-[color:var(--line-subtle)] text-[11.5px] leading-[1.7] text-[var(--text-secondary)]">
+        <ol className="m-0 mt-[8px] max-h-[120px] overflow-y-auto [padding:4px_10px] list-none border-l-[2px] border-l-[color:var(--line-subtle)] text-[12px] leading-[1.7] text-[var(--text-secondary)]">
           {status.commits.map((subject, index) => (
             // Subjects can repeat, so the position keeps each row apart; the list never reorders.
             <li key={index} className="overflow-hidden text-ellipsis whitespace-nowrap">
@@ -642,17 +642,18 @@ function CreatePullRequestDialog({
             </ToggleGroup>
           </div>
           {view === "preview" && body.trim() ? (
-            <div className="min-h-[200px] max-h-[calc(var(--viewport-h)_*_0.45)] overflow-y-auto [padding:10px_12px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] text-[12.5px]">
+            <div className="min-h-[200px] max-h-[calc(var(--viewport-h)_*_0.45)] overflow-y-auto [padding:10px_12px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] text-[13px]">
               <Markdown text={body} />
             </div>
           ) : (
-            <textarea
-              className={`motion-colors ${textInputClasses} block h-auto! min-h-[200px] max-h-[calc(var(--viewport-h)_*_0.45)] [padding:8px_10px]! leading-[1.55] resize-y [font-family:var(--font-mono)] text-[11.5px]!`}
+            <TextArea
+              mono
+              className="min-h-[200px] max-h-[calc(var(--viewport-h)_*_0.45)]"
               aria-label="Pull request description"
               placeholder={generate.isPending ? "" : "What changed, why, and what to check"}
               value={body}
               disabled={busy}
-              onChange={(event) => setBody(event.target.value)}
+              onValueChange={setBody}
               onKeyDown={submit}
             />
           )}

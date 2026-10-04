@@ -130,7 +130,7 @@ export function SubscriptionUsageRefresh({
     <div className="flex shrink-0 items-center gap-[12px]">
       {checked && (
         <span
-          className="text-[var(--text-tertiary)] text-[11.5px] tabular-nums whitespace-nowrap"
+          className="text-[var(--text-tertiary)] text-[12px] tabular-nums whitespace-nowrap"
           title="Usage refreshes every minute"
         >
           Updated{" "}
@@ -217,7 +217,7 @@ function UsageRow({
           {row.label}
         </span>
         {row.detail && (
-          <span className="text-[var(--text-tertiary)] text-[11.5px] leading-[1.4] tabular-nums">
+          <span className="text-[var(--text-tertiary)] text-[12px] leading-[1.4] tabular-nums">
             {row.detail}
           </span>
         )}
@@ -254,7 +254,7 @@ function UsageRow({
         <span title={resetTitle(row.resetsAt)}>{reset}</span>
         {budget && (
           <span
-            className="text-[var(--text-tertiary)] text-[11.5px] leading-[1.4]"
+            className="text-[var(--text-tertiary)] text-[12px] leading-[1.4]"
             title="Average share of the allowance you can spend per unit of time and still reach the reset"
           >
             {budget}
@@ -417,7 +417,7 @@ function ProviderSection({
             {groups.map((group) => (
               <div key={group.id} className="flex flex-col gap-[4px]">
                 {group.heading && (
-                  <h4 className="m-0 pt-[6px] text-[var(--text-tertiary)] text-[11.5px] font-medium leading-[1.4] [overflow-wrap:anywhere]">
+                  <h4 className="m-0 pt-[6px] text-[var(--text-tertiary)] text-[12px] font-medium leading-[1.4] [overflow-wrap:anywhere]">
                     {group.heading}
                   </h4>
                 )}
@@ -452,7 +452,7 @@ function connectionMessage(
 /** Explains the bar's two layers once for the whole page. */
 function UsageLegend(): React.JSX.Element {
   return (
-    <p className="flex flex-wrap items-center gap-x-[16px] gap-y-[4px] m-0 [padding:2px_2px_0] text-[var(--text-tertiary)] text-[11.5px] leading-[1.5]">
+    <p className="flex flex-wrap items-center gap-x-[16px] gap-y-[4px] m-0 [padding:2px_2px_0] text-[var(--text-tertiary)] text-[12px] leading-[1.5]">
       <span className="inline-flex items-center gap-[6px]">
         <span
           aria-hidden="true"

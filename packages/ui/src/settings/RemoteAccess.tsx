@@ -250,7 +250,7 @@ export function RemoteAccess() {
             {messageFor(error)}
           </p>
         )}
-        <div className="flex items-start gap-[10px] [padding:12px_16px] text-[11.5px] leading-[1.6] text-[var(--text-tertiary)]">
+        <div className="flex items-start gap-[10px] [padding:12px_16px] text-[12px] leading-[1.6] text-[var(--text-tertiary)]">
           <ShieldCheck
             size={14}
             strokeWidth={1.75}
@@ -272,7 +272,7 @@ export function RemoteAccess() {
         actions={
           <>
             <Button onClick={() => setConfirmSignOut(false)}>Cancel</Button>
-            <Button variant="primary" disabled={unlink.isPending} onClick={() => unlink.mutate()}>
+            <Button variant="danger" disabled={unlink.isPending} onClick={() => unlink.mutate()}>
               Sign out
             </Button>
           </>

@@ -10,6 +10,7 @@ import type { DiffViewType } from "../ui/ChangeDiffContent"
 import { diffLineCounts, parseFileDiffs } from "../ui/diff-model"
 import { FileIcon } from "../ui/FileIcon"
 import { ContextMenu, MenuAction, PanelNote } from "../ui/controls"
+import { segmentClasses, segmentGroupClasses } from "../ui/styles"
 import { useTabStore } from "../app/tab-store"
 import { RevealFileAction } from "../ui/FileContextActions"
 import { DiffReviewScope } from "../ui/DiffNotes"
@@ -63,7 +64,7 @@ export function DiffViewer({
             {file.path.slice(slash + 1)}
           </span>
           {slash > 0 && (
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] text-[11.5px]">
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] text-[12px]">
               {file.path.slice(0, slash)}
             </span>
           )}
@@ -82,7 +83,7 @@ export function DiffViewer({
           <button
             type="button"
             title="Open the thread to send these notes to the agent"
-            className="motion-colors inline-flex shrink-0 items-center gap-[5px] h-[24px] [padding:0_8px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-transparent text-[var(--text-secondary)] text-[11.5px] cursor-default [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
+            className="motion-colors inline-flex shrink-0 items-center gap-[5px] h-[24px] [padding:0_8px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-transparent text-[var(--text-secondary)] text-[12px] cursor-default [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
             onClick={() => openThread(reviewThreadId)}
           >
             <MessageSquareText
@@ -101,7 +102,7 @@ export function DiffViewer({
             const next = value[0] as DiffViewType | undefined
             if (next) setViewType(next)
           }}
-          className="flex shrink-0 gap-[2px] p-[2px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)]"
+          className={`shrink-0 ${segmentGroupClasses}`}
         >
           {(["unified", "split"] as const).map((type) => (
             <Toggle key={type} value={type} className={segmentClasses}>
@@ -170,10 +171,4 @@ export function DiffViewer({
 const wrapClasses = [
   "[&_.diff-code]:whitespace-pre-wrap [&_.diff-code]:[overflow-wrap:anywhere]",
   "[&_.diff-code]:[padding-inline-start:calc(10px_+_4ch)]! [&_.diff-code]:[text-indent:-4ch]",
-].join(" ")
-
-const segmentClasses = [
-  "h-[22px] [padding:0_9px] border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)]",
-  "text-[11.5px] cursor-default [&:hover]:text-[var(--text-primary)]",
-  "[&[data-pressed]]:bg-[var(--surface-selected)] [&[data-pressed]]:text-[var(--text-primary)]",
 ].join(" ")

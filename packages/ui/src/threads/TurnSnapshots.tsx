@@ -5,6 +5,7 @@ import { Check, CircleAlert, GitFork, History, Rewind, Undo2, X } from "lucide-r
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { TurnSnapshot } from "@meldshell/contracts/ipc"
 import { IconButton, MenuAction } from "../ui/controls"
+import { floatingPillClasses } from "../ui/styles"
 import { GradientSpinner, PopPresence, Swap } from "../ui/motion"
 import { queryKeys, replaceSnapshot } from "../data/cache"
 import { useTabStore } from "../app/tab-store"
@@ -206,19 +207,15 @@ export function RestoredMarker({
   )
 }
 
-const pillClasses = [
-  "pointer-events-auto flex items-center gap-[8px] max-w-full [padding:4px_4px_4px_12px]",
-  "[box-shadow:var(--shadow-raised)] border-[1px] border-[color:var(--line-strong)] rounded-[999px]",
-  "bg-[var(--surface-menu)] text-[var(--text-primary)] text-[12px]",
-].join(" ")
+const pillClasses = `pointer-events-auto max-w-full [padding:4px_4px_4px_12px] ${floatingPillClasses}`
 const pillButtonClasses = [
   "motion-colors inline-flex items-center gap-[5px] shrink-0 h-[24px] [padding:0_10px] border-0",
-  "rounded-[999px] bg-[var(--surface-hover)] text-[var(--text-primary)] text-[12px] cursor-pointer",
+  "rounded-[999px] bg-[var(--surface-hover)] text-[var(--text-primary)] text-[12px] cursor-default",
   "[&:hover]:bg-[var(--surface-active)] [&:disabled]:opacity-[0.5]",
 ].join(" ")
 const dismissClasses = [
   "motion-colors grid place-items-center w-[24px] h-[24px] shrink-0 border-0 rounded-[999px]",
-  "bg-transparent text-[var(--text-tertiary)] cursor-pointer",
+  "bg-transparent text-[var(--text-tertiary)] cursor-default",
   "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]",
 ].join(" ")
 

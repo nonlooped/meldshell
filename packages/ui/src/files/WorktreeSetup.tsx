@@ -142,15 +142,11 @@ export function SetupLogDialog({
           const output = event.currentTarget
           following.current = output.scrollHeight - output.scrollTop - output.clientHeight < 24
         }}
-        className="[margin:10px_20px_0] max-h-[calc(var(--viewport-h)_*_0.5)] min-h-[160px] p-[10px] overflow-auto border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-hover)] text-[var(--text-primary)] [font:11.5px_/_1.6_var(--font-mono)] whitespace-pre-wrap [overflow-wrap:anywhere] [&:focus-visible]:[outline:1px_solid_var(--focus-ring)]"
+        className="[margin:10px_20px_0] max-h-[calc(var(--viewport-h)_*_0.5)] min-h-[160px] p-[10px] overflow-auto border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-hover)] text-[var(--text-primary)] [font:12px_/_1.6_var(--font-mono)] whitespace-pre-wrap [overflow-wrap:anywhere] [&:focus-visible]:[outline:1px_solid_var(--focus-ring)]"
       >
         {text === undefined ? (log.isFetching ? "Loading…" : "") : text || "No output yet."}
       </pre>
-      {error && (
-        <p role="alert" className="text-[var(--color-deleted)]!">
-          {error.message}
-        </p>
-      )}
+      {error && <p role="alert">{error.message}</p>}
     </AppDialog>
   )
 }

@@ -176,7 +176,7 @@ export function ColorThemeSettings({
             <>
               <Button onClick={() => setRemoving(null)}>Cancel</Button>
               <Button
-                variant="primary"
+                variant="danger"
                 onClick={() => {
                   remove(removing)
                   setRemoving(null)
@@ -328,9 +328,7 @@ function ThemeEditor({
           />
           <div className="grid gap-[8px]">
             <div className="flex items-center justify-between gap-[12px]">
-              <span className="text-[var(--text-secondary)] text-[11.5px] font-medium">
-                Editing
-              </span>
+              <span className="text-[var(--text-secondary)] text-[12px] font-medium">Editing</span>
               <ToggleGroup
                 aria-label="Palette to edit"
                 value={[mode]}
@@ -360,7 +358,7 @@ function ThemeEditor({
                 />
               ))}
             </div>
-            <span className="mt-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium">
+            <span className="mt-[6px] text-[var(--text-secondary)] text-[12px] font-medium">
               Status
             </span>
             <div className="grid grid-cols-5 gap-[8px] [@media(max-width:_520px)]:grid-cols-3">
@@ -376,7 +374,7 @@ function ThemeEditor({
           </div>
         </div>
         <div className="grid content-start gap-[10px]">
-          <span className="text-[var(--text-secondary)] text-[11.5px] font-medium">Preview</span>
+          <span className="text-[var(--text-secondary)] text-[12px] font-medium">Preview</span>
           <span className="block h-[150px] overflow-hidden rounded-[var(--radius)] border-[1px] border-[color:var(--line)]">
             <MiniWindow palette={palette} detailed />
           </span>
@@ -449,7 +447,7 @@ function Contrast({
   return (
     <span
       className={cx(
-        "flex items-center justify-between gap-[8px] text-[11.5px]",
+        "flex items-center justify-between gap-[8px] text-[12px]",
         low ? "text-[var(--color-modified)]" : "text-[var(--text-tertiary)]",
       )}
     >
@@ -478,7 +476,7 @@ function ColorRow({
     <div className="flex items-center gap-[12px] [padding:9px_12px]">
       <ColorWell label={label} value={value} onChange={onChange} />
       <span className="grid min-w-0 flex-1 gap-[1px]">
-        <span className="text-[12.5px] font-medium text-[var(--text-primary)]">{label}</span>
+        <span className="text-[13px] font-medium text-[var(--text-primary)]">{label}</span>
         <span className="truncate text-[11px] text-[var(--text-tertiary)]">{hint}</span>
       </span>
       <HexField label={label} value={value} onChange={onChange} />
@@ -514,7 +512,7 @@ function ColorWell({
 }): React.JSX.Element {
   return (
     <label
-      className="motion-colors relative block h-[28px] w-[28px] flex-none overflow-hidden rounded-[8px] border-[1px] border-[color:var(--line-strong)] [box-shadow:inset_0_0_0_1px_rgba(255,255,255,0.08)] hover:[border-color:var(--text-tertiary)] has-[:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] has-[:focus-visible]:[outline-offset:2px]"
+      className="motion-colors relative block h-[28px] w-[28px] flex-none overflow-hidden rounded-[8px] border-[1px] border-[color:var(--line-strong)] [box-shadow:inset_0_0_0_1px_var(--edge-highlight)] hover:[border-color:var(--text-tertiary)] has-[:focus-visible]:[outline:1.5px_solid_var(--focus-ring)] has-[:focus-visible]:[outline-offset:2px]"
       style={{ background: value }}
     >
       <input

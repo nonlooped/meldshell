@@ -40,7 +40,7 @@ export function Palette({
       <Dialog.Portal>
         <Dialog.Backdrop
           render={<MotionSurface kind="backdrop" />}
-          className="fixed z-[100] [inset:0] [background:rgba(0,_0,_0,_0.2)]"
+          className="fixed z-[100] [inset:0] bg-[var(--backdrop-light)]"
         />
         <Dialog.Popup render={<MotionSurface kind="popup" />} className={popupClasses}>
           <Dialog.Title className="sr-only">{title}</Dialog.Title>
@@ -102,7 +102,7 @@ export function PaletteSearch<Item>({
       {notice !== undefined && notice !== null && (
         <div
           role="status"
-          className="flex items-center gap-[8px] min-h-[40px] [padding:10px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[12.5px] leading-[1.5] text-[var(--text-tertiary)]"
+          className="flex items-center gap-[8px] min-h-[40px] [padding:10px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[13px] leading-[1.5] text-[var(--text-tertiary)]"
         >
           {notice}
         </div>
@@ -151,7 +151,7 @@ export function PaletteRow({
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {detail !== undefined && (
         <span
-          className={`min-w-0 max-w-[45%] truncate text-[var(--text-tertiary)] ${monoDetail ? "[font-family:var(--font-mono)] text-[11.5px]" : "text-[12px]"}`}
+          className={`min-w-0 max-w-[45%] truncate text-[var(--text-tertiary)] ${monoDetail ? "[font-family:var(--font-mono)] text-[12px]" : "text-[12px]"}`}
         >
           {detail}
         </span>

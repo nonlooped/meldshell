@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from "motion/react"
 import { MessageSquareText, SendHorizontal, X } from "lucide-react"
 import { useState } from "react"
-import { IconButton } from "../ui/controls"
+import { Button, IconButton } from "../ui/controls"
 import { useMotionPreference } from "../ui/motion"
+import { rowIconButtonClasses, rowTextButtonClasses } from "../ui/styles"
 import { revealNote } from "../ui/DiffNotes"
 import {
   noteLines,
@@ -11,12 +12,6 @@ import {
   useThreadReviewNotes,
   type ReviewNote,
 } from "./review-notes"
-
-const rowButtonClasses =
-  "grid w-[22px] h-[22px] flex-none p-0 border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover:not(:disabled)]:bg-[var(--surface-active)] [&:hover:not(:disabled)]:text-[var(--text-primary)] disabled:opacity-40"
-
-const headerButtonClasses =
-  "motion-colors [padding:2px_6px] border-0 rounded-[var(--radius-sm)] bg-transparent text-inherit text-[11px] cursor-default [&:hover:not(:disabled)]:bg-[var(--surface-active)] [&:hover:not(:disabled)]:text-[var(--text-primary)] disabled:opacity-40"
 
 /**
  * The notes left on this thread's diff lines, sent back to the agent together as one follow-up.
@@ -69,24 +64,25 @@ export function ReviewNotes({
         </span>
         <button
           type="button"
-          className={headerButtonClasses}
+          className={rowTextButtonClasses}
           disabled={sending}
           onClick={() => useReviewNotes.getState().clear(threadId)}
         >
           Discard
         </button>
-        <button
-          type="button"
-          className="motion-colors inline-flex items-center gap-[5px] h-[22px] [padding:0_8px] border-0 rounded-[var(--radius-sm)] bg-[var(--accent)] text-[var(--accent-foreground)] text-[11px] font-medium cursor-default [&:hover:not(:disabled)]:bg-[var(--accent-hover)] disabled:opacity-50"
+        <Button
+          size="sm"
+          variant="primary"
+          className="h-[22px]! text-[11px]! [padding:0_8px]!"
+          icon={<SendHorizontal size={11} strokeWidth={2} aria-hidden="true" />}
           disabled={blocked !== null || sending}
           title={
             blocked ?? `Send ${notes.length === 1 ? "this note" : "these notes"} as one message`
           }
           onClick={() => void send()}
         >
-          <SendHorizontal size={11} strokeWidth={2} aria-hidden="true" />
           {sending ? "Sending…" : "Send to agent"}
-        </button>
+        </Button>
       </header>
       <ul className="m-0 [padding:0_4px_4px] list-none max-h-[132px] overflow-y-auto">
         <AnimatePresence initial={false}>
@@ -119,7 +115,7 @@ function NoteRow({
       exit={{ opacity: 0, height: reduced ? "auto" : 0 }}
       transition={{ duration: reduced ? 0 : 0.16 }}
       aria-label={`Note on ${noteLocation(note)}`}
-      className="flex min-w-0 items-center gap-[8px] [padding:3px_4px_3px_6px] rounded-[var(--radius)] overflow-hidden text-[12.5px] [&:hover]:bg-[var(--surface-active)]"
+      className="flex min-w-0 items-center gap-[8px] [padding:3px_4px_3px_6px] rounded-[var(--radius)] overflow-hidden text-[13px] [&:hover]:bg-[var(--surface-active)]"
     >
       <button
         type="button"
@@ -127,7 +123,7 @@ function NoteRow({
         title={missing ? "Open the diff this note is on to see it there" : "Show this note"}
         onClick={() => setMissing(!revealNote(note.id, reduced))}
       >
-        <span className="flex-none max-w-[40%] overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-secondary)] text-[11.5px] [font-family:var(--font-mono)]">
+        <span className="flex-none max-w-[40%] overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-secondary)] text-[12px] [font-family:var(--font-mono)]">
           {note.path.slice(slash + 1)}:{noteLines(note)}
         </span>
         <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-primary)]">
@@ -136,7 +132,7 @@ function NoteRow({
       </button>
       <IconButton
         unstyled
-        className={rowButtonClasses}
+        className={rowIconButtonClasses}
         label="Delete note"
         disabled={disabled}
         onClick={() => useReviewNotes.getState().remove(threadId, note.id)}

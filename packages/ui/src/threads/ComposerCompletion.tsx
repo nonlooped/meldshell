@@ -419,11 +419,11 @@ function CompletionRow({ item }: { item: CompletionItem }): React.JSX.Element {
         {command.name}
       </span>
       {command.argumentHint && (
-        <span className="flex-none text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.5px]">
+        <span className="flex-none text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[11px]">
           {command.argumentHint}
         </span>
       )}
-      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] text-[11.5px]">
+      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] text-[12px]">
         {command.description}
       </span>
     </>
@@ -442,6 +442,6 @@ const menuClasses = [
 
 const optionClasses = [
   "motion-colors flex h-[30px] items-center gap-[9px] [padding:0_9px] rounded-[var(--radius-sm)]",
-  "text-[var(--text-secondary)] cursor-default text-[12.5px] select-none",
+  "text-[var(--text-secondary)] cursor-default text-[13px] select-none",
   "[&[aria-selected='true']]:bg-[var(--surface-active)] [&[aria-selected='true']]:text-[var(--text-primary)]",
 ].join(" ")

@@ -8,7 +8,7 @@ import {
   type ScheduleCadence,
   type ScheduledPrompt,
 } from "@meldshell/contracts"
-import { AppDialog, Button, SelectField } from "../ui/controls"
+import { AppDialog, Button, SelectField, TextArea } from "../ui/controls"
 import { segmentClasses, segmentGroupClasses, textInputClasses } from "../ui/styles"
 import { describeMoment, localInputValue, shortMoment, WEEKDAYS } from "./schedule-format"
 import { useMinuteClock, useScheduleActions } from "./schedule-queries"
@@ -127,7 +127,7 @@ function UpcomingRuns({ runs, now }: { runs: readonly Date[]; now: Date }): Reac
         {runs.map((run, index) => (
           <li
             key={run.getTime()}
-            className={`inline-flex h-[24px] items-center [padding:0_9px] rounded-[999px] border-[1px] text-[11.5px] tabular-nums whitespace-nowrap ${
+            className={`inline-flex h-[24px] items-center [padding:0_9px] rounded-[999px] border-[1px] text-[12px] tabular-nums whitespace-nowrap ${
               index === 0
                 ? "border-[color:color-mix(in_srgb,var(--accent)_45%,transparent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--text-primary)]"
                 : "border-[color:var(--line-subtle)] text-[var(--text-secondary)]"
@@ -137,7 +137,7 @@ function UpcomingRuns({ runs, now }: { runs: readonly Date[]; now: Date }): Reac
           </li>
         ))}
         {runs.length === UPCOMING && (
-          <li className="text-[var(--text-tertiary)] text-[11.5px]" aria-label="and so on">
+          <li className="text-[var(--text-tertiary)] text-[12px]" aria-label="and so on">
             …
           </li>
         )}
@@ -146,7 +146,7 @@ function UpcomingRuns({ runs, now }: { runs: readonly Date[]; now: Date }): Reac
   )
 }
 
-const labelClasses = "block mb-[6px] text-[var(--text-secondary)] text-[11.5px] font-medium"
+const labelClasses = "block mb-[6px] text-[var(--text-secondary)] text-[12px] font-medium"
 const fieldClasses = `motion-colors ${textInputClasses}`
 const sameDays = (left: readonly number[], right: readonly number[]) =>
   left.length === right.length && right.every((day) => left.includes(day))
@@ -358,12 +358,12 @@ export function ScheduleDialog({
       <div className="flex flex-col gap-[16px] [padding:16px_20px_0]">
         <label className="block">
           <span className={labelClasses}>Prompt</span>
-          <textarea
-            className={`${fieldClasses} h-auto! min-h-[96px] max-h-[calc(var(--viewport-h)_*_0.4)] [padding:8px_10px]! leading-[1.5] resize-y`}
+          <TextArea
+            className="min-h-[96px] max-h-[calc(var(--viewport-h)_*_0.4)]"
             placeholder="What should the agent do each time?"
             autoFocus={form.prompt === ""}
             value={form.prompt}
-            onChange={(event) => update({ prompt: event.target.value })}
+            onValueChange={(prompt) => update({ prompt })}
           />
         </label>
         <div>
@@ -393,17 +393,13 @@ export function ScheduleDialog({
         </div>
         <CadenceFields form={form} update={update} />
         {!paused && runs.length > 1 && <UpcomingRuns runs={runs} now={now} />}
-        <p className="m-0 text-[var(--text-tertiary)] text-[11.5px] leading-[1.55]">
+        <p className="m-0 text-[var(--text-tertiary)] text-[12px] leading-[1.55]">
           Sent to this thread with its current model while MeldShell is running, and queued if the
           thread is busy. A run missed while MeldShell was closed happens once when it starts.
           Attachments are not scheduled.
         </p>
       </div>
-      {error !== null && (
-        <p role="alert" className="text-[var(--color-deleted)]!">
-          {error}
-        </p>
-      )}
+      {error !== null && <p role="alert">{error}</p>}
     </AppDialog>
   )
 }

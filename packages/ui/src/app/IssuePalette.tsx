@@ -103,7 +103,7 @@ function IssueSearch({
           <IssueRow issue={issue} starting={starting?.number === issue.number} />
         )}
       />
-      <p className="m-0 flex items-center gap-[6px] [padding:7px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[11.5px] text-[var(--text-tertiary)]">
+      <p className="m-0 flex items-center gap-[6px] [padding:7px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[12px] text-[var(--text-tertiary)]">
         {starting !== null
           ? `Creating a branch for #${starting.number}…`
           : "The thread gets its own branch, and the issue goes to the agent with your first message."}
@@ -180,7 +180,7 @@ function IssueRow({
       )}
       {issue.updatedAt !== "" && (
         <span
-          className="w-[28px] flex-none text-right text-[11.5px] text-[var(--text-tertiary)] tabular-nums"
+          className="w-[28px] flex-none text-right text-[12px] text-[var(--text-tertiary)] tabular-nums"
           title={`Updated ${new Date(issue.updatedAt).toLocaleString()}`}
         >
           {relativeAge(issue.updatedAt)}

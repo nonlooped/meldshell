@@ -186,7 +186,7 @@ function AddressBar({
   }, [url])
   return (
     <form
-      className={`motion-colors flex h-[28px] min-w-0 flex-1 items-center border-[1px] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.16)] [:root[data-theme='light']_&]:bg-[var(--surface-raised)] ${
+      className={`motion-colors flex h-[28px] min-w-0 flex-1 items-center border-[1px] rounded-[var(--radius)] bg-[var(--surface-input)] ${
         invalid
           ? "border-[color:var(--color-deleted)]"
           : "border-[color:var(--line-subtle)] [&:focus-within]:[border-color:var(--line-strong)]"
@@ -262,7 +262,7 @@ function AddressBar({
                 }}
               >
                 <span className="flex min-w-[240px] max-w-[380px] flex-1 items-baseline justify-between gap-[16px]">
-                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-primary)] [font:11.5px_var(--font-mono)]">
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-primary)] [font:12px_var(--font-mono)]">
                     {suggestion.url}
                   </span>
                   <span className="flex-none text-[var(--text-tertiary)] text-[11px]">
@@ -504,7 +504,7 @@ function PreviewFailure({
     <div className={`absolute [inset:0] bg-[var(--scrim)] ${centeredStateClasses}`} role="alert">
       <h2>{copy.title}</h2>
       <p>{copy.advice}</p>
-      <code className="block max-w-[420px] mb-[18px] [padding:6px_10px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-hover)] text-[var(--text-secondary)] text-[11.5px] [overflow-wrap:anywhere]">
+      <code className="block max-w-[420px] mb-[18px] [padding:6px_10px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-hover)] text-[var(--text-secondary)] text-[12px] [overflow-wrap:anywhere]">
         {failure.url}
         <span className="text-[var(--text-tertiary)]"> · {failure.description}</span>
       </code>
@@ -548,7 +548,7 @@ function AgentActivityOverlay({ threadId }: { threadId: string }): React.JSX.Ele
       )}
       <div
         role="status"
-        className="absolute left-[10px] bottom-[10px] flex max-w-[calc(100%_-_20px)] items-center gap-[6px] h-[26px] [padding:0_10px_0_8px] rounded-full border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-menu)] text-[var(--text-secondary)] text-[11.5px] [box-shadow:0_4px_14px_rgba(0,_0,_0,_0.25)]"
+        className="absolute left-[10px] bottom-[10px] flex max-w-[calc(100%_-_20px)] items-center gap-[6px] h-[26px] [padding:0_10px_0_8px] rounded-full border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-menu)] text-[var(--text-secondary)] text-[12px] [box-shadow:var(--shadow-raised)]"
       >
         <Bot size={13} strokeWidth={1.75} className="flex-none text-[var(--accent)]" />
         <span className="flex-none font-[550] text-[var(--text-primary)]">Agent</span>
@@ -563,7 +563,7 @@ function AgentActivityOverlay({ threadId }: { threadId: string }): React.JSX.Ele
 /** Says how design mode works while it waits for a click. */
 function DesignModeHint(): React.JSX.Element {
   return (
-    <div className="pointer-events-none absolute bottom-[12px] left-[50%] [transform:translateX(-50%)] flex max-w-[calc(100%_-_20px)] items-center gap-[6px] h-[28px] [padding:0_12px_0_9px] rounded-full border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-menu)] text-[var(--text-secondary)] text-[11.5px] whitespace-nowrap [box-shadow:0_4px_14px_rgba(0,_0,_0,_0.25)]">
+    <div className="pointer-events-none absolute bottom-[12px] left-[50%] [transform:translateX(-50%)] flex max-w-[calc(100%_-_20px)] items-center gap-[6px] h-[28px] [padding:0_12px_0_9px] rounded-full border-[1px] border-[color:var(--line-subtle)] bg-[var(--surface-menu)] text-[var(--text-secondary)] text-[12px] whitespace-nowrap [box-shadow:var(--shadow-raised)]">
       <MousePointerClick size={13} strokeWidth={1.75} className="flex-none text-[var(--accent)]" />
       <span role="status" className="min-w-0 overflow-hidden text-ellipsis">
         <span className="font-[550] text-[var(--text-primary)]">Click an element</span> to add it to

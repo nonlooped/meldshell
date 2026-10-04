@@ -2,7 +2,7 @@ import type { AppSnapshot, ScheduledPrompt } from "@meldshell/contracts"
 import { AlarmClock, ArrowUpRight } from "lucide-react"
 import { useTabStore } from "../app/tab-store"
 import { useViewStore } from "../app/view-store"
-import { Button } from "../ui/controls"
+import { Button, PanelNote, QueryError } from "../ui/controls"
 import { ScheduleList } from "./ScheduleList"
 import { useSchedules } from "./schedule-queries"
 
@@ -13,19 +13,13 @@ export function ScheduledPrompts({ snapshot }: { snapshot: AppSnapshot }): React
   const openThread = useTabStore((state) => state.openThread)
   const schedules = query.data ?? []
   const titles = new Map(snapshot.threads.map((thread) => [thread.id, thread.title]))
-  if (query.isPending)
-    return <p className="text-[var(--text-tertiary)] text-[12.5px]">Loading schedules…</p>
-  if (query.isError)
-    return (
-      <p role="alert" className="text-[var(--color-deleted)] text-[12.5px]">
-        {query.error.message}
-      </p>
-    )
+  if (query.isPending) return <PanelNote role="status">Loading schedules…</PanelNote>
+  if (query.isError) return <QueryError query={query} />
   if (schedules.length === 0)
     return (
       <div className="flex flex-col items-center gap-[10px] [padding:40px_0] text-center">
         <AlarmClock size={20} strokeWidth={1.5} className="text-[var(--text-tertiary)]" />
-        <p className="m-0 max-w-[360px] text-[var(--text-secondary)] text-[12.5px] leading-[1.6]">
+        <p className="m-0 max-w-[360px] text-[var(--text-secondary)] text-[13px] leading-[1.6]">
           No prompts are scheduled. Write a prompt in a thread, then choose the alarm clock beside
           the attachment button to send it later or on repeat.
         </p>

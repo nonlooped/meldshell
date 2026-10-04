@@ -107,7 +107,7 @@ export function ThreadOrigin({
         </motion.h2>
         <motion.p
           {...enter(0.14, { y: 4 }, { y: 0 })}
-          className="m-0 mt-[8px] max-w-[440px] text-[12.5px] leading-[1.55] text-[var(--text-tertiary)] [text-wrap:pretty]"
+          className="m-0 mt-[8px] max-w-[440px] text-[13px] leading-[1.55] text-[var(--text-tertiary)] [text-wrap:pretty]"
         >
           The issue's description and comments go to the agent with your first message.
         </motion.p>

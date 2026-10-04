@@ -113,11 +113,11 @@ function Elapsed({ since }: { since: number }): React.JSX.Element {
   const left = MAX_DICTATION_SECONDS * 1000 - (now - since)
   if (left <= WARN_SECONDS * 1000)
     return (
-      <span className="tabular-nums text-[11.5px] text-[var(--color-deleted)]">
+      <span className="tabular-nums text-[12px] text-[var(--color-deleted)]">
         {elapsedLabel(Math.max(0, left))} left
       </span>
     )
-  return <span className="tabular-nums text-[11.5px]">{elapsedLabel(now - since)}</span>
+  return <span className="tabular-nums text-[12px]">{elapsedLabel(now - since)}</span>
 }
 
 /** Shown while speech becomes text, or while the model downloads the first time. */
@@ -148,10 +148,10 @@ function TranscribingPill({
     >
       <ActivitySpinner />
       {percent === null ? (
-        <span className="text-[11.5px]">Transcribing</span>
+        <span className="text-[12px]">Transcribing</span>
       ) : (
         <>
-          <span className="text-[11.5px] whitespace-nowrap">Getting model</span>
+          <span className="text-[12px] whitespace-nowrap">Getting model</span>
           <span
             className="block w-[44px] h-[3px] overflow-hidden rounded-full bg-[var(--surface-active)]"
             aria-hidden="true"

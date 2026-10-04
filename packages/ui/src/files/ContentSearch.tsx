@@ -167,7 +167,7 @@ function SearchField({
     <div className="shrink-0 [padding:8px_8px_6px]">
       <div
         data-invalid={invalid || undefined}
-        className="motion-colors flex items-center gap-[2px] h-[30px] pl-[8px] pr-[2px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.198)] [:root[data-theme='light']_&]:bg-[var(--surface-raised)] [&:focus-within]:[border-color:var(--line-strong)] [&:focus-within]:[box-shadow:0_0_0_3px_rgba(255,_255,_255,_0.045)] [&[data-invalid]]:[border-color:var(--color-deleted)]"
+        className="motion-colors flex items-center gap-[2px] h-[30px] pl-[8px] pr-[2px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-[var(--surface-input)] [&:focus-within]:[border-color:var(--line-strong)] [&:focus-within]:[box-shadow:0_0_0_3px_var(--focus-glow)] [&[data-invalid]]:[border-color:var(--color-deleted)]"
       >
         <Search
           size={13}
@@ -193,7 +193,7 @@ function SearchField({
           aria-invalid={invalid}
           disabled={disabled}
           spellCheck={false}
-          className="min-w-0 flex-1 h-full p-0 border-0 bg-transparent text-[12.5px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
+          className="min-w-0 flex-1 h-full p-0 border-0 bg-transparent text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
         />
         <Toggle
           aria-label="Match case"
@@ -262,7 +262,7 @@ function FileResults({
           <Collapsible.Trigger
             data-search-row=""
             title={file.path}
-            className="flex items-center gap-[6px] w-full h-[24px] [padding:0_10px_0_6px] border-0 bg-transparent text-left cursor-pointer [&:hover]:bg-[var(--surface-hover)] [&:focus-visible]:bg-[var(--surface-active)] outline-none"
+            className="flex items-center gap-[6px] w-full h-[24px] [padding:0_10px_0_6px] border-0 bg-transparent text-left cursor-default [&:hover]:bg-[var(--surface-hover)] [&:focus-visible]:bg-[var(--surface-active)] outline-none"
           >
             <ChevronRight
               size={12}
@@ -273,7 +273,7 @@ function FileResults({
             <span className="shrink-0 max-w-[60%] truncate text-[var(--text-primary)]">
               {file.path.slice(slash + 1)}
             </span>
-            <span className="flex-1 min-w-0 truncate text-[10.5px] text-[var(--text-tertiary)]">
+            <span className="flex-1 min-w-0 truncate text-[11px] text-[var(--text-tertiary)]">
               {file.path.slice(0, Math.max(0, slash))}
             </span>
             <span className="shrink-0 min-w-[18px] [padding:0_5px] rounded-full bg-[var(--surface-selected)] text-center text-[10px] leading-[16px] text-[var(--text-secondary)] [font-variant-numeric:tabular-nums]">
@@ -301,10 +301,10 @@ function FileResults({
                 data-search-row=""
                 title={`${file.path}:${line.line}`}
                 onClick={() => openFile(scope, file.path, line.line)}
-                className="flex items-baseline gap-[8px] w-full min-h-[22px] [padding:3px_10px_3px_38px] border-0 bg-transparent text-left cursor-pointer [&:hover]:bg-[var(--surface-hover)] [&:focus-visible]:bg-[var(--surface-active)] outline-none"
+                className="flex items-baseline gap-[8px] w-full min-h-[22px] [padding:3px_10px_3px_38px] border-0 bg-transparent text-left cursor-default [&:hover]:bg-[var(--surface-hover)] [&:focus-visible]:bg-[var(--surface-active)] outline-none"
               >
                 <MatchText line={line} />
-                <span className="shrink-0 ml-auto [font:10.5px_var(--font-mono)] text-[var(--text-tertiary)] [font-variant-numeric:tabular-nums]">
+                <span className="shrink-0 ml-auto [font:11px_var(--font-mono)] text-[var(--text-tertiary)] [font-variant-numeric:tabular-nums]">
                   {line.line}
                 </span>
               </button>
@@ -335,7 +335,7 @@ function MatchText({ line }: { readonly line: ContentSearchLine }): React.JSX.El
   }
   parts.push(line.text.slice(position))
   return (
-    <span className="min-w-0 truncate whitespace-pre [font:11.5px/1.5_var(--font-mono)] text-[var(--text-secondary)]">
+    <span className="min-w-0 truncate whitespace-pre [font:12px/1.5_var(--font-mono)] text-[var(--text-secondary)]">
       {line.clipped && <span className="text-[var(--text-tertiary)]">…</span>}
       {parts}
     </span>

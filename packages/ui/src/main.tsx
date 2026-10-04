@@ -69,5 +69,5 @@ const centeredStateClasses = [
   "[&_.brand-mark]:mb-[16px] [&_.brand-mark]:text-[var(--text-tertiary)] [&_h2]:m-0",
   "[&_h2]:[font-family:var(--font-display)] [&_h2]:text-[20px] [&_h2]:font-semibold",
   "[&_h2]:tracking-[-0.01em] [&_p]:max-w-[380px] [&_p]:[margin:8px_0_20px]",
-  "[&_p]:text-[var(--text-secondary)] [&_p]:text-[12.5px] [&_p]:leading-[1.6] h-full bg-[var(--scrim)]",
+  "[&_p]:text-[var(--text-secondary)] [&_p]:text-[13px] [&_p]:leading-[1.6] h-full bg-[var(--scrim)]",
 ].join(" ")

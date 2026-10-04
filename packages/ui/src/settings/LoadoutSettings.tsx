@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import { ArrowDown, ArrowUp, Check, Trash2 } from "lucide-react"
 import type { AppSnapshot, Loadout, SetAppSettingsInput } from "@meldshell/contracts"
 import { LOADOUT_ACTIONS, useKeybindings } from "../app/keybindings"
 import { Button, ChordKeys, IconButton, TextField } from "../ui/controls"
@@ -23,30 +23,50 @@ function LoadoutName({
 }): React.JSX.Element {
   const [name, setName] = useState(loadout.name)
   const [saved, setSaved] = useState(loadout.name)
+  const [renamed, setRenamed] = useState(false)
   if (saved !== loadout.name) {
     setSaved(loadout.name)
     setName(loadout.name)
   }
+  useEffect(() => {
+    if (!renamed) return
+    const timer = window.setTimeout(() => setRenamed(false), 1800)
+    return () => window.clearTimeout(timer)
+  }, [renamed])
   return (
-    <TextField
-      aria-label={`Name of ${loadout.name}`}
-      value={name}
-      maxLength={48}
-      disabled={disabled}
-      className="h-[28px]! text-[13px]! font-medium [&:not(:hover):not(:focus)]:[border-color:transparent]! [&:not(:hover):not(:focus)]:bg-transparent!"
-      onValueChange={setName}
-      onBlur={() => {
-        if (name.trim() === "") setName(loadout.name)
-        else if (name.trim() !== loadout.name) onRename(name)
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") event.currentTarget.blur()
-        if (event.key === "Escape") {
-          setName(loadout.name)
-          event.currentTarget.blur()
-        }
-      }}
-    />
+    <span className="relative flex items-center">
+      <TextField
+        aria-label={`Name of ${loadout.name}`}
+        value={name}
+        maxLength={48}
+        disabled={disabled}
+        className="h-[28px]! text-[13px]! font-medium [&:not(:hover):not(:focus)]:[border-color:transparent]! [&:not(:hover):not(:focus)]:bg-transparent!"
+        onValueChange={setName}
+        onBlur={() => {
+          if (name.trim() === "") setName(loadout.name)
+          else if (name.trim() !== loadout.name) {
+            onRename(name)
+            setRenamed(true)
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur()
+          if (event.key === "Escape") {
+            setName(loadout.name)
+            event.currentTarget.blur()
+          }
+        }}
+      />
+      {renamed && (
+        <span
+          role="status"
+          className="motion-enter pointer-events-none absolute right-[8px] inline-flex items-center gap-[4px] text-[var(--color-added)] text-[11px]"
+        >
+          <Check size={11} strokeWidth={2.25} aria-hidden="true" />
+          Saved
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -73,7 +93,7 @@ export function LoadoutSettings({
       description="A loadout remembers an agent, model, and reasoning effort together. Save one from the foot of the composer's model picker, then switch to it there or with its shortcut. The order here sets which shortcut each one uses."
     >
       {loadouts.length === 0 ? (
-        <p className="m-0 [padding:22px_16px] text-[var(--text-tertiary)] text-[12.5px] text-center">
+        <p className="m-0 [padding:22px_16px] text-[var(--text-tertiary)] text-[13px] text-center">
           No loadouts yet. Set up the composer the way you like, then choose Save current setup from
           its model picker.
         </p>
@@ -98,7 +118,7 @@ export function LoadoutSettings({
                     onRename={(name) => save(renameLoadout(loadouts, loadout.id, name))}
                   />
                   <span
-                    className={`overflow-hidden text-ellipsis whitespace-nowrap pl-[9px] text-[11.5px] ${selection === null ? "text-[var(--color-modified)]" : "text-[var(--text-tertiary)]"}`}
+                    className={`overflow-hidden text-ellipsis whitespace-nowrap pl-[9px] text-[12px] ${selection === null ? "text-[var(--color-modified)]" : "text-[var(--text-tertiary)]"}`}
                   >
                     {selection === null
                       ? "Its model is turned off or removed. Turn it back on in Providers & models to use this loadout."
@@ -139,7 +159,7 @@ export function LoadoutSettings({
       {removed !== null && (
         <p
           role="status"
-          className="flex items-center gap-[8px] m-0 [padding:8px_16px] text-[11.5px] text-[var(--text-secondary)]"
+          className="flex items-center gap-[8px] m-0 [padding:8px_16px] text-[12px] text-[var(--text-secondary)]"
         >
           Deleted “{removed.name}”.
           <Button

@@ -119,7 +119,7 @@ function SessionSearch({
           />
         )}
       />
-      <p className="m-0 flex items-center gap-[6px] [padding:7px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[11.5px] text-[var(--text-tertiary)]">
+      <p className="m-0 flex items-center gap-[6px] [padding:7px_16px] border-t-[1px] border-t-[color:var(--line-subtle)] text-[12px] text-[var(--text-tertiary)]">
         {importing !== null
           ? `Reading the ${cliLabel(importing.harness)} session…`
           : "The thread keeps the session, so its next message continues where the terminal left off."}
@@ -182,13 +182,13 @@ function SessionRow({
         </span>
       )}
       {session.branch !== null && (
-        <span className="hidden min-[560px]:inline-flex max-w-[140px] flex-none items-center gap-[4px] text-[11.5px] text-[var(--text-tertiary)]">
+        <span className="hidden min-[560px]:inline-flex max-w-[140px] flex-none items-center gap-[4px] text-[12px] text-[var(--text-tertiary)]">
           <GitBranch size={11} strokeWidth={2} aria-hidden="true" className="flex-none" />
           <span className="truncate">{session.branch}</span>
         </span>
       )}
       <span
-        className="w-[28px] flex-none text-right text-[11.5px] text-[var(--text-tertiary)] tabular-nums"
+        className="w-[28px] flex-none text-right text-[12px] text-[var(--text-tertiary)] tabular-nums"
         title={`Last active ${new Date(session.updatedAt).toLocaleString()}`}
       >
         {relativeAge(session.updatedAt)}

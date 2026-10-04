@@ -6,7 +6,7 @@ import { Fieldset } from "@base-ui-components/react/fieldset"
 import { skipToken, useQuery } from "@tanstack/react-query"
 import { MessageCircleQuestion, ShieldCheck } from "lucide-react"
 import type { ApprovalRequest, CanonicalEvent, ResolveApprovalInput } from "@meldshell/contracts"
-import { Button, Checkbox, Radio, TextField } from "../ui/controls"
+import { Button, Checkbox, Radio, TextArea, TextField } from "../ui/controls"
 import { cx, questionHeaderClasses, questionOptionClasses, questionTextClasses } from "../ui/styles"
 import { Markdown } from "../ui/Markdown"
 import { ChangeDiff } from "../ui/ChangeDiff"
@@ -127,12 +127,12 @@ function QuestionInput({
       )}
       {writing &&
         (question.multiline ? (
-          <textarea
-            className="mt-[8px] w-full [box-sizing:border-box] [resize:vertical] p-[10px] text-[var(--text-primary)] text-[12.5px] bg-[var(--surface-raised)] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] [font-family:inherit] outline-none [&:focus]:[border-color:var(--line-strong)]"
+          <TextArea
+            className="mt-[8px] min-h-[120px]"
             aria-label={question.question}
             disabled={disabled}
             value={draft.other}
-            onChange={(event) => onDraftChange({ ...draft, other: event.target.value })}
+            onValueChange={(other) => onDraftChange({ ...draft, other })}
             rows={6}
           />
         ) : (
@@ -186,7 +186,7 @@ function FieldList({ fields }: { fields: ReadonlyArray<ToolField> }): React.JSX.
           <dd
             className={cx(
               "m-0 min-w-0 text-[var(--text-primary)] whitespace-pre-wrap [overflow-wrap:anywhere] max-h-[160px] overflow-y-auto",
-              field.code && "[font-family:var(--font-mono)] text-[11.5px]",
+              field.code && "[font-family:var(--font-mono)] text-[12px]",
             )}
           >
             {field.value}
@@ -271,12 +271,12 @@ export function InteractionCard({
       </header>
       <div className="flex flex-col gap-[10px] max-h-[min(46vh,_440px)] overflow-y-auto [padding:8px_14px_12px] min-w-0">
         {summary !== null && (patch === null || request.kind !== "file-change") && (
-          <p className="m-0 text-[var(--text-secondary)] text-[12.5px] [overflow-wrap:anywhere]">
+          <p className="m-0 text-[var(--text-secondary)] text-[13px] [overflow-wrap:anywhere]">
             {summary}
           </p>
         )}
         {command !== null && (
-          <pre className="m-0 max-h-[180px] overflow-auto [padding:8px_10px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-hover)] text-[var(--text-primary)] [font-family:var(--font-mono)] text-[11.5px] leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere]">
+          <pre className="m-0 max-h-[180px] overflow-auto [padding:8px_10px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-hover)] text-[var(--text-primary)] [font-family:var(--font-mono)] text-[12px] leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere]">
             {command}
           </pre>
         )}
@@ -312,7 +312,7 @@ export function InteractionCard({
           {mutation.error.message}
         </p>
       )}
-      <footer className="@container flex flex-wrap items-center justify-end gap-[8px] [padding:10px_14px] border-t-[1px] border-t-[color:var(--line-subtle)] bg-[var(--surface-hover)] [&_.button]:h-[30px]">
+      <footer className="@container flex flex-wrap items-center justify-end gap-[8px] [padding:10px_14px] border-t-[1px] border-t-[color:var(--line-subtle)] bg-[var(--surface-hover)]">
         {declinable && (
           <TextField
             className="flex-[1_1_100%] @[620px]:flex-[1_1_220px] min-w-0 h-[30px]"

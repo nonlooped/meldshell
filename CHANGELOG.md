@@ -4,6 +4,14 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Changed
+
+- A consistency pass over the desktop app. Text fields, buttons, switches, and dialog backdrops now draw from theme tokens, so custom color themes colour them too, and every type size is a whole pixel. Destructive confirms (Delete permanently, Remove workspace, Delete theme, Restore changes, Sign out, Remove worktree) use a red Danger button instead of the accent. Errors inside dialogs, the commit box, and the composer read in the error colour, the composer's status lines share one shape with a dismiss button, and the transcript's read failure offers Try again. Menus keep their icon gutter so labels align, selects look like fields, the title bar's menu buttons use the same tooltip as its other buttons, inbox rows no longer show a native tooltip on hover, rows and disclosure triggers use the default cursor, and Scroll to latest, the snapshot Undo pill, and toasts share one floating style. The commit message takes two lines, Settings' active icon no longer turns accent, provider and loadout renames confirm with a brief Saved, the schedule action moved from the composer's toolbar into the send menu, the terminal's End action moved from its header into the pane menu, and the first-run guide uses the app's button and tile radii.
+
+### Added
+
+- The taskbar icon shows how many threads need attention (approvals, failures, and finished work you have not looked at), and the window flashes once when a new one arrives while another application is in front. Which threads you have looked at is now remembered across restarts. The inbox's workspace menu gains a Show filter (All threads, Needs attention, Running), the empty thread pane lists your three most recent threads, and two shortcuts join Settings: Ctrl+Shift+L focuses the composer and Ctrl+] moves focus to the next pane of a split.
+
 ### Fixed
 
 - Pi ignores idle notifications received before a new agent run starts. Cursor and Pi retained sessions now close when their thread is deleted or rewound, and Cursor sessions close when switching providers.

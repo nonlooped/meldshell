@@ -230,7 +230,7 @@ function SaveLoadoutDialog({
           )}
         </div>
         {mutation.error && (
-          <p role="alert" className="m-0 text-[11.5px] text-[var(--color-deleted)]">
+          <p role="alert" className="m-0 text-[12px] text-[var(--color-deleted)]">
             {mutation.error.message}
           </p>
         )}
@@ -242,7 +242,7 @@ function SaveLoadoutDialog({
 const pillClasses = [
   "motion-colors inline-flex max-w-full items-center gap-[6px] h-[24px] [padding:0_8px]",
   "border-[1px] border-[color:var(--line)] rounded-full bg-transparent cursor-default",
-  "text-[var(--text-secondary)] text-[11.5px] whitespace-nowrap",
+  "text-[var(--text-secondary)] text-[12px] whitespace-nowrap",
   "[&:hover:not(:disabled)]:bg-[var(--surface-hover)] [&:hover:not(:disabled)]:text-[var(--text-primary)]",
   "[&[data-active='true']]:bg-[var(--surface-active)] [&[data-active='true']]:text-[var(--text-primary)]",
   "[&[data-active='true']]:[border-color:var(--line-strong)] [&:disabled]:opacity-[0.5]",

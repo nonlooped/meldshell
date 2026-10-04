@@ -137,7 +137,7 @@ export function JsonTree({ value }: { value: unknown }) {
       <div
         role="tree"
         aria-label="JSON tree"
-        className="flex-1 min-h-0 overflow-auto [padding:12px_16px_24px] [font:12.5px_/_1.6_var(--font-mono)] text-[var(--text-secondary)] [scrollbar-gutter:stable]"
+        className="flex-1 min-h-0 overflow-auto [padding:12px_16px_24px] [font:13px_/_1.6_var(--font-mono)] text-[var(--text-secondary)] [scrollbar-gutter:stable]"
       >
         <JsonNode
           key={view.generation}
@@ -156,14 +156,14 @@ const rowClasses = "pl-[18px] whitespace-pre-wrap [overflow-wrap:anywhere]"
 
 const toggleClasses = [
   "flex items-center gap-0 w-full min-h-[20px] p-0 border-0 rounded-[var(--radius-sm)] bg-transparent",
-  "text-left text-inherit [font:inherit] cursor-pointer [&:hover]:bg-[var(--surface-hover)]",
+  "text-left text-inherit [font:inherit] cursor-default [&:hover]:bg-[var(--surface-hover)]",
   "disabled:cursor-default disabled:pl-[18px] disabled:[&:hover]:bg-transparent",
   "[&:focus-visible]:[outline:1px_solid_var(--focus-ring)] [&_>_svg]:flex-none [&_>_svg]:w-[18px]",
 ].join(" ")
 
 const countClasses = [
   "mx-[6px] [padding:0_6px] rounded-[999px] bg-[var(--surface-hover)] text-[var(--text-tertiary)]",
-  "[font-family:var(--font-text)] text-[10.5px]",
+  "[font-family:var(--font-text)] text-[11px]",
 ].join(" ")
 
 const groupClasses = "ml-[8px] pl-[2px] border-l-[1px] border-l-[color:var(--line-subtle)]"

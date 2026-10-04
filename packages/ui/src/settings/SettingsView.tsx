@@ -152,7 +152,7 @@ function SettingsSearchField({
         onKeyDown={onKeyDown}
         className={cx(
           "motion-colors w-full h-[32px] [padding:0_56px_0_31px] border-[1px] border-[color:var(--line-subtle)]",
-          "rounded-[var(--radius)] bg-[var(--surface-card)] text-[var(--text-primary)] text-[12.5px] outline-none",
+          "rounded-[var(--radius)] bg-[var(--surface-card)] text-[var(--text-primary)] text-[13px] outline-none",
           "[&::placeholder]:text-[var(--text-tertiary)] [&::-webkit-search-cancel-button]:appearance-none",
           "[&:hover]:[border-color:var(--line)] [&:focus]:[border-color:var(--line-strong)]",
           "[&:focus]:[box-shadow:0_0_0_3px_color-mix(in_srgb,var(--accent)_14%,transparent)]",
@@ -161,7 +161,7 @@ function SettingsSearchField({
       {query === "" ? (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute right-[8px] flex items-center gap-[2px] text-[10.5px] motion-colors group-focus-within/search:opacity-0 [@media(pointer:coarse)]:hidden"
+          className="pointer-events-none absolute right-[8px] flex items-center gap-[2px] text-[11px] motion-colors group-focus-within/search:opacity-0 [@media(pointer:coarse)]:hidden"
         >
           <kbd className={kbdClasses}>{isMac ? "⌘" : "Ctrl"}</kbd>
           <kbd className={kbdClasses}>F</kbd>
@@ -261,7 +261,7 @@ function SettingsSidebar({
                 onClick={() => onSelect(entry.id)}
                 className={cx(
                   "group/nav motion-colors relative z-[1] flex shrink-0 items-center gap-[10px] border-0 rounded-[var(--radius)]",
-                  "bg-transparent text-left text-[12.5px] cursor-default text-[var(--text-secondary)]",
+                  "bg-transparent text-left text-[13px] cursor-default text-[var(--text-secondary)]",
                   "[&:hover]:text-[var(--text-primary)] [&:not([aria-current]):hover]:bg-[var(--surface-hover)]",
                   "[&[aria-current]]:text-[var(--text-primary)] [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)]",
                   stacked
@@ -273,7 +273,7 @@ function SettingsSidebar({
                   size={15}
                   strokeWidth={1.75}
                   aria-hidden="true"
-                  className="flex-none text-[var(--text-tertiary)] motion-colors group-hover/nav:text-[var(--text-secondary)] group-aria-[current]/nav:text-[var(--accent)]"
+                  className="flex-none text-[var(--text-tertiary)] motion-colors group-hover/nav:text-[var(--text-secondary)] group-aria-[current]/nav:text-[var(--text-primary)]"
                 />
                 {entry.label}
               </button>
@@ -405,7 +405,7 @@ function SearchResults({
       {sections.map(({ section, entries }) => {
         return (
           <div key={section.id} role="group" aria-label={section.label} className="mb-[24px]">
-            <p className="m-0 [padding:0_2px_8px] text-[var(--text-tertiary)] text-[11.5px] font-medium">
+            <p className="m-0 [padding:0_2px_8px] text-[var(--text-tertiary)] text-[12px] font-medium">
               {section.label}
             </p>
             <div className={settingsCardClasses}>
@@ -431,7 +431,7 @@ function SearchResults({
                         <Highlighted text={entry.label} words={words} />
                       </span>
                       {entry.group !== entry.label && (
-                        <span className="overflow-hidden text-[var(--text-tertiary)] text-[11.5px] text-ellipsis whitespace-nowrap">
+                        <span className="overflow-hidden text-[var(--text-tertiary)] text-[12px] text-ellipsis whitespace-nowrap">
                           {entry.group}
                         </span>
                       )}
@@ -723,7 +723,7 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
             </h2>
             <p
               role={searching ? "status" : undefined}
-              className="m-0 text-[var(--text-secondary)] text-[12.5px] leading-[1.5]"
+              className="m-0 text-[var(--text-secondary)] text-[13px] leading-[1.5]"
             >
               {searching
                 ? results.length === 0
@@ -783,7 +783,7 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
           <>
             <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
             <Button
-              variant="primary"
+              variant="danger"
               onClick={() => {
                 if (deleteTarget !== null) onDeleteModel(deleteTarget.id)
                 setDeleteTarget(null)
@@ -895,7 +895,7 @@ function SettingsContent({
           >
             {snapshot.providers.length === 0 ? (
               <p
-                className={`m-0 [padding:28px_16px] text-[var(--text-tertiary)] text-[12.5px] text-center ${settingsCardSurfaceClasses}`}
+                className={`m-0 [padding:28px_16px] text-[var(--text-tertiary)] text-[13px] text-center ${settingsCardSurfaceClasses}`}
               >
                 No providers are configured.
               </p>

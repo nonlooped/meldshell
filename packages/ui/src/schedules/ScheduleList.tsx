@@ -109,14 +109,14 @@ function ScheduleRow({
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
               <span
-                className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] ${
+                className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] ${
                   dim ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"
                 }`}
                 title={schedule.prompt}
               >
                 {schedule.prompt}
               </span>
-              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] text-[11.5px]">
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-tertiary)] text-[12px]">
                 {describeCadence(schedule.cadence)}
                 <span aria-hidden="true"> · </span>
                 <span className={paused ? "text-[var(--color-modified)]" : ""}>
@@ -124,12 +124,12 @@ function ScheduleRow({
                 </span>
               </span>
               {schedule.lastError !== null && (
-                <span className="text-[var(--color-deleted)] text-[11.5px] [overflow-wrap:anywhere]">
+                <span className="text-[var(--color-deleted)] text-[12px] [overflow-wrap:anywhere]">
                   The last run could not be sent: {schedule.lastError}
                 </span>
               )}
               {actionError !== null && (
-                <span role="alert" className="text-[var(--color-deleted)] text-[11.5px]">
+                <span role="alert" className="text-[var(--color-deleted)] text-[12px]">
                   {actionError}
                 </span>
               )}
@@ -188,7 +188,7 @@ function ScheduleRow({
               Cancel
             </Button>
             <Button
-              variant="primary"
+              variant="danger"
               disabled={remove.isPending}
               onClick={() =>
                 remove.mutate(schedule.id, { onSuccess: () => setConfirmDelete(false) })

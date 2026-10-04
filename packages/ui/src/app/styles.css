@@ -218,6 +218,16 @@
     --surface-hover: rgba(255, 255, 255, 0.0405);
     --surface-active: rgba(255, 255, 255, 0.0675);
     --surface-selected: rgba(255, 255, 255, 0.0558);
+    /* A text field or select sits a step below the page; a button a step above it. */
+    --surface-input: rgba(0, 0, 0, 0.198);
+    --surface-button: rgba(255, 255, 255, 0.027);
+    /* The track of a switch that is off. */
+    --surface-track: rgba(0, 0, 0, 0.27);
+    /* The veil behind a dialog, and the lighter one behind a palette. */
+    --backdrop: rgba(0, 0, 0, 0.45);
+    --backdrop-light: rgba(0, 0, 0, 0.2);
+    /* The soft halo a focused field gets beside its stronger border. */
+    --focus-glow: rgba(255, 255, 255, 0.045);
 
     --line-subtle: rgba(255, 255, 255, 0.055);
     --line: rgba(255, 255, 255, 0.09);
@@ -262,6 +272,10 @@
     --font-text: "Mona Sans Variable", "Segoe UI Variable Text", system-ui, sans-serif;
     --font-display: "Mona Sans Variable", "Segoe UI Variable Display", system-ui, sans-serif;
     --font-mono: "Monaspace Neon", "Cascadia Code", ui-monospace, monospace;
+
+    /* Type sizes are whole pixels: 10 for badges, 11 for captions, 12 for secondary text, 13 for
+     * body copy, 14 for reading, and 16 and up for headings. Half pixels blur at app scales other
+     * than one. */
 
     --radius-sm: 5px;
     --radius: 7px;
@@ -420,6 +434,12 @@
     --surface-hover: rgba(40, 36, 30, 0.05);
     --surface-active: rgba(40, 36, 30, 0.085);
     --surface-selected: rgba(40, 36, 30, 0.07);
+    --surface-input: rgba(236, 235, 231, 0.95);
+    --surface-button: rgba(255, 255, 255, 0.4);
+    --surface-track: rgba(40, 36, 30, 0.085);
+    --backdrop: rgba(40, 36, 30, 0.3);
+    --backdrop-light: rgba(40, 36, 30, 0.12);
+    --focus-glow: rgba(68, 84, 186, 0.14);
     --line-subtle: rgba(40, 36, 30, 0.08);
     --line: rgba(40, 36, 30, 0.13);
     --line-strong: rgba(40, 36, 30, 0.25);

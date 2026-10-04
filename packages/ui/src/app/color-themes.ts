@@ -336,6 +336,32 @@ const TEXT_LEVELS: Readonly<Record<ThemeMode, readonly [number, number, number]>
   light: [0.79, 0.7, 0.4],
 }
 
+/** The surfaces of fields, buttons, switch tracks, and veils, which sit below or above the page. */
+function controlTokens(
+  background: Rgb,
+  foreground: Rgb,
+  accent: Rgb,
+  dark: boolean,
+): Record<string, string> {
+  if (dark)
+    return {
+      "--surface-input": rgba(BLACK, 0.198),
+      "--surface-button": rgba(WHITE, 0.027),
+      "--surface-track": rgba(BLACK, 0.27),
+      "--backdrop": rgba(BLACK, 0.45),
+      "--backdrop-light": rgba(BLACK, 0.2),
+      "--focus-glow": rgba(WHITE, 0.045),
+    }
+  return {
+    "--surface-input": rgba(mix(background, WHITE, 0.34), 0.95),
+    "--surface-button": rgba(WHITE, 0.4),
+    "--surface-track": rgba(foreground, 0.085),
+    "--backdrop": rgba(foreground, 0.3),
+    "--backdrop-light": rgba(foreground, 0.12),
+    "--focus-glow": rgba(accent, 0.14),
+  }
+}
+
 /**
  * Every colour token the stylesheet defines for a mode, derived from a palette. The proportions
  * follow the original MeldShell tokens, so a theme reads like the default with new colours.
@@ -373,6 +399,7 @@ export function themeTokens(palette: ThemePalette, mode: ThemeMode): Record<stri
     "--surface-hover": rgba(foreground, dark ? 0.0405 : 0.05),
     "--surface-active": rgba(foreground, dark ? 0.0675 : 0.085),
     "--surface-selected": rgba(foreground, dark ? 0.0558 : 0.07),
+    ...controlTokens(background, foreground, accent, dark),
     "--line-subtle": rgba(foreground, dark ? 0.055 : 0.08),
     "--line": rgba(foreground, dark ? 0.09 : 0.13),
     "--line-strong": rgba(foreground, dark ? 0.17 : 0.25),

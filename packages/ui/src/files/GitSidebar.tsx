@@ -33,10 +33,10 @@ import {
   MenuAction,
   PanelNote,
   QueryError,
-  TextField,
+  TextArea,
 } from "../ui/controls"
 import { GitSkeleton, LinesSkeleton } from "../ui/Skeleton"
-import { disclosureChevronClasses } from "../ui/styles"
+import { disclosureChevronClasses, paneSeparatorClasses } from "../ui/styles"
 import { FileIcon } from "../ui/FileIcon"
 import { useTabStore } from "../app/tab-store"
 import { ChangeDiff } from "../ui/ChangeDiff"
@@ -152,7 +152,7 @@ function FileRow({
               type="button"
               onClick={() => openDiff(scope, change.path, side)}
               className={
-                "git-file flex items-center gap-[7px] w-full h-[28px] border-0 [padding:0_14px] bg-transparent text-left cursor-pointer [&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)]"
+                "git-file flex items-center gap-[7px] w-full h-[28px] border-0 [padding:0_14px] bg-transparent text-left cursor-default [&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)]"
               }
               title={`${change.originalPath ? `${change.originalPath} → ` : ""}${change.path} · ${statusLabel(change)}`}
               aria-label={`${change.path}, ${statusLabel(change)}`}
@@ -231,7 +231,7 @@ function FileRow({
           <>
             <Button onClick={() => setConfirmRestore(false)}>Cancel</Button>
             <Button
-              variant="primary"
+              variant="danger"
               disabled={busy}
               onClick={() => {
                 onAction(change.path, "restore")
@@ -345,7 +345,7 @@ export function GitSidebar({
               />
             </Panel>
             <Separator
-              className={gitSectionSeparatorClasses}
+              className={`motion-colors ${paneSeparatorClasses}`}
               aria-label="Resize source control sections"
             />
             <Panel
@@ -448,14 +448,15 @@ function CommitSection({
     <section className="[padding:10px_12px] shrink-0" aria-label="Commit changes">
       <div
         className={
-          "relative [&_>_.icon-button]:absolute [&_>_.icon-button]:top-[50%] [&_>_.icon-button]:right-[4px] [&_>_.icon-button]:[transform:translateY(-50%)] [&_.git-commit-message]:pr-[34px]"
+          "relative [&_>_.icon-button]:absolute [&_>_.icon-button]:top-[4px] [&_>_.icon-button]:right-[4px] [&_.git-commit-message]:pr-[34px]"
         }
       >
-        <TextField
-          className="git-commit-message w-full min-w-0"
+        {/* Two rows: a subject, and room for a body line, as Conventional Commits expect. */}
+        <TextArea
+          className="git-commit-message w-full min-w-0 min-h-[58px]! [resize:none]!"
+          rows={2}
           aria-label="Commit message"
-          placeholder="Commit message"
-          title={`Commit to ${data.branch} with Ctrl+Enter`}
+          placeholder={`Commit to ${data.branch}`}
           value={message}
           disabled={disabled}
           onValueChange={setMessage}
@@ -522,7 +523,7 @@ function CommitSection({
       )}
       {mutation.isError && (
         <p
-          className="[margin:8px_0_0] text-[var(--text-tertiary)] text-[11px] [overflow-wrap:anywhere]"
+          className="[margin:8px_0_0] text-[var(--color-deleted)] text-[11px] [overflow-wrap:anywhere]"
           role="alert"
         >
           {mutation.error.message}
@@ -561,7 +562,7 @@ function ChangesSection({
       onOpenChange={onOpenChange}
     >
       <div className="flex items-center shrink-0 pr-[6px] [&_.git-section-heading]:flex-1 [&_.git-section-heading]:min-w-0">
-        <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-medium [&:hover]:bg-[var(--surface-hover)]">
+        <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-default text-[11px] font-medium [&:hover]:bg-[var(--surface-hover)]">
           <ChevronRight size={13} className={disclosureChevronClasses} />
           <span>Changes</span>
           <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
@@ -655,10 +656,10 @@ function GraphSection({
       open={open}
       onOpenChange={onOpenChange}
     >
-      <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-pointer text-[11px] font-medium [&:hover]:bg-[var(--surface-hover)]">
+      <Collapsible.Trigger className="git-section-heading flex items-center gap-[6px] w-full min-h-[32px] shrink-0 [padding:0_12px] border-0 bg-transparent cursor-default text-[11px] font-medium [&:hover]:bg-[var(--surface-hover)]">
         <ChevronRight size={13} className={disclosureChevronClasses} />
         <span>Graph</span>
-        <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal">
+        <span className="ml-[auto] text-[var(--text-tertiary)] text-[10px] font-normal italic">
           All branches
         </span>
       </Collapsible.Trigger>
@@ -721,7 +722,7 @@ function CommitRow({
       <ContextMenu
         trigger={
           <Collapsible.Trigger
-            className="w-full border-0 bg-transparent text-left cursor-pointer pl-[0] flex items-center gap-[6px] h-[28px] pr-[12px] [&:hover]:bg-[var(--surface-hover)] [&[aria-expanded='true']]:bg-[var(--surface-hover)]"
+            className="w-full border-0 bg-transparent text-left cursor-default pl-[0] flex items-center gap-[6px] h-[28px] pr-[12px] [&:hover]:bg-[var(--surface-hover)] [&[aria-expanded='true']]:bg-[var(--surface-hover)]"
             title={`${commit.subject}\n${commit.author} · ${new Date(commit.date).toLocaleString()}\n${commit.hash.slice(0, 7)}${commit.refs ? `\n${commit.refs}` : ""}`}
           >
             <svg
@@ -747,7 +748,7 @@ function CommitRow({
             </span>
             {ref !== null && (
               <span
-                className="inline-flex max-w-[96px] shrink-0 items-center gap-[4px] h-[18px] [padding:0_6px] rounded-[9px] bg-[color-mix(in_srgb,var(--color-info)_12%,transparent)] text-[10.5px] text-[var(--color-info)]"
+                className="inline-flex max-w-[96px] shrink-0 items-center gap-[4px] h-[18px] [padding:0_6px] rounded-[9px] bg-[color-mix(in_srgb,var(--color-info)_12%,transparent)] text-[11px] text-[var(--color-info)]"
                 title={commit.refs}
               >
                 {ref.head && (
@@ -764,7 +765,7 @@ function CommitRow({
             )}
             <time
               dateTime={commit.date}
-              className="shrink-0 min-w-[24px] text-right text-[var(--text-tertiary)] text-[10.5px] tabular-nums"
+              className="shrink-0 min-w-[24px] text-right text-[var(--text-tertiary)] text-[11px] tabular-nums"
             >
               {relativeAge(commit.date)}
             </time>
@@ -816,10 +817,4 @@ const gitFileStatusClasses = [
   "[&[data-kind='renamed']]:text-[var(--color-renamed)]",
   "[&[data-kind='deleted']]:text-[var(--color-deleted)]",
   "[&[data-kind='conflict']]:text-[var(--color-deleted)]",
-].join(" ")
-
-const gitSectionSeparatorClasses = [
-  "relative h-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute",
-  "[&::after]:z-[2] [&::after]:[inset:-3px_0] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)]",
-  "[&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]",
 ].join(" ")

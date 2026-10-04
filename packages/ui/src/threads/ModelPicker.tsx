@@ -121,7 +121,7 @@ export function ModelPicker({
                           value={model}
                           title={label(model)}
                         >
-                          <span className="model-item-name text-inherit text-[12.5px]">
+                          <span className="model-item-name text-inherit text-[13px]">
                             {label(model)}
                           </span>
                           <Combobox.ItemIndicator className="flex shrink-0">
@@ -151,7 +151,7 @@ const popupClasses = [
   "popup min-w-[190px] max-h-[var(--available-height,_420px)] overflow-y-auto p-[5px]",
   "border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-lg)] bg-[var(--surface-menu)]",
   "[backdrop-filter:blur(32px)]",
-  "[box-shadow:0_4px_16px_rgba(0,_0,_0,_0.16),_inset_0_1px_0_var(--line-subtle)]",
+  "[box-shadow:var(--shadow-popup),_inset_0_1px_0_var(--edge-highlight)]",
   "text-[var(--text-primary)] outline-none [transform-origin:var(--transform-origin)]",
   "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
   "[@media(prefers-reduced-transparency:_reduce)]:bg-[var(--surface-overlay)] [&.popup]:flex",
@@ -163,7 +163,7 @@ const modelPickerSearchClasses = [
   "flex items-center shrink-0 gap-[9px] [padding:11px_14px] border-b-[1px] border-b-[color:var(--line-subtle)]",
   "text-[var(--text-tertiary)] [&_input]:min-w-0 [&_input]:w-full [&_input]:p-0 [&_input]:border-0",
   "[&_input]:outline-none [&_input]:bg-transparent [&_input]:text-[var(--text-primary)]",
-  "[&_input]:[font:inherit] [&_input]:text-[12.5px] [&_input::placeholder]:text-[var(--text-tertiary)]",
+  "[&_input]:[font:inherit] [&_input]:text-[13px] [&_input::placeholder]:text-[var(--text-tertiary)]",
 ].join(" ")
 
 const modelPickerOptionClasses = [

@@ -71,7 +71,7 @@ function BriefCard({
         </IconButton>
       </div>
       <div
-        className={`[padding:10px_16px_12px] text-[var(--text-secondary)] text-[12.5px] overflow-y-auto ${compact ? "max-h-[220px]" : "max-h-[360px]"}`}
+        className={`[padding:10px_16px_12px] text-[var(--text-secondary)] text-[13px] overflow-y-auto ${compact ? "max-h-[220px]" : "max-h-[360px]"}`}
       >
         <Markdown text={briefText(handoff.brief)} />
       </div>
@@ -87,7 +87,7 @@ const lineClasses = [
 
 const triggerClasses = [
   "motion-colors inline-flex items-center gap-[6px] [padding:3px_10px] border-[1px] border-[color:var(--line-subtle)] rounded-[999px]",
-  "bg-[var(--surface-raised)] text-inherit [font:inherit] cursor-pointer",
+  "bg-[var(--surface-raised)] text-inherit [font:inherit] cursor-default",
   "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)]",
   "[&[data-panel-open]]:text-[var(--text-secondary)]",
 ].join(" ")
@@ -254,7 +254,7 @@ export function HandoffNotice({
       >
         <NoticeLabel fork={fork} previous={previous} harness={harness} handoff={handoff} />
         {handoff !== null && (
-          <Collapsible.Trigger className="motion-colors shrink-0 inline-flex items-center gap-[4px] ml-auto [padding:2px_8px] border-0 rounded-[999px] bg-transparent text-inherit [font:inherit] cursor-pointer [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)] [&[data-panel-open]]:text-[var(--text-secondary)]">
+          <Collapsible.Trigger className="motion-colors shrink-0 inline-flex items-center gap-[4px] ml-auto [padding:2px_8px] border-0 rounded-[999px] bg-transparent text-inherit [font:inherit] cursor-default [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)] [&[data-panel-open]]:text-[var(--text-secondary)]">
             {open ? "Hide summary" : "Preview summary"}
             <ChevronRight className={disclosureChevronClasses} size={12} />
           </Collapsible.Trigger>
