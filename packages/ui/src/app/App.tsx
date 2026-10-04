@@ -837,7 +837,12 @@ export function App(): React.JSX.Element {
     const archiving = thread.status === "active"
     setStatusMutation.mutate(
       { threadId: thread.id, status: archiving ? "settled" : "active" },
-      { onSuccess: () => setArchivedThread(archiving ? thread : null) },
+      {
+        onSuccess: () => {
+          if (archiving) removeThread(thread.id)
+          setArchivedThread(archiving ? thread : null)
+        },
+      },
     )
   }
   const toggleInbox = () =>
