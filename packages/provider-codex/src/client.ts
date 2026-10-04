@@ -4,6 +4,9 @@ import type { ThreadStartResponse } from "./generated/v2/ThreadStartResponse"
 import type { ThreadResumeResponse } from "./generated/v2/ThreadResumeResponse"
 import type { TurnStartResponse } from "./generated/v2/TurnStartResponse"
 import type { ModelListResponse } from "./generated/v2/ModelListResponse"
+import type { ThreadListResponse } from "./generated/v2/ThreadListResponse"
+import type { ThreadReadResponse } from "./generated/v2/ThreadReadResponse"
+import type { ThreadTurnsListResponse } from "./generated/v2/ThreadTurnsListResponse"
 import type { ChildProcessWithoutNullStreams } from "node:child_process"
 import { createInterface } from "node:readline"
 import {
@@ -26,6 +29,9 @@ import threadStartResponseSchema from "../schema/v2/ThreadStartResponse.json"
 import threadResumeResponseSchema from "../schema/v2/ThreadResumeResponse.json"
 import turnStartResponseSchema from "../schema/v2/TurnStartResponse.json"
 import modelListResponseSchema from "../schema/v2/ModelListResponse.json"
+import threadListResponseSchema from "../schema/v2/ThreadListResponse.json"
+import threadReadResponseSchema from "../schema/v2/ThreadReadResponse.json"
+import threadTurnsListResponseSchema from "../schema/v2/ThreadTurnsListResponse.json"
 
 const MINIMUM_CODEX_VERSION = "0.153.0"
 
@@ -140,12 +146,18 @@ interface Responses {
   "thread/resume": ThreadResumeResponse
   "turn/start": TurnStartResponse
   "model/list": ModelListResponse
+  "thread/list": ThreadListResponse
+  "thread/read": ThreadReadResponse
+  "thread/turns/list": ThreadTurnsListResponse
 }
 const responseValidators: { [M in keyof Responses]: ValidateFunction<Responses[M]> } = {
   "thread/start": ajv.compile<ThreadStartResponse>(threadStartResponseSchema),
   "thread/resume": ajv.compile<ThreadResumeResponse>(threadResumeResponseSchema),
   "turn/start": ajv.compile<TurnStartResponse>(turnStartResponseSchema),
   "model/list": ajv.compile<ModelListResponse>(modelListResponseSchema),
+  "thread/list": ajv.compile<ThreadListResponse>(threadListResponseSchema),
+  "thread/read": ajv.compile<ThreadReadResponse>(threadReadResponseSchema),
+  "thread/turns/list": ajv.compile<ThreadTurnsListResponse>(threadTurnsListResponseSchema),
 }
 
 /**

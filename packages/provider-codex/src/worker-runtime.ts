@@ -20,6 +20,7 @@ import {
 } from "./client"
 import { encodeInteractionResponse } from "./interactions"
 import { nativeThreadIdOf, nativeTurnIdOf } from "./messages"
+import { listCodexSessions, readCodexSession } from "./sessions"
 import { codexSkillCommands } from "./skills"
 import { TitleTurns } from "./title-turns"
 import { inputItems, sandboxPolicy, threadSettings } from "./turn-input"
@@ -478,6 +479,26 @@ export const runCodexWorker = (
       )
   }
 
+  const listSessions = (requestId: string, workspacePath: string): void => {
+    void serverForRequest()
+      .then((server) => listCodexSessions(server, workspacePath))
+      .then(
+        (sessions) => publish({ type: "sessions-result", requestId, sessions }),
+        (cause: unknown) =>
+          publish({ type: "sessions-result", requestId, error: errorMessage(cause) }),
+      )
+  }
+
+  const readSession = (requestId: string, nativeThreadId: string): void => {
+    void serverForRequest()
+      .then((server) => readCodexSession(server, nativeThreadId))
+      .then(
+        (history) => publish({ type: "session-history-result", requestId, history }),
+        (cause: unknown) =>
+          publish({ type: "session-history-result", requestId, error: errorMessage(cause) }),
+      )
+  }
+
   parentPort.on("message", ({ data }) => {
     if (data === "probe-now") {
       void probe()
@@ -512,6 +533,12 @@ export const runCodexWorker = (
         break
       case "list-commands":
         listCommands(input.requestId, input.workspacePath)
+        break
+      case "list-sessions":
+        listSessions(input.requestId, input.workspacePath)
+        break
+      case "read-session":
+        readSession(input.requestId, input.nativeThreadId)
         break
       case "start-turn":
         void startTurn(input.dispatch)

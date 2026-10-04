@@ -10,6 +10,7 @@ import {
   TitleRequest,
   TurnDispatch,
 } from "./models"
+import { CliSessionHistory, CliSessionSummary } from "./cli-sessions"
 
 export const WorkerCommand = Schema.Union([
   Schema.Struct({
@@ -44,6 +45,19 @@ export const WorkerCommand = Schema.Union([
     requestId: Schema.String,
     workspacePath: Schema.String,
   }),
+  /** Lists the sessions the harness's CLI stored for a folder. */
+  Schema.Struct({
+    type: Schema.Literal("list-sessions"),
+    requestId: Schema.String,
+    workspacePath: Schema.String,
+  }),
+  /** Reads one stored session's conversation so it can be imported. */
+  Schema.Struct({
+    type: Schema.Literal("read-session"),
+    requestId: Schema.String,
+    workspacePath: Schema.String,
+    nativeThreadId: Schema.String,
+  }),
 ])
 export type WorkerCommand = typeof WorkerCommand.Type
 export type ProviderWorkerInput = WorkerCommand | "probe-now"
@@ -63,6 +77,22 @@ export const CommandsResult = Schema.Struct({
   type: Schema.Literal("commands-result"),
   requestId: Schema.String,
   commands: Schema.optional(Schema.Array(ComposerCommand)),
+  error: Schema.optional(Schema.String),
+})
+
+/** A worker's answer to `list-sessions`. */
+export const SessionsResult = Schema.Struct({
+  type: Schema.Literal("sessions-result"),
+  requestId: Schema.String,
+  sessions: Schema.optional(Schema.Array(CliSessionSummary)),
+  error: Schema.optional(Schema.String),
+})
+
+/** A worker's answer to `read-session`. */
+export const SessionHistoryResult = Schema.Struct({
+  type: Schema.Literal("session-history-result"),
+  requestId: Schema.String,
+  history: Schema.optional(CliSessionHistory),
   error: Schema.optional(Schema.String),
 })
 
@@ -116,6 +146,8 @@ export const WorkerEvent = Schema.Union([
   }),
   UsageResult,
   CommandsResult,
+  SessionsResult,
+  SessionHistoryResult,
   Schema.Struct({ type: Schema.Literal("process-started"), pid: Pid }),
   Schema.Struct({ type: Schema.Literal("process-stopped"), pid: Pid }),
   Schema.Struct({

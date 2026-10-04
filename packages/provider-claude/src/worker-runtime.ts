@@ -29,6 +29,7 @@ import { loadModelHistory } from "./model-history"
 import { claudeModels } from "./models"
 import { claudeOptions, claudePrompt } from "./options"
 import { spawnClaudeProcess } from "./process"
+import { listClaudeSessions, readClaudeSession } from "./sessions"
 import { accountStatus, claudeStatus, discoveryStatus, missingInstall } from "./status"
 import { claudeUsage } from "./usage"
 
@@ -382,6 +383,24 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
       publish({ type: "commands-result", requestId, error: errorMessage(cause) }),
     )
 
+  const listSessions = (requestId: string, workspacePath: string): Promise<void> =>
+    listClaudeSessions(workspacePath).then(
+      (sessions) => publish({ type: "sessions-result", requestId, sessions }),
+      (cause: unknown) =>
+        publish({ type: "sessions-result", requestId, error: errorMessage(cause) }),
+    )
+
+  const readSession = (
+    requestId: string,
+    workspacePath: string,
+    nativeThreadId: string,
+  ): Promise<void> =>
+    readClaudeSession(workspacePath, nativeThreadId).then(
+      (history) => publish({ type: "session-history-result", requestId, history }),
+      (cause: unknown) =>
+        publish({ type: "session-history-result", requestId, error: errorMessage(cause) }),
+    )
+
   const shutdown = async (): Promise<void> => {
     if (stopping) return
     stopping = true
@@ -456,6 +475,12 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
           break
         case "list-commands":
           void listCommands(message.requestId, message.workspacePath)
+          break
+        case "list-sessions":
+          void listSessions(message.requestId, message.workspacePath)
+          break
+        case "read-session":
+          void readSession(message.requestId, message.workspacePath, message.nativeThreadId)
           break
         case "start-turn":
           startTurn(message.dispatch)

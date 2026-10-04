@@ -21,6 +21,7 @@ import { discoverPi, type PiCommand } from "./discovery"
 import { parseModelSlug, piModels } from "./models"
 import { piPrompt } from "./prompt"
 import { PiRpc } from "./rpc"
+import { listPiSessions, readPiSession } from "./sessions"
 
 type Emit = (method: string, params: unknown, validated?: boolean, requestId?: string) => void
 
@@ -581,6 +582,30 @@ export const runPiWorker = (
           break
         case "list-commands":
           void listCommands(message.requestId, message.workspacePath)
+          break
+        case "list-sessions":
+          void listPiSessions(message.workspacePath).then(
+            (sessions) =>
+              publish({ type: "sessions-result", requestId: message.requestId, sessions }),
+            (cause: unknown) =>
+              publish({
+                type: "sessions-result",
+                requestId: message.requestId,
+                error: errorMessage(cause),
+              }),
+          )
+          break
+        case "read-session":
+          void readPiSession(message.workspacePath, message.nativeThreadId).then(
+            (history) =>
+              publish({ type: "session-history-result", requestId: message.requestId, history }),
+            (cause: unknown) =>
+              publish({
+                type: "session-history-result",
+                requestId: message.requestId,
+                error: errorMessage(cause),
+              }),
+          )
           break
         case "steer-turn":
           ack("Pi turns are not steered from MeldShell.")

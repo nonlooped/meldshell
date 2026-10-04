@@ -64,6 +64,9 @@ import {
   undoRewind,
   forkThread,
   previewHandoff,
+  importCliSession,
+  findSessionThreads,
+  resumableSession,
   sideQuestionPrompt,
 } from "@meldshell/core"
 import {
@@ -170,6 +173,10 @@ export const startCore = (parentPort: CorePort, databasePath: string) => {
       exposeCoreRead(sideQuestionPrompt(threadId, question)),
     RewindThread: (input) => exposeCoreError(rewindThread(input)),
     UndoRewind: ({ threadId }) => exposeCoreError(undoRewind(threadId)),
+    ImportCliSession: (input) => exposeCoreError(importCliSession(input)),
+    FindSessionThreads: ({ harness, nativeThreadIds }) =>
+      exposeCoreRead(findSessionThreads(harness, nativeThreadIds)),
+    GetResumableSession: ({ threadId }) => exposeCoreRead(resumableSession(threadId)),
     ForkThread: (input) => exposeCoreError(forkThread(input)),
     RecordRuntimeEvent: (input) => exposeCoreError(recordRuntimeEvent(input)),
     SetProviderSession: (input) =>

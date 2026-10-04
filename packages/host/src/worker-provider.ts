@@ -8,6 +8,8 @@ import {
   toError,
   WorkerEvent,
   type AppSnapshot,
+  type CliSessionHistory,
+  type CliSessionSummary,
   type CodexUsage,
   type ComposerCommand,
   type Harness,
@@ -44,13 +46,27 @@ import {
   turnSnapshotRef,
   type SnapshotPoint,
 } from "./turn-snapshots"
-import { deliverCommand, requestCommands, requestUsage } from "./worker-channel"
+import {
+  deliverCommand,
+  requestCommands,
+  requestSessionHistory,
+  requestSessions,
+  requestUsage,
+} from "./worker-channel"
 
 export interface ProviderService {
   readonly interrupt: (threadId: string, turnId: string) => Effect.Effect<void, Error>
   readonly status: Effect.Effect<ProviderStatus>
   readonly usage: Effect.Effect<CodexUsage, Error>
   readonly commands: (workspacePath: string) => Effect.Effect<ReadonlyArray<ComposerCommand>, Error>
+  /** The sessions the harness's own CLI stored for a folder. */
+  readonly sessions: (
+    workspacePath: string,
+  ) => Effect.Effect<ReadonlyArray<CliSessionSummary>, Error>
+  readonly sessionHistory: (
+    workspacePath: string,
+    nativeThreadId: string,
+  ) => Effect.Effect<CliSessionHistory, Error>
   readonly refresh: Effect.Effect<void, Error>
   /** Replaces the worker with a fresh one, which probes the harness again; fails running turns. */
   readonly restart: Effect.Effect<void, Error>
@@ -414,6 +430,8 @@ const providerRuntime = (
         case "command-ack":
         case "usage-result":
         case "commands-result":
+        case "sessions-result":
+        case "session-history-result":
           // The exchange that sent the command or request is waiting for these.
           return
       }
@@ -589,6 +607,10 @@ const providerRuntime = (
       usage: withWorker((child) => requestUsage(child, label)),
       commands: (workspacePath) =>
         withWorker((child) => requestCommands(child, label, workspacePath)),
+      sessions: (workspacePath) =>
+        withWorker((child) => requestSessions(child, label, workspacePath)),
+      sessionHistory: (workspacePath, nativeThreadId) =>
+        withWorker((child) => requestSessionHistory(child, label, workspacePath, nativeThreadId)),
       status: Ref.get(statusRef),
       refresh: Effect.suspend(() =>
         publishStatus(probing()).pipe(Effect.andThen(send("probe-now"))),

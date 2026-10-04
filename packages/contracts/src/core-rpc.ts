@@ -39,6 +39,12 @@ import {
   ForkRecord,
 } from "./models"
 import { CoreError } from "./errors"
+import {
+  CliHarness,
+  ImportedCliSession,
+  RecordCliSessionInput,
+  ResumableSession,
+} from "./cli-sessions"
 
 const snapshotRpc = <const Tag extends string, Payload extends Schema.Top>(
   tag: Tag,
@@ -143,6 +149,25 @@ export class CoreRpcs extends RpcGroup.make(
   Rpc.make("UndoRewind", {
     payload: Schema.Struct({ threadId: Schema.String }),
     success: UndoRewindResult,
+    error: CoreError,
+  }),
+  /** Records a session started in a harness's CLI as a thread, or finds the thread holding it. */
+  Rpc.make("ImportCliSession", {
+    payload: RecordCliSessionInput,
+    success: ImportedCliSession,
+    error: CoreError,
+  }),
+  Rpc.make("FindSessionThreads", {
+    payload: Schema.Struct({ harness: CliHarness, nativeThreadIds: Schema.Array(Schema.String) }),
+    success: Schema.Array(
+      Schema.Struct({ nativeThreadId: Schema.String, threadId: Schema.String }),
+    ),
+    error: CoreError,
+  }),
+  /** The session a thread's latest harness would continue in its CLI. */
+  Rpc.make("GetResumableSession", {
+    payload: Schema.Struct({ threadId: Schema.String }),
+    success: Schema.NullOr(ResumableSession),
     error: CoreError,
   }),
   /** Copies a thread's turns up to a point into a new thread that works in `worktree`. */

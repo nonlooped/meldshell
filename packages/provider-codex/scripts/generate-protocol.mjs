@@ -10,6 +10,9 @@ const schemas = [
   "v2/ThreadResumeResponse",
   "v2/TurnStartResponse",
   "v2/ModelListResponse",
+  "v2/ThreadListResponse",
+  "v2/ThreadReadResponse",
+  "v2/ThreadTurnsListResponse",
 ]
 const check = process.argv.includes("--check")
 for (const name of schemas) {

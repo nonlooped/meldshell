@@ -14,6 +14,7 @@ import { errorMessage, decodeCommand, IPC } from "@meldshell/contracts"
 import { remoteTerminals } from "./remote-terminals"
 import { administrationBridge } from "./administration"
 import { threadPort } from "./workspace-scripts"
+import { cliResumeScript } from "./cli-sessions"
 
 /** Runs the host in this process: core writer, provider workers, and the relay connection. */
 export async function startHost(
@@ -48,10 +49,12 @@ export async function startHost(
   const terminalContext = async (
     scope: { workspaceId: string; threadId: string },
     run: string | undefined,
+    cli = false,
   ) => {
     const cwd = await runtime.runPromise(scopePath(scope))
     const location = await core((client) => client.GetThreadLocation({ threadId: scope.threadId }))
     const env = await scriptEnvironment(location)
+    if (cli) return { cwd, env, run: await runtime.runPromise(cliResumeScript(scope.threadId)) }
     if (run === undefined) return { cwd, env, run: null }
     const script = (await readWorkspaceScripts(location.workspacePath)).run.find(
       (entry) => entry.name === run,
@@ -214,7 +217,8 @@ export async function startHost(
     scopePath: (scope: WorkspaceScope) => runtime.runPromise(scopePath(scope)),
     /**
      * Where a thread's terminal starts, the script variables it receives, and, when `run` names
-     * one, the workspace run script it should start.
+     * one, the workspace run script it should start. With `cli`, the shell instead continues the
+     * thread's session in its harness's CLI.
      */
     terminalContext,
     administrationResult: administration.result,

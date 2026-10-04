@@ -53,6 +53,7 @@ import {
 } from "./pull-requests"
 import { readWorkspaceScripts } from "./workspace-scripts"
 import { listIssues } from "./issues"
+import { importCliSession, listCliSessions } from "./cli-sessions"
 import {
   createThread,
   deleteThread,
@@ -140,6 +141,8 @@ export const hostOperations: Record<string, Operation> = {
     core.SearchTranscripts(input),
   ),
   [C.IPC.createThread]: operation(C.CreateThreadInput, false, createThread),
+  [C.IPC.listCliSessions]: operation(Schema.String, true, listCliSessions),
+  [C.IPC.importCliSession]: operation(C.ImportCliSessionInput, false, importCliSession),
   [C.IPC.renameWorkspace]: coreCall(C.RenameWorkspaceInput, false, (core, input) =>
     core.RenameWorkspace(input),
   ),
