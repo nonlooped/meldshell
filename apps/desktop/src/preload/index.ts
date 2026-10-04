@@ -49,6 +49,11 @@ const api: MeldShellApi = {
       list: () => ipcRenderer.invoke(IPC.listThreadWindows),
       onChange: on(IPC.threadWindowsChanged),
     },
+    designMode: {
+      pick: (webContentsId, accent) =>
+        ipcRenderer.invoke(IPC.designModePick, webContentsId, accent),
+      cancel: (webContentsId) => ipcRenderer.send(IPC.designModeCancel, webContentsId),
+    },
   },
   terminal: {
     open: (input) => ipcRenderer.invoke(IPC.terminalOpen, input),

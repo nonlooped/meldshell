@@ -93,18 +93,22 @@ export function useThreadManagementActions(
       callbacks.deleted(id)
     },
   )
-  const resolveApprovalMutation = useMutation({
-    mutationFn: (input: Input<"resolveApproval">) => window.meldshell.resolveApproval(input),
-    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.snapshot }),
-  })
   return {
     pinMutation,
     createThreadMutation,
     setStatusMutation,
     renameThreadMutation,
     deleteThreadMutation,
-    resolveApprovalMutation,
   }
+}
+
+/** Answers an agent's approval or question; each pane showing one keeps its own pending state. */
+export const useResolveApprovalMutation = () => {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: Input<"resolveApproval">) => window.meldshell.resolveApproval(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.snapshot }),
+  })
 }
 
 export const useThreadSettingsMutation = () =>

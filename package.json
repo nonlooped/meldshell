@@ -1,6 +1,6 @@
 {
   "name": "meldshell",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "private": true,
   "author": "MeldShell contributors",
   "description": "A local desktop environment for concurrent coding-agent threads",
@@ -31,7 +31,7 @@
     "control": "npm run dev --workspace=@meldshell/control",
     "dev:all": "node scripts/dev-all.mjs",
     "dev:host": "node scripts/dev-host.mjs",
-    "test:tooling": "node --import tsx --test tests/ci-scope.test.mjs tests/markdown-blocks.test.ts tests/file-previews.test.ts tests/onboarding.test.ts tests/dictation.test.ts tests/claude-provider.test.mts tests/settings.test.ts tests/pull-requests.test.ts tests/issues.test.ts tests/review-notes.test.ts tests/content-search.test.ts tests/loadouts.test.ts tests/changelog.test.ts tests/release-cli.test.mjs",
+    "test:tooling": "node --import tsx --test tests/ci-scope.test.mjs tests/markdown-blocks.test.ts tests/file-previews.test.ts tests/onboarding.test.ts tests/dictation.test.ts tests/claude-provider.test.mts tests/settings.test.ts tests/pull-requests.test.ts tests/issues.test.ts tests/review-notes.test.ts tests/content-search.test.ts tests/loadouts.test.ts tests/color-themes.test.ts tests/changelog.test.ts tests/release-cli.test.mjs tests/design-mode.test.ts tests/side-questions.test.ts tests/working-log.test.ts",
     "test:e2e:list": "e2e list",
     "typecheck:e2e": "tsc --noEmit -p tests/e2e/tsconfig.json"
   },

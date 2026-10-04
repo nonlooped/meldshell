@@ -14,8 +14,10 @@ import type {
   GitSnapshotInput,
   GitDiffInput,
   TurnSnapshotInput,
+  SideQuestionInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,
+  ForkThreadInput,
 } from "./workspace-inputs"
 export type {
   WorkspaceScope,
@@ -35,8 +37,10 @@ export type {
   GitFileAction,
   GitDiffSide,
   TurnSnapshotInput,
+  SideQuestionInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,
+  ForkThreadInput,
 } from "./workspace-inputs"
 
 import type { RemotePreviewInput, RemotePreviewFrame } from "./remote-preview"
@@ -74,11 +78,19 @@ import type {
   ScheduledPrompt,
   RewindResult,
   UndoRewindResult,
+  ForkResult,
   TurnHandoff,
   ThreadIssue,
 } from "./models"
 
-export type ComposerAttachment = InputAttachment & { readonly previewUrl?: string }
+export type ComposerAttachment = InputAttachment & {
+  readonly previewUrl?: string
+  /**
+   * Text sent with the message rather than shown in the composer, such as the HTML and styles of
+   * an element picked in the preview.
+   */
+  readonly context?: string
+}
 
 export interface HostFolders {
   readonly path: string
@@ -346,6 +358,8 @@ interface DesktopApi {
   readonly agentBrowser?: AgentBrowserApi
   /** Threads popped out into windows of their own, as on a second monitor. */
   readonly threadWindows?: ThreadWindowsApi
+  /** Picking elements in a preview page to describe them to an agent. */
+  readonly designMode?: DesignModeApi
 }
 
 interface ThreadWindowsApi {
@@ -356,6 +370,37 @@ interface ThreadWindowsApi {
   /** The threads that have a window of their own. */
   readonly list: () => Promise<readonly string[]>
   readonly onChange: (listener: (threadIds: readonly string[]) => void) => () => void
+}
+
+/** An element the user clicked in a preview page with design mode. */
+export interface PickedElement {
+  /** The page's address. */
+  readonly url: string
+  /** The tag with its id or first classes, such as `button.cta`. */
+  readonly label: string
+  /** A CSS selector that finds the element from the document. */
+  readonly selector: string
+  readonly width: number
+  readonly height: number
+  /** The element's HTML, shortened when it is long. */
+  readonly html: string
+  /** The element's visible text, shortened. */
+  readonly text: string
+  /** Computed styles that differ from their usual defaults, as property and value. */
+  readonly styles: readonly (readonly [string, string])[]
+  /** A PNG data URL of the element as the page shows it, or null when it could not be captured. */
+  readonly screenshot: string | null
+  /** The user shift-clicked, asking to pick another element after this one. */
+  readonly more: boolean
+}
+
+interface DesignModeApi {
+  /**
+   * Lets the user hover and click an element in a preview page, outlining it in `accent`. Resolves
+   * with the element, or null when picking is cancelled or the page navigates away.
+   */
+  readonly pick: (webContentsId: number, accent: string) => Promise<PickedElement | null>
+  readonly cancel: (webContentsId: number) => void
 }
 
 /** What an agent is doing in a thread's preview, and where on the page when it points somewhere. */
@@ -466,6 +511,10 @@ export const requests = {
   previewHandoff: request<(threadId: string) => Promise<TurnHandoff | null>>(
     "meldshell:preview-handoff",
   ),
+  /** Answers a side question about a thread without adding it to the thread or its agent's context. */
+  askSideQuestion: request<(input: SideQuestionInput) => Promise<string>>(
+    "meldshell:ask-side-question",
+  ),
   /** Takes a thread back to before a turn: its conversation, and its files when snapshotted. */
   rewindThread:
     request<(input: TurnSnapshotInput) => Promise<RewindResult>>("meldshell:rewind-thread"),
@@ -473,6 +522,11 @@ export const requests = {
     request<(input: UndoSnapshotRestoreInput) => Promise<UndoRewindResult>>(
       "meldshell:undo-rewind",
     ),
+  /**
+   * Starts a new thread on its own worktree from a point in another thread: the turns up to there,
+   * and the files as they were there when snapshotted. The original thread is left as it is.
+   */
+  forkThread: request<(input: ForkThreadInput) => Promise<ForkResult>>("meldshell:fork-thread"),
   renameWorkspace: request<(input: { workspaceId: string; name: string }) => Promise<AppSnapshot>>(
     "meldshell:rename-workspace",
   ),
@@ -633,6 +687,8 @@ export const IPC = {
   dockThreadWindow: "meldshell:dock-thread-window",
   listThreadWindows: "meldshell:list-thread-windows",
   threadWindowsChanged: "meldshell:thread-windows-changed",
+  designModePick: "meldshell:design-mode-pick",
+  designModeCancel: "meldshell:design-mode-cancel",
 } as const
 
 export type MeldShellApi = InvokeApi & {

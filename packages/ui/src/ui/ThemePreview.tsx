@@ -1,6 +1,7 @@
-import type { AppSettings } from "@meldshell/contracts"
+import type { AppSettings, ThemePalette } from "@meldshell/contracts"
 import { Monitor, Moon, Sun } from "lucide-react"
 import type { ReactNode } from "react"
+import { toHex, parseHex, type ColorTheme } from "../app/color-themes"
 
 type Theme = NonNullable<AppSettings["theme"]>
 
@@ -10,43 +11,91 @@ export const THEMES: ReadonlyArray<{ value: Theme; label: string; icon: ReactNod
   { value: "system", label: "System", icon: <Monitor size={13} strokeWidth={1.75} /> },
 ]
 
-const PALETTES = {
-  dark: { base: "#18181a", side: "#232326", line: "#38383d", accent: "#9eabf5" },
-  light: { base: "#ecebe8", side: "#e0dfdb", line: "#c6c5c0", accent: "#4555c4" },
-} as const
+/** `amount` of the way from the palette's background to its text. */
+function toward(palette: ThemePalette, amount: number): string {
+  const from = parseHex(palette.background) ?? [0, 0, 0]
+  const to = parseHex(palette.foreground) ?? [255, 255, 255]
+  return toHex([
+    from[0] + (to[0] - from[0]) * amount,
+    from[1] + (to[1] - from[1]) * amount,
+    from[2] + (to[2] - from[2]) * amount,
+  ])
+}
 
-/** A miniature MeldShell window in a theme's own colours: inbox, transcript, and composer. */
-function MiniWindow({ variant }: { variant: keyof typeof PALETTES }) {
-  const color = PALETTES[variant]
+/** A miniature MeldShell window in a palette's own colours: inbox, transcript, and composer. */
+export function MiniWindow({
+  palette,
+  detailed = false,
+}: {
+  readonly palette: ThemePalette
+  /** Adds a changed-lines card in the status colours, for larger previews. */
+  readonly detailed?: boolean
+}) {
+  const side = toward(palette, 0.05)
+  const line = toward(palette, 0.16)
+  const strong = toward(palette, 0.32)
   return (
     <span
       className="grid h-full grid-cols-[28%_1fr] gap-[6px] p-[7px]"
-      style={{ background: color.base }}
+      style={{ background: palette.background }}
     >
       <span
         className="grid content-start gap-[4px] p-[5px] rounded-[4px]"
-        style={{ background: color.side }}
+        style={{ background: side }}
       >
-        <span className="h-[5px] rounded-[2px]" style={{ background: color.accent }} />
-        <span className="h-[4px] w-[80%] rounded-[2px]" style={{ background: color.line }} />
-        <span className="h-[4px] w-[60%] rounded-[2px]" style={{ background: color.line }} />
+        <span className="h-[5px] rounded-[2px]" style={{ background: palette.accent }} />
+        <span className="h-[4px] w-[80%] rounded-[2px]" style={{ background: line }} />
+        <span className="h-[4px] w-[60%] rounded-[2px]" style={{ background: line }} />
+        {detailed && (
+          <>
+            <span className="h-[4px] w-[70%] rounded-[2px]" style={{ background: line }} />
+            <span className="h-[4px] w-[50%] rounded-[2px]" style={{ background: line }} />
+          </>
+        )}
       </span>
       <span className="grid content-end gap-[5px]">
-        <span className="h-[4px] w-[70%] rounded-[2px]" style={{ background: color.line }} />
-        <span className="h-[4px] w-[45%] rounded-[2px]" style={{ background: color.line }} />
-        <span className="h-[16px] rounded-[4px] border-[1px]" style={{ borderColor: color.line }} />
+        <span className="h-[4px] w-[70%] rounded-[2px]" style={{ background: strong }} />
+        <span className="h-[4px] w-[45%] rounded-[2px]" style={{ background: line }} />
+        {detailed && (
+          <span
+            className="grid gap-[3px] p-[5px] rounded-[4px] border-[1px]"
+            style={{ borderColor: line, background: side }}
+          >
+            <span className="h-[3px] w-[60%] rounded-[2px]" style={{ background: palette.added }} />
+            <span
+              className="h-[3px] w-[40%] rounded-[2px]"
+              style={{ background: palette.deleted }}
+            />
+            <span
+              className="h-[3px] w-[52%] rounded-[2px]"
+              style={{ background: palette.modified }}
+            />
+          </span>
+        )}
+        <span
+          className="flex h-[16px] items-center justify-end rounded-[4px] border-[1px] pr-[3px]"
+          style={{ borderColor: line }}
+        >
+          <span className="h-[8px] w-[8px] rounded-[3px]" style={{ background: palette.accent }} />
+        </span>
       </span>
     </span>
   )
 }
 
-export function ThemePreview({ theme }: { theme: Theme }) {
-  if (theme !== "system") return <MiniWindow variant={theme} />
+/** A theme in a mode, or split diagonally between its dark and light palettes for System. */
+export function ThemePreview({ theme, colors }: { theme: Theme; colors: ColorTheme }) {
+  if (theme !== "system") return <MiniWindow palette={colors[theme]} />
+  return <SplitPreview colors={colors} />
+}
+
+/** Both of a theme's palettes at once: dark above the diagonal, light below. */
+export function SplitPreview({ colors }: { colors: ColorTheme }) {
   return (
     <span className="relative block h-full">
-      <MiniWindow variant="dark" />
+      <MiniWindow palette={colors.dark} />
       <span className="absolute inset-0 [clip-path:polygon(100%_0,100%_100%,0_100%)]">
-        <MiniWindow variant="light" />
+        <MiniWindow palette={colors.light} />
       </span>
     </span>
   )

@@ -20,7 +20,6 @@ import type { RunScript, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { workspaceScope } from "../data/workspace-scope"
 import { AlarmClock, Plus, Settings } from "lucide-react"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
-import { InteractionDialog } from "../threads/InteractionDialog"
 import { FilePalette } from "./FilePalette"
 import { IssuePalette } from "./IssuePalette"
 import { ThreadPalette } from "./ThreadPalette"
@@ -667,7 +666,6 @@ export function App(): React.JSX.Element {
     setStatusMutation,
     renameThreadMutation,
     deleteThreadMutation,
-    resolveApprovalMutation,
   } = useThreadManagementActions(snapshot, {
     created: (threadId, input) => {
       if (threadId === undefined) return
@@ -871,8 +869,6 @@ export function App(): React.JSX.Element {
     const thread = allThreads.find((candidate) => candidate.id === id)
     return thread === undefined ? [] : [thread]
   })
-  const selectedApproval =
-    snapshot.approvals.find((approval) => approval.threadId === selectedThreadId) ?? null
 
   return (
     <MotionPreferences reduceMotion={snapshot.settings.reduceMotion ?? false}>
@@ -1139,15 +1135,6 @@ export function App(): React.JSX.Element {
                   })
               }
             />
-            {selectedApproval !== null && !appHidden && (
-              <InteractionDialog
-                key={selectedApproval.id}
-                request={selectedApproval}
-                pending={resolveApprovalMutation.isPending}
-                error={resolveApprovalMutation.error?.message ?? null}
-                onResolve={(input) => resolveApprovalMutation.mutate(input)}
-              />
-            )}
 
             <AppDialog
               open={renameTarget !== null}
