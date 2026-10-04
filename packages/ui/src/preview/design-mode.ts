@@ -1,15 +1,6 @@
 import type { ComposerAttachment, PickedElement } from "@meldshell/contracts/ipc"
 
-/** A fence longer than any run of backticks inside the text it wraps. */
-const fence = (body: string): string => {
-  const longest = Math.max(0, ...(body.match(/`+/g) ?? []).map((run) => run.length))
-  return "`".repeat(Math.max(3, longest + 1))
-}
-
-const block = (language: string, body: string): string => {
-  const marks = fence(body)
-  return `${marks}${language}\n${body}\n${marks}`
-}
+import { fencedCode } from "../ui/markdown-code"
 
 const shorten = (text: string, limit: number): string =>
   text.length > limit ? `${text.slice(0, limit - 1)}…` : text
@@ -22,10 +13,10 @@ export function elementContext(element: PickedElement): string {
     `- Size: ${element.width}×${element.height}`,
   ]
   if (element.text) lines.push(`- Text: ${JSON.stringify(element.text)}`)
-  const parts = [lines.join("\n"), block("html", element.html)]
+  const parts = [lines.join("\n"), fencedCode("html", element.html)]
   if (element.styles.length > 0)
     parts.push(
-      `Computed styles:\n${block("css", element.styles.map(([name, value]) => `${name}: ${value};`).join("\n"))}`,
+      `Computed styles:\n${fencedCode("css", element.styles.map(([name, value]) => `${name}: ${value};`).join("\n"))}`,
     )
   return parts.join("\n\n")
 }
