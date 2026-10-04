@@ -150,7 +150,11 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run install:electron
-      - run: npm run rebuild:native
+      # The Node-API addons need no Electron rebuild; node-pty ships prebuilds for Windows and
+      # macOS only, so Linux compiles it exactly as packaging does.
+      - name: Build the Linux terminal addon
+        if: runner.os == 'Linux'
+        run: npm rebuild node-pty
       - run: npm run typecheck:e2e
       - run: npm run build
       - name: Run journeys (Linux)

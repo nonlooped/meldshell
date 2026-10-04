@@ -11,7 +11,7 @@ npm run build
 npm test
 ```
 
-Linux needs Electron's shared libraries and a display; in headless Linux use `xvfb-run --auto-servernum npm test`. CI installs Electron and rebuilds its native dependencies, then runs the journeys on Ubuntu and Windows. No browser download, cloud account, OAuth login, or AI model key is needed. Provider turns are not dispatched by this suite.
+Linux needs Electron's shared libraries and a display; in headless Linux use `xvfb-run --auto-servernum npm test`. CI installs Electron and compiles the Linux terminal addon (Windows uses node-pty's bundled prebuilds, as the installer does), then runs the journeys on Ubuntu and Windows. No browser download, cloud account, OAuth login, or AI model key is needed. Provider turns are not dispatched by this suite.
 
 Focused commands:
 
