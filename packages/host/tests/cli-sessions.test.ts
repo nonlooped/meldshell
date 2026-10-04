@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { test } from "node:test"
 import { SqliteClient } from "@effect/sql-sqlite-node"
 import * as SqlClient from "effect/sql/SqlClient"
@@ -326,12 +326,17 @@ const piSession = [
   },
 ]
 
+/** Pi's folder for `/repo`, encoded from the path it resolves to, which on Windows has a drive. */
+const piFolder = `--${resolve("/repo")
+  .replace(/^[/\\]/, "")
+  .replace(/[/\\:]/g, "-")}--`
+
 test("a Pi session file plays back its current branch as the records Pi streams live", async () => {
   const agent = await mkdtemp(join(tmpdir(), "meldshell-pi-"))
   const previous = process.env.PI_CODING_AGENT_DIR
   process.env.PI_CODING_AGENT_DIR = agent
   try {
-    const folder = join(agent, "sessions", "--repo--")
+    const folder = join(agent, "sessions", piFolder)
     await mkdir(folder, { recursive: true })
     const file = join(folder, "2026-10-04T00-08-40-111Z_01a1043d-c7ad-7753-b718-95564259c26f.jsonl")
     await writeFile(file, `${piSession.map((entry) => JSON.stringify(entry)).join("\n")}\n`)
@@ -520,7 +525,7 @@ test("Cursor and Pi sessions come in as threads their CLIs can continue", async 
   const previous = process.env.PI_CODING_AGENT_DIR
   process.env.PI_CODING_AGENT_DIR = agent
   try {
-    const folder = join(agent, "sessions", "--repo--")
+    const folder = join(agent, "sessions", piFolder)
     await mkdir(folder, { recursive: true })
     const file = join(folder, "2026-10-04T00-08-40-111Z_01a1043d-c7ad-7753-b718-95564259c26f.jsonl")
     await writeFile(file, piSession.map((entry) => JSON.stringify(entry)).join("\n"))
