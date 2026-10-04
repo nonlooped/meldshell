@@ -6,7 +6,6 @@
   "description": "MeldShell marketing site",
   "scripts": {
     "dev": "astro dev",
-    "deploy": "wrangler pages deploy dist --project-name=meldshell --branch=main",
     "build": "astro build",
     "preview": "astro preview",
     "typecheck": "astro check"
@@ -33,7 +32,6 @@
     "@astrojs/check": "0.9.10",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "cookie": "2.0.1",
-    "wrangler": "4.146.0"
+    "cookie": "2.0.1"
   }
 }
