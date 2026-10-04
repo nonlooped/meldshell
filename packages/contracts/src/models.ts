@@ -844,6 +844,8 @@ export const ResolveApprovalInput = Schema.Struct({
   decision: ApprovalDecision,
   optionId: Schema.optional(Schema.String),
   answers: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
+  /** Why the user declined, passed back to the agent so it can try something else. */
+  reason: Schema.optional(Schema.String.pipe(Schema.check(Schema.isMaxLength(4000)))),
 })
 
 export type ResolveApprovalInput = typeof ResolveApprovalInput.Type

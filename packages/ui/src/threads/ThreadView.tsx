@@ -28,6 +28,8 @@ import { ThreadBranchToggle, ThreadOrigin } from "./ThreadOrigin"
 import { ThreadPullRequest } from "../files/PullRequest"
 import { useState } from "react"
 import { ScheduleDialog } from "../schedules/ScheduleDialog"
+import { useTabStore } from "../app/tab-store"
+import { InteractionCard } from "./InteractionCard"
 import { ThreadSchedules } from "../schedules/ThreadSchedules"
 
 export function ThreadView({
@@ -53,6 +55,9 @@ export function ThreadView({
   const settingsMutation = useAppSettingsMutation()
   const followUp = snapshot.settings.followUpMode ?? "queue"
   const queued = snapshot.queuedInputs.filter((item) => item.threadId === thread.id)
+  // Every pane showing the thread shows its request, so a split never hides one waiting.
+  const approval = snapshot.approvals.find((request) => request.threadId === thread.id) ?? null
+  const focused = useTabStore((state) => state.selectedThreadId === thread.id)
   const queueBusy = removeQueuedInputMutation.isPending || steerQueuedInputMutation.isPending
   const busy = ["running", "queued", "approval"].includes(thread.activity)
   const send = async (delivery: FollowUpDelivery = followUp) => {
@@ -205,6 +210,14 @@ export function ThreadView({
                   useViewStore.getState().focusComposer(thread.id)
                 }}
               />
+              {approval !== null && (
+                <InteractionCard
+                  key={approval.id}
+                  request={approval}
+                  revision={thread.historyRevision}
+                  focused={focused}
+                />
+              )}
               <ReviewNotes
                 threadId={thread.id}
                 blocked={

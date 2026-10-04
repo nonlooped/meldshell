@@ -8,7 +8,7 @@ import * as SqlClient from "effect/sql/SqlClient"
 import { Effect, Schema } from "effect"
 import { RuntimeEventInput, WorkerEvent } from "@meldshell/contracts"
 import { initializeDatabase, recordRuntimeEvent } from "@meldshell/core"
-import { toolApproval } from "../../provider-claude/src/approvals"
+import { permissionResult, toolApproval, toolPatch } from "../../provider-claude/src/approvals"
 import { ClaudeEvents } from "../../provider-claude/src/events"
 import { runClaudeWorker } from "../../provider-claude/src/worker-runtime"
 
@@ -70,10 +70,64 @@ test("Claude tool, task, and compaction events survive the core JSON codec", () 
 test("Claude approvals without shell commands survive the core JSON codec", () => {
   for (const name of ["Read", "Skill", "AskUserQuestion", "ExitPlanMode", "Bash"]) {
     const input = name === "Bash" ? { command: "printf probe" } : { extension: { value: null } }
-    const approval = toolApproval(name, input, [], "default")
+    const approval = toolApproval(name, input, [], "default", "/workspace")
     encodeEvent(runtimeEvent(approval.method, approval.params))
     assert.deepEqual(approval.params.input, input)
   }
+})
+
+test("Claude edit approvals read as a sentence and a diff, not JSON", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "meldshell-claude-edit-"))
+  try {
+    const lines = Array.from({ length: 20 }, (_, index) => `line ${index + 1}`)
+    await writeFile(join(workspace, "notes.txt"), `${lines.join("\n")}\n`)
+    const input = {
+      file_path: join(workspace, "notes.txt"),
+      old_string: "line 15",
+      new_string: "line fifteen",
+    }
+    const patch = await toolPatch("Edit", input, workspace)
+    const approval = toolApproval("Edit", input, [], "default", workspace, patch)
+    assert.equal(approval.method, "item/fileChange/requestApproval")
+    assert.equal(approval.params.reason, "Claude Code wants to edit notes.txt.")
+    assert.match(patch ?? "", /^--- notes\.txt\n\+\+\+ notes\.txt\n@@ -12,7 \+12,7 @@/)
+    assert.match(patch ?? "", /\n-line 15\n\+line fifteen\n/)
+    assert.equal(approval.params.patch, patch)
+
+    const created = await toolPatch(
+      "Write",
+      { file_path: join(workspace, "new.txt"), content: "hello\n" },
+      workspace,
+    )
+    assert.match(created ?? "", /^--- \/dev\/null\n\+\+\+ new\.txt\n@@ -0,0 \+1,1 @@\n\+hello\n/)
+
+    // An edit that no longer matches still shows its own text.
+    const stale = await toolPatch(
+      "Edit",
+      { file_path: join(workspace, "notes.txt"), old_string: "gone", new_string: "back" },
+      workspace,
+    )
+    assert.match(stale ?? "", /\n-gone\n[\s\S]*\+back/)
+    assert.equal(await toolPatch("Read", { file_path: input.file_path }, workspace), null)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+  }
+})
+
+test("A declined Claude approval carries the user's reason", () => {
+  const approval = toolApproval("Bash", { command: "rm -rf build" }, [], "default", "/workspace")
+  assert.deepEqual(
+    permissionResult(approval.pending, "decline", undefined, " Use npm run clean "),
+    {
+      behavior: "deny",
+      message: "The user declined this request and said: Use npm run clean",
+      interrupt: false,
+    },
+  )
+  assert.equal(
+    (permissionResult(approval.pending, "decline", undefined) as { message: string }).message,
+    "The user declined this request.",
+  )
 })
 
 const fixture = `
