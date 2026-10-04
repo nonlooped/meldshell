@@ -4,6 +4,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-04
+
 ### Fixed
 
 - Dictation warms a downloaded speech model when recording starts and prevents repeated clicks from starting overlapping recordings. The stop control remains clickable during its transition.
@@ -333,7 +335,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/nonlooped/meldshell/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/nonlooped/meldshell/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/nonlooped/meldshell/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/nonlooped/meldshell/compare/v0.11.0...v0.12.0
