@@ -19,8 +19,11 @@ import { QueuedMessages } from "./QueuedMessages"
 import { ReviewNotes } from "./ReviewNotes"
 import { reviewNotesMessage } from "./review-notes"
 import { skillAttachments } from "./composer-completion"
+import { messageWithContext } from "../preview/design-mode"
 import { Transcript } from "./Transcript"
 import { HandoffNotice } from "./Handoff"
+import { SideQuestions } from "./SideQuestions"
+import { sideQuestionText, useSideQuestions } from "./side-questions"
 import { ThreadBranchToggle, ThreadOrigin } from "./ThreadOrigin"
 import { ThreadPullRequest } from "../files/PullRequest"
 import { useState } from "react"
@@ -60,11 +63,21 @@ export function ThreadView({
   const send = async (delivery: FollowUpDelivery = followUp) => {
     const sent = useThreadDrafts.getState().drafts[thread.id] ?? emptyDraft
     if (sent.sending) return
+    const question = sideQuestionText(sent.text)
+    if (question !== null) {
+      if (question === "") return
+      // Answered apart from the thread; attachments stay for the next real message.
+      update(thread.id, { text: "", tokens: [] })
+      void useSideQuestions
+        .getState()
+        .ask({ workspaceId: thread.workspaceId, threadId: thread.id }, question)
+      return
+    }
     update(thread.id, { sending: true, error: null })
     try {
       const submitted = await submitTurnMutation.mutateAsync({
         threadId: thread.id,
-        text: sent.text,
+        text: messageWithContext(sent.text, sent.attachments),
         attachments: [
           ...sent.attachments.map(({ type, value, name }) => ({ type, value, name })),
           ...skillAttachments(sent.text, sent.tokens),
@@ -186,6 +199,17 @@ export function ThreadView({
           onSchedule={() => setScheduling(true)}
           accessory={
             <>
+              <SideQuestions
+                scope={{ workspaceId: thread.workspaceId, threadId: thread.id }}
+                harness={harness}
+                onAskAgent={(question) => {
+                  const current = useThreadDrafts.getState().drafts[thread.id]?.text ?? ""
+                  update(thread.id, {
+                    text: current.trim() === "" ? question : `${question}\n\n${current}`,
+                  })
+                  useViewStore.getState().focusComposer(thread.id)
+                }}
+              />
               {approval !== null && (
                 <InteractionCard
                   key={approval.id}

@@ -92,6 +92,10 @@ export function primaryWork(events: ReadonlyArray<CanonicalEvent>): Work | null 
   return significance.find((work) => (counts.get(work) ?? 0) > 0) ?? null
 }
 
+/** What kind of work a tool call did, for its row's icon. */
+export const toolEventWork = (event: CanonicalEvent): Work =>
+  toolWork(asRecord(asRecord(event.payload).item))
+
 /** Work that only looks things up; runs of it fold into one line in the working log. */
 export type LookupWork = Extract<Work, "read" | "search">
 

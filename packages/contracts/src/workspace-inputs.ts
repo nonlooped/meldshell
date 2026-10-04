@@ -111,6 +111,17 @@ export const ListIssuesInput = Schema.Struct({
 })
 export type ListIssuesInput = typeof ListIssuesInput.Type
 
+/** A quick question about a thread, answered apart from it so its agent never sees it. */
+export const SideQuestionInput = Schema.Struct({
+  workspaceId: Schema.String,
+  threadId: Schema.String,
+  question: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(4_000)),
+  ),
+})
+export type SideQuestionInput = typeof SideQuestionInput.Type
+
 export type GenerateCommitMessageInput = ExactOptional<WorkspaceScope, "threadId">
 export type GitFileAction = GitFileActionInput["action"]
 export type GitDiffSide = Exclude<GitDiffInput["side"], undefined>
@@ -129,6 +140,14 @@ export const RestoreTurnSnapshotInput = Schema.Struct({
   point: Schema.Literals(["before", "after"]),
 })
 export type RestoreTurnSnapshotInput = typeof RestoreTurnSnapshotInput.Type
+
+/** Copies a thread up to a turn into a new thread with its own worktree. */
+export const ForkThreadInput = Schema.Struct({
+  ...TurnSnapshotInput.fields,
+  /** `before` leaves the turn out and returns its message to edit; `after` keeps the whole turn. */
+  point: Schema.Literals(["before", "after"]),
+})
+export type ForkThreadInput = typeof ForkThreadInput.Type
 
 export const UndoSnapshotRestoreInput = Schema.Struct({
   workspaceId: Schema.String,

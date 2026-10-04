@@ -168,7 +168,14 @@ export class ClaudeEvents {
         },
       })
     else if (block.type === "thinking")
-      this.emit("item/completed", { item: { id, type: "reasoning", text: block.thinking } })
+      this.emit("item/completed", {
+        item: {
+          id,
+          type: "reasoning",
+          text: block.thinking,
+          parentToolUseId: message.parent_tool_use_id,
+        },
+      })
     else if (block.type === "tool_use") {
       this.startTool(message, block)
     }

@@ -335,6 +335,18 @@ export const runMigrations = Effect.gen(function* () {
         yield* sql`ALTER TABLE threads ADD COLUMN issue_context TEXT`
       }),
     },
+    {
+      version: 15,
+      apply: Effect.gen(function* () {
+        // A fork keeps its own copy of the turns, so it outlives the thread it came from.
+        yield* sql`ALTER TABLE threads ADD COLUMN fork_thread_id TEXT
+          REFERENCES threads(id) ON DELETE SET NULL`
+        yield* sql`ALTER TABLE threads ADD COLUMN fork_title TEXT`
+        // Until the fork's first turn, which reads the copied turns as a summary.
+        yield* sql`ALTER TABLE threads ADD COLUMN fork_fresh INTEGER NOT NULL DEFAULT 0
+          CHECK (fork_fresh IN (0, 1))`
+      }),
+    },
   ]
   const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table'`
   const has = (name: string) => tables.some((table) => table.name === name)

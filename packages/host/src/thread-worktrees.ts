@@ -1,12 +1,22 @@
 import { dirname, join } from "node:path"
 import { Effect } from "effect"
-import type { AppSnapshot, CreateThreadInput, ThreadLocation } from "@meldshell/contracts"
-import type { WorkspaceScope } from "@meldshell/contracts/ipc"
+import type {
+  AppSnapshot,
+  CreateThreadInput,
+  ForkResult,
+  ThreadLocation,
+} from "@meldshell/contracts"
+import type { ForkThreadInput, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { attempt } from "./attempt"
 import { CoreClient } from "./core-client"
 import { HostPlatform } from "./platform"
-import { statusAt } from "./git"
-import { deleteThreadSnapshots } from "./turn-snapshots"
+import { gitValue, statusAt } from "./git"
+import {
+  checkoutTurnSnapshot,
+  copyTurnSnapshots,
+  deleteThreadSnapshots,
+  threadFolder,
+} from "./turn-snapshots"
 import { issueBranchName, readIssue } from "./issues"
 import {
   createWorktree,
@@ -68,11 +78,17 @@ const withNewWorktree = <A, E, R>(
   workspacePath: string,
   record: (worktree: Awaited<ReturnType<typeof createWorktree>>) => Effect.Effect<A, E, R>,
   branchName?: string,
+  startPath?: string,
 ) =>
   Effect.gen(function* () {
     const platform = yield* HostPlatform
     const worktree = yield* attempt(() =>
-      createWorktree(workspacePath, join(dirname(platform.databasePath), "worktrees"), branchName),
+      createWorktree(
+        workspacePath,
+        join(dirname(platform.databasePath), "worktrees"),
+        branchName,
+        startPath,
+      ),
     )
     return yield* record(worktree).pipe(
       Effect.tapError(() =>
@@ -134,6 +150,62 @@ export const createThread = (input: CreateThreadInput) =>
           .pipe(Effect.flatMap((snapshot) => setUpCreatedWorktree(snapshot, worktree.path))),
       issue === undefined ? undefined : issueBranchName(issue),
     )
+  })
+
+/**
+ * Starts a new thread on its own worktree from a point in another thread. The worktree branches
+ * from the original's current commit, then takes the files the original had at that point, so
+ * committed and uncommitted work alike carry over. The original thread and its folder are left
+ * alone, even while it is working.
+ */
+export const forkThread = (input: ForkThreadInput) =>
+  Effect.gen(function* () {
+    const core = yield* CoreClient
+    const location = yield* core.GetThreadLocation({ threadId: input.threadId })
+    if (location.workspaceId !== input.workspaceId)
+      return yield* Effect.fail(new Error("Thread not found in this workspace."))
+    const repository = yield* attempt(() =>
+      gitValue(location.workspacePath, ["rev-parse", "--is-inside-work-tree"]),
+    )
+    if (repository !== "true")
+      return yield* Effect.fail(
+        new Error("Forking needs a Git repository, because the fork works in its own worktree."),
+      )
+    // A removed or missing worktree can't say which commit it was on, so the workspace's is used.
+    const source = threadFolder(location) ?? location.workspacePath
+    let filesRestored = false
+    const record = yield* withNewWorktree(
+      location.workspacePath,
+      (worktree) =>
+        Effect.gen(function* () {
+          filesRestored = yield* attempt(() =>
+            checkoutTurnSnapshot(worktree.path, input.threadId, input.turnId, input.point),
+          )
+          return yield* core.ForkThread({
+            threadId: input.threadId,
+            turnId: input.turnId,
+            point: input.point,
+            worktree: {
+              ...worktree,
+              baseBranch: location.worktree?.baseBranch ?? worktree.baseBranch,
+            },
+          })
+        }),
+      location.issue === null ? undefined : issueBranchName(location.issue),
+      source,
+    )
+    yield* attempt(() =>
+      copyTurnSnapshots(location.workspacePath, input.threadId, record.threadId, record.turns),
+    ).pipe(Effect.catch(Effect.logError))
+    const snapshot = yield* setUpWorktree(record.threadId).pipe(
+      Effect.catch((cause) => Effect.as(Effect.logError(cause), record.snapshot)),
+    )
+    return {
+      snapshot,
+      threadId: record.threadId,
+      text: record.text,
+      filesRestored,
+    } satisfies ForkResult
   })
 
 /**
