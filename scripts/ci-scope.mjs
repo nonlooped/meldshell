@@ -69,23 +69,12 @@ export function selectChecks(files, full = false, entries = workspaces()) {
         path !== "scripts/release.mjs" &&
         !releaseTests.includes(path),
     )
+  // Keep local and CI runs on the same explicit list, including each feature's new tests.
   const tests = rootTests
-    ? [
-        "tests/ci-scope.test.mjs",
-        "tests/markdown-blocks.test.ts",
-        "tests/file-previews.test.ts",
-        "tests/onboarding.test.ts",
-        "tests/dictation.test.ts",
-        "tests/claude-provider.test.mts",
-        "tests/settings.test.ts",
-        "tests/pull-requests.test.ts",
-        "tests/issues.test.ts",
-        "tests/review-notes.test.ts",
-        "tests/side-questions.test.ts",
-        "tests/content-search.test.ts",
-        "tests/loadouts.test.ts",
-        ...releaseTests,
-      ]
+    ? JSON.parse(readFileSync("package.json", "utf8"))
+        .scripts["test:tooling"].split(" --test ")[1]
+        .trim()
+        .split(/\s+/)
     : release
       ? releaseTests
       : []

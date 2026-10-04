@@ -79,23 +79,9 @@ test("global inputs, CI machinery, and forced runs select every workspace", () =
     for (const key of ["static", "protocol", "desktop", "site", "test", "windows", "e2e"])
       assert.equal(scope[key], true)
     assert.equal(scope.typechecks.length, workspaces().length)
-    assert.deepEqual(scope.tests, [
-      "tests/ci-scope.test.mjs",
-      "tests/markdown-blocks.test.ts",
-      "tests/file-previews.test.ts",
-      "tests/onboarding.test.ts",
-      "tests/dictation.test.ts",
-      "tests/claude-provider.test.mts",
-      "tests/settings.test.ts",
-      "tests/pull-requests.test.ts",
-      "tests/issues.test.ts",
-      "tests/review-notes.test.ts",
-      "tests/side-questions.test.ts",
-      "tests/content-search.test.ts",
-      "tests/loadouts.test.ts",
-      "tests/changelog.test.ts",
-      "tests/release-cli.test.mjs",
-    ])
+    assert(scope.tests.includes("tests/ci-scope.test.mjs"))
+    assert(scope.tests.includes("tests/changelog.test.ts"))
+    assert(scope.tests.includes("tests/release-cli.test.mjs"))
   }
 })
 
@@ -181,6 +167,29 @@ test("tooling selection matches the explicit npm script", () => {
   const { scripts } = JSON.parse(readFileSync("package.json", "utf8"))
   const scope = selectChecks(["packages/host/src/host.ts"])
   assert.deepEqual(scope.tests, scripts["test:tooling"].split(" --test ")[1].split(" "))
+})
+
+test("new tooling tests need registration only in the npm script", () => {
+  const cwd = process.cwd()
+  const directory = mkdtempSync(join(tmpdir(), "ci-tooling-"))
+  try {
+    writeFileSync(
+      join(directory, "package.json"),
+      JSON.stringify({
+        scripts: {
+          "test:tooling": "node --import tsx --test tests/new.test.mts tests/another.test.ts",
+        },
+      }),
+    )
+    process.chdir(directory)
+    assert.deepEqual(selectChecks([], true, []).tests, [
+      "tests/new.test.mts",
+      "tests/another.test.ts",
+    ])
+  } finally {
+    process.chdir(cwd)
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 test("every desktop build selection is covered by e2e", () => {
