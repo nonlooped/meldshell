@@ -90,6 +90,14 @@ export const setThreadPinned = (threadId: string, pinned: boolean) =>
     return yield* getSnapshot
   })
 
+/** Stamps the thread as seen now; `updatedAt` stays, so later work still reads as new. */
+export const markThreadSeen = (threadId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`UPDATE threads SET seen_at = ${new Date().toISOString()} WHERE id = ${threadId}`
+    return yield* getSnapshot
+  })
+
 export const renameThread = (threadId: string, title: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient

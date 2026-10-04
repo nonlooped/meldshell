@@ -64,6 +64,8 @@ export const Thread = Schema.Struct({
   pinned: Schema.optional(Schema.Boolean),
   createdAt: Schema.String,
   updatedAt: Schema.String,
+  /** When the operator last had the thread on screen; work after it is new to them. */
+  seenAt: Schema.optional(Schema.String),
   activity: Schema.Literals([
     "idle",
     "running",
@@ -1072,6 +1074,10 @@ export const RenameWorkspaceInput = Schema.Struct({
 export const SetThreadPinnedInput = Schema.Struct({
   threadId: Schema.String,
   pinned: Schema.Boolean,
+})
+
+export const MarkThreadSeenInput = Schema.Struct({
+  threadId: Schema.String,
 })
 
 export const SearchTranscriptsInput = Schema.Struct({

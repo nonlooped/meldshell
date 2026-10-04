@@ -30,9 +30,21 @@ function threadTransitions(
 
 const priority: ReadonlyArray<Chime> = ["attention", "failed", "done"]
 
+const finished = new Set<Activity>(["completed", "idle", "interrupted"])
+
 /**
- * Chimes for threads that change out of view and remembers finished threads the operator has not
- * looked at yet. The unseen set lives for this session only.
+ * A thread whose latest work the operator has not had on screen: it finished after it was last
+ * seen. The host keeps `seenAt`, so the mark survives a restart.
+ */
+const isUnseen = (thread: Thread): boolean =>
+  thread.status === "active" &&
+  thread.turnCount > 0 &&
+  finished.has(thread.activity) &&
+  (thread.seenAt === undefined || thread.seenAt < thread.updatedAt)
+
+/**
+ * Chimes for threads that change out of view and marks finished threads the operator has not
+ * looked at yet. Threads on screen in a focused window are stamped as seen on the host.
  */
 export function useThreadSignals(
   threads: ReadonlyArray<Thread>,
@@ -40,8 +52,11 @@ export function useThreadSignals(
   sounds: boolean,
 ): ReadonlySet<string> {
   const previous = useRef(new Map<string, Activity>())
-  const [unseen, setUnseen] = useState<ReadonlySet<string>>(() => new Set())
   const [focused, setFocused] = useState(() => document.hasFocus())
+  const unseen = useMemo(
+    () => new Set(threads.filter(isUnseen).map((thread) => thread.id)),
+    [threads],
+  )
 
   useEffect(() => {
     const update = () => setFocused(document.hasFocus())
@@ -59,23 +74,25 @@ export function useThreadSignals(
     )
     previous.current = new Map(threads.map((thread) => [thread.id, thread.activity]))
     if (transitions.length === 0) return
-    const finished = transitions.filter(({ chime }) => chime !== "attention")
-    if (finished.length > 0)
-      setUnseen((current) => new Set([...current, ...finished.map(({ threadId }) => threadId)]))
     const chime = priority.find((candidate) =>
       transitions.some((entry) => entry.chime === candidate),
     )
     if (sounds && chime !== undefined) playChime(chime)
   }, [threads, watchedIds, focused, sounds])
 
+  // A watched thread in a focused window is being read, so its latest work is seen. One request
+  // per thread revision keeps a slow host from being asked twice.
+  const stamped = useRef(new Map<string, string>())
   useEffect(() => {
     if (!focused) return
-    setUnseen((current) =>
-      watchedIds.some((id) => current.has(id))
-        ? new Set([...current].filter((id) => !watchedIds.includes(id)))
-        : current,
-    )
-  }, [watchedIds, focused])
+    for (const id of watchedIds) {
+      const thread = threads.find((candidate) => candidate.id === id)
+      if (thread === undefined || !isUnseen(thread)) continue
+      if (stamped.current.get(id) === thread.updatedAt) continue
+      stamped.current.set(id, thread.updatedAt)
+      void window.meldshell.markThreadSeen({ threadId: id }).catch(() => undefined)
+    }
+  }, [watchedIds, focused, threads])
 
   return unseen
 }

@@ -48,6 +48,8 @@ interface TabStore {
   readonly openThread: (threadId: string) => void
   readonly closeThread: (threadId: string) => void
   readonly cycle: (direction: 1 | -1) => void
+  /** Focuses the next pane of the selected split tab; a lone pane stays as it is. */
+  readonly cyclePane: () => void
 }
 
 function newThreadTab(threadId: string): ThreadTab {
@@ -188,6 +190,18 @@ export const useTabStore = create<TabStore>((set, get) => ({
           : state.selectedFileId,
     })
   },
+  cyclePane: () =>
+    set((state) => {
+      const tab = state.threadTabs.find((candidate) => candidate.id === state.selectedThreadTabId)
+      if (!tab || state.selectedFileId !== null) return state
+      const ids = visibleThreads(tab.layout)
+      if (ids.length < 2) return state
+      const next = ids[(ids.indexOf(tab.focusedThreadId) + 1) % ids.length]!
+      const tabs = state.threadTabs.map((candidate) =>
+        candidate.id === tab.id ? { ...candidate, focusedThreadId: next } : candidate,
+      )
+      return tabState(tabs, tab.id)
+    }),
   openThreadIds: [],
   selectedThreadId: null,
   openThread: (threadId) => {

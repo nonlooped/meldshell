@@ -33,6 +33,10 @@ interface ShortcutActions {
   popOutThread: (() => void) | null
   /** Starts or stops dictation in the thread in front; null when no thread is. */
   dictate: (() => void) | null
+  /** Puts the caret in the composer of the thread in front; null when no thread is. */
+  focusComposer: (() => void) | null
+  /** Moves focus to the next pane of a split; null while a single pane is shown. */
+  nextPane: (() => void) | null
   /**
    * Applies the saved loadout in `slot` (from 0) to the thread in front; null when no thread is.
    * Slots without a loadout leave the key to the focused element.
@@ -43,6 +47,19 @@ interface ShortcutActions {
 
 const isLoadoutAction = (action: ShortcutAction): action is LoadoutAction =>
   (LOADOUT_ACTIONS as readonly string[]).includes(action)
+
+/** Actions that have nothing to act on right now leave the key to the focused element. */
+function unavailable(action: ShortcutAction, actions: ShortcutActions): boolean {
+  const idle: Partial<Record<ShortcutAction, boolean>> = {
+    closeTab: actions.settingsOpen || actions.selectedThreadId === null,
+    archiveThread: actions.toggleArchived === null,
+    dictate: actions.dictate === null,
+    focusComposer: actions.focusComposer === null,
+    nextPane: actions.nextPane === null,
+    popOutThread: actions.popOutThread === null,
+  }
+  return idle[action] === true
+}
 
 export function handleAppShortcut(
   event: KeyboardEvent,
@@ -60,11 +77,7 @@ export function handleAppShortcut(
     return
   }
   const action = actionForEvent(event, bindings)
-  if (action === null) return
-  if (action === "closeTab" && (actions.settingsOpen || actions.selectedThreadId === null)) return
-  if (action === "archiveThread" && actions.toggleArchived === null) return
-  if (action === "dictate" && actions.dictate === null) return
-  if (action === "popOutThread" && actions.popOutThread === null) return
+  if (action === null || unavailable(action, actions)) return
   if (isLoadoutAction(action)) {
     const slot = LOADOUT_ACTIONS.indexOf(action)
     if (actions.applyLoadout === null || slot >= actions.loadoutCount) return
@@ -93,6 +106,8 @@ export function handleAppShortcut(
     openInEditor: actions.openInEditor,
     popOutThread: () => actions.popOutThread?.(),
     dictate: () => actions.dictate?.(),
+    focusComposer: () => actions.focusComposer?.(),
+    nextPane: () => actions.nextPane?.(),
   }
   run[action]()
 }

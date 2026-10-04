@@ -33,6 +33,11 @@ const legacySchema = Effect.gen(function* () {
   if (!threadColumns.some((column) => column.name === "title_locked")) {
     yield* sql`ALTER TABLE threads ADD COLUMN title_locked INTEGER NOT NULL DEFAULT 0`
   }
+  if (!threadColumns.some((column) => column.name === "seen_at")) {
+    // Existing threads count as seen, so an upgrade does not mark every finished one as new.
+    yield* sql`ALTER TABLE threads ADD COLUMN seen_at TEXT`
+    yield* sql`UPDATE threads SET seen_at = updated_at`
+  }
   yield* sql`
     CREATE INDEX IF NOT EXISTS threads_status_updated_idx
     ON threads(status, updated_at DESC)

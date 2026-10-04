@@ -177,6 +177,9 @@ export const hostOperations: Record<string, Operation> = {
   [C.IPC.setThreadPinned]: coreCall(C.SetThreadPinnedInput, false, (core, input) =>
     core.SetThreadPinned(input),
   ),
+  [C.IPC.markThreadSeen]: coreCall(C.MarkThreadSeenInput, false, (core, input) =>
+    core.MarkThreadSeen(input),
+  ),
   [C.IPC.setThreadStatus]: coreCall(C.SetThreadStatusInput, false, (core, input) =>
     core.SetThreadStatus(input),
   ),

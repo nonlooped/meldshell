@@ -1,5 +1,6 @@
 import {
   centeredStateClasses,
+  paneSeparatorClasses,
   railControlClasses,
   railLabelClasses,
   threadContentClasses,
@@ -20,6 +21,7 @@ import {
   cliLabel,
   isCliHarness,
   type AppSnapshot,
+  type Provider,
   type Thread,
   type TranscriptSearchResult,
   type Workspace,
@@ -38,6 +40,8 @@ import { selectedSearchText, useContentSearch } from "../files/content-search-st
 import { DiffViewer } from "../files/DiffViewer"
 import { FileViewer } from "../files/FileViewer"
 import { MeldMark } from "../ui/MeldMark"
+import { ProviderIcon } from "../ui/ProviderIcon"
+import { relativeAge } from "../ui/relative-age"
 import { WorkspaceManager } from "../workspaces/WorkspaceManager"
 import { TitleBar } from "./TitleBar"
 import { AppScale } from "./AppScale"
@@ -153,12 +157,19 @@ function popOutShortcut(thread: Thread | null): (() => void) | null {
 function ThreadPane({
   databaseError,
   hasThread,
+  recent,
+  providersByThreadId,
   onNewThread,
+  onOpenThread,
   children,
 }: {
   databaseError: boolean
   hasThread: boolean
+  /** The threads worked on most recently, so the first click lands in one of them. */
+  recent: ReadonlyArray<Thread>
+  providersByThreadId: ReadonlyMap<string, Provider>
   onNewThread: () => void
+  onOpenThread: (threadId: string) => void
   children: React.ReactNode
 }): React.JSX.Element {
   if (databaseError)
@@ -183,6 +194,31 @@ function ThreadPane({
         >
           New thread
         </Button>
+        {recent.length > 0 && (
+          <ul
+            className="flex w-[min(360px,_100%)] flex-col m-0 mt-[24px] p-[4px] list-none border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius-lg)] text-left"
+            aria-label="Recent threads"
+          >
+            {recent.map((thread) => (
+              <li key={thread.id}>
+                <Button
+                  variant="ghost"
+                  block
+                  className="justify-start! h-[34px]! gap-[10px]! [padding:0_10px]! font-normal!"
+                  icon={<ProviderIcon provider={providersByThreadId.get(thread.id)} size={14} />}
+                  onClick={() => onOpenThread(thread.id)}
+                >
+                  <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+                    {thread.title}
+                  </span>
+                  <span className="flex-none text-[var(--text-tertiary)] text-[11px] tabular-nums">
+                    {relativeAge(thread.updatedAt)}
+                  </span>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
       </FadeDiv>
     )
   return <>{children}</>
@@ -820,6 +856,21 @@ export function App(): React.JSX.Element {
     useWatchedThreadIds(),
     snapshot.settings.sounds ?? true,
   )
+  // The taskbar counts the threads waiting on the operator: approvals, failures, and finished work
+  // they have not looked at. The main window owns the badge.
+  const attentionCount =
+    windowThreadId === null
+      ? snapshot.threads.filter(
+          (thread) =>
+            thread.status === "active" &&
+            (thread.activity === "approval" ||
+              thread.activity === "failed" ||
+              unseenThreadIds.has(thread.id)),
+        ).length
+      : null
+  useEffect(() => {
+    if (attentionCount !== null) window.meldshell.desktop?.setAttention?.(attentionCount)
+  }, [attentionCount])
   const activeScope = tabScope(selectedFile, selectedThread)
   const activeWorkspaceId = activeScope?.workspaceId ?? ""
   const worktreeThread =
@@ -885,6 +936,10 @@ export function App(): React.JSX.Element {
       openInEditor: () => editor.open(),
       ...threadShortcuts(frontThread, toggleArchived, loadoutSwitch.apply),
       popOutThread: popOutShortcut(frontThread),
+      focusComposer:
+        frontThread === null ? null : () => useViewStore.getState().focusComposer(frontThread.id),
+      nextPane:
+        useTabStore.getState().layout?.kind === "split" ? useTabStore.getState().cyclePane : null,
 
       loadoutCount: loadoutSwitch.count,
     }
@@ -1032,7 +1087,7 @@ export function App(): React.JSX.Element {
                         />
                       </aside>
                     </SidebarPanel>
-                    <Separator className="motion-colors relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]" />
+                    <Separator className={`motion-colors ${paneSeparatorClasses}`} />
                   </MainWindowOnly>
 
                   <Panel id="thread" minSize={layout.threadMin}>
@@ -1041,7 +1096,12 @@ export function App(): React.JSX.Element {
                         <ThreadPane
                           databaseError={snapshotQuery.isError}
                           hasThread={selectedThread !== null}
+                          recent={inboxThreads
+                            .filter((thread) => thread.status === "active")
+                            .slice(0, 3)}
+                          providersByThreadId={providersByThreadId}
                           onNewThread={requestNewThread}
+                          onOpenThread={openThread}
                         >
                           <ThreadWorkbench
                             snapshot={snapshot}
@@ -1052,7 +1112,7 @@ export function App(): React.JSX.Element {
                       </FileOrThread>
                     </main>
                   </Panel>
-                  <Separator className="motion-colors relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]" />
+                  <Separator className={`motion-colors ${paneSeparatorClasses}`} />
                   <SidebarPanel
                     id="source-control"
                     panelRef={sourceControl.panelRef}
@@ -1232,7 +1292,7 @@ export function App(): React.JSX.Element {
                 <>
                   <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
                   <Button
-                    variant="primary"
+                    variant="danger"
                     disabled={deleteThreadMutation.isPending}
                     onClick={() => {
                       if (deleteTarget !== null) deleteThreadMutation.mutate(deleteTarget.id)

@@ -357,6 +357,11 @@ interface DesktopApi {
   readonly threadPort: (threadId: string) => Promise<number>
   /** Opens an http or https address in the system browser. */
   readonly openExternal: (url: string) => Promise<void>
+  /**
+   * How many threads wait on the operator, shown on the taskbar icon; the window also flashes once
+   * when the count rises while it is in the background.
+   */
+  readonly setAttention?: (count: number) => void
   /** Agents driving a thread's browser preview, on desktops whose host runs locally. */
   readonly agentBrowser?: AgentBrowserApi
   /** Threads popped out into windows of their own, as on a second monitor. */
@@ -571,6 +576,10 @@ export const requests = {
   setThreadPinned: request<(input: { threadId: string; pinned: boolean }) => Promise<AppSnapshot>>(
     "meldshell:set-thread-pinned",
   ),
+  /** Records that the thread is on screen now, so its latest work no longer counts as new. */
+  markThreadSeen: request<(input: { threadId: string }) => Promise<AppSnapshot>>(
+    "meldshell:mark-thread-seen",
+  ),
   searchTranscripts: request<(input: SearchTranscriptsInput) => Promise<TranscriptSearchPage>>(
     "meldshell:search-transcripts",
   ),
@@ -691,6 +700,7 @@ export const IPC = {
   revealFile: "meldshell:reveal-file",
   threadPort: "meldshell:thread-port",
   openExternal: "meldshell:open-external",
+  setAttention: "meldshell:set-attention",
   agentBrowserAttach: "meldshell:agent-browser-attach",
   agentBrowserShow: "meldshell:agent-browser-show",
   agentBrowserActivity: "meldshell:agent-browser-activity",

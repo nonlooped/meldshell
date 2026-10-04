@@ -23,6 +23,8 @@ export type ShortcutAction =
   | "togglePreview"
   | "openInEditor"
   | "popOutThread"
+  | "focusComposer"
+  | "nextPane"
   | "dictate"
   | LoadoutAction
 
@@ -60,6 +62,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     group: "Tabs",
     chord: "Ctrl+Shift+O",
   },
+  { id: "nextPane", label: "Focus the next pane in a split", group: "Panels", chord: "Ctrl+]" },
   { id: "toggleInbox", label: "Show or hide the inbox", group: "Panels", chord: "Ctrl+B" },
   {
     id: "toggleSourceControl",
@@ -75,6 +78,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     chord: "Ctrl+Shift+B",
   },
   { id: "openInEditor", label: "Open in editor", group: "Workspace", chord: "Ctrl+Shift+E" },
+  { id: "focusComposer", label: "Focus the composer", group: "Input", chord: "Ctrl+Shift+L" },
   { id: "dictate", label: "Start or stop dictation", group: "Input", chord: "Ctrl+Shift+D" },
   ...LOADOUT_ACTIONS.map((id, index) => ({
     id,

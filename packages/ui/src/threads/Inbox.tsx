@@ -18,6 +18,7 @@ import {
   CircleAlert,
   CircleX,
   Hourglass,
+  ListFilter,
   MoreHorizontal,
   Rows2,
   Search,
@@ -41,7 +42,9 @@ import {
   IconButton,
   MenuAction,
   MenuChoice,
+  MenuGroup,
   MenuRadioGroup,
+  MenuSeparator,
 } from "../ui/controls"
 import { relativeAge } from "../ui/relative-age"
 import { useScheduledThreadIds } from "../schedules/schedule-queries"
@@ -226,21 +229,14 @@ function InboxThread({
                 className="thread-open relative flex min-w-0 flex-1 flex-col overflow-hidden justify-start gap-[5px] [padding:8px_10px] border-0 bg-transparent text-inherit cursor-default text-left [&:focus-visible]:[outline-offset:-2px]"
                 data-dragging={draggable.isDragging ? "" : undefined}
                 aria-current={selected ? "true" : undefined}
-                // The rail names the thread in its own tooltip instead.
-                title={
-                  rail
-                    ? undefined
-                    : [thread.title, glanceLabel(glance), "Drag onto a pane to open it there"]
-                        .filter((line) => line !== null)
-                        .join("\n")
-                }
+                // The row shows its title, state, and age; the rail names it in a tooltip.
                 onClick={() => onOpen(thread.id)}
               >
                 <RailTile title={thread.title} glance={glance} />
                 {thread.status === "active" ? (
                   <>
                     <span
-                      className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
+                      className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[13px] font-medium ${railLabelClasses}`}
                     >
                       <TextSwap text={thread.title} />
                     </span>
@@ -297,7 +293,7 @@ function InboxThread({
                       <ProviderIcon provider={provider} size={14} />
                     </span>
                     <span
-                      className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[12.5px] font-medium ${railLabelClasses}`}
+                      className={`thread-title relative overflow-hidden text-ellipsis whitespace-nowrap text-inherit text-[13px] font-medium ${railLabelClasses}`}
                     >
                       <TextSwap text={thread.title} />
                     </span>
@@ -335,6 +331,7 @@ function InboxThread({
             </IconButton>
             <DropdownMenu
               align="end"
+              tooltip="More actions"
               trigger={
                 <BaseButton
                   type="button"
@@ -364,7 +361,12 @@ function InboxThread({
               >
                 {thread.pinned ? "Unpin thread" : "Pin thread"}
               </MenuAction>
-              <MenuAction onClick={() => onRename(thread)}>Rename thread…</MenuAction>
+              <MenuAction
+                icon={<SquarePen size={13} strokeWidth={1.75} />}
+                onClick={() => onRename(thread)}
+              >
+                Rename thread…
+              </MenuAction>
               <MenuAction
                 icon={<Archive size={13} strokeWidth={1.75} />}
                 onClick={() => onSetStatus(thread)}
@@ -409,7 +411,7 @@ function RailTile({ title, glance }: { title: string; glance: ThreadGlance }) {
       aria-hidden="true"
       className="motion-colors motion-duration-220 pointer-events-none absolute inset-[0] grid place-items-center opacity-0 group-data-[rail]/inbox:opacity-100"
     >
-      <span className="rail-tile relative grid h-[26px] w-[26px] place-items-center rounded-[var(--radius-sm)] border-[1px] border-[color:var(--line)] bg-[var(--surface-hover)] text-[10.5px] font-semibold tracking-[0.02em]">
+      <span className="rail-tile relative grid h-[26px] w-[26px] place-items-center rounded-[var(--radius-sm)] border-[1px] border-[color:var(--line)] bg-[var(--surface-hover)] text-[11px] font-semibold tracking-[0.02em]">
         {threadMonogram(title)}
         {glance !== "idle" && (
           <span className="absolute right-[-5px] bottom-[-5px] grid h-[13px] w-[13px] place-items-center rounded-full bg-[var(--surface-menu)]">
@@ -499,7 +501,7 @@ function InboxNotice({
     <div className="flex w-full flex-col items-center gap-[10px] [padding:20px_14px] text-center">
       <p
         role="status"
-        className="m-0 max-w-[200px] text-[var(--text-secondary)] text-[11.5px] leading-[1.45] [text-wrap:balance]"
+        className="m-0 max-w-[200px] text-[var(--text-secondary)] text-[12px] leading-[1.45] [text-wrap:balance]"
       >
         {message}
       </p>
@@ -523,6 +525,7 @@ function inboxNotice({
   pinnedThreads,
   activeThreads,
   settledThreads,
+  filter,
 }: {
   threads: ReadonlyArray<Thread>
   visibleThreads: ReadonlyArray<Thread>
@@ -530,8 +533,11 @@ function inboxNotice({
   pinnedThreads: ReadonlyArray<Thread>
   activeThreads: ReadonlyArray<Thread>
   settledThreads: ReadonlyArray<Thread>
+  filter: InboxFilter
 }): string | null {
   if (pinnedThreads.length + activeThreads.length > 0) return null
+  if (filter !== "all")
+    return filter === "attention" ? "Nothing needs your attention." : "Nothing is running."
   if (visibleThreads.length === 0 && workspaceId !== "all")
     return "No threads in this workspace yet."
   if (threads.length === 0) return "No threads yet."
@@ -565,6 +571,51 @@ function inboxRows({
     rows.push({ type: "heading", id: "active", label: "Inbox", count: activeThreads.length })
   rows.push(...activeThreads.map(threadRow))
   return rows
+}
+
+type InboxFilter = "all" | "attention" | "running"
+
+const FILTERS: ReadonlyArray<{ readonly value: InboxFilter; readonly label: string }> = [
+  { value: "all", label: "All threads" },
+  { value: "attention", label: "Needs attention" },
+  { value: "running", label: "Running" },
+]
+
+/** The workspace selector's icon and caption; a filter other than All names itself first. */
+function SelectorLabel({
+  filter,
+  workspaceName,
+}: {
+  filter: InboxFilter
+  workspaceName: string
+}): React.JSX.Element {
+  if (filter === "all")
+    return (
+      <>
+        <Folder size={15} strokeWidth={1.65} />
+        <span className={railLabelClasses}>{workspaceName}</span>
+      </>
+    )
+  const label = FILTERS.find((entry) => entry.value === filter)?.label ?? ""
+  return (
+    <>
+      <ListFilter size={15} strokeWidth={1.75} className="text-[var(--accent)]!" />
+      <span className={railLabelClasses}>{`${label} · ${workspaceName}`}</span>
+    </>
+  )
+}
+
+/** Whether a thread belongs in the list under the chosen filter. */
+function matchesInboxFilter(
+  filter: InboxFilter,
+  thread: Thread,
+  unseenThreadIds: ReadonlySet<string>,
+): boolean {
+  if (filter === "all") return true
+  if (filter === "running") return thread.activity === "running" || thread.activity === "queued"
+  return (
+    thread.activity === "approval" || thread.activity === "failed" || unseenThreadIds.has(thread.id)
+  )
 }
 
 const ARCHIVED_ROW_HEIGHT = 40
@@ -604,15 +655,19 @@ export function Inbox({
   // Archived threads are done; they stay out of sight until asked for.
   const [archivedExpanded, setArchivedExpanded] = useState(false)
   const [selectedWorkspaceId, setWorkspaceId] = useState("all")
+  // Which active threads the list shows: every one, those waiting on the operator, or the busy ones.
+  const [filter, setFilter] = useState<InboxFilter>("all")
   const workspaceId = workspaces.some((workspace) => workspace.id === selectedWorkspaceId)
     ? selectedWorkspaceId
     : "all"
   const visibleThreads = threads.filter(
     (thread) => workspaceId === "all" || thread.workspaceId === workspaceId,
   )
-  const pinnedThreads = visibleThreads.filter((thread) => thread.pinned)
+  const matchesFilter = (thread: Thread): boolean =>
+    matchesInboxFilter(filter, thread, unseenThreadIds)
+  const pinnedThreads = visibleThreads.filter((thread) => thread.pinned && matchesFilter(thread))
   const activeThreads = visibleThreads.filter(
-    (thread) => thread.status === "active" && !thread.pinned,
+    (thread) => thread.status === "active" && !thread.pinned && matchesFilter(thread),
   )
   const settledThreads = visibleThreads.filter(
     (thread) => thread.status === "settled" && !thread.pinned && showSettled,
@@ -625,6 +680,7 @@ export function Inbox({
       pinnedThreads,
       activeThreads,
       settledThreads,
+      filter,
     }),
     pinnedThreads,
     activeThreads,
@@ -725,8 +781,7 @@ export function Inbox({
                     title={rail ? selectedWorkspaceName : undefined}
                     aria-label={`Show threads from: ${selectedWorkspaceName}`}
                   >
-                    <Folder size={15} strokeWidth={1.65} />
-                    <span className={railLabelClasses}>{selectedWorkspaceName}</span>
+                    <SelectorLabel filter={filter} workspaceName={selectedWorkspaceName} />
                     <ChevronsUpDown size={13} strokeWidth={1.7} className={railLabelClasses} />
                   </BaseButton>
                 }
@@ -742,6 +797,20 @@ export function Inbox({
                     </MenuChoice>
                   ))}
                 </MenuRadioGroup>
+                <MenuSeparator />
+                <MenuRadioGroup
+                  value={filter}
+                  onValueChange={(value) => setFilter(value as InboxFilter)}
+                >
+                  <MenuGroup label="Show">
+                    {FILTERS.map((entry) => (
+                      <MenuChoice key={entry.value} value={entry.value}>
+                        {entry.label}
+                      </MenuChoice>
+                    ))}
+                  </MenuGroup>
+                </MenuRadioGroup>
+                <MenuSeparator />
                 <MenuAction icon={<FolderPlus size={14} />} onClick={onAddWorkspace}>
                   Add workspace
                 </MenuAction>
@@ -868,7 +937,7 @@ export function Inbox({
         {canLoadMore && (
           <BaseButton
             type="button"
-            className={`${railLabelClasses} sticky bottom-[0] w-full p-[7px] border-0 border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[11.5px] bg-[var(--surface-overlay)] cursor-default motion-colors [&:hover:not(:disabled)]:text-[var(--text-primary)] [&:disabled]:text-[var(--text-tertiary)]`}
+            className={`${railLabelClasses} sticky bottom-[0] w-full p-[7px] border-0 border-t-[1px] border-t-[color:var(--line-subtle)] text-[var(--text-secondary)] text-[12px] bg-[var(--surface-overlay)] cursor-default motion-colors [&:hover:not(:disabled)]:text-[var(--text-primary)] [&:disabled]:text-[var(--text-tertiary)]`}
             disabled={loadingMore}
             onClick={onLoadMore}
           >
@@ -1016,18 +1085,17 @@ function ActivityBadge({
 const inboxSearchClasses = [
   `flex h-[32px] min-w-0 w-full ${railControlClasses} items-center gap-[9px] [padding:0_9px] overflow-hidden border-0 rounded-[var(--radius)]`,
   "bg-transparent text-[var(--text-secondary)] text-left cursor-default [font:inherit]",
-  "[&_svg]:flex-none [&_svg]:text-[var(--text-tertiary)] [&_span]:flex-1 [&_span]:text-[12.5px]",
+  "[&_svg]:flex-none [&_svg]:text-[var(--text-tertiary)] [&_span]:flex-1 [&_span]:text-[13px]",
   "[&_kbd]:text-[10px] [&_kbd]:shrink-0 [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]",
   "[&:hover_svg]:text-[var(--text-secondary)]",
 ].join(" ")
 
 const workspaceSelectorClasses = [
   `flex h-[32px] min-w-0 w-full ${railControlClasses} items-center gap-[9px] [padding:0_8px] mt-[4px] overflow-hidden border-[1px]`,
-  "border-[color:var(--line)] rounded-[var(--radius)] [background:rgba(0,_0,_0,_0.12)]",
+  "border-[color:var(--line)] rounded-[var(--radius)] bg-[var(--surface-input)]",
   "text-[var(--text-secondary)] cursor-default text-left [&_svg]:flex-none",
-  "[&_svg]:text-[var(--text-tertiary)] [&_span]:min-w-0 [&_span]:flex-[1_1_auto] [&_span]:text-[12.5px]",
+  "[&_svg]:text-[var(--text-tertiary)] [&_span]:min-w-0 [&_span]:flex-[1_1_auto] [&_span]:text-[13px]",
   "[&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap",
   "[&:hover]:[border-color:var(--line-strong)] [&:hover]:text-[var(--text-primary)]",
   "[&[data-popup-open]]:[border-color:var(--line-strong)] [&[data-popup-open]]:text-[var(--text-primary)]",
-  "[:root[data-theme='light']_&]:bg-[var(--surface-raised)]",
 ].join(" ")

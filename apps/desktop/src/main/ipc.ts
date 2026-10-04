@@ -16,6 +16,7 @@ import { registerRemoteAdministration } from "./remote-administration"
 import { registerPreviewIpc } from "./preview"
 import { registerAgentBrowserIpc } from "./agent-browser"
 import { registerDesignModeIpc } from "./design-mode"
+import { registerAttentionIpc } from "./attention"
 
 // The site serves the account API; development uses the site dev server, which proxies it.
 const controlURL =
@@ -144,4 +145,5 @@ export const registerIpc = (): void => {
   registerPreviewIpc()
   registerAgentBrowserIpc()
   registerDesignModeIpc()
+  registerAttentionIpc()
 }

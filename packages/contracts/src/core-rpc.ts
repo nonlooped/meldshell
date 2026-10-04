@@ -28,6 +28,7 @@ import {
   InterruptedTurn,
   RenameWorkspaceInput,
   SetThreadPinnedInput,
+  MarkThreadSeenInput,
   SearchTranscriptsInput,
   TranscriptSearchPage,
   SaveScheduleInput,
@@ -60,6 +61,7 @@ export class CoreRpcs extends RpcGroup.make(
   snapshotRpc("RenameWorkspace", RenameWorkspaceInput),
   snapshotRpc("RemoveWorkspace", Schema.Struct({ workspaceId: Schema.String })),
   snapshotRpc("SetThreadPinned", SetThreadPinnedInput),
+  snapshotRpc("MarkThreadSeen", MarkThreadSeenInput),
   Rpc.make("SearchTranscripts", {
     payload: SearchTranscriptsInput,
     success: TranscriptSearchPage,
