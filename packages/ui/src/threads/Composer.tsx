@@ -172,11 +172,13 @@ function AttachmentChip({
           {attachment.name ?? (attachment.type === "image" ? "Pasted image" : attachment.value)}
         </span>
         <span className="text-[var(--text-tertiary)] text-[11px]">
-          {attachment.type === "image" || attachment.type === "localImage"
-            ? "Image"
-            : attachment.type === "skill"
-              ? "Skill"
-              : "File"}
+          {attachment.context
+            ? "Page element"
+            : attachment.type === "image" || attachment.type === "localImage"
+              ? "Image"
+              : attachment.type === "skill"
+                ? "Skill"
+                : "File"}
         </span>
       </span>
       <IconButton unstyled label={`Remove ${attachment.name ?? "attachment"}`} onClick={onRemove}>
@@ -230,13 +232,21 @@ function ComposerAttachments({
                     {(attachment.type === "image" || attachment.previewUrl) && (
                       <MenuAction onClick={() => setPreviewIndex(index)}>Preview image</MenuAction>
                     )}
-                    <MenuAction
-                      onClick={() =>
-                        void navigator.clipboard.writeText(attachment.name ?? attachment.value)
-                      }
-                    >
-                      Copy name or path
-                    </MenuAction>
+                    {attachment.context ? (
+                      <MenuAction
+                        onClick={() => void navigator.clipboard.writeText(attachment.context ?? "")}
+                      >
+                        Copy element details
+                      </MenuAction>
+                    ) : (
+                      <MenuAction
+                        onClick={() =>
+                          void navigator.clipboard.writeText(attachment.name ?? attachment.value)
+                        }
+                      >
+                        Copy name or path
+                      </MenuAction>
+                    )}
                     <MenuAction onClick={() => onRemoveAttachment(index)}>
                       Remove attachment
                     </MenuAction>

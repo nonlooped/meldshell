@@ -80,7 +80,14 @@ import type {
   ThreadIssue,
 } from "./models"
 
-export type ComposerAttachment = InputAttachment & { readonly previewUrl?: string }
+export type ComposerAttachment = InputAttachment & {
+  readonly previewUrl?: string
+  /**
+   * Text sent with the message rather than shown in the composer, such as the HTML and styles of
+   * an element picked in the preview.
+   */
+  readonly context?: string
+}
 
 export interface HostFolders {
   readonly path: string
@@ -346,6 +353,39 @@ interface DesktopApi {
   readonly openExternal: (url: string) => Promise<void>
   /** Agents driving a thread's browser preview, on desktops whose host runs locally. */
   readonly agentBrowser?: AgentBrowserApi
+  /** Picking elements in a preview page to describe them to an agent. */
+  readonly designMode?: DesignModeApi
+}
+
+/** An element the user clicked in a preview page with design mode. */
+export interface PickedElement {
+  /** The page's address. */
+  readonly url: string
+  /** The tag with its id or first classes, such as `button.cta`. */
+  readonly label: string
+  /** A CSS selector that finds the element from the document. */
+  readonly selector: string
+  readonly width: number
+  readonly height: number
+  /** The element's HTML, shortened when it is long. */
+  readonly html: string
+  /** The element's visible text, shortened. */
+  readonly text: string
+  /** Computed styles that differ from their usual defaults, as property and value. */
+  readonly styles: readonly (readonly [string, string])[]
+  /** A PNG data URL of the element as the page shows it, or null when it could not be captured. */
+  readonly screenshot: string | null
+  /** The user shift-clicked, asking to pick another element after this one. */
+  readonly more: boolean
+}
+
+interface DesignModeApi {
+  /**
+   * Lets the user hover and click an element in a preview page, outlining it in `accent`. Resolves
+   * with the element, or null when picking is cancelled or the page navigates away.
+   */
+  readonly pick: (webContentsId: number, accent: string) => Promise<PickedElement | null>
+  readonly cancel: (webContentsId: number) => void
 }
 
 /** What an agent is doing in a thread's preview, and where on the page when it points somewhere. */
@@ -623,6 +663,8 @@ export const IPC = {
   agentBrowserAttach: "meldshell:agent-browser-attach",
   agentBrowserShow: "meldshell:agent-browser-show",
   agentBrowserActivity: "meldshell:agent-browser-activity",
+  designModePick: "meldshell:design-mode-pick",
+  designModeCancel: "meldshell:design-mode-cancel",
 } as const
 
 export type MeldShellApi = InvokeApi & {
