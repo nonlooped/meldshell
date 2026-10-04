@@ -12,6 +12,7 @@ import {
   setThreadSettings,
   removeQueuedInput,
   steerQueuedInput,
+  closeThreadSessions,
 } from "./operations"
 import { providerFor } from "./worker-provider"
 import { ProviderUpdates } from "./provider-updates"
@@ -282,6 +283,7 @@ export const hostOperations: Record<string, Operation> = {
     Effect.gen(function* () {
       const core = yield* CoreClient
       const path = yield* idleThreadFolder(input)
+      yield* closeThreadSessions(input.threadId)
       // The files go back first, so the conversation never forgets work the folder still holds.
       const filesRestored = yield* attempt(async () => {
         if (!(await hasTurnSnapshot(path, input.threadId, input.turnId, "before"))) return false
@@ -307,6 +309,7 @@ export const hostOperations: Record<string, Operation> = {
       const core = yield* CoreClient
       const path = yield* idleThreadFolder(input)
       const result = yield* core.UndoRewind({ threadId: input.threadId })
+      yield* closeThreadSessions(input.threadId)
       if (result.filesRestored) yield* attempt(() => undoSnapshotRestore(path, input.threadId))
       return result
     }),

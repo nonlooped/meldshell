@@ -13,6 +13,9 @@ import { providerFor } from "./worker-provider"
 const publishChange = (threadId: string) =>
   Effect.flatMap(HostEvents, (events) => events.publish({ _tag: "RuntimeChanged", threadId }))
 
+/** These providers keep one process per thread rather than a shared app-server. */
+const RETAINED_HARNESSES = ["claude-code", "cursor", "pi"] as const
+
 const answerActiveTurn = (input: SubmitTurnInput) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
@@ -116,7 +119,7 @@ export const submitTurn = (input: SubmitTurnInput) =>
     return result
   })
 
-/** Stop Pi before deselecting it, so idle extensions cannot keep using the workspace. */
+/** Stop retained sessions before deselecting their provider. */
 export const setThreadSettings = (input: SetThreadSettingsInput) =>
   Effect.gen(function* () {
     const core = yield* CoreClient
@@ -125,14 +128,28 @@ export const setThreadSettings = (input: SetThreadSettingsInput) =>
     const previous = snapshot.providers.find((provider) => provider.id === current?.providerId)
     const model = snapshot.models.find((model) => model.id === input.modelId)
     const next = snapshot.providers.find((provider) => provider.id === model?.providerId)
-    if (previous?.harness === "pi" && next && next.harness !== "pi") {
+    if (
+      previous &&
+      RETAINED_HARNESSES.some((harness) => harness === previous.harness) &&
+      next &&
+      next.harness !== previous.harness
+    ) {
       if (yield* core.InterruptTurn({ threadId: input.threadId }))
         return yield* Effect.fail(new Error("Stop the running turn before switching providers."))
-      const provider = yield* providerFor("pi")
-      yield* provider.send({ type: "close-thread-session", threadId: input.threadId })
+      const provider = yield* providerFor(previous.harness)
+      yield* provider.closeThreadSession(input.threadId)
     }
     return yield* core.SetThreadSettings(input)
   })
+
+/** A deleted or rewound conversation must not leave a retained agent using its old context. */
+export const closeThreadSessions = (threadId: string) =>
+  Effect.forEach(
+    RETAINED_HARNESSES,
+    (harness) =>
+      Effect.flatMap(providerFor(harness), (provider) => provider.closeThreadSession(threadId)),
+    { discard: true },
+  )
 
 export const interruptTurn = (threadId: string) =>
   Effect.gen(function* () {

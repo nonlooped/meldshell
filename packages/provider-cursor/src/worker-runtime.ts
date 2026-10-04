@@ -313,6 +313,16 @@ export const runCursorWorker = (
     await session.client.close()
     clients.delete(session.client)
   }
+  const closeThreadSession = async (threadId: string): Promise<void> => {
+    const session = sessions.get(threadId)
+    if (!session) return
+    sessions.delete(threadId)
+    const running = [...turns.values()].filter((turn) => turn.dispatch.threadId === threadId)
+    for (const turn of running) turn.interrupted = true
+    cancelInteractions(session)
+    await closeSession(session)
+    await Promise.allSettled(running.map((turn) => turn.task))
+  }
   const probeFailed = (cause: unknown): void => {
     if (!stopping)
       publishStatus(
@@ -689,6 +699,12 @@ export const runCursorWorker = (
         case "start-turn":
           startTurn(message.dispatch)
           ack()
+          break
+        case "close-thread-session":
+          void closeThreadSession(message.threadId).then(
+            () => ack(),
+            (cause: unknown) => ack(errorMessage(cause)),
+          )
           break
         case "generate-title":
           void generateTitle(message.request)

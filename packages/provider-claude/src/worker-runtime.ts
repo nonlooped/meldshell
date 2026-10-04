@@ -25,6 +25,7 @@ import {
 } from "./approvals"
 import { discoverClaude, type ClaudeCommand } from "./discovery"
 import { ClaudeEvents } from "./events"
+import { LiveClaudeSession } from "./live-session"
 import { loadModelHistory } from "./model-history"
 import { claudeModels } from "./models"
 import { claudeOptions, claudePrompt } from "./options"
@@ -60,7 +61,6 @@ type Emit = (method: string, params: unknown, validated?: boolean, requestId?: s
 interface RunningTurn {
   readonly controller: AbortController
   task: Promise<void>
-  sessionId: string
   session?: Query
   interrupted: boolean
 }
@@ -72,6 +72,14 @@ interface WaitingApproval {
   readonly emit: Emit
 }
 
+interface ThreadSession {
+  readonly live: LiveClaudeSession
+  readonly key: string
+  nativeThreadId: string
+  options: Options
+  emit: Emit
+}
+
 export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<void> } => {
   let stopping = false
   let probing: Promise<void> | null = null
@@ -80,6 +88,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
   const controllers = new Set<AbortController>()
   const usageRequests = new Map<string, AbortController>()
   const turns = new Map<string, RunningTurn>()
+  const sessions = new Map<string, ThreadSession>()
   const approvals = new Map<string, WaitingApproval>()
   const publish = eventPublisher(port)
 
@@ -103,6 +112,78 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
   const closeQuery = (session: Query | undefined): void => {
     session?.close()
     if (session) queries.delete(session)
+  }
+
+  const closeThreadSession = async (threadId: string): Promise<void> => {
+    const session = sessions.get(threadId)
+    if (!session) return
+    sessions.delete(threadId)
+    await session.live.close()
+  }
+
+  const sessionFor = async (dispatch: TurnDispatch, emit: Emit): Promise<ThreadSession> => {
+    const options = claudeOptions(dispatch)
+    // These settings can change on a streaming session. Everything else (including tool access
+    // and workspace) must be installed at process startup, so recreate the session if it changes.
+    const {
+      model,
+      effort,
+      settings,
+      permissionMode,
+      resume: _resume,
+      sessionId: _id,
+      ...fixed
+    } = options
+    const key = JSON.stringify(fixed)
+    let session = sessions.get(dispatch.threadId)
+    if (
+      session &&
+      (session.live.closed ||
+        session.key !== key ||
+        dispatch.nativeThreadId !== session.nativeThreadId)
+    ) {
+      await closeThreadSession(dispatch.threadId)
+      session = undefined
+    }
+    if (session) {
+      session.emit = emit
+      if (model !== session.options.model) await session.live.query.setModel(model)
+      if (permissionMode !== session.options.permissionMode && permissionMode)
+        await session.live.query.setPermissionMode(permissionMode)
+      if (
+        effort !== session.options.effort ||
+        JSON.stringify(settings) !== JSON.stringify(session.options.settings)
+      )
+        await session.live.query.applyFlagSettings({
+          effortLevel: effort ?? null,
+          fastMode: dispatch.speed === "fast",
+        })
+      session.options = options
+      return session
+    }
+    const events = new ClaudeEvents((...args) => created.emit(...args))
+    const live = new LiveClaudeSession({ ...spawnOptions(), ...options }, (message) => {
+      const nativeThreadId =
+        message.type === "system" && message.subtype === "init"
+          ? message.session_id
+          : message.type === "conversation_reset"
+            ? message.new_conversation_id
+            : undefined
+      if (nativeThreadId !== undefined) {
+        created.nativeThreadId = nativeThreadId
+        publish({ type: "provider-session", threadId: dispatch.threadId, nativeThreadId })
+      }
+      events.accept(message)
+    })
+    const created: ThreadSession = {
+      live,
+      key,
+      nativeThreadId: dispatch.nativeThreadId ?? dispatch.turnId,
+      options,
+      emit,
+    }
+    sessions.set(dispatch.threadId, created)
+    return created
   }
 
   /**
@@ -190,7 +271,6 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
     const controller = new AbortController()
     const state: RunningTurn = {
       controller,
-      sessionId: dispatch.nativeThreadId ?? dispatch.turnId,
       task: Promise.resolve(),
       interrupted: false,
     }
@@ -210,30 +290,20 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
         },
       })
     const interrupted = (): boolean => state.interrupted || controller.signal.aborted
-    const events = new ClaudeEvents(emit)
     emit("turn/started", { turn: { id: dispatch.turnId, status: "running" } })
     let completed = false
     const finish = (result: "completed" | "failed" | "interrupted", error?: string): void => {
       if (completed) return
       completed = true
+      turns.delete(dispatch.turnId)
       if (error && result === "failed") emit("error", { error: { message: error } })
       emit("turn/completed", {
         turn: { status: result, ...(error === undefined ? {} : { error }) },
       })
     }
-    const startSession = (sessionId: string): void => {
-      state.sessionId = sessionId
-      publish({ type: "provider-session", threadId: dispatch.threadId, nativeThreadId: sessionId })
-    }
-    /** Handles one SDK message; true once the turn's result has arrived. */
-    const accept = (message: SDKMessage): boolean => {
-      if (message.type === "system" && message.subtype === "init") startSession(message.session_id)
-      if (message.type === "conversation_reset") startSession(message.new_conversation_id)
-      events.accept(message)
-      if (message.type !== "result") return false
+    const finishResult = (message: Extract<SDKMessage, { type: "result" }>): void => {
       const error = resultError(message)
       finish(interrupted() ? "interrupted" : error === undefined ? "completed" : "failed", error)
-      return true
     }
     // Approving a plan returns Claude to the permissions the thread chose, as Claude Code does.
     const workingMode = claudeOptions({ ...dispatch, mode: "default" }).permissionMode ?? "default"
@@ -267,41 +337,25 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
         emit(approval.method, approval.params, true, requestId)
       })
     }
-    const consume = async (session: Query): Promise<void> => {
-      for await (const message of session) if (accept(message)) break
-      if (!completed)
-        finish(
-          interrupted() ? "interrupted" : "failed",
-          "Claude stopped before returning a turn result.",
-        )
-    }
     state.task = (async () => {
-      let session: Query | undefined
       try {
-        const options = claudeOptions(dispatch)
         const input = await claudePrompt(dispatch)
         if (controller.signal.aborted) {
           finish("interrupted")
           return
         }
-        const prompt: AsyncIterable<SDKUserMessage> = {
-          async *[Symbol.asyncIterator]() {
-            yield input
-            yield* idleInput(controller.signal)
-          },
+        const session = await sessionFor(dispatch, emit)
+        state.session = session.live.query
+        if (controller.signal.aborted) {
+          finish("interrupted")
+          return
         }
-        session = query({
-          prompt,
-          options: { ...spawnOptions(), ...options, abortController: controller, canUseTool },
-        })
-        state.session = session
-        queries.add(session)
-        await consume(session)
+        const result = await session.live.send(input, canUseTool)
+        finishResult(result)
       } catch (cause) {
         finish(interrupted() ? "interrupted" : "failed", errorMessage(cause))
       } finally {
         controller.abort()
-        closeQuery(session)
         controllers.delete(controller)
         turns.delete(dispatch.turnId)
       }
@@ -406,6 +460,7 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
     stopping = true
     for (const controller of controllers) controller.abort()
     for (const session of queries) session.close()
+    await Promise.allSettled([...sessions.keys()].map(closeThreadSession))
     await Promise.allSettled([...turns.values()].map((turn) => turn.task))
   }
 
@@ -428,8 +483,11 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
       permissionResult(approval.pending, message.decision, message.answers, message.reason),
     )
     const { workingMode } = approval.pending
-    if (accepted && workingMode !== undefined)
+    if (accepted && workingMode !== undefined) {
+      for (const session of sessions.values())
+        if (session.emit === approval.emit) session.options.permissionMode = workingMode
       approval.emit("claude/permission_mode", { permissionMode: workingMode })
+    }
     ack()
   }
 
@@ -485,6 +543,12 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
         case "start-turn":
           startTurn(message.dispatch)
           ack()
+          break
+        case "close-thread-session":
+          void closeThreadSession(message.threadId).then(
+            () => ack(),
+            (cause) => ack(errorMessage(cause)),
+          )
           break
         case "generate-title":
           void generateTitle(message.request)

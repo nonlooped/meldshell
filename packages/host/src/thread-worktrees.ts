@@ -9,6 +9,7 @@ import type {
 import type { ForkThreadInput, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { attempt } from "./attempt"
 import { CoreClient } from "./core-client"
+import { closeThreadSessions } from "./operations"
 import { HostPlatform } from "./platform"
 import { gitValue, statusAt } from "./git"
 import {
@@ -259,6 +260,7 @@ export const deleteThread = (threadId: string) =>
       )
     yield* stopWorktreeSetup(threadId)
     const snapshot = yield* core.DeleteThread({ threadId })
+    yield* closeThreadSessions(threadId)
     // Snapshot refs live in the shared repository, so they outlast the thread's worktree.
     yield* attempt(() => deleteThreadSnapshots(location.workspacePath, threadId)).pipe(
       Effect.catch(Effect.logError),
@@ -283,7 +285,13 @@ export const removeWorkspace = (workspaceId: string) =>
           ),
         )
     for (const location of threads) yield* stopWorktreeSetup(location.threadId)
+    const before = yield* core.GetSnapshot()
     const snapshot = yield* core.RemoveWorkspace({ workspaceId })
+    yield* Effect.forEach(
+      before.threads.filter((thread) => thread.workspaceId === workspaceId),
+      (thread) => closeThreadSessions(thread.id),
+      { discard: true },
+    )
     for (const location of threads)
       yield* attempt(() =>
         removeWorktree(location.workspacePath, location.worktree!, {

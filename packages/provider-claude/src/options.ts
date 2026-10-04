@@ -2,6 +2,7 @@ import type { Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk"
 import { promptText, type TurnDispatch } from "@meldshell/contracts"
 import { readFile } from "node:fs/promises"
 import { extname } from "node:path"
+import { randomUUID } from "node:crypto"
 import { referenceText } from "@meldshell/provider-runtime"
 import { BROWSER_SERVER, browserUrl } from "@meldshell/provider-runtime/browser"
 
@@ -124,6 +125,7 @@ export const claudePrompt = async (dispatch: TurnDispatch): Promise<SDKUserMessa
   }
   return {
     type: "user",
+    uuid: randomUUID(),
     session_id: dispatch.nativeThreadId ?? dispatch.turnId,
     parent_tool_use_id: null,
     message: { role: "user", content },

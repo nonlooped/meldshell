@@ -6,6 +6,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Fixed
 
+- Pi ignores idle notifications received before a new agent run starts. Cursor and Pi retained sessions now close when their thread is deleted or rewound, and Cursor sessions close when switching providers.
+
+- Claude Code keeps its session and background commands alive between turns. Resumed task notifications no longer finish a new request prematurely, and background shell tasks no longer appear as subagents.
+
 - Closing a browser preview stays closed when its page finishes navigating during the close animation.
 
 - Archiving a thread closes its tab, including its pane in a split view.

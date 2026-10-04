@@ -233,7 +233,8 @@ export const runPiWorker = (
       // An extension started this run, so no MeldShell turn is waiting for it yet.
       if (!session.emit && !stopping) openTurn(session)
     }
-    if (record.type === "agent_settled") {
+    // An idle notification before agent_start does not belong to the waiting prompt.
+    if (record.type === "agent_settled" && session.running) {
       session.running = false
       session.settle?.()
     }

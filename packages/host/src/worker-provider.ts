@@ -71,6 +71,8 @@ export interface ProviderService {
   /** Replaces the worker with a fresh one, which probes the harness again; fails running turns. */
   readonly restart: Effect.Effect<void, Error>
   readonly send: (message: ProviderWorkerInput) => Effect.Effect<void, Error>
+  /** Closes one retained session; an exited worker has already stopped all of its sessions. */
+  readonly closeThreadSession: (threadId: string) => Effect.Effect<void, Error>
   readonly shutdown: Effect.Effect<void>
 }
 
@@ -628,6 +630,12 @@ const providerRuntime = (
         )
       }),
       send,
+      closeThreadSession: (threadId) =>
+        Ref.get(processRef).pipe(
+          Effect.flatMap((child) =>
+            child === null ? Effect.void : send({ type: "close-thread-session", threadId }),
+          ),
+        ),
     }
   })
 

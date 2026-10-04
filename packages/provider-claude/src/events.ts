@@ -24,7 +24,9 @@ const taskOrigin = (message: TaskMessage, previous: Record<string, unknown> | un
   const taskType = ("task_type" in message ? message.task_type : undefined) ?? previous?.taskType
   return {
     ...(taskType === undefined ? {} : { taskType }),
-    ...("tool_use_id" in message && message.tool_use_id !== undefined && taskType !== "local_bash"
+    ...("tool_use_id" in message &&
+    message.tool_use_id !== undefined &&
+    (taskType === "local_agent" || taskType === "remote_agent")
       ? { parentToolUseId: message.tool_use_id }
       : {}),
   }
