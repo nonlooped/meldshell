@@ -23,6 +23,7 @@ import {
   FolderPen,
   Hammer,
   ListChecks,
+  MessageCircleDashed,
   MessageCircleQuestion,
   MicOff,
   Paperclip,
@@ -42,6 +43,7 @@ import { ImageLightbox } from "../ui/MarkdownBlocks"
 import { ModelPickerWithLoadouts } from "./LoadoutPicker"
 import { useComposerCompletion } from "./ComposerCompletion"
 import type { ComposerToken } from "./composer-completion"
+import { sideQuestionText } from "./side-questions"
 import { dropText, launchFromText } from "../ui/flight"
 import { useViewStore } from "../app/view-store"
 import { DictationButton } from "./Dictation"
@@ -321,7 +323,58 @@ function ComposerTextActions({
   )
 }
 
+/** A side question goes to a separate request, so it waits on neither the worktree nor files. */
+function readyToSend({
+  sideQuestion,
+  settingUp,
+  ready,
+  hasContent,
+  loadingAttachments,
+}: {
+  sideQuestion: string | null
+  settingUp: boolean
+  ready: boolean
+  hasContent: boolean
+  loadingAttachments: boolean
+}): boolean {
+  if (sideQuestion !== null) return ready && sideQuestion !== ""
+  return ready && !settingUp && hasContent && !loadingAttachments
+}
+
+function sendAction(
+  sideQuestion: string | null,
+  running: boolean,
+  delivery: FollowUpDelivery,
+): string {
+  if (sideQuestion !== null) return "Ask side question"
+  return running ? FOLLOW_UP[delivery].label : "Send message"
+}
+
+function SendIcon({
+  sideQuestion,
+  running,
+  delivery,
+}: {
+  readonly sideQuestion: string | null
+  readonly running: boolean
+  readonly delivery: FollowUpDelivery
+}): React.JSX.Element {
+  const id = sideQuestion !== null ? "side" : running ? delivery : "send"
+  return (
+    <Swap id={id}>
+      {id === "side" ? (
+        <MessageCircleDashed size={15} strokeWidth={2.25} />
+      ) : running ? (
+        <FollowUpIcon delivery={delivery} size={15} strokeWidth={2.25} />
+      ) : (
+        <ArrowUp size={16} strokeWidth={2.25} />
+      )}
+    </Swap>
+  )
+}
+
 function sendTitle({
+  sideQuestion,
   sending,
   providerReady,
   providerName,
@@ -341,7 +394,11 @@ function sendTitle({
   running: boolean
   delivery: FollowUpDelivery
   settingUp: boolean
+  sideQuestion: string | null
 }): string {
+  if (sideQuestion === "") return "Type a question after /btw"
+  if (sideQuestion !== null && providerReady && hasSelection)
+    return `Ask a side question ${providerName} won't see (Enter)`
   if (sending) return "Sending message…"
   if (settingUp) return "Waiting for the setup script to finish"
   if (!providerReady) return `${providerName} is unavailable`
@@ -770,17 +827,19 @@ export function Composer({
     onTokensChange,
   })
   const settingUp = thread?.worktree?.setup === "running"
-  const canSend =
-    !settingUp &&
-    providerReady &&
-    selection !== null &&
-    (draft.trim().length > 0 || attachments.length > 0) &&
-    !sending &&
-    !loadingAttachments
+  // `/btw` asks a side question, answered apart from the thread; it needs no worktree or files.
+  const sideQuestion = sideQuestionText(draft)
+  const canSend = readyToSend({
+    sideQuestion,
+    settingUp,
+    ready: providerReady && selection !== null && !sending,
+    hasContent: draft.trim().length > 0 || attachments.length > 0,
+    loadingAttachments,
+  })
 
   const send = (delivery: FollowUpDelivery = followUp): void => {
     const textarea = textareaRef.current
-    if (textarea !== null && !reduced && draft.trim()) {
+    if (textarea !== null && !reduced && draft.trim() && sideQuestion === null) {
       // A queued prompt waits for its turn, so it joins the queue instead of the transcript.
       if (running && delivery === "queue" && sendButtonRef.current !== null)
         dropText(textarea, sendButtonRef.current)
@@ -1016,8 +1075,9 @@ export function Composer({
                     // Bounces once when there is first something to send.
                     className={`motion-colors ${sendButtonClasses} ${canSend ? "motion-ready" : ""}`}
                     disabled={!canSend}
-                    aria-label={running ? FOLLOW_UP[followUp].label : "Send message"}
+                    aria-label={sendAction(sideQuestion, running, followUp)}
                     label={sendTitle({
+                      sideQuestion,
                       sending,
                       providerReady,
                       providerName,
@@ -1030,13 +1090,7 @@ export function Composer({
                     })}
                     onClick={() => send()}
                   >
-                    <Swap id={running ? followUp : "send"}>
-                      {running ? (
-                        <FollowUpIcon delivery={followUp} size={15} strokeWidth={2.25} />
-                      ) : (
-                        <ArrowUp size={16} strokeWidth={2.25} />
-                      )}
-                    </Swap>
+                    <SendIcon sideQuestion={sideQuestion} running={running} delivery={followUp} />
                   </IconButton>
                 </span>
                 <PopPresence show={running}>

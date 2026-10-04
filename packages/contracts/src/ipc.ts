@@ -14,6 +14,7 @@ import type {
   GitSnapshotInput,
   GitDiffInput,
   TurnSnapshotInput,
+  SideQuestionInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,
 } from "./workspace-inputs"
@@ -35,6 +36,7 @@ export type {
   GitFileAction,
   GitDiffSide,
   TurnSnapshotInput,
+  SideQuestionInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,
 } from "./workspace-inputs"
@@ -493,6 +495,10 @@ export const requests = {
   /** What the thread's next turn would be told about work its agent has not seen. */
   previewHandoff: request<(threadId: string) => Promise<TurnHandoff | null>>(
     "meldshell:preview-handoff",
+  ),
+  /** Answers a side question about a thread without adding it to the thread or its agent's context. */
+  askSideQuestion: request<(input: SideQuestionInput) => Promise<string>>(
+    "meldshell:ask-side-question",
   ),
   /** Takes a thread back to before a turn: its conversation, and its files when snapshotted. */
   rewindThread:
