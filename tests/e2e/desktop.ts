@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import type { MeldShellApi } from "@meldshell/contracts/ipc"
-import { test as base } from "e2e"
+import { expect, test as base } from "e2e"
 import { defineEngine } from "e2e/engine"
 import { _electron, type ElectronApplication, type Page } from "playwright"
 
@@ -43,12 +43,17 @@ export class Desktop {
       async (id) => (await window.meldshell.desktop?.threadWindows?.list())?.includes(id) ?? false,
       threadId,
     )
-    await expectEventually(() => {
-      found = this.otherWindows().find((window) =>
-        window.url().includes(`thread=${encodeURIComponent(threadId)}`),
+    await expect
+      .poll(
+        () => {
+          found = this.otherWindows().find((window) =>
+            window.url().includes(`thread=${encodeURIComponent(threadId)}`),
+          )
+          return found !== undefined
+        },
+        { timeout: 10_000, message: "Timed out waiting for a thread window" },
       )
-      return found !== undefined
-    })
+      .toBe(true)
     found!.setDefaultTimeout(10_000)
     return found!
   }
@@ -141,14 +146,6 @@ export class Desktop {
         `Added workspace missing from snapshot: expected ${this.workspace}, received ${snapshot.workspaces.map((item) => item.path).join(", ")}`,
       )
     return workspace
-  }
-}
-
-async function expectEventually(check: () => boolean, timeout = 10_000): Promise<void> {
-  const deadline = Date.now() + timeout
-  while (!check()) {
-    if (Date.now() > deadline) throw new Error("Timed out waiting for a window")
-    await new Promise((resolve) => setTimeout(resolve, 100))
   }
 }
 
