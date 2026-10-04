@@ -28,6 +28,8 @@ interface PreviewStore {
   readonly toggle: (threadId: string) => void
   /** Records the page a thread's preview shows, opening the panel if it is hidden. */
   readonly show: (threadId: string, url: string) => void
+  /** Follows navigation in a mounted page without reopening a preview the user just hid. */
+  readonly navigate: (threadId: string, url: string) => void
   readonly resize: (threadId: string, size: number) => void
   readonly noteServers: (threadId: string, urls: readonly string[]) => void
   readonly noteActivity: (threadId: string, activity: AgentBrowserActivity) => void
@@ -65,6 +67,13 @@ export const usePreviewStore = create<PreviewStore>((set) => ({
         [threadId]: { ...(state.threads[threadId] ?? closed), open: true, url },
       },
     })),
+  navigate: (threadId, url) =>
+    set((state) => {
+      const current = state.threads[threadId]
+      return current === undefined || current.url === url
+        ? state
+        : { threads: { ...state.threads, [threadId]: { ...current, url } } }
+    }),
   resize: (threadId, size) =>
     set((state) => {
       const current = state.threads[threadId]

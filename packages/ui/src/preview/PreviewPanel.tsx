@@ -127,7 +127,7 @@ function usePage(view: React.RefObject<WebviewElement | null>, threadId: string)
     const onStop = () => setPage((current) => ({ ...current, loading: false, ...history() }))
     const onNavigate = (event: WebviewEvent) => {
       if (event.isMainFrame === false || event.url === undefined) return
-      usePreviewStore.getState().show(threadId, event.url)
+      usePreviewStore.getState().navigate(threadId, event.url)
       setPage((current) => ({ ...current, ...history() }))
     }
     const onFail = (event: WebviewEvent) => {

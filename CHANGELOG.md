@@ -6,6 +6,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ### Fixed
 
+- Closing a browser preview stays closed when its page finishes navigating during the close animation.
+
 - Archiving a thread closes its tab, including its pane in a split view.
 
 - Images pasted into the composer now appear with the sent user message in the transcript, including after reopening the thread.
