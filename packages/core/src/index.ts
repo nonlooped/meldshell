@@ -52,3 +52,4 @@ export {
   recordScheduleRun,
 } from "./schedules"
 export { rewindThread, undoRewind } from "./rewind"
+export { forkThread } from "./fork"

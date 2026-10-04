@@ -2,8 +2,8 @@ import { type CanonicalEvent, HARNESSES, isHarness, type TurnHandoff } from "@me
 import { prepareTranscriptTurns } from "@meldshell/projection"
 
 /**
- * A provider session only knows the turns it ran. When a thread moves to another harness, or a
- * rewind restarts the session, the next turn carries a written account of the work it missed, so
+ * A provider session only knows the turns it ran. When a thread moves to another harness, a
+ * rewind restarts the session, or a fork starts one, the next turn carries a written account of the work it missed, so
  * the agent continues the conversation instead of starting it over.
  */
 
@@ -141,25 +141,37 @@ const sections = (turns: readonly TurnDigest[]) => {
 export const buildHandoff = (
   harness: string,
   turns: ReadonlyArray<PastTurn>,
+  /** The title of the thread this one was forked from, while the fork has no turn of its own. */
+  forkedFrom: string | null = null,
 ): TurnHandoff | null => {
   const digests = turns.flatMap((turn) => digest(turn) ?? [])
   if (digests.length === 0) return null
   const from = [...new Set(digests.map((turn) => turn.harness))]
-  const reason = from.every((other) => other === harness) ? "restart" : "handoff"
+  const reason =
+    forkedFrom !== null ? "fork" : from.every((other) => other === harness) ? "restart" : "handoff"
   const others = from.filter((other) => other !== harness).map(harnessLabel)
   const intro =
-    reason === "restart"
-      ? "This conversation was rewound, so you are starting a new session. Here is the conversation so far, oldest first."
-      : `You are continuing a thread that ${list(others, others.length)} worked on in this folder. You have not seen ${
-          digests.length === 1 ? "that turn" : "those turns"
-        }, so here is what happened, oldest first.`
+    reason === "fork"
+      ? "This thread was forked from another conversation to try a different direction, so you are starting a new session. Here is the conversation up to the fork, oldest first."
+      : reason === "restart"
+        ? "This conversation was rewound, so you are starting a new session. Here is the conversation so far, oldest first."
+        : `You are continuing a thread that ${list(others, others.length)} worked on in this folder. You have not seen ${
+            digests.length === 1 ? "that turn" : "those turns"
+          }, so here is what happened, oldest first.`
   const brief = [
     "<meldshell_handoff>",
     `${intro} The files in the working folder already reflect this work; read them for detail rather than redoing it. The user's new message is outside this block.`,
     ...sections(digests),
     "</meldshell_handoff>",
   ].join("\n\n")
-  return { reason, from, to: harness, turnCount: digests.length, brief }
+  return {
+    reason,
+    ...(forkedFrom === null ? {} : { forkedFrom }),
+    from,
+    to: harness,
+    turnCount: digests.length,
+    brief,
+  }
 }
 
 const SIDE_QUESTION_LIMIT = 4_000

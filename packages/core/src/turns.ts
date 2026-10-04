@@ -112,6 +112,8 @@ const createDispatch = (
     const issue = yield* issueContext(threadId)
     // New work makes the latest rewind permanent: its turns stay out of the conversation.
     yield* sql`DELETE FROM thread_rewinds WHERE thread_id = ${threadId}`
+    // So does a fork's first turn: the summary of the turns it copied has been sent.
+    yield* sql`UPDATE threads SET fork_fresh = 0 WHERE id = ${threadId} AND fork_fresh = 1`
     const turnId = randomUUID()
     const timestamp = new Date().toISOString()
     yield* sql`
@@ -185,7 +187,8 @@ export const previewHandoff = (threadId: string) =>
 
 /**
  * The turns a harness's provider session has not seen, summarized. A session has seen everything
- * up to its own latest turn; without a session, which a rewind also clears, it has seen nothing.
+ * up to its own latest turn; without a session, which a rewind also clears and a fork never has,
+ * it has seen nothing.
  */
 const missedWork = (threadId: string, harness: string, hasSession: boolean) =>
   Effect.gen(function* () {
@@ -203,6 +206,12 @@ const missedWork = (threadId: string, harness: string, hasSession: boolean) =>
       ? turns.slice(turns.findLastIndex((turn) => turn.harness === harness) + 1)
       : turns
     if (missed.length === 0) return null
+    // A fork's first session reads the copied turns as the conversation it branched from.
+    const [fork] = hasSession
+      ? []
+      : yield* sql<{ readonly fork_title: string }>`
+          SELECT fork_title FROM threads WHERE id = ${threadId} AND fork_fresh = 1
+        `
     const events = yield* readRows(
       EventFromRow,
       sql`SELECT * FROM events WHERE thread_id = ${threadId}
@@ -214,6 +223,7 @@ const missedWork = (threadId: string, harness: string, hasSession: boolean) =>
         ...turn,
         events: events.filter((event) => event.turnId === turn.id),
       })),
+      fork?.fork_title ?? null,
     )
   })
 

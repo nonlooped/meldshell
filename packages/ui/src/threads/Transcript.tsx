@@ -30,6 +30,8 @@ import { TurnChanges } from "./TurnChanges"
 import {
   RestoreBeforeButton,
   RestoredMarker,
+  ForkButton,
+  ForkMenuAction,
   RewindButton,
   RewindMenuAction,
   SnapshotMenuActions,
@@ -782,11 +784,19 @@ function TurnRow({
               arrivingIn={entering && !reduced && index === 0 ? threadId : undefined}
               flash={index === 0 ? flash : undefined}
               onQuote={onQuote}
-              actions={index === 0 && <RewindButton turnId={turn.id} />}
+              actions={
+                index === 0 && (
+                  <>
+                    <RewindButton turnId={turn.id} />
+                    <ForkButton turnId={turn.id} point="before" />
+                  </>
+                )
+              }
               menu={
                 index === 0 && (
                   <>
                     <RewindMenuAction turnId={turn.id} />
+                    <ForkMenuAction turnId={turn.id} point="before" />
                     {snapshotMenu}
                   </>
                 )
@@ -808,7 +818,13 @@ function TurnRow({
             <Message
               event={turn.finalResponse}
               onQuote={onQuote}
-              menu={snapshotMenu}
+              actions={turn.complete && <ForkButton turnId={turn.id} point="after" />}
+              menu={
+                <>
+                  {turn.complete && <ForkMenuAction turnId={turn.id} point="after" />}
+                  {snapshotMenu}
+                </>
+              }
               className={
                 "[&_>_.event-markdown]:text-[var(--text-primary)] text-[var(--text-primary)]"
               }

@@ -17,6 +17,7 @@ import type {
   SideQuestionInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,
+  ForkThreadInput,
 } from "./workspace-inputs"
 export type {
   WorkspaceScope,
@@ -39,6 +40,7 @@ export type {
   SideQuestionInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,
+  ForkThreadInput,
 } from "./workspace-inputs"
 
 import type { RemotePreviewInput, RemotePreviewFrame } from "./remote-preview"
@@ -76,6 +78,7 @@ import type {
   ScheduledPrompt,
   RewindResult,
   UndoRewindResult,
+  ForkResult,
   TurnHandoff,
   ThreadIssue,
 } from "./models"
@@ -507,6 +510,11 @@ export const requests = {
     request<(input: UndoSnapshotRestoreInput) => Promise<UndoRewindResult>>(
       "meldshell:undo-rewind",
     ),
+  /**
+   * Starts a new thread on its own worktree from a point in another thread: the turns up to there,
+   * and the files as they were there when snapshotted. The original thread is left as it is.
+   */
+  forkThread: request<(input: ForkThreadInput) => Promise<ForkResult>>("meldshell:fork-thread"),
   renameWorkspace: request<(input: { workspaceId: string; name: string }) => Promise<AppSnapshot>>(
     "meldshell:rename-workspace",
   ),

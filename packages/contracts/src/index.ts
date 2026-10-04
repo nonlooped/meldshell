@@ -26,4 +26,5 @@ export {
   SideQuestionInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,
+  ForkThreadInput,
 } from "./workspace-inputs"
