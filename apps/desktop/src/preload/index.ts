@@ -43,6 +43,12 @@ const api: MeldShellApi = {
       onShow: on(IPC.agentBrowserShow),
       onActivity: on(IPC.agentBrowserActivity),
     },
+    threadWindows: {
+      open: (threadId) => ipcRenderer.invoke(IPC.openThreadWindow, threadId),
+      dock: (threadId) => ipcRenderer.invoke(IPC.dockThreadWindow, threadId),
+      list: () => ipcRenderer.invoke(IPC.listThreadWindows),
+      onChange: on(IPC.threadWindowsChanged),
+    },
     designMode: {
       pick: (webContentsId, accent) =>
         ipcRenderer.invoke(IPC.designModePick, webContentsId, accent),

@@ -356,8 +356,20 @@ interface DesktopApi {
   readonly openExternal: (url: string) => Promise<void>
   /** Agents driving a thread's browser preview, on desktops whose host runs locally. */
   readonly agentBrowser?: AgentBrowserApi
+  /** Threads popped out into windows of their own, as on a second monitor. */
+  readonly threadWindows?: ThreadWindowsApi
   /** Picking elements in a preview page to describe them to an agent. */
   readonly designMode?: DesignModeApi
+}
+
+interface ThreadWindowsApi {
+  /** Opens a thread in its own window, or brings that window forward when it is already open. */
+  readonly open: (threadId: string) => Promise<void>
+  /** Closes a thread's own window and shows the thread in the main window again. */
+  readonly dock: (threadId: string) => Promise<void>
+  /** The threads that have a window of their own. */
+  readonly list: () => Promise<readonly string[]>
+  readonly onChange: (listener: (threadIds: readonly string[]) => void) => () => void
 }
 
 /** An element the user clicked in a preview page with design mode. */
@@ -671,6 +683,10 @@ export const IPC = {
   agentBrowserAttach: "meldshell:agent-browser-attach",
   agentBrowserShow: "meldshell:agent-browser-show",
   agentBrowserActivity: "meldshell:agent-browser-activity",
+  openThreadWindow: "meldshell:open-thread-window",
+  dockThreadWindow: "meldshell:dock-thread-window",
+  listThreadWindows: "meldshell:list-thread-windows",
+  threadWindowsChanged: "meldshell:thread-windows-changed",
   designModePick: "meldshell:design-mode-pick",
   designModeCancel: "meldshell:design-mode-cancel",
 } as const

@@ -22,6 +22,7 @@ export type ShortcutAction =
   | "toggleTerminal"
   | "togglePreview"
   | "openInEditor"
+  | "popOutThread"
   | "dictate"
   | LoadoutAction
 
@@ -53,6 +54,12 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   { id: "archiveThread", label: "Archive or restore thread", group: "Navigation", chord: "Ctrl+E" },
   { id: "nextTab", label: "Next tab", group: "Tabs", chord: "Ctrl+Tab" },
   { id: "previousTab", label: "Previous tab", group: "Tabs", chord: "Ctrl+Shift+Tab" },
+  {
+    id: "popOutThread",
+    label: "Move thread to its own window or back",
+    group: "Tabs",
+    chord: "Ctrl+Shift+O",
+  },
   { id: "toggleInbox", label: "Show or hide the inbox", group: "Panels", chord: "Ctrl+B" },
   {
     id: "toggleSourceControl",
