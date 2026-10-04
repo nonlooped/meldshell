@@ -94,7 +94,8 @@ const fullSection = (turn: TurnDigest, index: number) => {
       )}`,
     )
   if (turn.reply.trim() !== "") lines.push(`**${agent} replied:** ${clip(turn.reply, REPLY_LIMIT)}`)
-  if (turn.status !== "completed") lines.push(`_This turn was ${turn.status}._`)
+  if (turn.status === "running") lines.push("_This turn is still running._")
+  else if (turn.status !== "completed") lines.push(`_This turn was ${turn.status}._`)
   return lines.join("\n\n")
 }
 
@@ -159,4 +160,31 @@ export const buildHandoff = (
     "</meldshell_handoff>",
   ].join("\n\n")
   return { reason, from, to: harness, turnCount: digests.length, brief }
+}
+
+const SIDE_QUESTION_LIMIT = 4_000
+
+/**
+ * A side question is answered by a separate, read-only request that sees a written account of the
+ * conversation. Nothing is added to the thread or its provider session, so the agent never sees the
+ * question or the answer.
+ */
+export const buildSideQuestionPrompt = (
+  harness: string,
+  turns: ReadonlyArray<PastTurn>,
+  question: string,
+): string => {
+  const digests = turns.flatMap((turn) => digest(turn) ?? [])
+  const known = isHarness(harness)
+  const agent = known ? HARNESSES[harness].label : "The agent"
+  const conversation =
+    digests.length === 0
+      ? "The conversation has no finished work yet."
+      : sections(digests).join("\n\n")
+  return [
+    `The user is working with ${known ? `${agent}, a coding agent,` : "a coding agent"} in this folder. They have a quick side question about that conversation. ${agent} will not see the question or your answer, so do not address it or continue its work.`,
+    "Answer the question directly and briefly, in Markdown. Base the answer on the conversation below and on the files in this folder when you can read them. Do not change any files or run commands that change anything. If the conversation does not say enough to answer, say what is missing instead of guessing.",
+    `<conversation>\n\n${conversation}\n\n</conversation>`,
+    `<side_question>\n${clip(question, SIDE_QUESTION_LIMIT)}\n</side_question>`,
+  ].join("\n\n")
 }
