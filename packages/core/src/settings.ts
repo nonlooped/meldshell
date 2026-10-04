@@ -4,6 +4,7 @@ import {
   DictationModel,
   FollowUpDelivery,
   CURRENT_TITLE_MODEL,
+  CustomThemes,
   Loadouts,
   Theme,
   TranscriptSize,
@@ -16,6 +17,7 @@ import { getSnapshot } from "./snapshots"
 const TITLE_MODEL_SETTING = "title_model_id"
 const KEYBINDINGS_SETTING = "keybindings"
 const LOADOUTS_SETTING = "loadouts"
+const CUSTOM_THEMES_SETTING = "custom_themes"
 const SHUTTING_DOWN_SETTING = "shutting_down"
 
 /** Preferences stored as strings, one row each, in the order `setAppSettings` accepts them. */
@@ -25,6 +27,7 @@ const PREFERENCES = [
   "opacity",
   "showSettled",
   "theme",
+  "colorTheme",
   "transcriptSize",
   "reduceMotion",
   "sounds",
@@ -35,6 +38,7 @@ const PREFERENCES = [
 
 const Keybindings = Schema.fromJsonString(Schema.Record(Schema.String, Schema.String))
 const StoredLoadouts = Schema.fromJsonString(Loadouts)
+const StoredCustomThemes = Schema.fromJsonString(CustomThemes)
 // Settings store literal strings; reject malformed booleans before applying defaults.
 const StoredBoolean = Schema.Literals(["true", "false"]).transform([true, false])
 const Opacity = Schema.NumberFromString.pipe(Schema.decodeTo(AppOpacity))
@@ -66,6 +70,8 @@ export const readAppSettings = Effect.gen(function* () {
     titleModelId: values.get(TITLE_MODEL_SETTING) ?? CURRENT_TITLE_MODEL,
     showSettled: stored(StoredBoolean, values.get("showSettled")) ?? true,
     theme: stored(Theme, values.get("theme")) ?? "dark",
+    colorTheme: values.get("colorTheme") ?? "meldshell",
+    customThemes: stored(StoredCustomThemes, values.get(CUSTOM_THEMES_SETTING)) ?? [],
     transcriptSize: stored(TranscriptSize, values.get("transcriptSize")) ?? "medium",
     reduceMotion: stored(StoredBoolean, values.get("reduceMotion")) ?? false,
     sounds: stored(StoredBoolean, values.get("sounds")) ?? true,
@@ -87,6 +93,8 @@ export const setAppSettings = (input: SetAppSettingsInput) =>
       yield* upsert(KEYBINDINGS_SETTING, JSON.stringify(input.keybindings))
     if (input.loadouts !== undefined)
       yield* upsert(LOADOUTS_SETTING, JSON.stringify(input.loadouts))
+    if (input.customThemes !== undefined)
+      yield* upsert(CUSTOM_THEMES_SETTING, JSON.stringify(input.customThemes))
     const titleModelId = input.titleModelId?.trim()
     if (titleModelId) yield* upsert(TITLE_MODEL_SETTING, titleModelId)
     return yield* getSnapshot

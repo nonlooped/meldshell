@@ -52,7 +52,14 @@ const ENTRIES: readonly SettingsSearchEntry[] = [
     group: "Loadouts",
     keywords: "saved agent model effort speed setup rename reorder delete presets",
   },
-  { label: "Theme", section: "appearance", group: "Theme", keywords: "dark light system colors" },
+  { label: "Theme", section: "appearance", group: "Theme", keywords: "dark light system mode" },
+  {
+    label: "Color theme",
+    section: "appearance",
+    group: "Color theme",
+    keywords:
+      "colors palette accent custom create new edit graphite midnight arctic ocean forest ember rose dusk",
+  },
   {
     label: "App opacity",
     section: "appearance",

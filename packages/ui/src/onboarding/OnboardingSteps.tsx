@@ -19,6 +19,7 @@ import {
   VolumeX,
 } from "lucide-react"
 import type { ReactNode } from "react"
+import { BUILT_IN_THEMES, resolveColorTheme } from "../app/color-themes"
 import { MeldMark } from "../ui/MeldMark"
 import { TEXT_SIZES, THEMES, ThemePreview } from "../ui/ThemePreview"
 import { ProviderIcon } from "../ui/ProviderIcon"
@@ -364,6 +365,7 @@ export function LookStep({
 }) {
   const theme = settings.theme ?? "dark"
   const textSize = settings.transcriptSize ?? "medium"
+  const colors = resolveColorTheme(settings)
   return (
     <>
       <StepTitle title="Make it yours" hint="Everything changes as you tap." />
@@ -386,7 +388,7 @@ export function LookStep({
                 className={cx(tileClasses, "grid gap-[10px] p-[8px] pb-[10px]")}
               >
                 <span className="block h-[92px] overflow-hidden rounded-[9px] border-[1px] border-[color:var(--line-subtle)]">
-                  <ThemePreview theme={option.value} />
+                  <ThemePreview theme={option.value} colors={colors} />
                 </span>
                 <span className="flex items-center justify-center gap-[6px] text-[12.5px] font-medium">
                   {option.icon}
@@ -397,8 +399,39 @@ export function LookStep({
             ))}
           </RadioGroup>
         </Stagger>
+        <Stagger index={2}>
+          <RadioGroup
+            aria-label="Color theme"
+            value={colors.id}
+            onValueChange={(value) => {
+              if (typeof value === "string") onChange({ colorTheme: value })
+            }}
+            className="flex flex-wrap items-center justify-center gap-[10px] [padding:2px_0]"
+          >
+            {BUILT_IN_THEMES.map((option) => (
+              <Radio.Root
+                key={option.id}
+                value={option.id}
+                aria-label={option.name}
+                title={option.name}
+                className="motion-colors grid h-[30px] w-[30px] place-items-center rounded-full border-[1px] border-[color:var(--line)] cursor-default [&:hover]:[border-color:var(--line-strong)] [&[data-checked]]:[border-color:var(--accent)] [&[data-checked]]:[box-shadow:0_0_0_3px_color-mix(in_srgb,var(--accent)_22%,transparent)]"
+                style={{
+                  background: `linear-gradient(135deg, ${option.dark.background} 50%, ${option.light.background} 50%)`,
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="h-[12px] w-[12px] rounded-full"
+                  style={{
+                    background: `linear-gradient(135deg, ${option.dark.accent} 50%, ${option.light.accent} 50%)`,
+                  }}
+                />
+              </Radio.Root>
+            ))}
+          </RadioGroup>
+        </Stagger>
         <Stagger
-          index={2}
+          index={3}
           className="grid grid-cols-[1.15fr_1fr_1fr] gap-[12px] [@media(max-width:_760px)]:grid-cols-1"
         >
           <RadioGroup
