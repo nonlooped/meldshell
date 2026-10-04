@@ -4,6 +4,14 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- Ask a side question about a thread with `/btw`, as in Claude Code, without it entering the agent's context. Type `/btw what does this function do?` and press Enter, even while the agent is working: the thread's own model answers in a sheet that floats over the foot of the transcript, from a written account of the conversation, in a separate read-only request, so the thread and the agent's session never see the question or the answer. Follow-up questions stack in the same sheet, each answer can be copied or turned into a real message for the agent, and Escape closes it. It works with every agent and uses the account the agent is already signed in with.
+
+- The working log says what each step worked on. Claude's tool rows name the file and lines read, the pattern searched and where, the page fetched, or the subagent's task, with the full path in the tooltip, and each gets an icon for what it did. Codex web searches show the query, page, or text they looked for instead of "webSearch". A Claude subagent's own reads, searches, and messages nest under the call that started it, with a count of its steps, instead of mixing into the main log.
+
+## [0.15.0] - 2026-10-04
+
 ### Fixed
 
 - Dictation warms a downloaded speech model when recording starts and prevents repeated clicks from starting overlapping recordings. The stop control remains clickable during its transition.
@@ -11,8 +19,6 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 - Claude Code turns no longer stop after tool calls or fail to finish in WSL because absent optional event fields were rejected by the host's JSON protocol. Tool results, approvals, and turn completion now omit those fields while preserving native data.
 
 ### Added
-
-- Ask a side question about a thread with `/btw`, as in Claude Code, without it entering the agent's context. Type `/btw what does this function do?` and press Enter, even while the agent is working: the thread's own model answers in a sheet that floats over the foot of the transcript, from a written account of the conversation, in a separate read-only request, so the thread and the agent's session never see the question or the answer. Follow-up questions stack in the same sheet, each answer can be copied or turned into a real message for the agent, and Escape closes it. It works with every agent and uses the account the agent is already signed in with.
 
 - Search file contents across the workspace with Ctrl+Shift+F. It opens a Search tab in the files sidebar (starting from any selected text), with toggles to match case and to use a regular expression. Results are grouped by file with each match highlighted, and clicking a line opens the file there. The search covers the thread's own worktree when it has one, skips ignored, binary, and very large files, and runs in the background so the app stays responsive.
 
@@ -335,7 +341,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/nonlooped/meldshell/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/nonlooped/meldshell/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/nonlooped/meldshell/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/nonlooped/meldshell/compare/v0.11.0...v0.12.0
