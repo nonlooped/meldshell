@@ -1,12 +1,15 @@
 import { createContext, useContext, useEffect, type ReactNode } from "react"
 import { create } from "zustand"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, CircleAlert, History, Rewind, Undo2, X } from "lucide-react"
+import { Check, CircleAlert, GitFork, History, Rewind, Undo2, X } from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import type { TurnSnapshot } from "@meldshell/contracts/ipc"
 import { IconButton, MenuAction } from "../ui/controls"
 import { GradientSpinner, PopPresence, Swap } from "../ui/motion"
 import { queryKeys, replaceSnapshot } from "../data/cache"
+import { useTabStore } from "../app/tab-store"
+import { useThreadDrafts } from "../app/thread-drafts"
+import { useViewStore } from "../app/view-store"
 
 type SnapshotPoint = "before" | "after"
 
@@ -20,11 +23,15 @@ interface SnapshotScope {
   readonly threadId: string
   /** A turn is running or a restore is in flight, so the folder cannot be restored now. */
   readonly busy: boolean
+  /** A restore, rewind, or fork is in flight. A fork only reads the folder, so a turn can run. */
+  readonly pending: boolean
   /** The snapshot the folder was last restored to, while that restore can still be undone. */
   readonly restored: Restore | null
   readonly restore: (restore: Restore) => void
   /** Takes the conversation, and the files when they were snapshotted, back to before a turn. */
   readonly rewind: (turnId: string) => void
+  /** Copies the conversation and files up to a point into a new thread on its own worktree. */
+  readonly fork: (turnId: string, point: SnapshotPoint) => void
 }
 
 const SnapshotContext = createContext<SnapshotScope | null>(null)
@@ -106,6 +113,49 @@ export function RewindMenuAction({
   return <MenuAction onClick={() => scope.rewind(turnId)}>Rewind to this message</MenuAction>
 }
 
+const forkLabels: Readonly<Record<SnapshotPoint, string>> = {
+  before: "Fork from this message",
+  after: "Fork from this reply",
+}
+
+/**
+ * Starts a new thread on its own worktree from this point, leaving this thread as it is. From a
+ * message, the fork stops before it and the message waits in the fork's composer to be rewritten;
+ * from a reply, the fork keeps the whole turn.
+ */
+export function ForkButton({
+  turnId,
+  point,
+}: {
+  readonly turnId: string
+  readonly point: SnapshotPoint
+}): React.JSX.Element | null {
+  const scope = useContext(SnapshotContext)
+  if (scope === null || turnId.startsWith("event:")) return null
+  return (
+    <IconButton
+      unstyled
+      label={forkLabels[point]}
+      disabled={scope.pending}
+      onClick={() => scope.fork(turnId, point)}
+    >
+      <GitFork size={13} />
+    </IconButton>
+  )
+}
+
+export function ForkMenuAction({
+  turnId,
+  point,
+}: {
+  readonly turnId: string
+  readonly point: SnapshotPoint
+}): React.JSX.Element | null {
+  const scope = useContext(SnapshotContext)
+  if (scope === null || scope.pending || turnId.startsWith("event:")) return null
+  return <MenuAction onClick={() => scope.fork(turnId, point)}>{forkLabels[point]}</MenuAction>
+}
+
 /** Context menu entries for a turn's snapshots. */
 export function SnapshotMenuActions({
   turnId,
@@ -180,7 +230,8 @@ interface Rewound {
 }
 
 type Status =
-  | { readonly state: "restoring" | "rewinding" }
+  | { readonly state: "restoring" | "rewinding" | "forking" }
+  | { readonly state: "forked"; readonly filesRestored: boolean }
   | { readonly state: "restored"; readonly restore: Restore }
   | { readonly state: "rewound"; readonly rewound: Rewound }
   | { readonly state: "undone"; readonly rewind: boolean }
@@ -202,6 +253,9 @@ const useStatuses = create<{
     }),
 }))
 
+const working = (status: Status) =>
+  status.state === "restoring" || status.state === "rewinding" || status.state === "forking"
+
 const turns = (count: number) => `${count} ${count === 1 ? "turn" : "turns"}`
 
 const statusText = (status: Status) => {
@@ -210,6 +264,12 @@ const statusText = (status: Status) => {
       return "Restoring files…"
     case "rewinding":
       return "Rewinding…"
+    case "forking":
+      return "Forking into a new worktree…"
+    case "forked":
+      return status.filesRestored
+        ? "Forked into its own worktree"
+        : "Forked. This point had no file snapshot, so the files are the original's latest commit"
     case "restored":
       return "Files restored"
     case "rewound":
@@ -226,7 +286,7 @@ const statusText = (status: Status) => {
 function StatusIcon({ status }: { readonly status: Status }): React.JSX.Element {
   return (
     <Swap id={status.state}>
-      {status.state === "restoring" || status.state === "rewinding" ? (
+      {working(status) ? (
         <GradientSpinner size={12} />
       ) : status.state === "failed" ? (
         <CircleAlert size={14} className="text-[var(--color-deleted)]" aria-hidden="true" />
@@ -288,6 +348,21 @@ export function TurnSnapshots({
     onError: fail,
     onSettled: refresh,
   })
+  const fork = useMutation({
+    mutationFn: ({ turnId, point }: { turnId: string; point: SnapshotPoint }) =>
+      window.meldshell.forkThread({ workspaceId: workspaceId!, threadId, turnId, point }),
+    onMutate: () => setStatus({ state: "forking" }),
+    onSuccess: ({ snapshot, threadId: forkId, text, filesRestored }) => {
+      replaceSnapshot(client, snapshot)
+      setStatus(null)
+      useStatuses.getState().set(forkId, { state: "forked", filesRestored })
+      // A message forked from waits in the new thread's composer, to be rewritten and sent.
+      if (text !== "") useThreadDrafts.getState().update(forkId, { text })
+      useTabStore.getState().openThread(forkId)
+      useViewStore.getState().focusComposer(forkId)
+    },
+    onError: fail,
+  })
   const undo = useMutation({
     mutationFn: async (rewound: Rewound | null) => {
       if (rewound === null)
@@ -306,23 +381,27 @@ export function TurnSnapshots({
   useEffect(() => {
     if (running) useStatuses.getState().set(threadId, null)
   }, [running, threadId])
-  // A finished undo fades on its own; a restore waits for its Undo and a failure for its reader.
+  // A finished undo or fork fades on its own; a restore waits for its Undo and a failure, or a
+  // fork that could not bring the files, for its reader.
   useEffect(() => {
-    if (status?.state !== "undone") return
+    const fades = status?.state === "undone" || (status?.state === "forked" && status.filesRestored)
+    if (!fades) return
     const timer = window.setTimeout(() => useStatuses.getState().set(threadId, null), 2400)
     return () => window.clearTimeout(timer)
   }, [status, threadId])
   if (workspaceId === undefined) return <>{children}</>
-  const pending = restore.isPending || rewind.isPending || undo.isPending
+  const pending = restore.isPending || rewind.isPending || undo.isPending || fork.isPending
   return (
     <SnapshotContext
       value={{
         workspaceId,
         threadId,
         busy: running || pending,
+        pending,
         restored: status?.state === "restored" ? status.restore : null,
         restore: (input) => restore.mutate(input),
         rewind: (turnId) => rewind.mutate(turnId),
+        fork: (turnId, point) => fork.mutate({ turnId, point }),
       }}
     >
       {children}
@@ -354,7 +433,7 @@ export function TurnSnapshots({
                   Undo
                 </BaseButton>
               )}
-              {status.state !== "restoring" && status.state !== "rewinding" && (
+              {!working(status) && (
                 <IconButton
                   unstyled
                   label="Dismiss"

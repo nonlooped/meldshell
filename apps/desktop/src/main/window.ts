@@ -3,16 +3,36 @@ import { logStartupTiming } from "./runtime/startup-timing"
 import type { AppSnapshot } from "@meldshell/contracts"
 import { is } from "@electron-toolkit/utils"
 import { guardPreviews } from "./preview"
-import { app, BrowserWindow, Menu, nativeTheme, shell, type Event } from "electron"
+import { app, BrowserWindow, Menu, nativeTheme, shell, type Event, type Rectangle } from "electron"
 
 let mainWindow: BrowserWindow | null = null
+/** Threads popped out into windows of their own, by thread id. */
+const threadWindows = new Map<string, BrowserWindow>()
 
 export const getMainWindow = (): BrowserWindow | null => mainWindow
 
+export const getThreadWindow = (threadId: string): BrowserWindow | undefined =>
+  threadWindows.get(threadId)
+
+export const threadWindowIds = (): string[] => [...threadWindows.keys()]
+
+/** Every window that shows the app: the main window and each popped-out thread. */
+export const appWindows = (): BrowserWindow[] =>
+  [mainWindow, ...threadWindows.values()].filter(
+    (window): window is BrowserWindow => window !== null && !window.isDestroyed(),
+  )
+
+/** The window that shows a thread: its own when it was popped out, else the main window. */
+export const windowForThread = (threadId: unknown): BrowserWindow | null => {
+  const own = typeof threadId === "string" ? threadWindows.get(threadId) : undefined
+  return own !== undefined && !own.isDestroyed() ? own : mainWindow
+}
+
 const updateCaptionTheme = (): void => {
-  mainWindow?.setTitleBarOverlay({
-    symbolColor: nativeTheme.shouldUseDarkColors ? "#f2f2f3" : "#202024",
-  })
+  for (const window of appWindows())
+    window.setTitleBarOverlay({
+      symbolColor: nativeTheme.shouldUseDarkColors ? "#f2f2f3" : "#202024",
+    })
 }
 nativeTheme.on("updated", updateCaptionTheme)
 export const applyAppearance = (snapshot: AppSnapshot): void => {
@@ -47,13 +67,21 @@ const watchDevelopmentShortcuts = (window: BrowserWindow): void => {
   })
 }
 
-export const createWindow = (onClose: (event: Event) => void): void => {
+export const THREAD_WINDOW_MIN = { width: 420, height: 400 } as const
+
+/** A window that shows the renderer, framed and locked down alike for every app window. */
+function createAppWindow(
+  frame: Partial<Rectangle> & {
+    width: number
+    height: number
+    minWidth: number
+    minHeight: number
+  },
+  query: Record<string, string> = {},
+): BrowserWindow {
   const window = new BrowserWindow({
     icon: join(app.getAppPath(), "resources/icon.png"),
-    width: 1440,
-    height: 920,
-    minWidth: 720,
-    minHeight: 520,
+    ...frame,
     show: false,
     // Linux has no acrylic backdrop; keep its backing opaque even before the renderer loads.
     backgroundColor: process.platform === "linux" ? "#161617" : "#00000000",
@@ -61,7 +89,7 @@ export const createWindow = (onClose: (event: Event) => void): void => {
     titleBarStyle: "hidden",
     titleBarOverlay: {
       color: "#00000000",
-      symbolColor: "#f2f2f3",
+      symbolColor: nativeTheme.shouldUseDarkColors ? "#f2f2f3" : "#202024",
       height: 44,
     },
     webPreferences: {
@@ -74,17 +102,8 @@ export const createWindow = (onClose: (event: Event) => void): void => {
     },
   })
 
-  mainWindow = window
   if (is.dev) watchDevelopmentShortcuts(window)
   guardPreviews(window)
-  window.on("close", onClose)
-  window.once("ready-to-show", () => {
-    logStartupTiming("ready-to-show")
-    window.show()
-  })
-  window.on("closed", () => {
-    mainWindow = null
-  })
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//i.test(url)) void shell.openExternal(url)
     return { action: "deny" }
@@ -94,8 +113,39 @@ export const createWindow = (onClose: (event: Event) => void): void => {
   })
 
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
-    void window.loadURL(process.env.ELECTRON_RENDERER_URL)
+    const url = new URL(process.env.ELECTRON_RENDERER_URL)
+    for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value)
+    void window.loadURL(url.toString())
   } else {
-    void window.loadFile(join(__dirname, "../renderer/index.html"))
+    void window.loadFile(join(__dirname, "../renderer/index.html"), { query })
   }
+  return window
+}
+
+export const createWindow = (onClose: (event: Event) => void): void => {
+  const window = createAppWindow({ width: 1440, height: 920, minWidth: 720, minHeight: 520 })
+  mainWindow = window
+  window.on("close", onClose)
+  window.once("ready-to-show", () => {
+    logStartupTiming("ready-to-show")
+    window.show()
+  })
+  window.on("closed", () => {
+    mainWindow = null
+  })
+}
+
+/** Opens a window that shows only one thread; the renderer reads the thread from its address. */
+export const createThreadWindow = (threadId: string, bounds: Rectangle): BrowserWindow => {
+  // A lone thread needs no sidebars, so its window can narrow to a strip beside other work.
+  const window = createAppWindow(
+    { ...bounds, minWidth: THREAD_WINDOW_MIN.width, minHeight: THREAD_WINDOW_MIN.height },
+    { thread: threadId },
+  )
+  threadWindows.set(threadId, window)
+  window.once("ready-to-show", () => window.show())
+  window.on("closed", () => {
+    if (threadWindows.get(threadId) === window) threadWindows.delete(threadId)
+  })
+  return window
 }

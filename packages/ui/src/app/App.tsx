@@ -15,7 +15,7 @@ import {
 } from "../data/mutations"
 import { useAppAppearance } from "./appearance"
 import { Tabs } from "@base-ui-components/react/tabs"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   cliLabel,
   isCliHarness,
@@ -28,7 +28,6 @@ import type { RunScript, WorkspaceScope } from "@meldshell/contracts/ipc"
 import { workspaceScope } from "../data/workspace-scope"
 import { AlarmClock, Plus, Settings } from "lucide-react"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
-import { InteractionDialog } from "../threads/InteractionDialog"
 import { FilePalette } from "./FilePalette"
 import { IssuePalette } from "./IssuePalette"
 import { SessionPalette } from "./SessionPalette"
@@ -60,6 +59,16 @@ import { terminalApi, useRunningScripts, useTerminalStore } from "../terminals/t
 import { useWorkspaceScripts } from "../terminals/workspace-scripts"
 import { useOpenInEditor } from "./editors"
 import { previewSupported, usePreviewStore } from "../preview/preview-store"
+import {
+  adoptDraft,
+  dockThread,
+  popOutAction,
+  popOutThread,
+  takeHandedOffThread,
+  threadWindowsSupported,
+  useThreadWindows,
+  windowThreadId,
+} from "./thread-windows"
 
 import { SchedulesView } from "../schedules/SchedulesView"
 import { SettingsView } from "../settings/SettingsView"
@@ -117,6 +126,30 @@ function threadShortcuts(
   }
 }
 
+/** Content only the main window shows; a popped-out window has its one thread instead. */
+function MainWindowOnly({ children }: { children: React.ReactNode }): React.JSX.Element | null {
+  return windowThreadId === null ? <>{children}</> : null
+}
+
+/** An action a popped-out window leaves to the main window, doing nothing there. */
+const inMainWindow = (action: () => void): (() => void) =>
+  windowThreadId === null ? action : () => undefined
+
+/** The app is already running when a thread pops out, so its window skips the launch screen. */
+const windowLaunch = <Launch extends { readonly loading: boolean }>(launch: Launch): Launch =>
+  windowThreadId === null ? launch : { ...launch, loading: false }
+
+/** The thread a thread action acts on: none while settings or a file is in front. */
+const frontThreadOf = (covered: boolean, file: FileTab | undefined, thread: Thread | null) =>
+  covered || file !== undefined ? null : thread
+
+/** Pops the thread in front out, or a popped-out window's thread back into the main window. */
+function popOutShortcut(thread: Thread | null): (() => void) | null {
+  if (thread === null || !threadWindowsSupported) return null
+  const own = windowThreadId
+  return own === null ? () => popOutThread(thread) : () => dockThread(own)
+}
+
 function ThreadPane({
   databaseError,
   hasThread,
@@ -136,7 +169,8 @@ function ThreadPane({
         <p>Your threads are still on disk. Restarting the application usually clears this.</p>
       </FadeDiv>
     )
-  if (!hasThread)
+  // A popped-out window holds its thread's place while the thread loads.
+  if (!hasThread && windowThreadId === null)
     return (
       <FadeDiv className={centeredStateClasses}>
         <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
@@ -537,13 +571,74 @@ function usePreviewToggle(closeWorkbenchViews: () => void, selectTab: (id: strin
 function useFirstRun(launching: boolean, loaded: boolean, snapshot: AppSnapshot): boolean {
   const open = useViewStore((state) => state.onboardingOpen)
   const decided = useRef(false)
-  const firstRun = loaded && needsOnboarding(snapshot)
+  // A popped-out thread's window leaves the guide to the main window.
+  const firstRun = loaded && windowThreadId === null && needsOnboarding(snapshot)
   useEffect(() => {
     if (launching || !loaded || decided.current) return
     decided.current = true
     if (firstRun) useViewStore.getState().openOnboarding()
   }, [launching, loaded, firstRun])
   return launching || open
+}
+
+/** A thread popped out from this window leaves its tabs; its own window shows it now. */
+function useDetachedThreadsLeave(closeThread: (threadId: string) => void): void {
+  useEffect(
+    () =>
+      useThreadWindows.subscribe(({ detached }) => {
+        for (const id of detached) if (id !== windowThreadId) closeThread(id)
+      }),
+    [closeThread],
+  )
+}
+
+/**
+ * The threads whose chimes this window plays: a popped-out window plays its own thread's, and the
+ * main window every other thread's.
+ */
+function useSignalThreads(threads: readonly Thread[]): readonly Thread[] {
+  const detached = useThreadWindows((state) => state.detached)
+  return useMemo(
+    () =>
+      threads.filter((thread) =>
+        windowThreadId === null ? !detached.has(thread.id) : thread.id === windowThreadId,
+      ),
+    [threads, detached],
+  )
+}
+
+/**
+ * A popped-out window shows its one thread: it opens the thread with the draft the main window
+ * handed off, and closes once its last pane closes or the thread is deleted.
+ */
+function usePoppedOutThread(
+  threads: readonly Thread[],
+  queriesLoaded: readonly boolean[],
+): readonly Thread[] {
+  const loaded = queriesLoaded.every(Boolean)
+  const [seed] = useState(() =>
+    windowThreadId === null ? null : takeHandedOffThread(windowThreadId),
+  )
+  useEffect(() => {
+    if (windowThreadId === null) return
+    adoptDraft(windowThreadId)
+    useTabStore.getState().openThread(windowThreadId)
+    return useTabStore.subscribe((state) => {
+      if (state.threadTabs.length === 0) window.close()
+    })
+  }, [])
+  const thread = threads.find((candidate) => candidate.id === windowThreadId) ?? null
+  const seen = useRef(false)
+  useEffect(() => {
+    if (windowThreadId === null || !loaded) return
+    if (thread !== null) seen.current = true
+    // Gone after it was listed, or never there to begin with: the thread was deleted.
+    else if (seen.current || seed === null) window.close()
+  }, [thread, loaded, seed])
+  useEffect(() => {
+    if (thread !== null) document.title = `${thread.title} · MeldShell`
+  }, [thread])
+  return useMemo(() => (seed === null ? [] : [seed]), [seed])
 }
 
 export function App(): React.JSX.Element {
@@ -586,7 +681,7 @@ export function App(): React.JSX.Element {
   const layout = panelLayout(tier, inbox.width, sourceControl.width)
 
   const { snapshotQuery, threadPagesQuery, snapshot } = useAppData()
-  const launch = useLaunch(!snapshotQuery.isPending, snapshot.providers)
+  const launch = windowLaunch(useLaunch(!snapshotQuery.isPending, snapshot.providers))
   const appHidden = useFirstRun(launch.loading, snapshotQuery.isSuccess, snapshot)
 
   const {
@@ -595,7 +690,6 @@ export function App(): React.JSX.Element {
     setStatusMutation,
     renameThreadMutation,
     deleteThreadMutation,
-    resolveApprovalMutation,
   } = useThreadManagementActions(snapshot, {
     created: (threadId, input) => {
       if (threadId === undefined) return
@@ -648,6 +742,7 @@ export function App(): React.JSX.Element {
       }),
     [closeWorkbenchViews, openThread],
   )
+  useDetachedThreadsLeave(removeThread)
 
   // Memoised because the Ctrl+N handler lists it as an effect dependency; without a stable identity
   // the keyboard listener would be torn down and re-registered on every render.
@@ -689,8 +784,12 @@ export function App(): React.JSX.Element {
   const preview = usePreviewToggle(closeWorkbenchViews, selectThread)
 
   const pagedThreads = threadPagesQuery.data?.pages.flatMap((page) => page.threads) ?? []
+  const poppedOutSeeds = usePoppedOutThread(
+    [...snapshot.threads, ...pagedThreads],
+    [snapshotQuery.isSuccess, threadPagesQuery.isSuccess],
+  )
   const threadMap = new Map(
-    [...searchThreads, ...pagedThreads].map((thread) => [thread.id, thread]),
+    [...poppedOutSeeds, ...searchThreads, ...pagedThreads].map((thread) => [thread.id, thread]),
   )
   for (const thread of snapshot.threads) threadMap.set(thread.id, thread)
   const allThreads = [...threadMap.values()]
@@ -715,8 +814,9 @@ export function App(): React.JSX.Element {
     snapshot.workspaces.map((workspace) => [workspace.id, workspace.name]),
   )
   const selectedThread = allThreads.find((thread) => thread.id === selectedThreadId) ?? null
+  const frontThread = frontThreadOf(workbenchCovered, selectedFile, selectedThread)
   const unseenThreadIds = useThreadSignals(
-    snapshot.threads,
+    useSignalThreads(snapshot.threads),
     useWatchedThreadIds(),
     snapshot.settings.sounds ?? true,
   )
@@ -752,33 +852,35 @@ export function App(): React.JSX.Element {
   // The listener stays registered; each render hands it the current actions.
   const shortcutActions = useRef<Parameters<typeof handleAppShortcut>[2] | null>(null)
   useEffect(() => {
-    // The thread a thread shortcut acts on: none while settings or a file is in front.
-    const frontThread = workbenchCovered || selectedFile !== undefined ? null : selectedThread
+    // A popped-out window shows its own thread only; the main window starts and finds threads.
+    const inMain = inMainWindow
     shortcutActions.current = {
       settingsOpen: workbenchCovered,
       closeSettings: closeWorkbenchViews,
-      requestNewThread,
-      openThreadPalette: () => setThreadPaletteOpen(true),
+      requestNewThread: inMain(requestNewThread),
+      openThreadPalette: inMain(() => setThreadPaletteOpen(true)),
       openFilePalette: () => setFilePaletteOpen(true),
       searchFiles: () => {
         closeWorkbenchViews()
         if (sourceControl.collapsed) toggleSourceControl()
         useContentSearch.getState().openSearch(selectedSearchText())
       },
-      openIssuePicker: () => useViewStore.getState().openIssuePicker(),
-      openSettings: () => openSettings(),
+      openIssuePicker: inMain(() => useViewStore.getState().openIssuePicker()),
+      openSettings: inMain(() => openSettings()),
       selectedThreadId: selectedTabId,
       closeThread,
       cycleTabs: (direction) => {
         closeWorkbenchViews()
         cycleTabs(direction)
       },
-      toggleInbox,
+      toggleInbox: inMain(toggleInbox),
       toggleSourceControl,
       toggleTerminal: terminal.toggle,
       togglePreview: preview.toggle,
       openInEditor: () => editor.open(),
       ...threadShortcuts(frontThread, toggleArchived, loadoutSwitch.apply),
+      popOutThread: popOutShortcut(frontThread),
+
       loadoutCount: loadoutSwitch.count,
     }
   })
@@ -795,8 +897,6 @@ export function App(): React.JSX.Element {
     const thread = allThreads.find((candidate) => candidate.id === id)
     return thread === undefined ? [] : [thread]
   })
-  const selectedApproval =
-    snapshot.approvals.find((approval) => approval.threadId === selectedThreadId) ?? null
 
   return (
     <MotionPreferences reduceMotion={snapshot.settings.reduceMotion ?? false}>
@@ -824,6 +924,8 @@ export function App(): React.JSX.Element {
                 selectThread(tabId)
               }}
               sidebarsVisible={!workbenchCovered}
+              onPopOutThread={popOutThread}
+              onThreadWindow={popOutShortcut(frontThread)}
               inboxCollapsed={inbox.collapsed}
               sourceControlCollapsed={sourceControl.collapsed}
               onToggleInbox={toggleInbox}
@@ -864,67 +966,69 @@ export function App(): React.JSX.Element {
                   className="motion-panels motion-duration-220 min-h-0"
                   orientation={layout.orientation}
                 >
-                  <SidebarPanel
-                    id="inbox"
-                    panelRef={inbox.panelRef}
-                    elementRef={inbox.elementRef}
-                    onTransitionEnd={inbox.onTransitionEnd}
-                    collapsible
-                    collapsedSize={inbox.collapsedSize}
-                    // The rail's controls size against the panel's live width, so they track its edge.
-                    className="@container"
-                    defaultSize={inbox.defaultSize}
-                    minSize={layout.inboxMin}
-                    maxSize={layout.inboxMax}
-                    groupResizeBehavior="preserve-pixel-size"
-                    onResize={inbox.onResize}
-                  >
-                    <aside {...inbox.asideProps} style={{ width: layout.inboxWidth }}>
-                      <Inbox
-                        rail={inbox.rail}
-                        showSettled={snapshot.settings.showSettled ?? true}
-                        onSearch={() => setThreadPaletteOpen(true)}
-                        onManageWorkspaces={() => setWorkspacesOpen(true)}
-                        onPin={(thread) => pinMutation.mutate(thread)}
-                        threads={inboxThreads}
-                        workspaces={snapshot.workspaces}
-                        workspaceNames={workspaceNames}
-                        providersByThreadId={providersByThreadId}
-                        selectedThreadId={selectedThreadId}
-                        unseenThreadIds={unseenThreadIds}
-                        onNewThread={requestNewThread}
-                        onNewThreadInWorkspace={(workspaceId) =>
-                          createThreadMutation.mutate({ workspaceId })
-                        }
-                        onRename={(thread) => {
-                          setRenameTarget(thread)
-                          setRenameTitle(thread.title)
-                        }}
-                        onAddWorkspace={() => addWorkspaceMutation.mutate()}
-                        onOpen={(threadId) => {
-                          closeWorkbenchViews()
-                          openThread(threadId)
-                        }}
-                        onOpenBeside={(threadId, edge) => {
-                          closeWorkbenchViews()
-                          openBeside(threadId, edge)
-                        }}
-                        onSetStatus={toggleArchived}
-                        onDelete={setDeleteTarget}
-                        canLoadMore={threadPagesQuery.hasNextPage}
-                        loadingMore={threadPagesQuery.isFetchingNextPage}
-                        onLoadMore={() => void threadPagesQuery.fetchNextPage()}
-                      />
+                  <MainWindowOnly>
+                    <SidebarPanel
+                      id="inbox"
+                      panelRef={inbox.panelRef}
+                      elementRef={inbox.elementRef}
+                      onTransitionEnd={inbox.onTransitionEnd}
+                      collapsible
+                      collapsedSize={inbox.collapsedSize}
+                      // The rail's controls size against the panel's live width, so they track its edge.
+                      className="@container"
+                      defaultSize={inbox.defaultSize}
+                      minSize={layout.inboxMin}
+                      maxSize={layout.inboxMax}
+                      groupResizeBehavior="preserve-pixel-size"
+                      onResize={inbox.onResize}
+                    >
+                      <aside {...inbox.asideProps} style={{ width: layout.inboxWidth }}>
+                        <Inbox
+                          rail={inbox.rail}
+                          showSettled={snapshot.settings.showSettled ?? true}
+                          onSearch={() => setThreadPaletteOpen(true)}
+                          onManageWorkspaces={() => setWorkspacesOpen(true)}
+                          onPin={(thread) => pinMutation.mutate(thread)}
+                          threads={inboxThreads}
+                          workspaces={snapshot.workspaces}
+                          workspaceNames={workspaceNames}
+                          providersByThreadId={providersByThreadId}
+                          selectedThreadId={selectedThreadId}
+                          unseenThreadIds={unseenThreadIds}
+                          onNewThread={requestNewThread}
+                          onNewThreadInWorkspace={(workspaceId) =>
+                            createThreadMutation.mutate({ workspaceId })
+                          }
+                          onRename={(thread) => {
+                            setRenameTarget(thread)
+                            setRenameTitle(thread.title)
+                          }}
+                          onAddWorkspace={() => addWorkspaceMutation.mutate()}
+                          onOpen={(threadId) => {
+                            closeWorkbenchViews()
+                            openThread(threadId)
+                          }}
+                          onOpenBeside={(threadId, edge) => {
+                            closeWorkbenchViews()
+                            openBeside(threadId, edge)
+                          }}
+                          onPopOut={popOutAction}
+                          onSetStatus={toggleArchived}
+                          onDelete={setDeleteTarget}
+                          canLoadMore={threadPagesQuery.hasNextPage}
+                          loadingMore={threadPagesQuery.isFetchingNextPage}
+                          onLoadMore={() => void threadPagesQuery.fetchNextPage()}
+                        />
 
-                      <InboxFooter
-                        rail={inbox.rail}
-                        onOpenSettings={() => openSettings()}
-                        onOpenSchedules={openSchedules}
-                      />
-                    </aside>
-                  </SidebarPanel>
-
-                  <Separator className="motion-colors relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]" />
+                        <InboxFooter
+                          rail={inbox.rail}
+                          onOpenSettings={() => openSettings()}
+                          onOpenSchedules={openSchedules}
+                        />
+                      </aside>
+                    </SidebarPanel>
+                    <Separator className="motion-colors relative w-[1px] flex-[0_0_1px] bg-[var(--line-subtle)] outline-none [&::after]:absolute [&::after]:z-[2] [&::after]:[inset:0_-3px] [&::after]:[content:''] [&:hover]:bg-[var(--line-strong)] [&:focus-visible]:bg-[var(--line-strong)] [&[data-separator='active']]:bg-[var(--line-strong)]" />
+                  </MainWindowOnly>
 
                   <Panel id="thread" minSize={layout.threadMin}>
                     <main className="grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]">
@@ -1075,15 +1179,6 @@ export function App(): React.JSX.Element {
                 })
               }
             />
-            {selectedApproval !== null && !appHidden && (
-              <InteractionDialog
-                key={selectedApproval.id}
-                request={selectedApproval}
-                pending={resolveApprovalMutation.isPending}
-                error={resolveApprovalMutation.error?.message ?? null}
-                onResolve={(input) => resolveApprovalMutation.mutate(input)}
-              />
-            )}
 
             <AppDialog
               open={renameTarget !== null}
@@ -1152,14 +1247,16 @@ export function App(): React.JSX.Element {
           </Tabs.Root>
         </LaunchReveal>
         <LaunchScreen launch={launch} />
-        <OnboardingLayer
-          launching={launch.loading}
-          snapshot={snapshot}
-          onOpenThread={(threadId) => {
-            closeWorkbenchViews()
-            openThread(threadId)
-          }}
-        />
+        <MainWindowOnly>
+          <OnboardingLayer
+            launching={launch.loading}
+            snapshot={snapshot}
+            onOpenThread={(threadId) => {
+              closeWorkbenchViews()
+              openThread(threadId)
+            }}
+          />
+        </MainWindowOnly>
       </div>
     </MotionPreferences>
   )

@@ -14,12 +14,14 @@ import {
   Folder,
   FolderPlus,
   GitBranch,
+  GitFork,
   CircleAlert,
   CircleX,
   Hourglass,
   MoreHorizontal,
   Rows2,
   Search,
+  SquareArrowOutUpRight,
   SquarePen,
   Trash2,
   Pin,
@@ -44,6 +46,7 @@ import {
 import { relativeAge } from "../ui/relative-age"
 import { useScheduledThreadIds } from "../schedules/schedule-queries"
 import { useViewStore } from "../app/view-store"
+import { useShownElsewhere } from "../app/thread-windows"
 import {
   glanceLabel,
   isFinished,
@@ -83,11 +86,72 @@ interface InboxProps {
   readonly onOpen: (threadId: string) => void
   /** Opens the thread in a new pane beside the one in front, the keyboard route to a split. */
   readonly onOpenBeside: (threadId: string, edge: SplitEdge) => void
+  /** Opens the thread in a window of its own; absent where windows cannot open. */
+  readonly onPopOut?: (thread: Thread) => void
   readonly onSetStatus: (thread: Thread) => void
   readonly onDelete: (thread: Thread) => void
   readonly canLoadMore: boolean
   readonly loadingMore: boolean
   readonly onLoadMore: () => void
+}
+
+/** Marks a thread that shows in a window of its own. */
+function OwnWindowMark({ threadId }: { threadId: string }): React.JSX.Element | null {
+  if (!useShownElsewhere(threadId)) return null
+  return (
+    <span
+      className="inline-flex shrink-0"
+      role="img"
+      aria-label="Open in its own window"
+      title="Open in its own window"
+    >
+      <SquareArrowOutUpRight size={12} strokeWidth={1.75} aria-hidden="true" />
+    </span>
+  )
+}
+
+/** Opens a thread in its own window, or brings that window forward once it has one. */
+function PopOutAction({
+  thread,
+  onPopOut,
+  icon = false,
+}: {
+  thread: Thread
+  onPopOut: InboxProps["onPopOut"]
+  icon?: boolean
+}): React.JSX.Element | null {
+  const ownWindow = useShownElsewhere(thread.id)
+  if (onPopOut === undefined) return null
+  return (
+    <MenuAction
+      icon={icon ? <SquareArrowOutUpRight size={13} strokeWidth={1.75} /> : undefined}
+      onClick={() => onPopOut(thread)}
+    >
+      {ownWindow ? "Show its window" : "Open in new window"}
+    </MenuAction>
+  )
+}
+
+/** Marks a fork, or a thread on its own branch, beside its agent. */
+function ThreadPlace({ thread }: { readonly thread: Thread }): React.JSX.Element | null {
+  const fork = thread.fork
+  const branch = thread.worktree?.branch
+  if (fork === undefined && branch === undefined) return null
+  const label =
+    fork === undefined
+      ? `Works on its own branch: ${branch}`
+      : branch === undefined
+        ? `Forked from ${fork.title}`
+        : `Forked from ${fork.title}, on its own branch: ${branch}`
+  return (
+    <span className="inline-flex shrink-0" role="img" aria-label={label} title={label}>
+      {fork === undefined ? (
+        <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
+      ) : (
+        <GitFork size={12} strokeWidth={1.75} aria-hidden="true" />
+      )}
+    </span>
+  )
 }
 
 function InboxThread({
@@ -99,6 +163,7 @@ function InboxThread({
   selectedThreadId,
   onOpen,
   onOpenBeside,
+  onPopOut,
   onPin,
   onRename,
   onSetStatus,
@@ -113,6 +178,7 @@ function InboxThread({
   | "selectedThreadId"
   | "onOpen"
   | "onOpenBeside"
+  | "onPopOut"
   | "onPin"
   | "onRename"
   | "onSetStatus"
@@ -181,16 +247,8 @@ function InboxThread({
                     <span className={`${threadContextClasses} ${railLabelClasses}`}>
                       <ProviderIcon provider={provider} size={13} />
                       <span className="flex min-w-0 flex-1 items-center gap-[6px] overflow-visible!">
-                        {thread.worktree !== undefined && (
-                          <span
-                            className="inline-flex shrink-0"
-                            role="img"
-                            aria-label={`Own branch ${thread.worktree.branch}`}
-                            title={`Works on its own branch: ${thread.worktree.branch}`}
-                          >
-                            <GitBranch size={12} strokeWidth={1.75} aria-hidden="true" />
-                          </span>
-                        )}
+                        <ThreadPlace thread={thread} />
+                        <OwnWindowMark threadId={thread.id} />
                         {scheduled && (
                           <span
                             className="inline-flex shrink-0"
@@ -299,6 +357,7 @@ function InboxThread({
               >
                 Open below
               </MenuAction>
+              <PopOutAction thread={thread} onPopOut={onPopOut} icon />
               <MenuAction
                 icon={thread.pinned ? <PinOff size={13} /> : <Pin size={13} />}
                 onClick={() => onPin(thread)}
@@ -326,6 +385,7 @@ function InboxThread({
       <MenuAction onClick={() => onOpen(thread.id)}>Open thread</MenuAction>
       <MenuAction onClick={() => onOpenBeside(thread.id, "right")}>Open to the right</MenuAction>
       <MenuAction onClick={() => onOpenBeside(thread.id, "bottom")}>Open below</MenuAction>
+      <PopOutAction thread={thread} onPopOut={onPopOut} />
       <MenuAction onClick={() => onPin(thread)}>
         {thread.pinned ? "Unpin thread" : "Pin thread"}
       </MenuAction>
@@ -530,6 +590,7 @@ export function Inbox({
   onAddWorkspace,
   onOpen,
   onOpenBeside,
+  onPopOut,
   onSetStatus,
   onDelete,
   canLoadMore,
@@ -610,6 +671,7 @@ export function Inbox({
       scheduled={scheduledThreadIds.has(thread.id)}
       onOpen={onOpen}
       onOpenBeside={onOpenBeside}
+      onPopOut={onPopOut}
       onPin={onPin}
       onRename={onRename}
       onSetStatus={onSetStatus}

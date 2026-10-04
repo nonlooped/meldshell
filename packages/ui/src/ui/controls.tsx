@@ -34,7 +34,7 @@ import { Check, ChevronDown, X } from "lucide-react"
 
 type ButtonVariant = "default" | "primary" | "ghost"
 
-interface ButtonProps extends React.ComponentPropsWithoutRef<"button"> {
+interface ButtonProps extends React.ComponentProps<"button"> {
   readonly variant?: ButtonVariant
   readonly size?: "md" | "sm"
   readonly block?: boolean
@@ -626,7 +626,7 @@ const dialogClasses = [
   "[&_>_.text-input]:w-[calc(100%_-_40px)] [&_>_.text-input]:[margin:12px_20px_0]",
   "[@media(prefers-reduced-transparency:_reduce)]:[backdrop-filter:none]",
   "[&:has(.workspace-manager)]:w-[640px] [&:has(.setup-log)]:w-[680px] [&_>_.field]:[margin:18px_20px_0]",
-  "[&:has(.search-controls)]:w-[680px] [&:has(.pull-request-form)]:w-[600px] [&:has(.markdown-lightbox)]:w-[min(1100px,_calc(var(--viewport-w)_*_0.9))]",
+  "[&:has(.search-controls)]:w-[680px] [&:has(.theme-editor)]:w-[720px] [&:has(.pull-request-form)]:w-[600px] [&:has(.markdown-lightbox)]:w-[min(1100px,_calc(var(--viewport-w)_*_0.9))]",
   "[&:has(.markdown-lightbox)]:max-w-[calc(var(--viewport-w)_*_0.9)] [&:has(.markdown-table-expanded)]:w-[min(1400px,_calc(var(--viewport-w)_*_0.94))]",
   "[&:has(.markdown-table-expanded)]:max-w-[calc(var(--viewport-w)_*_0.94)]",
 ].join(" ")

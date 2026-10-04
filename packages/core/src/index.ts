@@ -42,6 +42,7 @@ export {
   reconcileWorker,
   finishShutdown,
   previewHandoff,
+  sideQuestionPrompt,
 } from "./turns"
 export {
   listSchedules,
@@ -52,3 +53,4 @@ export {
 } from "./schedules"
 export { rewindThread, undoRewind } from "./rewind"
 export { importCliSession, findSessionThreads, resumableSession } from "./cli-sessions"
+export { forkThread } from "./fork"

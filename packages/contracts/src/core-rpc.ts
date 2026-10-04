@@ -35,6 +35,8 @@ import {
   RewindResult,
   UndoRewindResult,
   TurnHandoff,
+  ForkPoint,
+  ForkRecord,
 } from "./models"
 import { CoreError } from "./errors"
 import {
@@ -127,6 +129,12 @@ export class CoreRpcs extends RpcGroup.make(
     success: Schema.NullOr(TurnHandoff),
     error: CoreError,
   }),
+  /** The prompt for a side question about a thread, which its agent never sees. */
+  Rpc.make("SideQuestionPrompt", {
+    payload: Schema.Struct({ threadId: Schema.String, question: Schema.String }),
+    success: Schema.String,
+    error: CoreError,
+  }),
   /** Takes a turn and every later one out of the conversation; the next turn starts a new session. */
   Rpc.make("RewindThread", {
     payload: Schema.Struct({
@@ -160,6 +168,17 @@ export class CoreRpcs extends RpcGroup.make(
   Rpc.make("GetResumableSession", {
     payload: Schema.Struct({ threadId: Schema.String }),
     success: Schema.NullOr(ResumableSession),
+    error: CoreError,
+  }),
+  /** Copies a thread's turns up to a point into a new thread that works in `worktree`. */
+  Rpc.make("ForkThread", {
+    payload: Schema.Struct({
+      threadId: Schema.String,
+      turnId: Schema.String,
+      point: ForkPoint,
+      worktree: ThreadWorktree.mapFields(Struct.omit(["state", "setup"])),
+    }),
+    success: ForkRecord,
     error: CoreError,
   }),
   Rpc.make("RecordRuntimeEvent", {

@@ -1,5 +1,5 @@
 import { basename, dirname, extname } from "node:path"
-import { dialog, ipcMain, nativeImage, shell } from "electron"
+import { BrowserWindow, dialog, ipcMain, nativeImage, shell } from "electron"
 import { Effect } from "effect"
 import { toError, IPC, type AppSnapshot } from "@meldshell/contracts"
 import type { ComposerAttachment } from "@meldshell/contracts/ipc"
@@ -15,50 +15,55 @@ import { registerEditorIpc } from "./editors"
 import { registerRemoteAdministration } from "./remote-administration"
 import { registerPreviewIpc } from "./preview"
 import { registerAgentBrowserIpc } from "./agent-browser"
+import { registerDesignModeIpc } from "./design-mode"
 
 // The site serves the account API; development uses the site dev server, which proxies it.
 const controlURL =
   import.meta.env.VITE_CONTROL_URL ||
   (import.meta.env.DEV ? "http://localhost:4321" : "https://meldshell.nonlooped.xyz")
 
-const selectAttachments = Effect.gen(function* () {
-  const host = yield* Effect.promise(() => desktopHost.start())
-  const defaultPath = yield* Effect.promise(() => desktopHost.pickerPath())
-  const options: Electron.OpenDialogOptions = {
-    title: "Attach files to this turn",
-    defaultPath,
-    buttonLabel: "Attach",
-    properties: ["openFile", "multiSelections"],
-  }
-  const currentWindow = getMainWindow()
-  const choice = yield* Effect.tryPromise({
-    try: () =>
-      currentWindow === null
-        ? dialog.showOpenDialog(options)
-        : dialog.showOpenDialog(currentWindow, options),
-    catch: toError,
+/** Dialogs open over the window that asked, which may be a popped-out thread's. */
+const senderWindow = (event: Electron.IpcMainInvokeEvent): BrowserWindow | null =>
+  BrowserWindow.fromWebContents(event.sender) ?? getMainWindow()
+
+const selectAttachments = (currentWindow: BrowserWindow | null) =>
+  Effect.gen(function* () {
+    const host = yield* Effect.promise(() => desktopHost.start())
+    const defaultPath = yield* Effect.promise(() => desktopHost.pickerPath())
+    const options: Electron.OpenDialogOptions = {
+      title: "Attach files to this turn",
+      defaultPath,
+      buttonLabel: "Attach",
+      properties: ["openFile", "multiSelections"],
+    }
+    const choice = yield* Effect.tryPromise({
+      try: () =>
+        currentWindow === null
+          ? dialog.showOpenDialog(options)
+          : dialog.showOpenDialog(currentWindow, options),
+      catch: toError,
+    })
+    if (choice.canceled) return []
+    const imageExtensions = new Set([".avif", ".bmp", ".gif", ".jpeg", ".jpg", ".png", ".webp"])
+    return yield* Effect.promise(() =>
+      Promise.all(
+        choice.filePaths.map(async (path): Promise<ComposerAttachment> => {
+          const value = await host.request("toHostPath", path)
+          if (basename(path).toLowerCase() === "skill.md") {
+            return { type: "skill", value, name: basename(dirname(path)) }
+          }
+          if (imageExtensions.has(extname(path).toLowerCase())) {
+            const previewUrl = await nativeImage
+              .createThumbnailFromPath(path, { width: 160, height: 160 })
+              .then((image) => (image.isEmpty() ? undefined : image.toDataURL()))
+              .catch(() => undefined)
+            return { type: "localImage", value, name: basename(path), previewUrl }
+          }
+          return { type: "mention", value, name: basename(path) }
+        }),
+      ),
+    )
   })
-  if (choice.canceled) return []
-  const imageExtensions = new Set([".avif", ".bmp", ".gif", ".jpeg", ".jpg", ".png", ".webp"])
-  return yield* Effect.promise(() =>
-    Promise.all(
-      choice.filePaths.map(async (path): Promise<ComposerAttachment> => {
-        const value = await host.request("toHostPath", path)
-        if (basename(path).toLowerCase() === "skill.md") {
-          return { type: "skill", value, name: basename(dirname(path)) }
-        }
-        if (imageExtensions.has(extname(path).toLowerCase())) {
-          const previewUrl = await nativeImage
-            .createThumbnailFromPath(path, { width: 160, height: 160 })
-            .then((image) => (image.isEmpty() ? undefined : image.toDataURL()))
-            .catch(() => undefined)
-          return { type: "localImage", value, name: basename(path), previewUrl }
-        }
-        return { type: "mention", value, name: basename(path) }
-      }),
-    ),
-  )
-})
 
 export const registerIpc = (): void => {
   registerRemoteAdministration()
@@ -105,7 +110,9 @@ export const registerIpc = (): void => {
       ? host.request("call", IPC.getSnapshot, [])
       : host.request("addWorkspace", await host.request("toHostPath", choice.filePaths[0]))
   })
-  ipcMain.handle(IPC.selectAttachments, () => Effect.runPromise(selectAttachments))
+  ipcMain.handle(IPC.selectAttachments, (event) =>
+    Effect.runPromise(selectAttachments(senderWindow(event))),
+  )
   ipcMain.handle(IPC.closeApp, () => Effect.runPromise(confirmAndClose))
   ipcMain.handle(IPC.getUpdateStatus, () => updateService.status)
   ipcMain.handle(IPC.checkForUpdates, () => updateService.check())
@@ -136,4 +143,5 @@ export const registerIpc = (): void => {
   registerEditorIpc()
   registerPreviewIpc()
   registerAgentBrowserIpc()
+  registerDesignModeIpc()
 }

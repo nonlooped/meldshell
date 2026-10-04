@@ -24,6 +24,8 @@ export {
   CreatePullRequestInput,
   ListIssuesInput,
   TurnSnapshotInput,
+  SideQuestionInput,
   RestoreTurnSnapshotInput,
   UndoSnapshotRestoreInput,
+  ForkThreadInput,
 } from "./workspace-inputs"

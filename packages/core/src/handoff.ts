@@ -2,8 +2,8 @@ import { type CanonicalEvent, HARNESSES, isHarness, type TurnHandoff } from "@me
 import { prepareTranscriptTurns } from "@meldshell/projection"
 
 /**
- * A provider session only knows the turns it ran. When a thread moves to another harness, or a
- * rewind restarts the session, the next turn carries a written account of the work it missed, so
+ * A provider session only knows the turns it ran. When a thread moves to another harness, a
+ * rewind restarts the session, or a fork starts one, the next turn carries a written account of the work it missed, so
  * the agent continues the conversation instead of starting it over.
  */
 
@@ -94,7 +94,8 @@ const fullSection = (turn: TurnDigest, index: number) => {
       )}`,
     )
   if (turn.reply.trim() !== "") lines.push(`**${agent} replied:** ${clip(turn.reply, REPLY_LIMIT)}`)
-  if (turn.status !== "completed") lines.push(`_This turn was ${turn.status}._`)
+  if (turn.status === "running") lines.push("_This turn is still running._")
+  else if (turn.status !== "completed") lines.push(`_This turn was ${turn.status}._`)
   return lines.join("\n\n")
 }
 
@@ -140,23 +141,62 @@ const sections = (turns: readonly TurnDigest[]) => {
 export const buildHandoff = (
   harness: string,
   turns: ReadonlyArray<PastTurn>,
+  /** The title of the thread this one was forked from, while the fork has no turn of its own. */
+  forkedFrom: string | null = null,
 ): TurnHandoff | null => {
   const digests = turns.flatMap((turn) => digest(turn) ?? [])
   if (digests.length === 0) return null
   const from = [...new Set(digests.map((turn) => turn.harness))]
-  const reason = from.every((other) => other === harness) ? "restart" : "handoff"
+  const reason =
+    forkedFrom !== null ? "fork" : from.every((other) => other === harness) ? "restart" : "handoff"
   const others = from.filter((other) => other !== harness).map(harnessLabel)
   const intro =
-    reason === "restart"
-      ? "This conversation was rewound, so you are starting a new session. Here is the conversation so far, oldest first."
-      : `You are continuing a thread that ${list(others, others.length)} worked on in this folder. You have not seen ${
-          digests.length === 1 ? "that turn" : "those turns"
-        }, so here is what happened, oldest first.`
+    reason === "fork"
+      ? "This thread was forked from another conversation to try a different direction, so you are starting a new session. Here is the conversation up to the fork, oldest first."
+      : reason === "restart"
+        ? "This conversation was rewound, so you are starting a new session. Here is the conversation so far, oldest first."
+        : `You are continuing a thread that ${list(others, others.length)} worked on in this folder. You have not seen ${
+            digests.length === 1 ? "that turn" : "those turns"
+          }, so here is what happened, oldest first.`
   const brief = [
     "<meldshell_handoff>",
     `${intro} The files in the working folder already reflect this work; read them for detail rather than redoing it. The user's new message is outside this block.`,
     ...sections(digests),
     "</meldshell_handoff>",
   ].join("\n\n")
-  return { reason, from, to: harness, turnCount: digests.length, brief }
+  return {
+    reason,
+    ...(forkedFrom === null ? {} : { forkedFrom }),
+    from,
+    to: harness,
+    turnCount: digests.length,
+    brief,
+  }
+}
+
+const SIDE_QUESTION_LIMIT = 4_000
+
+/**
+ * A side question is answered by a separate, read-only request that sees a written account of the
+ * conversation. Nothing is added to the thread or its provider session, so the agent never sees the
+ * question or the answer.
+ */
+export const buildSideQuestionPrompt = (
+  harness: string,
+  turns: ReadonlyArray<PastTurn>,
+  question: string,
+): string => {
+  const digests = turns.flatMap((turn) => digest(turn) ?? [])
+  const known = isHarness(harness)
+  const agent = known ? HARNESSES[harness].label : "The agent"
+  const conversation =
+    digests.length === 0
+      ? "The conversation has no finished work yet."
+      : sections(digests).join("\n\n")
+  return [
+    `The user is working with ${known ? `${agent}, a coding agent,` : "a coding agent"} in this folder. They have a quick side question about that conversation. ${agent} will not see the question or your answer, so do not address it or continue its work.`,
+    "Answer the question directly and briefly, in Markdown. Base the answer on the conversation below and on the files in this folder when you can read them. Do not change any files or run commands that change anything. If the conversation does not say enough to answer, say what is missing instead of guessing.",
+    `<conversation>\n\n${conversation}\n\n</conversation>`,
+    `<side_question>\n${clip(question, SIDE_QUESTION_LIMIT)}\n</side_question>`,
+  ].join("\n\n")
 }

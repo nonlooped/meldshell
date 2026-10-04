@@ -33,6 +33,8 @@ export const WorkerCommand = Schema.Union([
     decision: ApprovalDecision,
     optionId: Schema.optional(Schema.String),
     answers: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
+    /** Why the user declined; only Claude Code takes it with the answer itself. */
+    reason: Schema.optional(Schema.String),
   }),
   Schema.Struct({ type: Schema.Literal("close-thread-session"), threadId: Schema.String }),
   Schema.Struct({ type: Schema.Literal("shutdown") }),

@@ -11,7 +11,7 @@ import { IPC } from "@meldshell/contracts/ipc"
 import { desktopPlatform } from "./platform"
 import { createConnectionManager, type Connection } from "./connection"
 import { startWsl, WslCancelled } from "./wsl"
-import { getMainWindow } from "../window"
+import { appWindows, windowForThread } from "../window"
 import { startAgentBrowser, stopAgentBrowser } from "../agent-browser"
 
 let selectedMode: Promise<DesktopMode> | undefined
@@ -29,23 +29,27 @@ const events = new Set<string>([
 
 function publish(channel: string, args: readonly unknown[]): void {
   for (const listener of listeners) listener(channel, args)
-  const window = getMainWindow()
   if (channel === "host:notification") {
-    if (window?.isFocused()) return
     const [title, body, threadId] = args
     if (typeof title !== "string" || typeof body !== "string" || typeof threadId !== "string")
       return
+    // The window that shows the thread decides; a popped-out thread has its own.
+    if (windowForThread(threadId)?.isFocused()) return
     const notification = new Notification({ title, body })
     notification.once("click", () => {
-      const main = getMainWindow()
-      if (main?.isMinimized()) main.restore()
-      main?.show()
-      main?.focus()
-      main?.webContents.send(IPC.attentionRequested, threadId)
+      const window = windowForThread(threadId)
+      if (window === null || window.isDestroyed()) return
+      if (window.isMinimized()) window.restore()
+      window.show()
+      window.focus()
+      window.webContents.send(IPC.attentionRequested, threadId)
     })
     notification.show()
-  } else if (events.has(channel) && window && !window.isDestroyed())
-    window.webContents.send(channel, ...args)
+  } else if (channel === IPC.attentionRequested) {
+    const window = windowForThread(args[0])
+    if (window !== null && !window.isDestroyed()) window.webContents.send(channel, ...args)
+  } else if (events.has(channel))
+    for (const window of appWindows()) window.webContents.send(channel, ...args)
 }
 
 async function connectLocal(): Promise<Connection> {

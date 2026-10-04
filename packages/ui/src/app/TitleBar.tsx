@@ -16,6 +16,8 @@ import {
   PanelRightOpen,
   Play,
   Square,
+  SquareArrowDownLeft,
+  SquareArrowOutUpRight,
   SquareTerminal,
   X,
 } from "lucide-react"
@@ -40,6 +42,7 @@ import { useKeybindings, withShortcut } from "./keybindings"
 import { useThreadDraggable } from "./thread-drag"
 import { type ThreadLayout, visibleThreads } from "./thread-layout"
 import { useViewportTier } from "./viewport"
+import { threadWindowsSupported, windowThreadId } from "./thread-windows"
 
 interface TitleBarProps {
   readonly openThreads: ReadonlyArray<Thread>
@@ -72,9 +75,28 @@ interface TitleBarProps {
   /** The CLI that can continue the thread on screen, such as "Claude Code CLI", or null. */
   readonly cli: string | null
   readonly onOpenInCli: () => void
+  /** Pops a tab's thread out into its own window. */
+  readonly onPopOutThread: (thread: Thread) => void
+  /**
+   * Moves the thread on screen into its own window, or a popped-out window's thread back; null while
+   * no thread is on screen or this client cannot open windows.
+   */
+  readonly onThreadWindow: (() => void) | null
 }
 
 const noDrag = "[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
+
+/** What the window button does here: a popped-out window sends its thread back. */
+const threadWindowLabel =
+  windowThreadId === null ? "Open in new window" : "Move back to main window"
+
+function ThreadWindowIcon({ size }: { size: number }): React.JSX.Element {
+  return windowThreadId === null ? (
+    <SquareArrowOutUpRight size={size} />
+  ) : (
+    <SquareArrowDownLeft size={size} />
+  )
+}
 
 /** Marks a title bar button whose work is running, like a server started by a run script. */
 function RunningDot(): React.JSX.Element {
@@ -298,6 +320,7 @@ type ThreadToolsProps = Pick<
   | "onToggleTerminal"
   | "cli"
   | "onOpenInCli"
+  | "onThreadWindow"
 >
 
 /** In a narrow window the editor, run, preview, and terminal buttons share one menu. */
@@ -315,10 +338,13 @@ function ThreadToolsMenu({
   onToggleTerminal,
   cli,
   onOpenInCli,
+  onThreadWindow,
 }: ThreadToolsProps): React.JSX.Element | null {
   const bindings = useKeybindings((state) => state.bindings)
   const sections: React.ReactNode[] = []
-  if (previewShown !== null || terminalShown !== null)
+  // A popped-out window keeps its way back in view instead.
+  const windowAction = windowThreadId === null ? onThreadWindow : null
+  if (previewShown !== null || terminalShown !== null || windowAction !== null)
     sections.push(
       <MenuGroup key="panels" label="Panels">
         {previewShown !== null && (
@@ -332,6 +358,11 @@ function ThreadToolsMenu({
               terminalShown ? "Hide terminal" : "Show terminal",
               bindings.toggleTerminal,
             )}
+          </MenuAction>
+        )}
+        {windowAction !== null && (
+          <MenuAction icon={<ThreadWindowIcon size={13} />} onClick={windowAction}>
+            {withShortcut(threadWindowLabel, bindings.popOutThread)}
           </MenuAction>
         )}
       </MenuGroup>,
@@ -494,9 +525,10 @@ function TabStrip({
   providersByThreadId,
   selectedTabId,
   onCloseTab,
+  onPopOutThread,
 }: Pick<
   TitleBarProps,
-  "openThreads" | "providersByThreadId" | "selectedTabId" | "onCloseTab"
+  "openThreads" | "providersByThreadId" | "selectedTabId" | "onCloseTab" | "onPopOutThread"
 >): React.JSX.Element {
   const files = useTabStore((state) => state.files)
   const threadTabs = useTabStore((state) => state.threadTabs)
@@ -573,6 +605,17 @@ function TabStrip({
               <MenuAction disabled={tabIds.at(-1) === tab.id} onClick={() => closeRight(tab.id)}>
                 Close tabs to the right
               </MenuAction>
+              {threadWindowsSupported && windowThreadId === null && (
+                <>
+                  <MenuSeparator />
+                  <MenuAction
+                    icon={<SquareArrowOutUpRight size={13} />}
+                    onClick={() => onPopOutThread(thread)}
+                  >
+                    {shared ? `Open “${thread.title}” in new window` : "Open in new window"}
+                  </MenuAction>
+                </>
+              )}
             </ContextMenu>
             <IconButton
               unstyled
@@ -675,6 +718,20 @@ function PhoneTabs({
   )
 }
 
+/** Moves the thread on screen into its own window, or a popped-out window's thread back. */
+function ThreadWindowButton({ onClick }: { onClick: () => void }): React.JSX.Element {
+  const shortcut = useKeybindings((state) => state.bindings.popOutThread)
+  return (
+    <IconButton
+      className={noDrag}
+      label={withShortcut(threadWindowLabel, shortcut)}
+      onClick={onClick}
+    >
+      <ThreadWindowIcon size={15} />
+    </IconButton>
+  )
+}
+
 /** The editor, run, preview, and terminal buttons of a window wide enough to show them apart. */
 function ThreadToolButtons({
   editors,
@@ -690,6 +747,7 @@ function ThreadToolButtons({
   onToggleTerminal,
   cli,
   onOpenInCli,
+  onThreadWindow,
 }: ThreadToolsProps): React.JSX.Element {
   const bindings = useKeybindings((state) => state.bindings)
   const hasEditors = editors !== null && editors.length > 0
@@ -746,6 +804,7 @@ function ThreadToolButtons({
           <SquareTerminal size={16} />
         </IconButton>
       )}
+      {onThreadWindow !== null && <ThreadWindowButton onClick={onThreadWindow} />}
     </>
   )
 }
@@ -774,6 +833,8 @@ export function TitleBar({
   onOpenInEditor,
   cli,
   onOpenInCli,
+  onPopOutThread,
+  onThreadWindow,
 }: TitleBarProps): React.JSX.Element {
   const bindings = useKeybindings((state) => state.bindings)
   const tier = useViewportTier()
@@ -792,6 +853,7 @@ export function TitleBar({
     onToggleTerminal,
     cli,
     onOpenInCli,
+    onThreadWindow,
   }
   return (
     <header
@@ -801,7 +863,7 @@ export function TitleBar({
       {!phone && (
         <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
       )}
-      {sidebarsVisible && (
+      {sidebarsVisible && windowThreadId === null && (
         <IconButton
           className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
           label={withShortcut(
@@ -838,6 +900,7 @@ export function TitleBar({
           providersByThreadId={providersByThreadId}
           selectedTabId={selectedTabId}
           onCloseTab={onCloseTab}
+          onPopOutThread={onPopOutThread}
         />
       )}
       {sidebarsVisible &&
@@ -846,6 +909,10 @@ export function TitleBar({
         ) : (
           <ThreadToolsMenu {...threadTools} />
         ))}
+      {sidebarsVisible &&
+        tier !== "regular" &&
+        windowThreadId !== null &&
+        onThreadWindow !== null && <ThreadWindowButton onClick={onThreadWindow} />}
       {sidebarsVisible && (
         <IconButton
           className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"

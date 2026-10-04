@@ -20,6 +20,7 @@ import {
   answerProblem,
   permissionResult,
   toolApproval,
+  toolPatch,
   type PendingApproval,
 } from "./approvals"
 import { discoverClaude, type ClaudeCommand } from "./discovery"
@@ -240,7 +241,15 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
       if (interrupted() || context.signal.aborted)
         return { behavior: "deny", message: "Turn interrupted.", interrupt: true }
       const requestId = `claude:${randomUUID()}`
-      const approval = toolApproval(toolName, toolInput, context.suggestions ?? [], workingMode)
+      const patch = await toolPatch(toolName, toolInput, dispatch.workspacePath)
+      const approval = toolApproval(
+        toolName,
+        toolInput,
+        context.suggestions ?? [],
+        workingMode,
+        dispatch.workspacePath,
+        patch,
+      )
       return new Promise<PermissionResult>((resolve) => {
         const abort = (): void => {
           emit("serverRequest/resolved", { requestId })
@@ -415,7 +424,9 @@ export const runClaudeWorker = (port: WorkerPort): { shutdown: () => Promise<voi
       ack(problem)
       return
     }
-    approval.resolve(permissionResult(approval.pending, message.decision, message.answers))
+    approval.resolve(
+      permissionResult(approval.pending, message.decision, message.answers, message.reason),
+    )
     const { workingMode } = approval.pending
     if (accepted && workingMode !== undefined)
       approval.emit("claude/permission_mode", { permissionMode: workingMode })

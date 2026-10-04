@@ -101,6 +101,54 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     await desktop.page.waitForFunction(() => document.documentElement.dataset.theme === "light")
   })
 
+  test("a color theme and a custom one made from it apply across the app and survive restart", async ({
+    desktop,
+  }) => {
+    const page = desktop.page
+    await page.getByRole("button", { name: /^Settings/ }).click()
+    await page
+      .getByRole("navigation", { name: "Settings sections" })
+      .getByRole("button", { name: "Appearance", exact: true })
+      .click()
+    const themes = page.getByRole("radiogroup", { name: "Color theme", exact: true })
+    await themes.getByRole("radio", { name: "Ocean", exact: true }).click()
+    await page.waitForFunction(() =>
+      document.documentElement.dataset.colorTheme?.startsWith("ocean:"),
+    )
+    await page.getByRole("button", { name: "New theme", exact: true }).click()
+    const editor = page.getByRole("dialog", { name: "New theme" })
+    await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Harbor")
+    await editor.getByRole("textbox", { name: "Accent hex code" }).fill("#f0b45a")
+    // The app previews the theme being edited before it is saved.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(),
+        ),
+      )
+      .toBe("#f0b45a")
+    await editor.getByRole("button", { name: "Create theme", exact: true }).click()
+    await expect
+      .poll(async () => {
+        const { settings } = await desktop.call("getSnapshot")
+        const custom = settings.customThemes?.[0]
+        return {
+          name: custom?.name,
+          accent: custom?.dark.accent,
+          selected: settings.colorTheme === custom?.id,
+        }
+      })
+      .toEqual({ name: "Harbor", accent: "#f0b45a", selected: true })
+    await desktop.restart()
+    await expect
+      .poll(() =>
+        desktop.page.evaluate(() =>
+          getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(),
+        ),
+      )
+      .toBe("#f0b45a")
+  })
+
   test("the setup guide applies preferences and hands over to a focused first thread", async ({
     desktop,
   }) => {
@@ -411,5 +459,46 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     await desktop.call("deleteSchedule", resumed.id)
     expect(await desktop.call("listSchedules", { threadId: first.id })).toEqual([])
     expect((await desktop.call("listSchedules", { threadId: second.id }))[0]?.id).toBe(sibling.id)
+  })
+
+  test("a thread pops out into its own window with its draft and docks back", async ({
+    desktop,
+  }) => {
+    const workspace = await desktop.addWorkspace()
+    const created = await desktop.call("createThread", {
+      workspaceId: workspace.id,
+      title: "Second monitor work",
+    })
+    const thread = created.threads.find((item) => item.title === "Second monitor work")!
+    const page = desktop.page
+    await page.getByRole("button", { name: "Search threads and messages", exact: true }).click()
+    await page.getByText("Second monitor work", { exact: true }).first().click()
+    await page.getByRole("dialog").waitFor({ state: "detached" })
+    const composer = page.getByLabel(/^Message /)
+    await composer.fill("Keep this draft")
+    await page.keyboard.press("Control+Shift+O")
+
+    const popped = await desktop.threadWindow(thread.id)
+    // The window shows the thread alone, with the unsent draft that followed it.
+    await expect.poll(() => popped.getByLabel(/^Message /).inputValue()).toBe("Keep this draft")
+    expect(await popped.getByRole("button", { name: "Search threads and messages" }).count()).toBe(
+      0,
+    )
+    await expect.poll(() => popped.title()).toBe("Second monitor work · MeldShell")
+    // The main window gives the thread up and brings its window forward instead of reopening it.
+    await page.getByRole("tab", { name: /Second monitor work/ }).waitFor({ state: "detached" })
+
+    await popped.getByLabel(/^Message /).fill("Edited in its window")
+    await popped.getByRole("button", { name: /^Move back to main window/ }).click()
+    await expect.poll(() => desktop.otherWindows().length).toBe(0)
+    await page.getByRole("tab", { name: /Second monitor work/ }).waitFor()
+    await expect.poll(() => composer.inputValue()).toBe("Edited in its window")
+
+    // A window still open when the app quits opens again at the next launch.
+    await page.keyboard.press("Control+Shift+O")
+    await desktop.threadWindow(thread.id)
+    await desktop.restart()
+    const restored = await desktop.threadWindow(thread.id)
+    await restored.getByRole("button", { name: /^Move back to main window/ }).waitFor()
   })
 })

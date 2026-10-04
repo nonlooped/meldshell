@@ -44,6 +44,18 @@ export const ThreadIssue = Schema.Struct({
 
 export type ThreadIssue = typeof ThreadIssue.Type
 
+/** The thread a fork was copied from, at the message it was forked from. */
+export const ThreadFork = Schema.Struct({
+  /** Null once the original thread is deleted; the fork keeps its own copy of the turns. */
+  threadId: Schema.NullOr(Schema.String),
+  /** The original thread's title when it was forked. */
+  title: Schema.String,
+  /** The fork has not run a turn of its own yet, so its next turn starts from a summary. */
+  fresh: Schema.Boolean,
+})
+
+export type ThreadFork = typeof ThreadFork.Type
+
 export const Thread = Schema.Struct({
   id: Schema.String,
   workspaceId: Schema.String,
@@ -77,16 +89,19 @@ export const Thread = Schema.Struct({
   /** Changes whenever turns leave or return to the conversation, so open transcripts are reread. */
   historyRevision: Schema.optional(Schema.String),
   issue: Schema.optional(ThreadIssue),
+  fork: Schema.optional(ThreadFork),
 })
 
 export type Thread = typeof Thread.Type
 
 /**
- * Why a turn's provider received a summary of earlier turns: another harness ran them, or the
- * provider session restarted after a rewind.
+ * Why a turn's provider received a summary of earlier turns: another harness ran them, the
+ * provider session restarted after a rewind, or the thread was forked from another one.
  */
 export const TurnHandoff = Schema.Struct({
-  reason: Schema.Literals(["handoff", "restart"]),
+  reason: Schema.Literals(["handoff", "restart", "fork"]),
+  /** For a fork, the title of the thread it was copied from. */
+  forkedFrom: Schema.optional(Schema.String),
   /** The harnesses whose turns the summary covers, in the order they first ran. */
   from: Schema.Array(Schema.String),
   to: Schema.String,
@@ -396,6 +411,43 @@ export const AppOpacity = Schema.Number.pipe(
 
 export const Theme = Schema.Literals(["dark", "light", "system"])
 
+/** A colour as `#rrggbb`. */
+const HexColor = Schema.String.pipe(Schema.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)))
+
+/**
+ * The colours a theme chooses for one mode. Every other token, such as surfaces, lines, and
+ * secondary text, is derived from these, so a palette stays coherent however it is edited.
+ */
+export const ThemePalette = Schema.Struct({
+  background: HexColor,
+  foreground: HexColor,
+  accent: HexColor,
+  added: HexColor,
+  modified: HexColor,
+  deleted: HexColor,
+  renamed: HexColor,
+  info: HexColor,
+})
+
+export type ThemePalette = typeof ThemePalette.Type
+
+/** How many themes a user can create. */
+export const MAX_CUSTOM_THEMES = 24
+
+/** A colour theme the user made: a palette for dark mode and one for light. */
+export const CustomTheme = Schema.Struct({
+  id: Schema.String.pipe(Schema.check(Schema.isMaxLength(64))),
+  name: Schema.String.pipe(Schema.check(Schema.isMaxLength(48))),
+  dark: ThemePalette,
+  light: ThemePalette,
+})
+
+export type CustomTheme = typeof CustomTheme.Type
+
+export const CustomThemes = Schema.Array(CustomTheme).pipe(
+  Schema.check(Schema.isMaxLength(MAX_CUSTOM_THEMES)),
+)
+
 export const TranscriptSize = Schema.Literals(["small", "medium", "large"])
 
 /** How a message sent while a turn runs reaches the agent: after the turn, or into it. */
@@ -429,6 +481,10 @@ export const AppSettings = Schema.Struct({
   opacity: Schema.optional(AppOpacity),
   showSettled: Schema.optional(Schema.Boolean),
   theme: Schema.optional(Theme),
+  /** The colour theme: a built-in theme's id or a `CustomTheme` id. */
+  colorTheme: Schema.optional(Schema.String.pipe(Schema.check(Schema.isMaxLength(64)))),
+  /** Themes the user created, in the order they were made. */
+  customThemes: Schema.optional(CustomThemes),
   transcriptSize: Schema.optional(TranscriptSize),
   reduceMotion: Schema.optional(Schema.Boolean),
   /** Chimes when a thread finishes or needs attention out of view. */
@@ -829,6 +885,8 @@ export const ResolveApprovalInput = Schema.Struct({
   decision: ApprovalDecision,
   optionId: Schema.optional(Schema.String),
   answers: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
+  /** Why the user declined, passed back to the agent so it can try something else. */
+  reason: Schema.optional(Schema.String.pipe(Schema.check(Schema.isMaxLength(4000)))),
 })
 
 export type ResolveApprovalInput = typeof ResolveApprovalInput.Type
@@ -914,6 +972,32 @@ export const UndoRewindResult = Schema.Struct({
 })
 
 export type UndoRewindResult = typeof UndoRewindResult.Type
+
+/** Where a fork starts: before a turn's message, or at the end of the turn. */
+export const ForkPoint = Schema.Literals(["before", "after"])
+
+export type ForkPoint = typeof ForkPoint.Type
+
+/** The new thread a fork recorded, with each copied turn's id beside the original's. */
+export const ForkRecord = Schema.Struct({
+  snapshot: AppSnapshot,
+  threadId: Schema.String,
+  /** The message a fork from before a turn starts with, to edit and send; empty otherwise. */
+  text: Schema.String,
+  turns: Schema.Array(Schema.Struct({ from: Schema.String, to: Schema.String })),
+})
+
+export type ForkRecord = typeof ForkRecord.Type
+
+export const ForkResult = Schema.Struct({
+  snapshot: AppSnapshot,
+  threadId: Schema.String,
+  text: Schema.String,
+  /** The fork's files match the original's at that point; an older turn has no snapshot. */
+  filesRestored: Schema.Boolean,
+})
+
+export type ForkResult = typeof ForkResult.Type
 
 export const RuntimeEventInput = Schema.Struct({
   threadId: Schema.String,

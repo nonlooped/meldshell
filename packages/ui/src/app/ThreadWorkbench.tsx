@@ -4,7 +4,16 @@ import { useLayoutEffect, useRef, useState } from "react"
 import { useElementWidth } from "./viewport"
 import type { AppSnapshot, Thread, TranscriptSearchResult } from "@meldshell/contracts"
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels"
-import { Columns2, Globe, Maximize2, MoreHorizontal, Rows2, SquareTerminal, X } from "lucide-react"
+import {
+  Columns2,
+  Globe,
+  Maximize2,
+  MoreHorizontal,
+  Rows2,
+  SquareArrowOutUpRight,
+  SquareTerminal,
+  X,
+} from "lucide-react"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import {
   AppDialog,
@@ -31,6 +40,10 @@ import {
   type ThreadLayout,
 } from "./thread-layout"
 import { useThreadDrag, useThreadDraggable, useThreadDroppable } from "./thread-drag"
+import { popOutThread, threadWindowsSupported, windowThreadId } from "./thread-windows"
+
+/** Only the main window pops panes out; a popped-out window already holds its own thread. */
+const canPopOut = threadWindowsSupported && windowThreadId === null
 
 interface WorkbenchProps {
   readonly snapshot: AppSnapshot
@@ -152,6 +165,9 @@ function ThreadTileHeader({
         <MenuAction onClick={() => useTabStore.getState().maximizeThread(thread.id)}>
           Show only this thread
         </MenuAction>
+        {canPopOut && (
+          <MenuAction onClick={() => popOutThread(thread)}>Open in new window</MenuAction>
+        )}
         {previewSupported && (
           <MenuAction onClick={() => usePreviewStore.getState().toggle(thread.id)}>
             {previewShown ? "Hide preview" : "Show preview"}
@@ -191,6 +207,14 @@ function ThreadTileHeader({
         >
           Show only this thread
         </MenuAction>
+        {canPopOut && (
+          <MenuAction
+            icon={<SquareArrowOutUpRight size={13} />}
+            onClick={() => popOutThread(thread)}
+          >
+            Open in new window
+          </MenuAction>
+        )}
         {previewSupported && (
           <MenuAction
             icon={<Globe size={13} />}
