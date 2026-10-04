@@ -4,6 +4,10 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- The working log says what each step worked on. Claude's tool rows name the file and lines read, the pattern searched and where, the page fetched, or the subagent's task, with the full path in the tooltip, and each gets an icon for what it did. Codex web searches show the query, page, or text they looked for instead of "webSearch". A Claude subagent's own reads, searches, and messages nest under the call that started it, with a count of its steps, instead of mixing into the main log.
+
 ## [0.15.0] - 2026-10-04
 
 ### Fixed

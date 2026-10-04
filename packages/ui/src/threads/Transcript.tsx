@@ -23,7 +23,7 @@ import { Toggle } from "@base-ui-components/react/toggle"
 import { Button as BaseButton } from "@base-ui-components/react/button"
 import { Button, ContextMenu, MenuAction } from "../ui/controls"
 import { disclosureChevronClasses } from "../ui/styles"
-import { messageHandoff, type CanonicalEvent } from "@meldshell/contracts"
+import { asRecord, messageHandoff, type CanonicalEvent } from "@meldshell/contracts"
 import type { WorkspaceScope } from "@meldshell/contracts/ipc"
 import { ChangeDiff } from "../ui/ChangeDiff"
 import { TurnChanges } from "./TurnChanges"
@@ -46,10 +46,12 @@ import {
   lookupSummary,
   lookupWork,
   primaryWork,
+  toolEventWork,
   workSummary,
   type LookupWork,
   type Work,
 } from "./work-summary"
+import { nestSubagents, startsSubagent, toolLabel, type LogNode } from "./tool-label"
 import { MessageRail } from "./MessageRail"
 import { AsyncQuestions } from "./AsyncQuestions"
 import { landFlight } from "../ui/flight"
@@ -60,6 +62,7 @@ import { refreshTranscript, type TranscriptWindow } from "../data/transcript"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   ArrowDown,
+  Bot,
   Brain,
   ChevronRight,
   CircleAlert,
@@ -221,6 +224,11 @@ const iconFor = (event: CanonicalEvent): React.JSX.Element => {
       return <FileCode2 {...props} />
     case "error":
       return <CircleAlert {...props} />
+    case "tool": {
+      if (startsSubagent(event)) return <Bot {...props} />
+      const Icon = workIcons[toolEventWork(event)]
+      return <Icon {...props} />
+    }
     default:
       return <Wrench {...props} />
   }
@@ -232,7 +240,26 @@ const toolSummary = (event: CanonicalEvent): string => {
   if (event.kind === "plan") return "Updated plan"
   if (event.kind === "command")
     return commandLabel(event.payload, text.split("\n\n", 1)[0] ?? "Command")
+  const label = toolLabel(event)
+  if (label !== null) return label.target === null ? label.verb : `${label.verb} ${label.target}`
   return text.split("\n", 1)[0] ?? event.method.replaceAll("/", " · ")
+}
+
+/** A row's name, with the file, pattern, or URL it worked on set apart from the verb. */
+function ToolTitle({ event }: { readonly event: CanonicalEvent }): React.JSX.Element {
+  const label = toolLabel(event)
+  const summary = toolSummary(event)
+  return (
+    <span className="work-item-title" title={label?.full ? `${label.verb} ${label.full}` : summary}>
+      {label?.target ? (
+        <>
+          {label.verb} <span className="work-item-target">{label.target}</span>
+        </>
+      ) : (
+        summary
+      )}
+    </span>
+  )
 }
 
 function ToolBody({
@@ -257,6 +284,18 @@ function ToolBody({
         )}
       </>
     )
+  if (startsSubagent(event)) {
+    // The subagent's steps sit above; its brief and answer read as text, not arguments.
+    const item = asRecord(asRecord(event.payload).item)
+    const prompt = asRecord(item.arguments).prompt
+    const result = typeof item.aggregatedOutput === "string" ? item.aggregatedOutput : tool.output
+    return (
+      <>
+        {typeof prompt === "string" && prompt && <ToolOutput label="Prompt" text={prompt} />}
+        {result && <ToolOutput label="Result" text={result} />}
+      </>
+    )
+  }
   if (event.kind === "tool")
     return (
       <>
@@ -328,9 +367,49 @@ function ToolLineActions({
   )
 }
 
-function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+/** A row's state beside its title: status, progress, and how much a subagent has done. */
+function ToolBadges({
+  tool,
+  steps,
+  nested,
+}: {
+  tool: ReturnType<typeof toolDetails>
+  steps: readonly LogNode[]
+  nested: boolean
+}) {
+  return (
+    <>
+      {tool.status && (
+        <span
+          className="work-item-status [&[data-failed]]:text-[var(--color-deleted)]"
+          data-failed={tool.failed || undefined}
+        >
+          {tool.status}
+        </span>
+      )}
+      {tool.status === "Running" && tool.progress && (
+        <span title={tool.progress}>{tool.progress}</span>
+      )}
+      {steps.length > 0 && <span className="work-item-status">{stepCount(countSteps(steps))}</span>}
+      {tool.parent && !nested && <span title={tool.parent}>Subagent</span>}
+    </>
+  )
+}
+
+function ToolLine({
+  event,
+  steps = [],
+  nested = false,
+}: {
+  readonly event: CanonicalEvent
+  /** A subagent's own work, nested under the call that started it. */
+  readonly steps?: readonly LogNode[]
+  /** Rendered inside its subagent's call, which already says whose work it is. */
+  readonly nested?: boolean
+}): React.JSX.Element {
   const tool = toolDetails(event)
+  // A running subagent shows what it is doing; a finished one folds to its call.
+  const [open, setOpen] = useState(steps.length > 0 && tool.status === "Running")
   const text = fallbackText(event)
   const commandOutput = event.kind === "command" ? text.split("\n\n").slice(1).join("\n\n") : ""
   const patches = event.kind === "file-change" ? fileChangePatches(event) : []
@@ -348,9 +427,9 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
     return (
       <ContextMenu
         trigger={
-          <div className="flex min-w-0 min-h-[28px] items-center gap-[7px] [padding:4px_7px] rounded-[var(--radius-sm)] text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.75px] [&_span]:min-w-0 [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap">
+          <div className="flex min-w-0 min-h-[28px] items-center gap-[7px] [padding:4px_7px] rounded-[var(--radius-sm)] text-[var(--text-tertiary)] [font-family:var(--font-mono)] text-[10.75px] [&_span]:min-w-0 [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap [&_.work-item-target]:text-[var(--text-secondary)]">
             {iconFor(event)}
-            <span>{toolSummary(event)}</span>
+            <ToolTitle event={event} />
           </div>
         }
       >
@@ -366,21 +445,8 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
         trigger={
           <Collapsible.Trigger className={`motion-colors ${workItemTriggerClasses}`}>
             {iconFor(event)}
-            <span className="work-item-title" title={toolSummary(event)}>
-              {toolSummary(event)}
-            </span>
-            {tool.status && (
-              <span
-                className="work-item-status [&[data-failed]]:text-[var(--color-deleted)]"
-                data-failed={tool.failed || undefined}
-              >
-                {tool.status}
-              </span>
-            )}
-            {tool.status === "Running" && tool.progress && (
-              <span title={tool.progress}>{tool.progress}</span>
-            )}
-            {tool.parent && <span title={tool.parent}>Subagent</span>}
+            <ToolTitle event={event} />
+            <ToolBadges tool={tool} steps={steps} nested={nested} />
             <ChevronRight className={disclosureChevronClasses} size={13} />
           </Collapsible.Trigger>
         }
@@ -394,6 +460,11 @@ function ToolLine({ event }: { readonly event: CanonicalEvent }): React.JSX.Elem
         />
       </ContextMenu>
       <CollapsiblePanel className="grid gap-[10px] min-w-0 [margin:6px_6px_16px_26px]">
+        {steps.length > 0 && (
+          <div className="flex flex-col gap-[1px] -ml-[16px] pl-[8px] border-l-[1px] border-l-[color:var(--line-subtle)]">
+            <WorkingLog nodes={steps} nested />
+          </div>
+        )}
         <ToolBody
           event={event}
           tool={tool}
@@ -506,25 +577,55 @@ function WorkingSection({
         </span>
       </Collapsible.Trigger>
       <CollapsiblePanel className="flex flex-col gap-[1px] [margin:3px_0_1px_7px] [padding:3px_0_3px_12px] border-l-[1px] border-l-[color:var(--line-subtle)]">
-        {foldLookups(
-          turn.workingEvents.filter(
-            (event) =>
-              !(turn.complete && event.method === "turn/diff/updated") && !isFailure(event),
-          ),
-        ).map((entry) =>
-          "run" in entry ? (
-            <LookupRun key={entry.run[0]!.id} work={entry.work} events={entry.run} />
-          ) : (
-            <WorkingEvent key={entry.event.id} event={entry.event} />
-          ),
-        )}
+        <WorkingLog
+          nodes={nestSubagents(
+            turn.workingEvents.filter(
+              (event) =>
+                !(turn.complete && event.method === "turn/diff/updated") && !isFailure(event),
+            ),
+          )}
+        />
       </CollapsiblePanel>
     </Collapsible.Root>
   )
 }
 
+/** A list of working-log entries, with subagents' work nested under the calls that started them. */
+function WorkingLog({
+  nodes,
+  nested = false,
+}: {
+  readonly nodes: readonly LogNode[]
+  readonly nested?: boolean
+}): React.JSX.Element {
+  return (
+    <>
+      {foldLookups(nodes).map((entry) =>
+        "run" in entry ? (
+          <LookupRun key={entry.run[0]!.id} work={entry.work} events={entry.run} nested={nested} />
+        ) : (
+          <WorkingEvent
+            key={entry.node.event.id}
+            event={entry.node.event}
+            steps={entry.node.children}
+            nested={nested}
+          />
+        ),
+      )}
+    </>
+  )
+}
+
 /** One working-log entry: commentary and thinking read as prose, like the rest of the conversation. */
-function WorkingEvent({ event }: { readonly event: CanonicalEvent }): React.JSX.Element {
+function WorkingEvent({
+  event,
+  steps,
+  nested,
+}: {
+  readonly event: CanonicalEvent
+  readonly steps: readonly LogNode[]
+  readonly nested: boolean
+}): React.JSX.Element {
   if (event.kind === "assistant" || event.kind === "reasoning")
     return (
       <Markdown
@@ -532,26 +633,43 @@ function WorkingEvent({ event }: { readonly event: CanonicalEvent }): React.JSX.
         className={`[padding:6px_8px] text-[11.5px] leading-[1.55] ${event.kind === "reasoning" ? "text-[var(--text-tertiary)]" : "text-[var(--text-secondary)]"}`}
       />
     )
-  return <ToolLine event={event} />
+  return <ToolLine event={event} steps={steps} nested={nested} />
 }
+
+/** How much a subagent did, counting its tool calls but not its prose. */
+const stepCount = (count: number): string => `${count} ${count === 1 ? "step" : "steps"}`
+
+const countSteps = (nodes: readonly LogNode[]): number =>
+  nodes.reduce(
+    (total, node) =>
+      total +
+      (node.event.kind === "assistant" || node.event.kind === "reasoning" ? 0 : 1) +
+      countSteps(node.children),
+    0,
+  )
 
 /** Consecutive lookups of one kind fold into a single line once there are this many. */
 const FOLD_LOOKUPS = 3
 
 type WorkingEntry =
-  | { readonly event: CanonicalEvent }
+  | { readonly node: LogNode }
   | { readonly work: LookupWork; readonly run: readonly CanonicalEvent[] }
 
-function foldLookups(events: ReadonlyArray<CanonicalEvent>): readonly WorkingEntry[] {
+// A call with nested work keeps its own row, so only lookups without any fold together.
+const nodeLookup = (node: LogNode): LookupWork | null =>
+  node.children.length === 0 ? lookupWork(node.event) : null
+
+function foldLookups(nodes: readonly LogNode[]): readonly WorkingEntry[] {
   const entries: WorkingEntry[] = []
   let index = 0
-  while (index < events.length) {
-    const work = lookupWork(events[index]!)
+  while (index < nodes.length) {
+    const work = nodeLookup(nodes[index]!)
     let end = index + 1
-    if (work !== null) while (end < events.length && lookupWork(events[end]!) === work) end++
-    const run = events.slice(index, end)
-    if (work !== null && run.length >= FOLD_LOOKUPS) entries.push({ work, run })
-    else entries.push(...run.map((event) => ({ event })))
+    if (work !== null) while (end < nodes.length && nodeLookup(nodes[end]!) === work) end++
+    const run = nodes.slice(index, end)
+    if (work !== null && run.length >= FOLD_LOOKUPS)
+      entries.push({ work, run: run.map((node) => node.event) })
+    else entries.push(...run.map((node) => ({ node })))
     index = end
   }
   return entries
@@ -561,9 +679,11 @@ function foldLookups(events: ReadonlyArray<CanonicalEvent>): readonly WorkingEnt
 function LookupRun({
   work,
   events,
+  nested,
 }: {
   readonly work: LookupWork
   readonly events: readonly CanonicalEvent[]
+  readonly nested: boolean
 }): React.JSX.Element {
   return (
     <Collapsible.Root>
@@ -574,7 +694,7 @@ function LookupRun({
       </Collapsible.Trigger>
       <CollapsiblePanel className="flex flex-col gap-[1px] ml-[10px] pl-[8px] border-l-[1px] border-l-[color:var(--line-subtle)]">
         {events.map((event) => (
-          <ToolLine key={event.id} event={event} />
+          <ToolLine key={event.id} event={event} nested={nested} />
         ))}
       </CollapsiblePanel>
     </Collapsible.Root>
@@ -951,5 +1071,5 @@ const workItemTriggerClasses = [
   "[&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-secondary)] [&_span]:min-w-0",
   "[&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:whitespace-nowrap",
   "[&_.disclosure-chevron]:ml-[auto] [&_.work-item-title]:flex-1 [&_.work-item-status]:shrink-0",
-  "[&_.work-item-status]:text-[11px]",
+  "[&_.work-item-status]:text-[11px] [&_.work-item-target]:text-[var(--text-secondary)]",
 ].join(" ")
