@@ -10,11 +10,20 @@ import { installDesktopBehavior } from "./app/desktop-behavior"
 import { ThreadDragProvider } from "./app/thread-drag"
 import { MeldMark } from "./ui/MeldMark"
 import { Button } from "./ui/controls"
+import { useRemoteClient, type RemoteClientOptions } from "./app/remote-client"
 import "./app/styles.css"
 
-export function mount(info: AppInfo): void {
+export type { RemoteClientStatus } from "./app/remote-client"
+
+export interface MountOptions {
+  /** Set by a browser attached to a host through the relay; the desktop leaves it out. */
+  readonly remote?: RemoteClientOptions
+}
+
+export function mount(info: AppInfo, options: MountOptions = {}): void {
   document.documentElement.dataset.platform = window.meldshell.platform
   installDesktopBehavior()
+  if (options.remote) useRemoteClient.getState().attach(options.remote)
 
   const queryClient = new QueryClient({
     defaultOptions: {

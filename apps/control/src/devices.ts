@@ -8,6 +8,8 @@ export type DeviceRow = {
   online: number
   lastSeen: number | null
   revokedAt: number | null
+  /** Set once the account named the device itself; re-registration then keeps that name. */
+  renamedAt: number | null
 }
 
 export const getDevice = (db: D1Database, id: string) =>
@@ -38,23 +40,44 @@ const disableKey = (env: Env, row: DeviceRow) =>
     body: { configId: "device", keyId: row.keyId, userId: row.accountId, enabled: false },
   })
 
-/** Issues a new credential for a device, disabling any previous one. Callers serialize per account. */
+/**
+ * Issues a new credential for a device, disabling any previous one. Callers serialize per account.
+ * A name chosen on the devices page outlives re-registration; the host's hostname fills in
+ * otherwise. The name in force is returned so the host can show it.
+ */
 export async function registerDevice(env: Env, accountId: string, id: string, name: string) {
   const existing = await getDevice(env.DB, id)
   if (existing && existing.accountId !== accountId)
     throw new Error("Device belongs to another account.")
+  const finalName = existing !== null && existing.renamedAt !== null ? existing.name : name
   const key = await accounts(env).api.createApiKey({
-    body: { configId: "device", userId: accountId, name },
+    body: { configId: "device", userId: accountId, name: finalName },
   })
   if (existing) await disableKey(env, existing)
   await env.DB.prepare(
-    `INSERT INTO "device" (id, accountId, name, keyId, online, lastSeen, revokedAt)
-     VALUES (?, ?, ?, ?, 0, NULL, NULL)
+    `INSERT INTO "device" (id, accountId, name, keyId, online, lastSeen, revokedAt, renamedAt)
+     VALUES (?, ?, ?, ?, 0, NULL, NULL, NULL)
      ON CONFLICT(id) DO UPDATE SET name = excluded.name, keyId = excluded.keyId, revokedAt = NULL`,
   )
-    .bind(id, accountId, name, key.id)
+    .bind(id, accountId, finalName, key.id)
     .run()
-  return { deviceId: id, credential: key.key }
+  return { deviceId: id, credential: key.key, name: finalName }
+}
+
+/** Names a device for its account; returns false when the account has no such live device. */
+export async function renameDevice(
+  env: Env,
+  accountId: string,
+  id: string,
+  name: string,
+  now = Date.now(),
+) {
+  const result = await env.DB.prepare(
+    'UPDATE "device" SET name = ?, renamedAt = ? WHERE id = ? AND accountId = ? AND revokedAt IS NULL',
+  )
+    .bind(name, now, id, accountId)
+    .run()
+  return (result.meta.changes ?? 0) > 0
 }
 
 export async function revokeDevice(env: Env, accountId: string, id: string, now = Date.now()) {

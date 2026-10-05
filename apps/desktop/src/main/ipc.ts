@@ -138,6 +138,9 @@ export const registerIpc = (): void => {
     if (!url?.startsWith("http")) throw new Error("This page is no longer available.")
     await shell.openExternal(url)
   })
+  ipcMain.handle(IPC.cancelRemoteLink, async () =>
+    (await desktopHost.start()).request("remote.cancelLink"),
+  )
   ipcMain.handle(IPC.unlinkRemote, async () => (await desktopHost.start()).request("remote.unlink"))
   ipcMain.handle(IPC.retryRemote, async () => (await desktopHost.start()).request("remote.retry"))
   registerTerminalIpc()

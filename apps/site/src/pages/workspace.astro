@@ -6,25 +6,18 @@ import "@meldshell/ui/styles.css"
 <html lang="en" data-platform="web">
   <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" /><meta name="robots" content="noindex" /><title>MeldShell</title><link rel="icon" href="/favicon.svg" /></head>
   <body>
-    <nav id="remote-bar" aria-label="Remote connection">
-      <a href="/dashboard" class="remote-back" aria-label="Back to your devices">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-        <span>Devices</span>
-      </a>
-      <span class="remote-divider" aria-hidden="true"></span>
-      <span id="remote-device" class="remote-device"></span>
-      <span id="remote-state" class="remote-state" data-state="connecting" role="status">
-        <span class="remote-dot" aria-hidden="true"></span><span id="remote-label">Connecting</span>
-      </span>
-      <span id="remote-detail" class="remote-detail"></span>
-    </nav>
+    <!-- Before the workspace is on screen, this page explains the connection. Afterwards the
+         renderer's own title bar names the computer and reports the connection itself. -->
     <div id="remote-gate" data-state="connecting">
       <div class="gate-card">
         <span class="gate-spinner" aria-hidden="true"></span>
         <h1 id="gate-title">Connecting…</h1>
         <p id="gate-body">Reaching MeldShell on your computer.</p>
         <p id="gate-hint" hidden>Taking a while? Make sure MeldShell is open on that computer and connected to the internet.</p>
-        <a href="/dashboard" id="gate-action">Back to your devices</a>
+        <div class="gate-actions">
+          <button type="button" id="gate-retry" hidden>Try again</button>
+          <a href="/dashboard" id="gate-action">Back to your devices</a>
+        </div>
       </div>
     </div>
     <div id="root"></div>
@@ -32,42 +25,39 @@ import "@meldshell/ui/styles.css"
       import appPackage from "../../../../package.json"
       import { describe, listDevices, requireSession } from "../remote/accounts"
       import { remoteApi, type RemoteState } from "../remote/transport"
+      import type { RemoteClientStatus } from "@meldshell/ui"
 
       const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
-      const labels: Record<RemoteState, string> = {
-        connecting: "Connecting",
-        connected: "Connected",
-        reconnecting: "Reconnecting",
-        offline: "Computer offline",
-        ended: "Disconnected",
-      }
       let mounted = false
+      let current: RemoteClientStatus = { state: "connecting", message: "Reaching MeldShell on your computer." }
+      const listeners = new Set<(status: RemoteClientStatus) => void>()
       function show(state: RemoteState, message: string) {
-        $("#remote-state").dataset.state = state
-        $("#remote-label").textContent = labels[state]
-        $("#remote-detail").textContent = state === "connected" ? "" : message
-        $("#remote-detail").title = message
+        current = { state, message }
+        for (const listener of listeners) listener(current)
         if (mounted) return
-        // Before the workspace loads, the full-page gate explains what is happening.
         const gate = $("#remote-gate")
         gate.dataset.state = state
         const ended = state === "ended"
         const offline = state === "offline" || state === "reconnecting"
         $("#gate-title").textContent = ended ? "Access ended" : offline ? "Your computer isn’t reachable" : "Connecting…"
         $("#gate-body").textContent = message
-        $("#gate-hint").hidden = ended || offline ? true : $("#gate-hint").hidden
+        $("#gate-retry").hidden = !ended
+        if (ended || offline) $("#gate-hint").hidden = true
       }
+      $("#gate-retry").addEventListener("click", () => location.reload())
 
       void (async () => {
         await requireSession()
         const id = new URL(location.href).searchParams.get("device")
         if (!id) { location.assign("/dashboard"); return }
-        void listDevices().then((devices) => {
+        let deviceName = "Your computer"
+        const named = listDevices().then((devices) => {
           const device = devices.find((item) => item.id === id)
           if (!device) return
-          $("#remote-device").textContent = device.name
+          deviceName = device.name
           document.title = `${device.name} — MeldShell`
-          if (!mounted) $("#gate-body").textContent = `Reaching MeldShell on ${device.name}.`
+          if (!mounted && $("#remote-gate").dataset.state === "connecting")
+            $("#gate-body").textContent = `Reaching MeldShell on ${device.name}.`
         }).catch(() => undefined)
         setTimeout(() => { if (!mounted && $("#remote-gate").dataset.state === "connecting") $("#gate-hint").hidden = false }, 8_000)
 
@@ -80,48 +70,42 @@ import "@meldshell/ui/styles.css"
         window.meldshell = remote.api
         await connected
         window.meldshell = remote.forHost(await remote.api.getRemoteStatus().catch(() => null))
+        await named
         const { mount } = await import("@meldshell/ui")
-        mount({ version: appPackage.version })
+        mount({ version: appPackage.version }, {
+          remote: {
+            deviceName,
+            devicesURL: "/dashboard",
+            subscribe: (listener) => {
+              listeners.add(listener)
+              listener(current)
+              return () => { listeners.delete(listener) }
+            },
+          },
+        })
         mounted = true
         $("#remote-gate").hidden = true
       })().catch(cause => show("ended", describe(cause)))
     </script>
     <style is:global>
-      html[data-platform=web] { --remote-bar: 36px; }
-      #remote-bar { height: var(--remote-bar); display: flex; align-items: center; gap: 10px; padding: 0 max(10px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left)); font-size: 12px; border-bottom: 1px solid var(--line); background: var(--surface-overlay); color: var(--text-secondary); min-width: 0; }
-      #remote-bar .remote-back { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px 0 4px; border-radius: var(--radius-sm); color: var(--text-primary); flex-shrink: 0; }
-      #remote-bar .remote-back:hover { background: var(--surface-hover); }
-      #remote-bar .remote-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-      .remote-divider { width: 1px; height: 16px; background: var(--line); flex-shrink: 0; }
-      .remote-device { color: var(--text-primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30vw; }
-      .remote-device:empty { display: none; }
-      .remote-state { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 10px; background: var(--surface-hover); color: var(--text-primary); flex-shrink: 0; }
-      .remote-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-info); }
-      .remote-state[data-state=connected] .remote-dot { background: var(--color-added); }
-      .remote-state:is([data-state=reconnecting], [data-state=offline]) .remote-dot { background: var(--color-modified); }
-      .remote-state[data-state=ended] .remote-dot { background: var(--color-deleted); }
-      .remote-state:is([data-state=connecting], [data-state=reconnecting]) .remote-dot { animation: remote-pulse 1.2s ease-in-out infinite; }
-      @keyframes remote-pulse { 50% { opacity: .35; } }
-      .remote-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-
-      #remote-gate { position: fixed; inset: var(--remote-bar) 0 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: var(--scrim, #161617); }
+      #remote-gate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: var(--scrim, #161617); }
       #remote-gate[hidden] { display: none; }
       .gate-card { display: grid; justify-items: center; gap: 10px; max-width: 360px; text-align: center; }
       .gate-card h1 { margin: 6px 0 0; font: 600 20px/1.3 var(--font-display); color: var(--text-primary); }
       .gate-card p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
       .gate-card #gate-hint { color: var(--text-tertiary); font-size: 12px; }
-      .gate-card a { margin-top: 10px; display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--text-primary); font-size: 12.5px; }
-      .gate-card a:hover { background: var(--surface-hover); border-color: var(--line-strong); }
+      .gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+      .gate-actions a, .gate-actions button { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius); background: transparent; color: var(--text-primary); font: inherit; font-size: 12.5px; cursor: default; }
+      .gate-actions a:hover, .gate-actions button:hover { background: var(--surface-hover); border-color: var(--line-strong); }
+      .gate-actions [hidden] { display: none; }
       .gate-spinner { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--text-primary); animation: remote-spin .8s linear infinite; }
       #remote-gate:is([data-state=ended], [data-state=offline], [data-state=reconnecting]) .gate-spinner { animation: none; border-color: var(--line-strong); }
       #remote-gate[data-state=ended] .gate-spinner { display: none; }
       @keyframes remote-spin { to { rotate: 1turn; } }
-      @media (prefers-reduced-motion: reduce) { .gate-spinner, .remote-dot { animation-duration: 3s !important; } }
+      @media (prefers-reduced-motion: reduce) { .gate-spinner { animation-duration: 3s !important; } }
 
-      html[data-platform=web] #root { height: calc(100dvh - var(--remote-bar) - 1px); }
+      html[data-platform=web] #root { height: 100dvh; }
       @media (max-width: 640px) {
-        .remote-back span, .remote-divider { display: none; }
-        .remote-detail { display: none; }
         html[data-platform=web] { --text-base: 14px; }
         html[data-platform=web] input, html[data-platform=web] textarea { font-size: 16px; }
         html[data-platform=web] [role=dialog] { max-width: calc(100vw - 24px); }

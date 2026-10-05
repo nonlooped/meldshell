@@ -22,6 +22,7 @@ const api: MeldShellApi = {
     ),
   onOpenAttention: on(IPC.attentionRequested),
   onUpdateStatus: on(IPC.updateStatusChanged),
+  onRemoteStatus: on(IPC.remoteStatusChanged),
   desktop: {
     ...(process.platform === "win32"
       ? {

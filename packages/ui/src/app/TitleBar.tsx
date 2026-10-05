@@ -43,6 +43,8 @@ import { useThreadDraggable } from "./thread-drag"
 import { type ThreadLayout, visibleThreads } from "./thread-layout"
 import { useViewportTier } from "./viewport"
 import { threadWindowsSupported, windowThreadId } from "./thread-windows"
+import { RemoteDeviceChip, RemoteViewersButton } from "./RemoteClientChrome"
+import { useRemoteClient } from "./remote-client"
 
 interface TitleBarProps {
   readonly openThreads: ReadonlyArray<Thread>
@@ -839,6 +841,7 @@ export function TitleBar({
   const bindings = useKeybindings((state) => state.bindings)
   const tier = useViewportTier()
   const phone = tier === "phone"
+  const remote = useRemoteClient((state) => state.active)
   const threadTools = {
     editors,
     editorFolder,
@@ -860,8 +863,13 @@ export function TitleBar({
       className={`titlebar [-webkit-app-region:drag] flex items-center min-w-0 border-b-[1px] border-b-[color:var(--line-subtle)] select-none ${tier === "regular" ? "gap-[10px]" : "gap-[6px]"}`}
       data-tier={tier}
     >
-      {!phone && (
-        <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
+      {/* A browser names the computer it drives where the desktop shows the mark. */}
+      {remote ? (
+        <RemoteDeviceChip />
+      ) : (
+        !phone && (
+          <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
+        )
       )}
       {sidebarsVisible && windowThreadId === null && (
         <IconButton
@@ -913,6 +921,7 @@ export function TitleBar({
         tier !== "regular" &&
         windowThreadId !== null &&
         onThreadWindow !== null && <ThreadWindowButton onClick={onThreadWindow} />}
+      <RemoteViewersButton />
       {sidebarsVisible && (
         <IconButton
           className="[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"

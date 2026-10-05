@@ -68,6 +68,10 @@ export const describe = (cause: unknown) => errorMessage(cause).replace(/^Error:
 
 export type Device = { id: string; name: string; online: boolean; lastSeen: number | null }
 export const listDevices = () => accountRequest("/api/remote/v1/devices") as Promise<Device[]>
+export const MAX_DEVICE_NAME = 100
+/** Names a computer on the devices page; the name survives signing in again from that computer. */
+export const renameDevice = (id: string, name: string) =>
+  accountRequest(`/api/remote/v1/devices/${encodeURIComponent(id)}`, { name }, "PATCH")
 
 /** "just now", "5 minutes ago", "yesterday", or a date for anything older than a week. */
 export function relativeTime(time: number, now = Date.now()) {

@@ -57,6 +57,7 @@ import { useViewportTier, type ViewportTier } from "./viewport"
 import { useViewStore } from "./view-store"
 import { ThreadWorkbench } from "./ThreadWorkbench"
 import { LaunchReveal, LaunchScreen, useLaunch } from "./LaunchScreen"
+import { RemoteConnectionNotice } from "./RemoteClientChrome"
 import { useThreadDrafts } from "./thread-drafts"
 import { useThreadSignals, useWatchedThreadIds } from "./thread-signals"
 import { terminalApi, useRunningScripts, useTerminalStore } from "../terminals/terminal-store"
@@ -1312,6 +1313,7 @@ export function App(): React.JSX.Element {
           </Tabs.Root>
         </LaunchReveal>
         <LaunchScreen launch={launch} />
+        <RemoteConnectionNotice />
         <MainWindowOnly>
           <OnboardingLayer
             launching={launch.loading}

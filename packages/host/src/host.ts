@@ -7,10 +7,16 @@ import { reconcileWorktrees, scopePath } from "./thread-worktrees"
 import { createHostRuntime, stopHost } from "./runtime"
 import type { HostPlatform } from "./platform"
 import { connectRelay } from "./remote-connection"
-import { beginLink, readCredential, unlinkDevice } from "./identity"
+import { beginLink, LinkCancelled, unlinkDevice } from "./identity"
 import { readWorkspaceScripts, scriptEnvironment } from "./workspace-scripts"
 import { scheduleLoop } from "./scheduler"
-import { errorMessage, decodeCommand, IPC } from "@meldshell/contracts"
+import {
+  errorMessage,
+  decodeCommand,
+  IPC,
+  type RemoteLinking,
+  type RemoteStatus,
+} from "@meldshell/contracts"
 import { remoteTerminals } from "./remote-terminals"
 import { administrationBridge } from "./administration"
 import { threadPort } from "./workspace-scripts"
@@ -66,6 +72,28 @@ export async function startHost(
 
   const administration = administrationBridge(onEvent)
   const terminals = remoteTerminals({ terminalContext }, (frame) => relay.publish(frame))
+  let linking: (RemoteLinking & { cancel: () => void }) | null = null
+  let linkError: string | null = null
+  const remoteStatus = (): RemoteStatus => {
+    const state = relay.state()
+    return {
+      linked: state.credential !== null,
+      desktop: platform.desktop === true,
+      account: state.credential?.account ?? null,
+      siteURL: state.credential?.siteURL ?? null,
+      deviceName: state.credential?.deviceName ?? null,
+      connection: state.connection,
+      status: state.status,
+      viewers: state.viewers,
+      linking:
+        linking === null
+          ? null
+          : { userCode: linking.userCode, verificationURL: linking.verificationURL },
+      error: linkError,
+    }
+  }
+  // The desktop renders this live; browsers are not told about each other.
+  const announceRemote = () => onEvent(IPC.remoteStatusChanged, [remoteStatus()])
   const relay = connectRelay(
     directory,
     async (raw, clientId) => {
@@ -83,6 +111,7 @@ export async function startHost(
       }
     },
     terminals.clients,
+    announceRemote,
   )
   const desktopCall = (method: string, args: readonly unknown[]) => {
     if (platform.desktop) return administration.call(method, args)
@@ -143,34 +172,32 @@ export async function startHost(
     ),
   )
 
-  let linking: { userCode: string; verificationURL: string } | null = null
-  let linkError: string | null = null
   const remote = {
-    status: async () => {
-      const credential = await readCredential(directory)
-      return {
-        linked: !!credential,
-        desktop: platform.desktop === true,
-        account: credential?.account ?? null,
-        siteURL: credential?.siteURL ?? null,
-        status: relay.status(),
-        linking,
-        error: linkError,
-      }
-    },
-    link: async (url: string) => {
-      if (linking) return linking
+    status: async () => remoteStatus(),
+    link: async (url: string): Promise<RemoteLinking> => {
+      if (linking) return { userCode: linking.userCode, verificationURL: linking.verificationURL }
       const pending = await beginLink(directory, url)
-      linking = { userCode: pending.userCode, verificationURL: pending.verificationURL }
+      const current = {
+        userCode: pending.userCode,
+        verificationURL: pending.verificationURL,
+        cancel: pending.cancel,
+      }
+      linking = current
       linkError = null
+      announceRemote()
       pending.complete
         .then(relay.sync, (cause: unknown) => {
-          linkError = errorMessage(cause)
+          if (!(cause instanceof LinkCancelled)) linkError = errorMessage(cause)
         })
         .finally(() => {
-          linking = null
+          if (linking === current) linking = null
+          announceRemote()
         })
-      return linking
+      return { userCode: current.userCode, verificationURL: current.verificationURL }
+    },
+    /** Abandons a sign-in that is still waiting for the browser. */
+    cancelLink: async () => {
+      linking?.cancel()
     },
     unlink: async () => {
       if (linking) throw new Error("Wait for sign-in to finish before signing out.")

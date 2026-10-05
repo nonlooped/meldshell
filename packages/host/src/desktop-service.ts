@@ -39,6 +39,7 @@ export function desktopService(
       terminalContext: host.terminalContext,
       "remote.status": host.remote.status,
       "remote.link": host.remote.link,
+      "remote.cancelLink": host.remote.cancelLink,
       "remote.unlink": host.remote.unlink,
       "remote.retry": host.remote.retry,
       "terminal.open": terminals.open,

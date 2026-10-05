@@ -25,6 +25,7 @@ const events = new Set<string>([
   IPC.providerStatusChanged,
   IPC.providerUpdateChanged,
   IPC.attentionRequested,
+  IPC.remoteStatusChanged,
 ])
 
 function publish(channel: string, args: readonly unknown[]): void {

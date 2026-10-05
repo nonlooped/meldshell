@@ -436,22 +436,46 @@ const request = <Invoke extends (...args: never[]) => Promise<unknown>>(
   channel: string,
 ): Request<Invoke> => ({ channel })
 
+/**
+ * Where this host stands with the relay. `offline` covers every reconnecting state once a
+ * credential exists; `revoked` means the account removed this computer; `error` means the stored
+ * credential could not be read.
+ */
+export type RemoteConnection =
+  | "unlinked"
+  | "connecting"
+  | "online"
+  | "offline"
+  | "revoked"
+  | "error"
+export interface RemoteLinking {
+  readonly userCode: string
+  readonly verificationURL: string
+}
+export interface RemoteStatus {
+  readonly linked: boolean
+  /** Hosts before remote administration omit this. */
+  readonly desktop?: boolean
+  readonly account: { id: string; email: string; name: string } | null
+  readonly siteURL: string | null
+  /** The name this computer registered under, as the devices page lists it. Older links lack it. */
+  readonly deviceName: string | null
+  /** Hosts before structured status omit this; clients then read `status`. */
+  readonly connection?: RemoteConnection
+  /** A sentence for the connection state, such as why it is offline. */
+  readonly status: string
+  /** Browsers connected through the relay right now. */
+  readonly viewers: number
+  readonly linking: RemoteLinking | null
+  readonly error: string | null
+}
+
 /** The whitelist and signatures for renderer invocation methods. */
 export const requests = {
-  getRemoteStatus:
-    request<
-      () => Promise<{
-        linked: boolean
-        desktop?: boolean
-        account: { id: string; email: string; name: string } | null
-        siteURL: string | null
-        status: string
-        linking: { userCode: string; verificationURL: string } | null
-        error: string | null
-      }>
-    >("meldshell:remote-status"),
-  linkRemote:
-    request<() => Promise<{ userCode: string; verificationURL: string }>>("meldshell:link-remote"),
+  getRemoteStatus: request<() => Promise<RemoteStatus>>("meldshell:remote-status"),
+  linkRemote: request<() => Promise<RemoteLinking>>("meldshell:link-remote"),
+  /** Abandons a sign-in that is waiting for the browser, so another can start. */
+  cancelRemoteLink: request<() => Promise<void>>("meldshell:cancel-remote-link"),
   openRemotePage: request<(page: "sign-in" | "dashboard") => Promise<void>>(
     "meldshell:open-remote-page",
   ),
@@ -687,6 +711,7 @@ export const IPC = {
   runtimeChanged: "meldshell:runtime-changed",
   attentionRequested: "meldshell:attention-requested",
   updateStatusChanged: "meldshell:update-status-changed",
+  remoteStatusChanged: "meldshell:remote-status-changed",
   terminalOpen: "meldshell:terminal-open",
   terminalWrite: "meldshell:terminal-write",
   terminalResize: "meldshell:terminal-resize",
@@ -721,6 +746,8 @@ export type MeldShellApi = InvokeApi & {
   ) => () => void
   readonly onOpenAttention: (listener: (threadId: string) => void) => () => void
   readonly onUpdateStatus: (listener: (status: AppUpdateStatus) => void) => () => void
+  /** Relay changes on this host, such as a browser connecting. Desktop clients only. */
+  readonly onRemoteStatus?: (listener: (status: RemoteStatus) => void) => () => void
   readonly remotePreview?: (input: RemotePreviewInput) => Promise<RemotePreviewFrame | null>
   readonly hostControl?: {
     readonly restart: () => Promise<void>

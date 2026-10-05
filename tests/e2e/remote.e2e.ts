@@ -41,6 +41,54 @@ test.describe("Remote account journeys", { platforms: ["control"] }, () => {
     expect(devices.find((device) => device.id === second)?.name).toBe("Build host")
   })
 
+  test("a name chosen on the devices page survives signing in again from that computer", async ({
+    control,
+  }) => {
+    const deviceId = randomUUID()
+    expect(
+      (
+        await control.request("/api/remote/v1/devices", {
+          method: "POST",
+          body: { deviceId, name: "DESKTOP-4F2K" },
+        })
+      ).status,
+    ).toBe(200)
+    expect(
+      (
+        await control.request(`/api/remote/v1/devices/${deviceId}`, {
+          method: "PATCH",
+          body: { name: "   " },
+        })
+      ).status,
+    ).toBe(400)
+    expect(
+      (
+        await control.request(`/api/remote/v1/devices/${randomUUID()}`, {
+          method: "PATCH",
+          body: { name: "Nobody's" },
+        })
+      ).status,
+    ).toBe(404)
+    const renamed = await control.request(`/api/remote/v1/devices/${deviceId}`, {
+      method: "PATCH",
+      body: { name: "  Work laptop " },
+    })
+    expect(renamed.status).toBe(200)
+    expect(renamed.body).toEqual({ id: deviceId, name: "Work laptop" })
+    // The host signs in again and registers under its hostname; the chosen name wins.
+    const again = await control.request("/api/remote/v1/devices", {
+      method: "POST",
+      body: { deviceId, name: "DESKTOP-4F2K" },
+    })
+    expect(again.status).toBe(200)
+    expect((again.body as { name: string }).name).toBe("Work laptop")
+    const devices = (await control.request("/api/remote/v1/devices")).body as {
+      id: string
+      name: string
+    }[]
+    expect(devices.find((device) => device.id === deviceId)?.name).toBe("Work laptop")
+  })
+
   test("invalid and untrusted registration cannot mutate the device list, and sign-out revokes access", async ({
     control,
   }) => {

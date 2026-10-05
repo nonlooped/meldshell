@@ -23,6 +23,7 @@ export interface DesktopMethods {
   terminalContext: Host["terminalContext"]
   "remote.status": Host["remote"]["status"]
   "remote.link": Host["remote"]["link"]
+  "remote.cancelLink": Host["remote"]["cancelLink"]
   "remote.unlink": Host["remote"]["unlink"]
   "remote.retry": Host["remote"]["retry"]
   "terminal.open": (input: TerminalOpenInput) => Promise<TerminalSession>

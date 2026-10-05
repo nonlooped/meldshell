@@ -1,5 +1,5 @@
 import { accounts, providers, type Env } from "./auth"
-import { authenticateDevice, getDevice, listDevices } from "./devices"
+import { authenticateDevice, getDevice, listDevices, renameDevice } from "./devices"
 import { ADMISSION_HEADER, type Admission } from "./relay"
 
 export { Account } from "./account"
@@ -7,6 +7,14 @@ export { DeviceRelay } from "./relay"
 
 const MAX_BODY_BYTES = 64 * 1024
 const DEVICE_ID = /^[a-f0-9-]{36}$/
+const MAX_DEVICE_NAME = 100
+
+/** A device name from a request body: trimmed, non-empty, and within the API key name limit. */
+function deviceName(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const name = value.trim()
+  return name.length >= 1 && name.length <= MAX_DEVICE_NAME ? name : null
+}
 
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { "Cache-Control": "no-store" } })
@@ -82,24 +90,29 @@ async function route(request: Request, env: Env): Promise<Response> {
     return json(await listDevices(env.DB, session.user.id))
   if (url.pathname === "/api/remote/v1/devices" && request.method === "POST") {
     const input = (await request.json()) as { deviceId?: unknown; name?: unknown }
-    if (
-      typeof input.deviceId !== "string" ||
-      !DEVICE_ID.test(input.deviceId) ||
-      typeof input.name !== "string" ||
-      input.name.length < 1 ||
-      input.name.length > 100
-    )
+    const name = deviceName(input.name)
+    if (typeof input.deviceId !== "string" || !DEVICE_ID.test(input.deviceId) || name === null)
       return json({ error: "Invalid device" }, 400)
     const existing = await getDevice(env.DB, input.deviceId)
     if (existing && existing.accountId !== session.user.id)
       return json({ error: "Device cannot be registered" }, 403)
-    return json(await account.register(session.user.id, input.deviceId, input.name))
+    return json(await account.register(session.user.id, input.deviceId, name))
   }
-  if (url.pathname.startsWith("/api/remote/v1/devices/") && request.method === "DELETE") {
+  if (url.pathname.startsWith("/api/remote/v1/devices/")) {
     const id = decodeURIComponent(url.pathname.split("/").at(-1)!)
-    if (!(await account.revoke(session.user.id, id)))
-      return json({ error: "Device not found" }, 404)
-    return json({ revoked: true })
+    if (request.method === "DELETE") {
+      if (!(await account.revoke(session.user.id, id)))
+        return json({ error: "Device not found" }, 404)
+      return json({ revoked: true })
+    }
+    if (request.method === "PATCH") {
+      const input = (await request.json()) as { name?: unknown }
+      const name = deviceName(input.name)
+      if (name === null) return json({ error: "Enter a name of up to 100 characters" }, 400)
+      if (!(await renameDevice(env, session.user.id, id, name)))
+        return json({ error: "Device not found" }, 404)
+      return json({ id, name })
+    }
   }
   return json({ error: "Not found" }, 404)
 }

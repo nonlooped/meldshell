@@ -7,6 +7,7 @@ import {
   HEARTBEAT_TIMEOUT_MS,
   MAX_BUFFER_BYTES,
   MAX_FRAME_BYTES,
+  type RemoteConnection,
   type RemoteResult,
 } from "@meldshell/contracts"
 import { readCredential, type DeviceCredential } from "./identity"
@@ -25,18 +26,47 @@ function frameText(frame: { type: string; id?: string; clientId?: string }) {
   })
 }
 
-const REVOKED = "Authorization revoked; sign in again"
+export interface RelayState {
+  readonly connection: RemoteConnection
+  /** A sentence for the state, such as why the relay is unreachable. */
+  readonly status: string
+  /** Browsers connected through the relay right now. */
+  readonly viewers: number
+  readonly credential: DeviceCredential | null
+}
+
+const sentence: Record<RemoteConnection, string> = {
+  unlinked: "Not linked",
+  connecting: "Connecting",
+  online: "Online",
+  offline: "Offline; reconnecting",
+  revoked: "Authorization revoked; sign in again",
+  error: "Could not read device credentials",
+}
 
 /** Keeps this host connected to the relay while a device credential exists. */
 export function connectRelay(
   directory: string,
   execute: (command: unknown, clientId: string) => Promise<RemoteResult>,
   clients: (ids: readonly string[]) => void = () => undefined,
+  onChange: (state: RelayState) => void = () => undefined,
 ) {
   let credential: DeviceCredential | null = null
-  let status = "Not linked"
+  let connection: RemoteConnection = "unlinked"
   /** Browsers connected through the relay; events are only worth sending while one watches. */
   let watchers = 0
+  const state = (): RelayState => ({
+    connection,
+    status: sentence[connection],
+    viewers: watchers,
+    credential,
+  })
+  const changed = () => onChange(state())
+  const become = (next: RemoteConnection) => {
+    if (next === connection) return
+    connection = next
+    changed()
+  }
   class HostSocket extends WS {
     constructor(url: string, protocols?: string | string[]) {
       super(url, protocols, {
@@ -83,14 +113,13 @@ export function connectRelay(
       socket.reconnect(1013, "Reconnect to recover state")
     else socket.send(frameText(frame))
   }
-  socket.addEventListener("open", () => {
-    status = "Online"
-  })
+  socket.addEventListener("open", () => become("online"))
   socket.addEventListener("close", (event) => {
     watchers = 0
     clients([])
-    if (event.code === 4003) status = REVOKED
-    else if (credential) status = "Offline; reconnecting"
+    if (event.code === 4003) connection = "revoked"
+    else if (credential) connection = "offline"
+    changed()
   })
   socket.addEventListener("message", (event) => {
     if (event.data === HEARTBEAT_PONG) return
@@ -107,9 +136,11 @@ export function connectRelay(
       frame = {}
     }
     if (frame.type === "clients" && typeof frame.count === "number") {
+      const before = watchers
       watchers = frame.count
       if (Array.isArray(frame.ids) && frame.ids.every((id) => typeof id === "string"))
         clients(frame.ids)
+      if (before !== watchers) changed()
       return
     }
     const { clientId } = frame
@@ -123,20 +154,23 @@ export function connectRelay(
     } catch {
       credential = null
       socket.close()
-      status = "Could not read device credentials"
+      connection = "error"
+      changed()
       return
     }
     if (credential) {
-      status = "Connecting"
+      connection = "connecting"
+      changed()
       socket.reconnect()
     } else {
       socket.close()
-      status = "Not linked"
+      connection = "unlinked"
+      changed()
     }
   }
   void sync()
   return {
-    status: () => status,
+    state,
     sync,
     /** Sends an event to connected browsers; they refetch state when they connect. */
     publish: (frame: { type: string }) => {
