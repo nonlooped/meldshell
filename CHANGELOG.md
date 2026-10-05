@@ -4,6 +4,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-05
+
 ### Changed
 
 - A consistency pass over the desktop app. Text fields, buttons, switches, and dialog backdrops now draw from theme tokens, so custom color themes colour them too, and every type size is a whole pixel. Destructive confirms (Delete permanently, Remove workspace, Delete theme, Restore changes, Sign out, Remove worktree) use a red Danger button instead of the accent. Errors inside dialogs, the commit box, and the composer read in the error colour, the composer's status lines share one shape with a dismiss button, and the transcript's read failure offers Try again. Menus keep their icon gutter so labels align, selects look like fields, the title bar's menu buttons use the same tooltip as its other buttons, inbox rows no longer show a native tooltip on hover, rows and disclosure triggers use the default cursor, and Scroll to latest, the snapshot Undo pill, and toasts share one floating style. The commit message takes two lines, Settings' active icon no longer turns accent, provider and loadout renames confirm with a brief Saved, the schedule action moved from the composer's toolbar into the send menu, the terminal's End action moved from its header into the pane menu, and the first-run guide uses the app's button and tile radii.
@@ -379,7 +381,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/nonlooped/meldshell/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/nonlooped/meldshell/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/nonlooped/meldshell/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/nonlooped/meldshell/compare/v0.12.0...v0.13.0
