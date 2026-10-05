@@ -50,6 +50,9 @@ test("only a fresh install without the stored flag opens the guide", () => {
   )
   const workspace = { id: "w", path: "/w", name: "w", createdAt: "", lastOpenedAt: "" }
   assert.equal(needsOnboarding(snapshot({ workspaces: [workspace] })), false)
+  // The home workspace exists on every install, so it does not mean the guide was finished.
+  const home = { ...workspace, id: "home", path: "/home/me", name: "Home", home: true }
+  assert.equal(needsOnboarding(snapshot({ workspaces: [home] })), true)
 })
 
 test("agent rows list built-in providers in catalog order", () => {

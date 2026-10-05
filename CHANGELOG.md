@@ -13,6 +13,7 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 ### Added
 
 - The taskbar icon shows how many threads need attention (approvals, failures, and finished work you have not looked at), and the window flashes once when a new one arrives while another application is in front. Which threads you have looked at is now remembered across restarts. The inbox's workspace menu gains a Show filter (All threads, Needs attention, Running), the empty thread pane lists your three most recent threads, and two shortcuts join Settings: Ctrl+Shift+L focuses the composer and Ctrl+] moves focus to the next pane of a split.
+- A built-in Home workspace for threads that need no project, such as general or system-wide questions. It works in your home folder (`~`), so its agents and terminals start there. Pick it from a new thread's workspace heading, the first-run guide, or the inbox menu's New thread in Home. It is marked with an accent house icon wherever workspaces are listed, sits first and apart from your projects in workspace menus, and leads Manage workspaces on a tinted card. A new Home thread says it works outside any project. It can be renamed but not removed, and it offers no worktree or issue start because it is not a project.
 
 ### Fixed
 

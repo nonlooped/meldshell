@@ -7,11 +7,12 @@ export type OnboardingStep = (typeof ONBOARDING_STEPS)[number]
 
 /**
  * A fresh install opens the guide once. Installs that already hold work predate it, so they are
- * treated as set up even though they never stored the flag.
+ * treated as set up even though they never stored the flag. The home workspace is always there,
+ * so it does not count as work.
  */
 export const needsOnboarding = (snapshot: AppSnapshot): boolean =>
   snapshot.settings.onboarded !== true &&
-  snapshot.workspaces.length === 0 &&
+  snapshot.workspaces.every((workspace) => workspace.home === true) &&
   snapshot.threads.length === 0
 
 type Availability = ProviderStatus["availability"]

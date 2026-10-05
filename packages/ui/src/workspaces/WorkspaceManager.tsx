@@ -2,6 +2,7 @@ import { useState } from "react"
 import { errorMessage, type Workspace } from "@meldshell/contracts"
 import { Folder, FolderPlus } from "lucide-react"
 import { AppDialog, Button, ContextMenu, MenuAction, TextField } from "../ui/controls"
+import { HomeMark, splitHome } from "./WorkspaceLabel"
 
 export function WorkspaceManager({
   workspaces,
@@ -14,6 +15,7 @@ export function WorkspaceManager({
   readonly onRename: (workspaceId: string, name: string) => Promise<unknown>
   readonly onRemove: (workspaceId: string) => Promise<unknown>
 }): React.JSX.Element {
+  const { home, projects } = splitHome(workspaces)
   const [editing, setEditing] = useState<Workspace | null>(null)
   const [removing, setRemoving] = useState<Workspace | null>(null)
   const [name, setName] = useState("")
@@ -43,19 +45,28 @@ export function WorkspaceManager({
         </Button>
       </div>
       {error && !editing && !removing && <p role="alert">{error}</p>}
-      {workspaces.length === 0 && (
+      {projects.length === 0 && (
         <p className="settings-empty [padding:28px_0] text-[var(--text-tertiary)] text-[13px] text-center">
-          Add a folder to start a workspace.
+          Add a project folder to start a workspace.
         </p>
       )}
-      {workspaces.map((workspace) => (
+      {[...(home === undefined ? [] : [home]), ...projects].map((workspace) => (
         <ContextMenu
           key={workspace.id}
           trigger={
-            <section className={workspaceCardClasses}>
-              <Folder size={19} />
+            <section
+              className={
+                workspace.home === true
+                  ? `${workspaceCardClasses} ${homeCardClasses}`
+                  : workspaceCardClasses
+              }
+            >
+              {workspace.home === true ? <HomeMark size={19} /> : <Folder size={19} />}
               <div className="min-w-0 flex-1">
-                <h3>{workspace.name}</h3>
+                <h3>
+                  {workspace.name}
+                  {workspace.home === true && <span className={homeTagClasses}>Home folder</span>}
+                </h3>
                 <code>{workspace.path}</code>
               </div>
               <div className="flex flex-wrap gap-[8px] [@media(max-width:_1050px)]:ml-[35px]">
@@ -70,16 +81,18 @@ export function WorkspaceManager({
                 >
                   Rename
                 </Button>
-                <Button
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => {
-                    setError("")
-                    setRemoving(workspace)
-                  }}
-                >
-                  Remove
-                </Button>
+                {workspace.home !== true && (
+                  <Button
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => {
+                      setError("")
+                      setRemoving(workspace)
+                    }}
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
             </section>
           }
@@ -107,7 +120,9 @@ export function WorkspaceManager({
               Open in file manager
             </MenuAction>
           )}
-          <MenuAction onClick={() => setRemoving(workspace)}>Remove workspace…</MenuAction>
+          {workspace.home !== true && (
+            <MenuAction onClick={() => setRemoving(workspace)}>Remove workspace…</MenuAction>
+          )}
         </ContextMenu>
       ))}
       <AppDialog
@@ -182,6 +197,13 @@ export function WorkspaceManager({
     </>
   )
 }
+
+/** Home sits first on a faint accent wash, so it reads as built in rather than one more project. */
+const homeCardClasses =
+  "[padding:16px_14px]! mb-[8px] rounded-[var(--radius-lg)] border-[1px]! border-[color:color-mix(in_srgb,var(--accent)_28%,transparent)]! bg-[color-mix(in_srgb,var(--accent)_7%,transparent)]"
+
+const homeTagClasses =
+  "ml-[8px] inline-flex items-center h-[18px] [padding:0_7px] rounded-full align-middle bg-[color-mix(in_srgb,var(--accent)_16%,transparent)] text-[var(--accent)] text-[11px] font-medium"
 
 const workspaceCardClasses = [
   "flex items-center gap-[16px] [padding:20px_0] border-b-[1px] border-b-[color:var(--line-subtle)]",

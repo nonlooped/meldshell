@@ -5,7 +5,7 @@ import { Toggle } from "@base-ui-components/react/toggle"
 import { ToggleGroup } from "@base-ui-components/react/toggle-group"
 import { ArrowUpRight, CircleDot, Folder, GitBranch, SquareTerminal } from "lucide-react"
 import { replaceSnapshot } from "../data/cache"
-import { DropdownMenu, MenuChoice, MenuRadioGroup } from "../ui/controls"
+import { DropdownMenu, MenuChoice, MenuRadioGroup, MenuSeparator } from "../ui/controls"
 import { MeldMark } from "../ui/MeldMark"
 import { motion } from "motion/react"
 import { useMotionPreference } from "../ui/motion"
@@ -13,6 +13,7 @@ import { ErrorToast } from "../ui/Notice"
 import { segmentClasses, segmentGroupClasses } from "../ui/styles"
 import { WorktreeSetupNote } from "../files/WorktreeSetup"
 import { useViewStore } from "../app/view-store"
+import { HomeMark, WorkspaceLabel, splitHome } from "../workspaces/WorkspaceLabel"
 
 const originEase = [0.16, 1, 0.3, 1] as const
 
@@ -91,7 +92,9 @@ export function ThreadOrigin({
           />
           <span className="tabular-nums">Issue #{thread.issue.number}</span>
           {workspace !== undefined && (
-            <span className="text-[var(--text-tertiary)]">in {workspace.name}</span>
+            <span className="text-[var(--text-tertiary)]">
+              in <WorkspaceLabel workspace={workspace} size={12} />
+            </span>
           )}
           <ArrowUpRight
             size={12}
@@ -131,6 +134,7 @@ export function ThreadOrigin({
               aria-label={`Workspace: ${workspace?.name ?? "Unknown workspace"}`}
               className="motion-colors inline-flex max-w-full [margin:0_-4px] [padding:0_4px] border-0 rounded-[var(--radius-sm)] bg-transparent text-inherit [font:inherit] cursor-default [&:hover:not(:disabled)]:bg-[var(--surface-hover)] [&[data-popup-open]]:bg-[var(--surface-hover)] [&:focus-visible]:[outline:1.5px_solid_var(--focus-ring)]"
             >
+              {workspace?.home === true && <HomeMark size={18} className="self-center mr-[6px]" />}
               <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap [text-decoration:underline_dotted] [text-decoration-color:var(--line-strong)] [text-decoration-thickness:1.5px] [text-underline-offset:5px]">
                 {workspace?.name ?? "an unknown workspace"}
               </span>
@@ -141,24 +145,20 @@ export function ThreadOrigin({
             value={thread.workspaceId}
             onValueChange={(next) => mutation.mutate({ workspaceId: String(next) })}
           >
-            {workspaces.map((entry) => (
-              <MenuChoice
-                key={entry.id}
-                value={entry.id}
-                // Paths only disambiguate workspaces that share a name.
-                detail={
-                  workspaces.some((other) => other.id !== entry.id && other.name === entry.name)
-                    ? entry.path
-                    : undefined
-                }
-              >
-                {entry.name}
-              </MenuChoice>
-            ))}
+            <WorkspaceChoices workspaces={workspaces} />
           </MenuRadioGroup>
         </DropdownMenu>
         ?
       </motion.h2>
+      {workspace?.home === true && (
+        <motion.p
+          {...enter(0.14, { y: 4 }, { y: 0 })}
+          className="m-0 mt-[8px] max-w-[440px] text-[13px] leading-[1.55] text-[var(--text-tertiary)] [text-wrap:pretty]"
+        >
+          Outside any project, for general questions and your computer. Agents start in{" "}
+          <code className="[font-family:var(--font-mono)] text-[12px]">~</code>.
+        </motion.p>
+      )}
       {mutation.isError && (
         <ErrorToast message={mutation.error.message} onDismiss={() => mutation.reset()} />
       )}
@@ -166,11 +166,46 @@ export function ThreadOrigin({
   )
 }
 
+/** Home first, apart from the projects, which show paths only to tell same-named ones apart. */
+function WorkspaceChoices({ workspaces }: { workspaces: readonly Workspace[] }): React.JSX.Element {
+  const { home, projects } = splitHome(workspaces)
+  return (
+    <>
+      {home !== undefined && (
+        <MenuChoice value={home.id} hint="Your home folder, outside any project">
+          <WorkspaceLabel workspace={home} />
+        </MenuChoice>
+      )}
+      {home !== undefined && projects.length > 0 && <MenuSeparator />}
+      {projects.map((entry) => (
+        <MenuChoice
+          key={entry.id}
+          value={entry.id}
+          detail={
+            projects.some((other) => other.id !== entry.id && other.name === entry.name)
+              ? entry.path
+              : undefined
+          }
+        >
+          {entry.name}
+        </MenuChoice>
+      ))}
+    </>
+  )
+}
+
 /**
  * Sits under an empty thread's composer and chooses between the shared workspace folder and the
- * thread's own Git worktree until the first message.
+ * thread's own Git worktree until the first message. The home folder is no project, so it offers
+ * only the terminal sessions started there.
  */
-export function ThreadBranchToggle({ thread }: { thread: Thread }): React.JSX.Element {
+export function ThreadBranchToggle({
+  thread,
+  home,
+}: {
+  thread: Thread
+  home: boolean
+}): React.JSX.Element {
   const { mutation, busy } = useDraftLocation(thread.id)
   const pending = useMutationState({
     filters: { mutationKey: draftLocationKey(thread.id), status: "pending" },
@@ -189,39 +224,41 @@ export function ThreadBranchToggle({ thread }: { thread: Thread }): React.JSX.El
   return (
     <div className="thread-branch-toggle [padding:10px_var(--pane-gutter)_0]">
       <div className="flex w-full max-w-[680px] min-w-0 items-center justify-center gap-[10px] [margin:0_auto]">
-        <ToggleGroup
-          aria-label="Where the thread works"
-          value={[isolated ? "own" : "shared"]}
-          disabled={busy}
-          onValueChange={(value) => {
-            const next = value[0]
-            if (next !== undefined) mutation.mutate({ isolated: next === "own" })
-          }}
-          className={`shrink-0 ${segmentGroupClasses}`}
-        >
-          <Toggle
-            value="shared"
-            title="Shares files with the other threads in this workspace"
-            className={segmentClasses}
+        {!home && (
+          <ToggleGroup
+            aria-label="Where the thread works"
+            value={[isolated ? "own" : "shared"]}
+            disabled={busy}
+            onValueChange={(value) => {
+              const next = value[0]
+              if (next !== undefined) mutation.mutate({ isolated: next === "own" })
+            }}
+            className={`shrink-0 ${segmentGroupClasses}`}
           >
-            <Folder size={13} strokeWidth={2} aria-hidden="true" />
-            Workspace folder
-          </Toggle>
-          <Toggle
-            value="own"
-            title="A Git worktree from the current commit, so parallel threads never collide"
-            className={segmentClasses}
-          >
-            <GitBranch size={13} strokeWidth={2} aria-hidden="true" />
-            Own branch
-          </Toggle>
-        </ToggleGroup>
+            <Toggle
+              value="shared"
+              title="Shares files with the other threads in this workspace"
+              className={segmentClasses}
+            >
+              <Folder size={13} strokeWidth={2} aria-hidden="true" />
+              Workspace folder
+            </Toggle>
+            <Toggle
+              value="own"
+              title="A Git worktree from the current commit, so parallel threads never collide"
+              className={segmentClasses}
+            >
+              <GitBranch size={13} strokeWidth={2} aria-hidden="true" />
+              Own branch
+            </Toggle>
+          </ToggleGroup>
+        )}
         {note !== undefined ? (
           <span className="min-w-0 text-[var(--text-tertiary)] text-[12px]">{note}</span>
         ) : (
           <WorktreeSetupNote thread={thread} className="text-[12px]" />
         )}
-        {thread.issue === undefined && note === undefined && (
+        {!home && thread.issue === undefined && note === undefined && (
           <BaseButton
             type="button"
             disabled={busy}

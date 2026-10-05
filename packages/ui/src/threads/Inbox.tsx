@@ -48,6 +48,7 @@ import {
 } from "../ui/controls"
 import { relativeAge } from "../ui/relative-age"
 import { useScheduledThreadIds } from "../schedules/schedule-queries"
+import { HomeMark, WorkspaceLabel, splitHome } from "../workspaces/WorkspaceLabel"
 import { useViewStore } from "../app/view-store"
 import { useShownElsewhere } from "../app/thread-windows"
 import {
@@ -173,6 +174,7 @@ function InboxThread({
   onDelete,
   unseen,
   scheduled,
+  home,
 }: Pick<
   InboxProps,
   | "rail"
@@ -191,6 +193,8 @@ function InboxThread({
   workspaceId: string
   unseen: boolean
   scheduled: boolean
+  /** The thread works in the home workspace rather than a project. */
+  home: boolean
 }): React.JSX.Element {
   const draggable = useThreadDraggable(thread.id, "inbox")
   const archiveChord = useKeybindings((state) => state.bindings.archiveThread)
@@ -257,7 +261,13 @@ function InboxThread({
                         )}
                         {workspaceId === "all" && (
                           <span className="thread-workspace">
-                            {workspaceNames.get(thread.workspaceId) ?? "Unknown workspace"}
+                            <WorkspaceLabel
+                              size={11}
+                              workspace={{
+                                name: workspaceNames.get(thread.workspaceId) ?? "Unknown workspace",
+                                home,
+                              }}
+                            />
                           </span>
                         )}
                         <ActivityBadge activity={thread.activity} show="running">
@@ -581,18 +591,63 @@ const FILTERS: ReadonlyArray<{ readonly value: InboxFilter; readonly label: stri
   { value: "running", label: "Running" },
 ]
 
+/** The home workspace first, set apart from the projects that follow it. */
+function WorkspaceChoices({
+  workspaces,
+}: {
+  workspaces: ReadonlyArray<Workspace>
+}): React.JSX.Element {
+  const { home, projects } = splitHome(workspaces)
+  return (
+    <>
+      {home !== undefined && (
+        <MenuChoice value={home.id} hint="Your home folder, for questions outside a project">
+          <WorkspaceLabel workspace={home} />
+        </MenuChoice>
+      )}
+      {home !== undefined && projects.length > 0 && <MenuSeparator />}
+      {projects.map((workspace) => (
+        <MenuChoice key={workspace.id} value={workspace.id}>
+          {workspace.name}
+        </MenuChoice>
+      ))}
+    </>
+  )
+}
+
+/** General questions start in the home folder, without a project. */
+function NewHomeThreadAction({
+  workspaces,
+  workspaceId,
+  onNewThreadInWorkspace,
+}: {
+  workspaces: ReadonlyArray<Workspace>
+  workspaceId: string
+  onNewThreadInWorkspace: (workspaceId: string) => void
+}): React.JSX.Element | null {
+  const home = workspaces.find((workspace) => workspace.home === true)
+  if (home === undefined || home.id === workspaceId) return null
+  return (
+    <MenuAction icon={<HomeMark />} onClick={() => onNewThreadInWorkspace(home.id)}>
+      New thread in {home.name}
+    </MenuAction>
+  )
+}
+
 /** The workspace selector's icon and caption; a filter other than All names itself first. */
 function SelectorLabel({
   filter,
   workspaceName,
+  home,
 }: {
   filter: InboxFilter
   workspaceName: string
+  home: boolean
 }): React.JSX.Element {
   if (filter === "all")
     return (
       <>
-        <Folder size={15} strokeWidth={1.65} />
+        {home ? <HomeMark size={15} /> : <Folder size={15} strokeWidth={1.65} />}
         <span className={railLabelClasses}>{workspaceName}</span>
       </>
     )
@@ -725,6 +780,7 @@ export function Inbox({
       selectedThreadId={selectedThreadId}
       unseen={unseenThreadIds.has(thread.id)}
       scheduled={scheduledThreadIds.has(thread.id)}
+      home={thread.workspaceId === homeWorkspaceId}
       onOpen={onOpen}
       onOpenBeside={onOpenBeside}
       onPopOut={onPopOut}
@@ -735,6 +791,7 @@ export function Inbox({
     />
   )
 
+  const homeWorkspaceId = splitHome(workspaces).home?.id
   const selectedWorkspaceName =
     workspaceId === "all"
       ? "All workspaces"
@@ -781,7 +838,11 @@ export function Inbox({
                     title={rail ? selectedWorkspaceName : undefined}
                     aria-label={`Show threads from: ${selectedWorkspaceName}`}
                   >
-                    <SelectorLabel filter={filter} workspaceName={selectedWorkspaceName} />
+                    <SelectorLabel
+                      filter={filter}
+                      workspaceName={selectedWorkspaceName}
+                      home={workspaceId === homeWorkspaceId}
+                    />
                     <ChevronsUpDown size={13} strokeWidth={1.7} className={railLabelClasses} />
                   </BaseButton>
                 }
@@ -791,11 +852,7 @@ export function Inbox({
                   onValueChange={(value) => setWorkspaceId(String(value))}
                 >
                   <MenuChoice value="all">All workspaces</MenuChoice>
-                  {workspaces.map((workspace) => (
-                    <MenuChoice key={workspace.id} value={workspace.id}>
-                      {workspace.name}
-                    </MenuChoice>
-                  ))}
+                  <WorkspaceChoices workspaces={workspaces} />
                 </MenuRadioGroup>
                 <MenuSeparator />
                 <MenuRadioGroup
@@ -828,6 +885,11 @@ export function Inbox({
           >
             {workspaceId === "all" ? "New thread" : "New thread in this workspace"}
           </MenuAction>
+          <NewHomeThreadAction
+            workspaces={workspaces}
+            workspaceId={workspaceId}
+            onNewThreadInWorkspace={onNewThreadInWorkspace}
+          />
           <MenuAction
             onClick={() =>
               useViewStore

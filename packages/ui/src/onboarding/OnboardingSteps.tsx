@@ -1,3 +1,4 @@
+import { HomeMark } from "../workspaces/WorkspaceLabel"
 import type {
   AppSettings,
   AppSnapshot,
@@ -251,7 +252,10 @@ export function WorkspaceStep({
 }) {
   return (
     <>
-      <StepTitle title="Pick a project" hint="A folder your agents can read and change." />
+      <StepTitle
+        title="Pick a project"
+        hint="A folder your agents can read and change, or Home for general questions."
+      />
       <div className="grid justify-items-center gap-[14px]">
         <Stagger index={1} className="w-[min(440px,_100%)]">
           <button
@@ -290,11 +294,15 @@ export function WorkspaceStep({
                     "flex items-center gap-[10px] [padding:10px_38px_10px_12px] max-w-[300px]",
                   )}
                 >
-                  <FolderOpen
-                    size={16}
-                    strokeWidth={1.75}
-                    className="shrink-0 text-[var(--text-tertiary)]"
-                  />
+                  {workspace.home === true ? (
+                    <HomeMark size={16} />
+                  ) : (
+                    <FolderOpen
+                      size={16}
+                      strokeWidth={1.75}
+                      className="shrink-0 text-[var(--text-tertiary)]"
+                    />
+                  )}
                   <span className="overflow-hidden text-[13px] font-medium text-ellipsis whitespace-nowrap">
                     {workspace.name}
                   </span>

@@ -1,5 +1,6 @@
 import { SqlSchema } from "effect/sql"
 import { Effect, Result, SchemaGetter, Schema, Struct } from "effect"
+import { homeWorkspacePath } from "./workspace-paths"
 import {
   CursorQuestion,
   PiDialog,
@@ -236,6 +237,7 @@ const fromWorkspaceRow = (row: WorkspaceRow): Workspace => ({
   name: row.name,
   createdAt: row.created_at,
   lastOpenedAt: row.last_opened_at,
+  ...(row.path === homeWorkspacePath ? { home: true } : {}),
 })
 
 export const fromThreadRow = (row: ThreadRow): Thread => {

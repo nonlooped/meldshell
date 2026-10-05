@@ -7,6 +7,8 @@ export const Workspace = Schema.Struct({
   name: Schema.String,
   createdAt: Schema.String,
   lastOpenedAt: Schema.String,
+  /** The user's home folder, always present for threads that need no project. */
+  home: Schema.optional(Schema.Boolean),
 })
 
 export type Workspace = typeof Workspace.Type

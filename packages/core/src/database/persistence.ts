@@ -6,6 +6,7 @@ import { Effect } from "effect"
 import { seedCatalog } from "../catalog"
 import { clearShuttingDown } from "../settings"
 import { transaction } from "./transaction"
+import { ensureHomeWorkspace } from "./workspace-paths"
 
 export const initializeDatabase = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -17,6 +18,7 @@ export const initializeDatabase = Effect.gen(function* () {
   yield* runMigrations
 
   yield* recoverInterruptedWork.pipe(transaction)
+  yield* ensureHomeWorkspace
 
   yield* seedCatalog
 })

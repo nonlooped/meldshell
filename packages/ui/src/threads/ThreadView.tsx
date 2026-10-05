@@ -246,7 +246,14 @@ export function ThreadView({
             </>
           }
         />
-        {thread.turnCount === 0 && <ThreadBranchToggle thread={thread} />}
+        {thread.turnCount === 0 && (
+          <ThreadBranchToggle
+            thread={thread}
+            home={snapshot.workspaces.some(
+              (workspace) => workspace.id === thread.workspaceId && workspace.home === true,
+            )}
+          />
+        )}
       </FadeDiv>
       {scheduling && (
         <ScheduleDialog
