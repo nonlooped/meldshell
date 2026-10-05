@@ -1,43 +1,70 @@
 # Windows and WSL
 
-The Windows MeldShell app offers **Windows (native)** and **WSL (Linux)** modes in **Settings → App & updates → Execution environment**. Choose a mode, then **Restart and switch**. Restarting closes terminals and interrupts any running agent turns after confirmation. Threads, settings, provider sign-ins, and remote-account identity stay separate in each environment; switching back restores access to that environment’s data. No history is moved or merged.
+Use this guide to choose where MeldShell executes work, prepare a WSL distribution, or diagnose the Windows-to-Linux connection.
 
-New installations default to Windows mode, where agents, tools, Git, editors, and terminals run directly on Windows without WSL. Native terminals use PowerShell (with Command Prompt as a fallback). Existing installations with a saved WSL distribution or `MELDSHELL_WSL_DISTRO` retain WSL mode until you choose otherwise. The mode is saved in `environment.json` in the Windows user-data directory; an explicit Windows choice takes precedence over the distribution environment variable.
+## Choose an execution environment
 
-In WSL mode, MeldShell runs its host in one selected WSL distribution. Codex, Claude Code, Cursor CLI, Pi, their tools and MCP servers, Git, worktrees, setup scripts, terminals, and development servers run there. MeldShell does not automatically fall back to Windows tools when WSL is unavailable. The Linux desktop continues to run its host locally.
+In the Windows desktop, open **Settings → App & updates → Execution environment**, choose **Windows (native)** or **WSL (Linux)**, then **Restart and switch**. Switching closes terminals and interrupts active turns after confirmation.
 
-## Set up the distribution
+| Mode | Where work runs | State and credentials |
+| --- | --- | --- |
+| Windows | Native Windows agents, Git, editors, and terminals | Windows app data and provider sign-ins |
+| WSL | Linux tools in the selected distribution | That distribution's data and provider sign-ins |
 
-Install WSL and your preferred distribution using [Microsoft's installation guide](https://learn.microsoft.com/windows/wsl/install). Inside that distribution, install:
+Switching does not move or merge history. Returning to an environment restores access to its threads and settings. The Linux desktop runs its host locally.
 
-- Linux Node.js 24 or newer and npm, available in an interactive Bash login shell.
-- Python 3, make, and a C++ compiler for the Linux terminal addon. On Ubuntu or Debian these are provided by `python3` and `build-essential`.
-- Git and whichever agent CLIs you use. Sign in to each CLI inside WSL.
+New Windows installations default to native mode. A saved choice in `environment.json` takes precedence over distribution hints. Without a saved mode, an existing `wsl.json` choice or `MELDSHELL_WSL_DISTRO` selects WSL. See [environment selection](../apps/desktop/src/main/runtime/environment-settings.ts) for the precedence.
 
-MeldShell uses the distribution's default Linux user and its Bash startup files. Linux-side CLI overrides and credentials belong in that environment. The desktop does not forward Windows credential or provider environment variables. Mounted Windows PATH entries under `/mnt/<drive>` are removed from the host's PATH to avoid discovering Windows tool installations. MeldShell does not change WSL's system-wide interoperability settings or prevent commands you explicitly configure from invoking Windows programs.
+## Prepare WSL
 
-Select WSL mode and restart, then choose the distribution if one has not been saved. First launch copies the matching host from the installed app into WSL, downloads locked runtime dependencies, and builds the terminal addon. Internet access is needed for this step. Later launches reuse the prepared host; changed host code or Node ABI gets a new installation and removes the previous ones. No account or network listener is needed for the desktop connection.
+Install a distribution using [Microsoft's WSL installation guide](https://learn.microsoft.com/windows/wsl/install). In that distribution's default user's environment, make these available to an interactive Bash login shell:
 
-If setup fails, the error dialog offers retry, another distribution, **Use Windows**, or quit. **Use Windows** explicitly saves Windows mode and restarts with the native host; there is no automatic fallback. To select a different distribution on a later launch, set the Windows environment variable `MELDSHELL_WSL_DISTRO` to its exact name, or remove `wsl.json` from MeldShell's Windows user-data directory while the app is closed to choose again. In WSL mode, the override takes precedence over the saved distribution choice. Each distribution has separate threads, settings, and provider sessions.
+- Linux Node.js 24 or newer and npm.
+- Python 3, make, and a C++ compiler for the terminal addon.
+- Git and the agent CLIs you intend to use, signed in inside Linux.
 
-## Projects, files, and tools in WSL
+Select WSL mode and choose the distribution when prompted. First launch copies the matching host payload from the app, installs locked dependencies, and builds the terminal addon. This needs internet access. Subsequent launches reuse a cache identified by payload contents, Node ABI, and architecture. The desktop connection uses process pipes and does not require an account or network listener.
 
-The folder and attachment pickers start in the selected Linux user's home through `\\wsl.localhost\<distribution>`. Both `\\wsl.localhost` and `\\wsl$` paths are accepted. A selection from another distribution is rejected. Local Windows drive paths are translated by that distribution's `wslpath`, so custom mount locations work. Prefer projects under `/home/<user>` for Linux filesystem performance; see [Microsoft's filesystem guidance](https://learn.microsoft.com/windows/wsl/filesystems).
+The host uses Linux startup files for tools and credentials. MeldShell clears `WSLENV` when starting the host and filters mounted Windows paths under `/mnt/<drive>` from its tool-search PATH. Configure Linux-side tools there; explicitly configured commands can still invoke Windows programs.
 
-File references and provider payloads use Linux paths. Agent configuration, credentials, and sessions are read from the Linux home. Terminals use Linux PTYs and `$SHELL`; their run scripts receive Linux workspace and worktree paths. Editors are discovered and launched in Linux. A Linux GUI editor or file manager may require WSLg. Windows editors are not launched by MeldShell's editor action.
+## Projects and paths
 
-Windows browser previews can usually reach Linux development servers through `localhost`. If a preview fails, check the server and your [WSL networking configuration](https://learn.microsoft.com/windows/wsl/networking); MeldShell does not change firewall or WSL networking settings.
+Prefer projects in the Linux filesystem, such as `/home/<user>/projects`, when using Linux tools. Microsoft's [filesystem guidance](https://learn.microsoft.com/windows/wsl/filesystems) explains the performance tradeoff.
+
+Folder and attachment pickers use the selected distribution's home through `\\wsl.localhost\<distribution>`. MeldShell also accepts `\\wsl$\<distribution>` paths and converts local Windows drive paths with that distribution's `wslpath`. Paths belonging to another distribution are rejected.
+
+Provider payloads, terminals, worktrees, and scripts use Linux paths. Editor actions launch Linux editors; GUI applications may need WSLg. Browser previews depend on the development server and [WSL networking](https://learn.microsoft.com/windows/wsl/networking). MeldShell does not configure the firewall or WSL networking.
 
 ## Data and recovery
 
-Windows mode uses the existing database and remote-account identity in the Windows app user-data directory (or `MELDSHELL_DATA_DIR`, if configured), along with provider credentials in the Windows environment. Switching back to Windows makes pre-WSL Windows history available again.
+| Data | Location |
+| --- | --- |
+| Native host database and remote identity | App user-data directory, overridden by `MELDSHELL_DATA_DIR` |
+| Windows mode and distribution selection | `environment.json` and `wsl.json` in app user data |
+| WSL host database and remote identity | `~/.local/share/meldshell`, overridden by Linux-side `MELDSHELL_WSL_DATA_DIR` |
+| Prepared WSL host payloads | `~/.cache/meldshell/hosts` |
 
-The database and remote-account identity live under `~/.local/share/meldshell` in WSL. Set `MELDSHELL_WSL_DATA_DIR` in the Linux startup environment to use another absolute Linux directory. The headless host (`npm run host`) defaults to the same directory; do not run both against one database at the same time. Give the headless host its own `--data-dir` inside that distribution. Host installations are cached under `~/.cache/meldshell/hosts`; a cache unused for 14 days is removed the next time MeldShell prepares a new one. Existing Windows databases are left in place and are not automatically migrated or merged with Linux history. Back up the WSL data directory when the app is closed.
+The WSL data override must be an absolute Linux path. The standalone headless host defaults to the same Linux data directory, so give it a separate `--data-dir` when running alongside the desktop host. Back up application data while its host is stopped.
 
-Closing MeldShell stops its Linux host, agents, and terminals. It does not shut down the distribution or stop unrelated WSL programs. If WSL stops or the connection breaks, terminals report an exit and in-flight requests fail. Requests are never automatically resent: check the thread before retrying a prompt. The next connection starts the host again and uses the existing durable-state recovery. Provider credentials and the chosen distribution are not reset.
+Payload caches are separate from conversation data. Preparing a new cache removes other caches unused for more than 14 days; it does not remove all older installations on every launch.
 
-## Development and verification
+Closing MeldShell stops its host, agents, and terminals without shutting down the distribution. If WSL or its pipe connection stops, pending requests fail and terminals report an exit. Reconnection does not replay requests. Check a thread's state before resubmitting a prompt whose delivery is uncertain.
 
-On Windows, `npm run dev` and `npm run build` prepare the WSL host payload; other platforms skip it unless `MELDSHELL_BUILD_WSL_HOST=1` is set. `npm run build:wsl-host --workspace=@meldshell/desktop` rebuilds just that payload. Its external runtime dependencies are pinned in `apps/host/runtime/package.json` and its lockfile; keep those versions aligned with the workspace dependencies when updating them.
+## Resolve a startup problem
 
-The [e2e suite](../tests/e2e/README.md) tests the native desktop on Linux and Windows. Bundled WSL host installation and switching still require manual validation. Manual Windows validation should still cover first launch, a project with spaces and non-ASCII characters, a real provider turn and interruption, an isolated worktree with setup/run scripts, terminal resize and Ctrl+C, attachments, Linux editor launch, WSL shutdown during work, app restart, and clean app shutdown. The native desktop journeys do not certify Windows/WSL integration.
+| Symptom | Check or action |
+| --- | --- |
+| Linux Node or npm is missing | Confirm the selected distribution's default user can find Linux executables from an interactive Bash login shell |
+| Terminal addon preparation fails | Install the compiler prerequisites in that distribution and retry |
+| The wrong distribution starts | In WSL mode, `MELDSHELL_WSL_DISTRO` overrides the saved distribution; change it or remove `wsl.json` while the app is closed to choose again |
+| A distribution hint has no effect | An explicitly saved Windows mode wins; select WSL in Settings first |
+| WSL is unavailable | The error dialog offers retry, another distribution, **Use Windows**, or quit; there is no automatic fallback |
+| A project or credential appears missing after switching | Check the active environment and its data directory before attempting recovery |
+
+The [WSL launcher](../apps/desktop/src/main/runtime/wsl.ts), [bootstrap](../apps/desktop/src/main/runtime/wsl-bootstrap.ts), and [Linux desktop host](../apps/host/src/desktop.ts) are the implementation references for these behaviors.
+
+## Develop or verify the integration
+
+Windows development and desktop builds prepare the WSL payload. Elsewhere, set `MELDSHELL_BUILD_WSL_HOST=1` to include it. To rebuild only that payload, use `npm run build:wsl-host --workspace=@meldshell/desktop`. Its [build script](../apps/desktop/scripts/build-wsl-host.mjs) checks the pinned runtime dependencies against installed versions.
+
+The [journey suite](../tests/e2e/README.md) exercises the native desktop, not bundled WSL installation or environment switching. For a WSL change, choose manual evidence for the affected path: first preparation, file translation, provider execution, worktree scripts, terminals, or shutdown and reconnect. Record the distribution, Node version, and app artifact used. Follow the repository's [verification policy](../AGENTS.md#verification) for agent-run UI checks.

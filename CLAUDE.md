@@ -1,3 +1,5 @@
-# MeldShell repository guidance
+# Working on MeldShell with Claude
 
-Follow [AGENTS.md](AGENTS.md), the shared source of repository rules. Its task links identify the documentation relevant to your change.
+Read and follow [AGENTS.md](AGENTS.md) for this repository's instructions. It is the shared source for project boundaries, task-specific references, verification, and completion.
+
+Keep repository guidance in AGENTS.md so Claude and other coding agents use the same rules.

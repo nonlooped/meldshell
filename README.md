@@ -92,7 +92,7 @@ Check how much of each subscription window you have left, and when it resets, be
 | **Browser preview** | A per-thread browser for the dev server your agent just started. |
 | **Scheduled prompts** | Send a prompt to a thread once, on an interval, or on a daily schedule. |
 | **Attachments** | Drop images and files into any message. |
-| **Remote access** | Reach a linked desktop or headless host from a browser, with host folder browsing, terminals and run scripts. |
+| **Remote access** | Reach a linked desktop or headless host from a browser, with host folder browsing, terminals and run scripts. Scan a QR code to open it on your phone. [Remote access guide](docs/remote-access.md). |
 | **Make it yours** | Dark and light themes, adjustable transcript size, and customizable keyboard shortcuts. |
 | **Windows and WSL** | Run natively on Windows, or keep the app on Windows and the agents, Git and terminals in Linux. [Setup guide](docs/wsl.md). |
 
@@ -119,7 +119,7 @@ npm install
 npm run dev
 ```
 
-Installation downloads Electron and rebuilds SQLite for Electron's Node ABI. See [Contributing](CONTRIBUTING.md) for development checks and [Release](docs/release.md) for packaging.
+Installation downloads Electron and prepares the terminal addon. SQLite comes from the Node runtime. See [Contributing](CONTRIBUTING.md) for development setup and focused checks, and [Release](docs/release.md) for packaging.
 
 </details>
 
@@ -133,8 +133,11 @@ Installation downloads Electron and rebuilds SQLite for Electron's Node ABI. See
 | Change processes, storage, IPC, or recovery | [Host](packages/host/src/host.ts), [contracts](packages/contracts/src/ipc.ts) |
 | Work on provider behavior | [Provider packages](packages) |
 | Change desktop UI or transcript output | [Renderer styles](packages/ui/src/app/styles.css), [Markdown renderer](packages/ui/src/ui/Markdown.tsx) |
-| Build or deploy the site | [Pages configuration](apps/site/wrangler.jsonc), [account worker](apps/control/wrangler.jsonc) |
+| Develop the desktop or remote site | [Contributing](CONTRIBUTING.md) |
+| Deploy the site, account API, or relay | [Remote services](docs/deployment.md) |
+| Run application journeys | [Journey guide](tests/e2e/README.md) |
 | Set up Windows or WSL | [Windows and WSL guide](docs/wsl.md) |
+| Open a computer from your phone or a server | [Remote access guide](docs/remote-access.md) |
 | See what changed between versions | [Changelog](CHANGELOG.md) |
 | Work as an agent | [AGENTS.md](AGENTS.md) |
 

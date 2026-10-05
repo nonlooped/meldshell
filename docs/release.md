@@ -1,93 +1,80 @@
 # Releasing MeldShell
 
-Use this checklist for an installer candidate. Routine edits follow [AGENTS.md](../AGENTS.md#verification). A recorded result applies only to its exact artifact.
+Use this guide to publish a desktop release, prepare an installer candidate, or understand update delivery. For a routine code or documentation change, use [Contributing](../CONTRIBUTING.md#choose-checks-by-impact). For the site and account service, use [deployment](deployment.md).
 
-## Automatic releases
+## Choose the release path
 
-The [Release](../.github/workflows/release.yml) workflow runs from `main`:
+The [Release workflow](../.github/workflows/release.yml) owns packaging and publishing. Its [release script](../scripts/release.mjs) owns eligibility, version changes, and release notes.
 
-- **Stable**, daily at 00:17 UTC: if [CHANGELOG.md](../CHANGELOG.md) has `## [Unreleased]` entries, it releases them as the next minor version (`0.9.0` → `0.10.0`). It moves the entries under the new version and date, bumps every version field, pushes `chore(release): vX.Y.0` to `main` with an annotated tag, and publishes the GitHub Release as the latest release. Days without Unreleased entries release nothing.
-- **Nightly**, after a `main` push's CI run completes and hourly at minute 47: if files outside `docs/`, `.github/`, and Markdown changed since the nearest release tag, stable or nightly, an automatic run publishes a prerelease only when that release is at least 30 minutes old. A run triggered by CI releases only when CI passed and skips if a newer commit arrived meanwhile, combining rapid pushes into one build. The 30-minute limit prevents another automatic nightly immediately afterward, while the CI trigger covers scheduled events that GitHub delays or drops. Manual nightly runs use the change rule without the delay or 30-minute limit. The version is `vX.Y.0-nightly.YYYYMMDDHHMM` for the upcoming minor version, set only in the build; nothing is committed, and the tag points at the triggering `main` commit. Its notes list the Unreleased entries and the commits since the previous release. Nightlies are never marked latest and are kept.
+| Path | When it runs | Result |
+| --- | --- | --- |
+| Stable | Daily, when Unreleased contains entries; also available manually | Next minor version, release commit and tag, public latest release |
+| Nightly | After successful main-push CI and on an hourly schedule when eligible; also available manually | Prerelease for the upcoming minor version; no version commit |
+| Build-only | Manual, from the selected ref | Installer workflow artifacts without a tag or publication |
 
-Each release requires the full [CI](../.github/workflows/ci.yml) suite to pass on its commit and packages both platforms from that commit. `main` pushes already run the full suite, so a release reuses that verdict and runs the suite itself only for a commit without a successful run. It is tagged and published only if everything passes, so a failure leaves no tag, commit, or release. The schedule does not retry a commit whose release failed. A new commit on `main`, a rerun, or a manual run with the same channel does.
+The workflow defines exact schedules and artifact retention. Automatic nightlies require application changes since the nearest release tag and at least 30 minutes since that release. Documentation and workflow changes alone do not trigger them. CI-triggered nightlies skip a commit superseded on `main`.
 
-The stable job pushes its release commit only as a fast-forward of the commit it tested. If `main` moved during the run, the push fails, nothing is published, and the next day's run releases the newer commit. A rerun after a failed upload reuses the tag it already pushed and refuses to change a published release.
+For a manual run, open **Actions → Release → Run workflow** and choose the channel. Stable and nightly releases require `main`; build-only accepts another ref. **Cut a nightly even when no app files changed** bypasses the change requirement for a manual nightly, but cannot reuse an existing timestamped tag.
 
-To release now, open **Actions → Release → Run workflow**, select the `main` branch and `nightly`, then run it. Check **Cut a nightly even when no app files changed** to force a fresh nightly from the current `main` commit, including when the last nightly already used that commit. Leave it unchecked to use the scheduled change rule. Manual `stable` runs use the Unreleased entry rule. The force option cannot reuse a tag created in the same UTC minute; wait until the next minute and run it again. `build-only` packages installers from any ref as seven-day workflow artifacts without releasing. GitHub disables scheduled workflows in a public repository after 60 days without repository activity; re-enable Release from the Actions tab if that happens.
+Publishing requires full CI evidence for the source commit and successful packaging on Windows and Linux. A successful main-push CI run is reused; otherwise the workflow invokes CI. This automated evidence does not establish that every manual scenario below was tested. CI monitoring by an agent follows [AGENTS.md](../AGENTS.md#verification).
 
-If account API or relay behavior changed, complete the [remote service cutover](#remote-service-cutover) before the next scheduled stable release. Routine releases do not need local builds or suites. Use the candidate path below when installer or runtime changes need manual evidence. Keep the manual matrix as the coverage reference and record skipped cases; a routine release does not imply that every manual case was certified.
+## Changelog and versions
+
+The [changelog policy](../AGENTS.md#changelog-and-releases) determines which changes need entries. Write those entries for users under `## [Unreleased]`, using the existing Added, Changed, Fixed, or other applicable group.
+
+Stable releases move Unreleased entries into a dated version section, update the root and desktop manifests and their lockfile entries, and publish `vX.Y.Z`. The current policy increments the minor version. Nightlies use `vX.Y.0-nightly.YYYYMMDDHHMM` for the next minor release and set that version only in the build.
+
+Leave version edits and released changelog sections to the release tooling. Changing the version policy itself belongs in the script and its [tests](../tests/release-cli.test.mjs).
 
 ## Remote service cutover
 
-When a release changes the account API or relay, put the compatible site and account worker in production before the scheduled release of a desktop build that points to them. The Worker configuration is [apps/control/wrangler.jsonc](../apps/control/wrangler.jsonc), and the Pages configuration is [apps/site/wrangler.jsonc](../apps/site/wrangler.jsonc).
-
-1. Confirm the D1 database ID and configure the Worker secrets: `BETTER_AUTH_SECRET` (at least 32 characters), plus both client ID and secret for at least one of Google or Discord. Register `https://meldshell.nonlooped.xyz/api/auth/callback/google` and `https://meldshell.nonlooped.xyz/api/auth/callback/discord` with the respective providers you enable.
-2. Apply D1 migrations and deploy the account Worker with `npm run deploy --workspace=@meldshell/control`. This command changes the production database; review its pending migrations first.
-3. Cloudflare's GitHub integration builds and deploys the `meldshell` Pages project from each `main` push that changes its build watch paths. Pages does not wait for CI, so a site change reaches production even if CI fails on that commit. Confirm the deployment completed in the Pages dashboard before cutting a compatible desktop release. Its `/api/*` Function gets the `CONTROL` service binding to `meldshell-control` from the Pages configuration. The project uses these dashboard settings:
-   - Production branch `main`, root directory `apps/site`, build output directory `dist`.
-   - Build command `cd ../.. && npm ci --ignore-scripts && npm run build --workspace=@meldshell/site`, which installs the workspace from the repository root without the desktop's install scripts.
-   - Environment variables `NODE_VERSION=24` and `SKIP_DEPENDENCY_INSTALL=1`.
-   - Build watch paths including `apps/site/*`, `packages/ui/*`, `packages/contracts/*`, and `package-lock.json`.
-4. Route `meldshell.nonlooped.xyz` to Pages. Confirm `/api/remote/v1/config` returns the enabled providers, and complete a real sign-in and device link before that release. A successful static home page alone does not verify the account API.
-
-## Versioning
-
-MeldShell has one app version, kept in the root and desktop `package.json` files and the lockfile. Tags are `vX.Y.Z` for stable releases and `vX.Y.Z-nightly.YYYYMMDDHHMM` for nightlies, following [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every stable release bumps the minor version; a nightly precedes the stable release it leads up to. A major version, such as 1.0.0 for the first public release, needs a change to [scripts/release.mjs](../scripts/release.mjs).
-
-Every user-visible change adds an entry under `## [Unreleased]` in [CHANGELOG.md](../CHANGELOG.md), using the Keep a Changelog groups `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Write each entry for users, not in terms of the implementation. Internal refactors, tests, CI, and documentation need no entry. A change without an entry still reaches nightlies but does not start a stable release. A [test](../tests/changelog.test.ts) keeps the version fields and changelog consistent.
-
-## Updates
-
-Installed builds check GitHub Releases every four hours. Stable installs follow the latest stable release. Settings › About › **Nightly builds** switches to the nightly channel, which follows GitHub prereleases. A nightly install follows nightlies by default. Turning the switch off installs the latest stable release even though it is older. The choice is stored in `update-channel.json` in the app's user data folder.
+If a desktop change requires new account API or relay behavior, deploy compatible services before publishing that desktop. Follow [Deploying remote services](deployment.md) for the Worker, database, Pages configuration, and evidence of a working deployment. A static site build does not establish API or relay compatibility.
 
 ## Build and assemble
 
-Native Windows and Linux runners package NSIS x64 and AppImage x64 artifacts while CI runs. The publish job verifies the installers and updater metadata, then stages them with blockmaps and SHA256SUMS in a draft before publishing it. Nightlies also carry `nightly.yml` and `nightly-linux.yml`, copies of the `latest` metadata that the updater reads for a prerelease. A failed upload leaves the draft unpublished.
+Use this path when installer or runtime behavior needs an actual candidate. A release-workflow edit alone does not require a local candidate.
 
-For a local candidate:
+Build on the target platform using the normal development installation. The configured artifacts are Windows x64 NSIS and Linux x64 AppImage:
 
-1. Use Node.js 24 or newer on Windows 11 x64 for NSIS and x64 Linux for AppImage.
-2. Install with `npm ci`. For full local candidate validation, run `npm run knip`, `npm run check:fast`, `npm run build`, and then `npm test` once. The tests require the built Electron bundle; the packaging command in the next step also builds it. When using workflow artifacts, use the workflow's automated verdict instead of repeating these checks locally.
-3. Run `npm run package:win` on Windows or `npm run package:linux` on Linux.
-4. Inspect the repository-root `release` output. Confirm database startup uses the runtime's built-in SQLite, the terminal addon loads outside ASAR, and no Claude Code native executable is packaged.
-5. Record hashes and complete the applicable manual matrix against those exact artifacts. Results from a local or `build-only` build apply only to that build; record any checks on the published installers separately.
+```sh
+npm run package:win
+```
 
-Keep each installer/AppImage with the `latest.yml` or `latest-linux.yml` produced by the same build. Installed applications cannot use draft assets; public downloads and updates need a publicly accessible destination. Never embed a GitHub access token in the app.
+or, on Linux:
 
-Configuration lives in [electron-builder.yml](../apps/desktop/electron-builder.yml). Pull requests and `main` pushes run [CI](../.github/workflows/ci.yml): static checks, the website build and tooling tests, and the end-to-end journeys on Linux and Windows. Pull requests run the checks their changes affect; `main` pushes run everything.
+```sh
+npm run package:linux
+```
 
-## Manual candidate matrix
+Each command builds before packaging. Output goes to the repository's `release/` directory. [electron-builder.yml](../apps/desktop/electron-builder.yml) defines packaged files and native resources.
 
-Use fresh operating-system user profiles. Run the provider matrix on Windows and startup/update cases on Linux; record additional Linux coverage and all skipped cases. Authenticated requests may consume account quota. Agent execution of manual/UI checks still requires the explicit request described in AGENTS.md.
+For full local candidate certification, select automated checks covering the candidate's changes and platform. Existing CI evidence for the same source can supply the repository checks; do not rerun an unrelated suite merely because an installer was produced. Desktop journeys need a desktop build and follow the [journey guide](../tests/e2e/README.md).
 
-| Area | Acceptance evidence |
+Inspect the packaged runtime where relevant: SQLite comes from Node; the terminal and ONNX native libraries need disk-accessible resources; Windows includes the WSL host payload. Agent CLIs are discovered on the user's machine rather than shipped as the app's provider runtime.
+
+Keep installers, blockmaps, and updater metadata from the same build together. The workflow verifies artifacts, adds SHA-256 checksums and nightly channel metadata when needed, uploads a draft, then publishes it. Installed updaters need publicly accessible release assets.
+
+## Manual candidate evidence
+
+Choose cases affected by the change and the platforms being claimed. Use disposable workspaces and a separate app profile. Agent execution of manual or UI checks follows the repository verification policy; authenticated provider work can consume account quota.
+
+| Area | Evidence to record |
 | --- | --- |
-| Codex unavailable | Missing, outdated, and unauthenticated states leave stored threads readable and explain the required action |
-| Codex ready | Catalog/capabilities match discovery; streaming, completion, restart resume, interruption, approval, and attachments work |
-| Claude unavailable | Missing CLI, failed compatibility probe, and authentication errors identify the problem while other providers remain usable |
-| Claude ready | PATH/override discovery, streaming, completion, restart resume, interruption, approvals, questions, attachments, Code/Plan, and supported settings work |
-| Cursor unavailable | Missing CLI, wrong executable/handshake, and authentication failures leave other providers usable |
-| Cursor ready | Catalog and exact model IDs, Agent/Plan/Ask, streaming, permissions, questions/plans, cancellation, attachments, and restart session loading work |
-| Pi unavailable | Missing CLI and no model credentials identify the required action while other providers remain usable |
-| Pi ready | Catalog of credentialed models, thinking levels, streaming, extension commands and dialogs, runs an extension starts on its own appearing as turns, cancellation, attachments, and restart session resume work |
-| Provider switching | Switching among installed harnesses resumes each native history without importing other providers' messages |
-| Worker failure | Affected work settles, other providers continue, and reconnect does not replay ambiguous submissions |
-| Usage | All configured provider cards refresh or show an account-appropriate unavailable/error state |
-| Forced exit | Running turns become interrupted; queued input survives restart |
-| Attention | Completion and approval notifications focus the correct thread; out-of-view completion marks clear on viewing, and optional sounds respect the preference |
-| Remote control | A linked desktop and headless host appear only to their account; browser prompts, queues, questions, approvals, files, and Git operations reach the right host; reconnect and revocation preserve host work |
-| Workspace lifecycle | Rename/pin persist; active work blocks removal; removal keeps disk files |
-| Search/preferences | Matches open the right turn, archives remain searchable, preferences survive restart; temporary tabs/drafts are accurately represented |
-| Files/Git | Previews and line links open correctly; staging, unstaging, discard, commit, push, and history reflect the test repository |
-| Layout/accessibility | Keyboard navigation, split panes, themes, reduced motion, transparency fallback, and text scaling remain usable |
-| History/scale | Forward-paged full-history loading and search navigation preserve complete turns; measure the 10,000-thread target, long-history fetch cost, and large-turn limits |
-| Updates | Both platforms check, download, and restart; up-to-date/feed-error states recover; cancelling the active-turn warning keeps the app running; development stays offline from the feed |
-| Uninstall | Windows per-user uninstall needs no elevation and retains user data unless separately removed |
+| Installation and native resources | App starts from the packaged artifact, storage opens, terminal process runs, applicable native features load, uninstall preserves intended user data |
+| Providers | For each affected harness: discovery and unavailable states, a real turn, permissions or questions, cancellation, and native session resume |
+| Durability and isolation | Restart preserves history and queued input; interruption is represented accurately; one provider's failure does not break siblings or replay uncertain submissions |
+| Shared desktop and browser behavior | Affected flows work in the intended client; desktop-only capabilities remain explicit |
+| Remote service | Account and device isolation, linking, command routing, reconnect, and revocation for affected flows |
+| Workspaces and tools | Files, Git, worktrees, scripts, and terminals act on the selected host and thread location |
+| Windows and WSL | Applicable setup, switching, path translation, and recovery cases from the [WSL guide](wsl.md#develop-or-verify-the-integration) |
+| Presentation and updates | Affected keyboard, theme, layout, transcript, or update-channel behavior on the relevant platform |
 
-Use a disposable repository for Git operations and a separate application profile for fixture conversations.
+Record source commit and local changes, artifact name and SHA-256, OS and provider versions, checks performed, and observed results. Mark skipped or failing cases explicitly. A local build's results apply to that artifact; a rebuilt or published installer needs its own evidence for artifact-specific claims.
 
-## Record and publish
+## Updates and failed releases
 
-Keep a candidate record with the source commit and local changes, artifact names, sizes, SHA-256 hashes, operating-system versions, installed provider versions, commands, and each matrix result. Mark skipped and failing checks explicitly.
+Installed builds check GitHub Releases periodically. **Settings → App & updates → Release channel** selects Stable or Nightly. A nightly install defaults to Nightly; selecting Stable permits returning to the latest stable release. The [updater](../apps/desktop/src/main/updater.ts) owns timing, channel persistence, and availability.
 
-Only describe a candidate as verified to the extent its record supports. Unsigned Windows installers may trigger SmartScreen.
+A checks or packaging failure prevents publication. A later failure can leave a tag, release commit, or unpublished draft, so inspect the failed stage before retrying. The workflow can reuse a pushed tag and replace assets on a draft, but refuses to overwrite a published release. A stable release push also fails if `main` advanced beyond the commit it prepared.
+
+Scheduled runs skip a commit already recorded as a failed release for that channel. A new commit or an explicit rerun/manual run can retry. Use the workflow's plan reason and failed stage to distinguish an intentional skip from an error.

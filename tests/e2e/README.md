@@ -1,50 +1,54 @@
 # Application journeys
 
-[TesterArmy e2e](https://tester.army/e2e) owns test discovery, isolation, fixture steps, assertions, deadlines, and reports. Playwright is the Electron driver inside our custom engine; there is no Playwright test runner or mocked renderer bridge. The control engine boots Wrangler's real local Worker, D1, and Durable Objects.
+Use these tests for behavior that crosses the UI, IPC, host, storage, or account-service boundaries. Small logic regressions can use the existing Node tests instead; see [check selection](../../CONTRIBUTING.md#choose-checks-by-impact).
 
-## Run
+The suite uses the `e2e` runner with two custom engines. [e2e.config.ts](../../e2e.config.ts) owns discovery, targets, concurrency, deadlines, and reporters.
 
-Use Node 24+, Git, and the normal development install (`npm install`). Build the desktop before running it:
+## Select a target
+
+| Target | What runs | Prerequisites |
+| --- | --- | --- |
+| `electron` | The built desktop, real preload bridge, workers, SQLite database, and shell processes | Development install, Git, desktop build, and a display with Electron's system libraries |
+| `control` | The account Worker with local D1 and Durable Objects | Development install; no desktop build or display |
+
+For a desktop journey:
 
 ```sh
 npm run build
-npm test
+npm test -- tests/e2e/journeys.e2e.ts --target electron
 ```
 
-Linux needs Electron's shared libraries and a display; in headless Linux use `xvfb-run --auto-servernum npm test`. CI installs Electron and compiles the Linux terminal addon (Windows uses node-pty's bundled prebuilds, as the installer does), then runs the journeys on Ubuntu and Windows. No browser download, cloud account, OAuth login, or AI model key is needed. Provider turns are not dispatched by this suite.
-
-Focused commands:
+For account API journeys:
 
 ```sh
-npm test -- tests/e2e/journeys.e2e.ts --target electron
 npm test -- tests/e2e/remote.e2e.ts --target control
-npm run test:e2e:list
-npm run typecheck:e2e
-npm run test:tooling
 ```
 
-The repository's UI verification policy applies to local Electron runs. Listing and typechecking do not launch Electron. The HTTP-only control target can run without a display or a desktop build.
+On headless Linux, prefix the desktop test command with `xvfb-run --auto-servernum`. [CI](../../.github/workflows/ci.yml) is the reference for platform preparation. Agent execution of desktop tests follows [AGENTS.md](../../AGENTS.md#verification).
 
-## Coverage and isolation
+To inspect the suite without launching either target:
 
-Eleven journeys replace 72 application test files. They test outcomes across boundaries rather than mapping old unit assertions one for one:
+```sh
+npm run test:e2e:list
+npm run typecheck:e2e
+```
 
-| Journey | Boundaries and outcomes |
-| --- | --- |
-| Returning user | Real preload IPC, workspace/thread mutations, worker/database persistence, full Electron restart, typed core errors from the restarted RPC client, renamed entries in the thread palette |
-| Archive and delete | Durable archive status, deletion, sibling preservation, survivor in the thread palette after restart |
-| Preferences | Accessible Settings controls, saved settings, restart, rendered theme |
-| First-run setup | Guide shown on a fresh profile and skipped, rerun from Settings, live theme choice, first thread with a focused composer, completion kept across restart |
-| Workspace files | Actual files with spaces and Unicode, preview/list/rename/delete, rejection of writes outside the workspace |
-| Isolated work | Actual Git worktree, checkout isolation, persisted worktree identity and file access after restart |
-| Model catalog | Custom model edits, restart, removal without altering existing models |
-| Terminal process | Actual shell process and file output in the selected workspace, resize and close |
-| Scheduled work | Paused schedule, edits, restart, safe future run time, deletion, sibling preservation |
-| Device lifecycle | Real account API, local D1/DO, independent devices, revoke and re-register |
-| Rejected writes and sign-out | Invalid input, untrusted origin, unchanged state, session revocation |
+`npm test` selects the whole journey suite. `npm run test:tooling` selects the separate aggregate of Node tests listed in the root manifest.
 
-Each attempt gets a temporary directory. Desktop attempts create a fresh Git repository, SQLite data directory, and Electron user profile; a restart within an attempt retains these directories. Control attempts apply committed migrations and seed one offline account session in a separate local D1 store. Teardown closes the processes before removing their data. Tests run with one worker and no retries so failure is visible. Control HTTP requests have a 30-second fetch/body deadline to accommodate local auth, D1, and Durable Object cold starts on Windows CI; the journey's 90-second overall deadline still applies. Request steps record the method and path, but not credentials or bodies.
+## Isolation and coverage
 
-Reports are written to `.e2e/` (JSON, JUnit, Markdown) and uploaded by CI. Fixture IPC/API operations appear as e2e steps. These custom engines do not currently record browser traces or screenshots. AI actions are optional in e2e; these journeys use deterministic actions and assertions and need no agent configuration.
+The [desktop engine](desktop.ts) creates a temporary Git workspace, app profile, and database for each attempt. Restarts inside an attempt retain those directories so tests can verify persistence. Teardown closes Electron and removes the fixture. Playwright drives Electron inside this engine; the renderer uses the real preload API.
 
-The three root tooling suites still use Node's runner, separately from application tests. They cover release/changelog tooling and CI selection. Removed provider-protocol, update, rich-transcript, remote-WebSocket, and bundled-WSL unit checks are not individually reproduced. Real provider authentication/turns, relay reconnection, website-only flows, and Windows/WSL switching remain verification gaps; these journeys do not certify them.
+The [control engine](control.ts) starts Wrangler's local test harness, applies committed D1 migrations, and seeds an offline account session. It does not require production credentials or an OAuth login. HTTP steps record method and path without logging credentials or request bodies.
+
+[Desktop journeys](journeys.e2e.ts) cover workspace and thread lifecycle, settings and themes, onboarding, files and search, worktrees, model settings, terminals, schedules, and detached thread windows. [Account journeys](remote.e2e.ts) cover device registration, naming and revocation, rejected mutations, and sign-out. Read the test assertions for the exact coverage; passing a journey does not certify every feature in its area.
+
+The journeys do not submit model turns. Desktop startup can still probe locally installed providers, so these fixtures are not a sandbox for arbitrary provider behavior. Real authentication, model execution, relay reconnection, production OAuth, website-only flows, and WSL switching need separate evidence when relevant.
+
+## Change a journey or investigate a failure
+
+Express the user outcome at the boundary that could fail. Use the existing fixtures for setup and cleanup. When persistence is the risk, assert after restarting; when isolation is the risk, assert that the sibling resource or outside workspace is unchanged.
+
+Reports are written under `.e2e/` and uploaded by CI. The custom engines do not currently capture browser traces or screenshots. Read the failing step and fixture before changing a timeout: the control request deadline accommodates local Worker startup, while the runner owns the overall journey deadline.
+
+Use the smallest reproduction that exposes the failure, then rerun the affected journey after fixing it. A test report establishes the assertions it ran; record any remaining manual or integration gap separately.
