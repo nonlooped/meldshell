@@ -20,7 +20,9 @@ routeDiagnosticsToStderr()
 if (process.platform !== "linux") throw new Error("The WSL host must run with Linux Node.js.")
 const distribution = process.env.WSL_DISTRO_NAME
 if (!distribution) throw new Error("The desktop host must run inside WSL.")
-const directory = process.env.MELDSHELL_WSL_DATA_DIR || join(homedir(), ".local/share/meldshell")
+const directory =
+  process.env.MELDSHELL_WSL_DATA_DIR ||
+  join(homedir(), ".local/share", process.env.MELDSHELL_DEVELOPMENT ? "meldshell-dev" : "meldshell")
 if (!directory.startsWith("/"))
   throw new Error("MELDSHELL_WSL_DATA_DIR must be a Linux absolute path.")
 await mkdir(directory, { recursive: true, mode: 0o700 })

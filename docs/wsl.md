@@ -25,7 +25,7 @@ Install a distribution using [Microsoft's WSL installation guide](https://learn.
 
 Select WSL mode and choose the distribution when prompted. First launch copies the matching host payload from the app, installs locked dependencies, and builds the terminal addon. This needs internet access. Subsequent launches reuse a cache identified by payload contents, Node ABI, and architecture. The desktop connection uses process pipes and does not require an account or network listener.
 
-The host uses Linux startup files for tools and credentials. MeldShell clears `WSLENV` when starting the host and filters mounted Windows paths under `/mnt/<drive>` from its tool-search PATH. Configure Linux-side tools there; explicitly configured commands can still invoke Windows programs.
+The host uses Linux startup files for tools and credentials. MeldShell clears `WSLENV` when starting the host, except for a development marker in builds run from source, and filters mounted Windows paths under `/mnt/<drive>` from its tool-search PATH. Configure Linux-side tools there; explicitly configured commands can still invoke Windows programs.
 
 ## Projects and paths
 
@@ -41,7 +41,7 @@ Provider payloads, terminals, worktrees, and scripts use Linux paths. Editor act
 | --- | --- |
 | Native host database and remote identity | App user-data directory, overridden by `MELDSHELL_DATA_DIR` |
 | Windows mode and distribution selection | `environment.json` and `wsl.json` in app user data |
-| WSL host database and remote identity | `~/.local/share/meldshell`, overridden by Linux-side `MELDSHELL_WSL_DATA_DIR` |
+| WSL host database and remote identity | `~/.local/share/meldshell` (`meldshell-dev` when run from source), overridden by Linux-side `MELDSHELL_WSL_DATA_DIR` |
 | Prepared WSL host payloads | `~/.cache/meldshell/hosts` |
 
 The WSL data override must be an absolute Linux path. The standalone headless host defaults to the same Linux data directory, so give it a separate `--data-dir` when running alongside the desktop host. Back up application data while its host is stopped.

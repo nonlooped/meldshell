@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Installation downloads Electron and prepares the terminal addon. SQLite comes from the Node runtime; there is no separate SQLite addon to rebuild. Development starts the actual desktop and can discover your installed provider CLIs. Use a separate `MELDSHELL_DATA_DIR` when experimenting with application data.
+Installation downloads Electron and prepares the terminal addon. SQLite comes from the Node runtime; there is no separate SQLite addon to rebuild. Development starts the actual desktop and can discover your installed provider CLIs. It keeps its own user data, with a `-dev` suffix on the installed app's directory and `~/.local/share/meldshell-dev` for a WSL host, so it can run beside an installed MeldShell. Use a separate `MELDSHELL_DATA_DIR` when experimenting with application data.
 
 Choose the entry point for the work:
 
@@ -25,6 +25,21 @@ Choose the entry point for the work:
 | Account configuration and deployment | [Remote services](docs/deployment.md) |
 
 The combined development commands serve the dashboard at `http://localhost:4321/dashboard`. Real sign-in needs the local account configuration described in the deployment guide. The headless development command shares the development desktop's data directory by default; close the desktop first or select a separate `MELDSHELL_DATA_DIR`.
+
+## Drive the app as an agent
+
+The `meldshell-dev` MCP server ([source](apps/desktop/scripts/meldshell-dev-mcp.mjs)) lets coding agents run the desktop from this checkout and use it. Each `launch` gets a temporary profile, database, and Git workspace with the first-run guide skipped, so it runs beside your own instance without touching its data. Renderer edits hot-reload. `launch` and `restart` rebuild the main process and preload when their sources changed. `stop` removes the temporary files.
+
+Agents read a window with `snapshot` and act on the element refs it lists through `click`, `type`, `press`, `hover`, and `wait_for`. `screenshot` captures a window or element. `evaluate` runs JavaScript in the renderer, where `window.meldshell` sets up state faster than clicking, or in the main process. `logs` returns main-process output, renderer console messages, and Vite errors.
+
+Each provider reads the server from its project configuration. Providers start it in the thread's workspace, so it works in worktrees too:
+
+| Provider | Configuration | One-time setup |
+| --- | --- | --- |
+| Claude Code | [.mcp.json](.mcp.json); [.claude/settings.json](.claude/settings.json) allows its tools | Approve the server when interactive `claude` asks. MeldShell's sessions connect it without asking. |
+| Codex | [.codex/config.toml](.codex/config.toml) | Trust the project. Codex trusts it when a writable thread first opens. |
+| Cursor | [.cursor/mcp.json](.cursor/mcp.json); [.cursor/cli.json](.cursor/cli.json) allows its tools | Run `cursor-agent mcp enable meldshell-dev`; repeat it after the entry changes. |
+| Pi | [.pi/mcp.json](.pi/mcp.json); the pi-mcp-adapter extension also reads `.mcp.json` | Trust the project. |
 
 ## Choose checks by impact
 

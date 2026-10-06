@@ -15,7 +15,7 @@ const dataDirectory =
       : process.platform === "darwin"
         ? join(homedir(), "Library/Application Support")
         : (process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config")),
-    "@meldshell/desktop",
+    "@meldshell/desktop-dev",
   )
 
 const run = (args) =>

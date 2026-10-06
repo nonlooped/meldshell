@@ -31,15 +31,21 @@ release/
 *.p12
 *.pfx
 
-# Team-local AI tooling, installed skills, and MCP configuration
+# Team-local AI tooling, installed skills, and MCP configuration, except the shared meldshell-dev
+# MCP server each provider reads from the repository
 .agents/
-.claude/
-.codex/
-.cursor/
+.claude/*
+!/.claude/settings.json
+.codex/*
+!/.codex/config.toml
+.cursor/*
+!/.cursor/cli.json
 .windsurf/
 .aider*
-.mcp.json
 mcp.json
+!/.mcp.json
+!/.cursor/mcp.json
+!/.pi/mcp.json
 AGENTS.local.md
 CLAUDE.local.md
 /skills-lock.json

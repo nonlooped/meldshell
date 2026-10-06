@@ -1,0 +1,8 @@
+# Codex reads this in trusted projects. The server starts in the thread's workspace.
+[mcp_servers.meldshell-dev]
+command = "node"
+args = ["apps/desktop/scripts/meldshell-dev-mcp.mjs"]
+startup_timeout_sec = 30
+# Launching can include a main-process rebuild.
+tool_timeout_sec = 300
+default_tools_approval_mode = "approve"

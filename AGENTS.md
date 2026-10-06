@@ -45,7 +45,7 @@ Choose evidence for the behavior being changed. Before running checks, briefly s
 
 Run repository-wide lint, builds, typechecks, suites, or aggregates only when requested or when targeted checks cannot cover the impact; explain the reason first. Batch checks after coherent changes. Once the relevant checks pass, finish unless new changes, failures, or unresolved risks justify another pass.
 
-Visual verification and manual testing belong to the user unless explicitly requested of the agent. Do not launch a browser, Electron, Playwright, screenshots, or a substitute UI harness for verification without that request. Complete the code work first; when visual evidence is necessary, request a specific manual check or screenshot and use the feedback without requesting the same evidence again. Static checks do not establish UI behavior.
+Static checks do not establish UI behavior. To see a change working in the desktop app, use the `meldshell-dev` MCP server; see [drive the app as an agent](CONTRIBUTING.md#drive-the-app-as-an-agent).
 
 Use the release checklist when preparing or certifying an actual release candidate. An installer, release-tooling, or documentation edit alone does not request candidate certification.
 

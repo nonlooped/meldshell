@@ -13,7 +13,7 @@
       "entry": ["e2e.config.ts", "tests/e2e/**/*.e2e.ts", "tests/*.test.*"]
     },
     "apps/desktop": {
-      "entry": ["src/main/index.ts", "src/main/workers/*.ts"],
+      "entry": ["src/main/index.ts", "src/main/workers/*.ts", "scripts/meldshell-dev-mcp.mjs"],
       "project": ["src/**/*.{ts,tsx,mjs,css}"],
       // Imported through bundled workspace packages (host, providers); listing them keeps them
       // external and packaged. Core and provider-runtime are bundled workspace sources of the host.

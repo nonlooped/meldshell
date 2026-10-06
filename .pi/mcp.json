@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "meldshell-dev": {
+      "command": "node",
+      "args": ["apps/desktop/scripts/meldshell-dev-mcp.mjs"],
+      "description": "Run and drive an isolated MeldShell desktop built from this checkout",
+      "exposure": "direct",
+      "timeout": 300,
+      "directTools": true,
+      "idleTimeout": 0,
+      "requestTimeoutMs": 300000
+    }
+  }
+}

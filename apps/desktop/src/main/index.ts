@@ -1,3 +1,4 @@
+import "./development-profile"
 import { electronApp, is } from "@electron-toolkit/utils"
 import { app, BrowserWindow, type Event } from "electron"
 import contextMenu from "electron-context-menu"

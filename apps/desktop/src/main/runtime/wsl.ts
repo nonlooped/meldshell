@@ -66,7 +66,10 @@ export async function startWsl(
     windowsHide: true,
     stdio: "pipe",
     // WSL startup files own credentials and tool settings; never import the Windows host's.
-    env: { ...process.env, WSLENV: "" },
+    // Development only forwards its marker, so its host keeps separate Linux data.
+    env: app.isPackaged
+      ? { ...process.env, WSLENV: "" }
+      : { ...process.env, WSLENV: "MELDSHELL_DEVELOPMENT", MELDSHELL_DEVELOPMENT: "1" },
   })
   const client = new PipeClient(child, event, disconnected)
   try {

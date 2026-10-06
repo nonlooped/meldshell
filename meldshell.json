@@ -2,7 +2,7 @@
   "scripts": {
     "setup": "npm ci",
     "run": {
-      "desktop": "npm run dev --workspace=@meldshell/desktop -- -- --user-data-dir=.dev-data",
+      "desktop": "npm run dev",
       "site": "npm run dev --workspace=@meldshell/site"
     }
   }

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "meldshell-dev": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["apps/desktop/scripts/meldshell-dev-mcp.mjs"]
+    }
+  }
+}
