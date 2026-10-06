@@ -7,7 +7,7 @@ import { prepareTranscriptTurns } from "@meldshell/projection"
  * the agent continues the conversation instead of starting it over.
  */
 
-interface PastTurn {
+export interface PastTurn {
   readonly id: string
   readonly harness: string
   readonly status: string
@@ -49,7 +49,7 @@ const commandsRun = (events: ReadonlyArray<CanonicalEvent>) =>
   })
 
 /** What one turn asked for and did, in the terms a person reading the transcript would use. */
-interface TurnDigest {
+export interface TurnDigest {
   readonly harness: string
   readonly status: string
   readonly request: string
@@ -58,7 +58,7 @@ interface TurnDigest {
   readonly commands: readonly string[]
 }
 
-const digest = (turn: PastTurn): TurnDigest | null => {
+export const digestTurn = (turn: PastTurn): TurnDigest | null => {
   const projected = prepareTranscriptTurns(turn.events)
   const request = projected
     .flatMap((part) => part.userMessages.map((event) => event.text ?? ""))
@@ -140,11 +140,11 @@ const sections = (turns: readonly TurnDigest[]) => {
  */
 export const buildHandoff = (
   harness: string,
-  turns: ReadonlyArray<PastTurn>,
+  /** The missed turns that did something, oldest first. */
+  digests: ReadonlyArray<TurnDigest>,
   /** The title of the thread this one was forked from, while the fork has no turn of its own. */
   forkedFrom: string | null = null,
 ): TurnHandoff | null => {
-  const digests = turns.flatMap((turn) => digest(turn) ?? [])
   if (digests.length === 0) return null
   const from = [...new Set(digests.map((turn) => turn.harness))]
   const reason =
@@ -183,10 +183,10 @@ const SIDE_QUESTION_LIMIT = 4_000
  */
 export const buildSideQuestionPrompt = (
   harness: string,
-  turns: ReadonlyArray<PastTurn>,
+  /** The conversation's turns that did something, oldest first. */
+  digests: ReadonlyArray<TurnDigest>,
   question: string,
 ): string => {
-  const digests = turns.flatMap((turn) => digest(turn) ?? [])
   const known = isHarness(harness)
   const agent = known ? HARNESSES[harness].label : "The agent"
   const conversation =

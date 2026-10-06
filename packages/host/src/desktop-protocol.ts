@@ -37,6 +37,7 @@ export interface DesktopMethods {
 /** Streams with no answer worth waiting for; a keystroke must not allocate a pending request. */
 export interface DesktopNotifications {
   "terminal.write": (id: string, data: string) => void
+  "terminal.ack": (id: string, chars: number) => void
   "terminal.resize": (id: string, cols: number, rows: number) => void
 }
 export type DesktopMethod = keyof DesktopMethods

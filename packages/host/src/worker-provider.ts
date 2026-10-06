@@ -37,6 +37,7 @@ import { CoreClient } from "./core-client"
 import { HostEvents } from "./events"
 import { handleGeneratedText } from "./generated-text"
 import { interruptWithRecovery } from "./interrupt-turn"
+import { makeKeyedLock } from "./keyed-lock"
 import { HostPlatform, type HostProcess } from "./platform"
 import { makeEventQueue } from "./runtime-queue"
 import { logStartupTiming } from "./startup-timing"
@@ -167,21 +168,27 @@ const providerRuntime = (
           .pipe(Effect.mapError(toError))
       })
 
+    /**
+     * Holds one thread's snapshot captures and turn deliveries in order, so a turn never starts
+     * before its files are recorded or while the previous turn's are, without making other threads
+     * of this provider wait for that thread's capture.
+     */
+    const threadCapture = makeKeyedLock()
+
     const send = (message: ProviderWorkerInput): Effect.Effect<void, Error> =>
       Effect.gen(function* () {
         const dispatch =
           typeof message !== "string" && message.type === "start-turn" ? message.dispatch : null
         const child = yield* Ref.get(processRef)
         yield* bindDispatch(dispatch, child)
-        if (dispatch !== null)
-          yield* snapshotTurn(dispatch.workspacePath, dispatch.threadId, dispatch.turnId, "before")
-        const refused =
-          child === null ||
-          (stopping && (typeof message === "string" || message.type !== "shutdown"))
-        const delivery = refused
-          ? Effect.fail(new Error(`${label} is unavailable or shutting down.`))
-          : deliverCommand(child, message, label)
-        yield* delivery.pipe(
+        const deliver = Effect.suspend(() => {
+          const refused =
+            child === null ||
+            (stopping && (typeof message === "string" || message.type !== "shutdown"))
+          return refused
+            ? Effect.fail(new Error(`${label} is unavailable or shutting down.`))
+            : deliverCommand(child, message, label)
+        }).pipe(
           Effect.tapError(() =>
             dispatch === null
               ? Effect.void
@@ -198,6 +205,13 @@ const providerRuntime = (
                   },
                   promoteQueue: false,
                 }),
+          ),
+        )
+        if (dispatch === null) return yield* deliver
+        yield* threadCapture(
+          dispatch.threadId,
+          snapshotTurn(dispatch.workspacePath, dispatch.threadId, dispatch.turnId, "before").pipe(
+            Effect.andThen(deliver),
           ),
         )
       })
@@ -220,20 +234,8 @@ const providerRuntime = (
       })
 
     /** Tells clients about a stored event, notifies the user when it needs them, and starts queued input. */
-    const announce = (input: RuntimeEventInput, result: RuntimeEventResult) =>
+    const publishEvent = (input: RuntimeEventInput, result: RuntimeEventResult) =>
       Effect.gen(function* () {
-        // The finished turn's files are recorded before clients see the turn end
-        // or a queued follow-up can change them.
-        if (input.method === "turn/completed")
-          yield* core.GetThreadLocation({ threadId: input.threadId }).pipe(
-            Effect.flatMap((location) => {
-              const folder = threadFolder(location)
-              return folder === null
-                ? Effect.void
-                : snapshotTurn(folder, input.threadId, input.turnId, "after")
-            }),
-            Effect.catchCause(Effect.logError),
-          )
         // Mid-turn events only extend the transcript, so clients refetch the whole app state only
         // when the core reports a snapshot change: a finished turn, an approval, a rename or mode.
         yield* hostEvents.publish({
@@ -249,6 +251,38 @@ const providerRuntime = (
         if (result.nextDispatch !== null)
           yield* send({ type: "start-turn", dispatch: result.nextDispatch })
       })
+
+    /** Records a finished turn's files; a turn whose folder is unavailable has none to record. */
+    const snapshotFinishedTurn = (input: RuntimeEventInput) =>
+      core.GetThreadLocation({ threadId: input.threadId }).pipe(
+        Effect.flatMap((location) => {
+          const folder = threadFolder(location)
+          return folder === null
+            ? Effect.void
+            : snapshotTurn(folder, input.threadId, input.turnId, "after")
+        }),
+        Effect.catchCause(Effect.logError),
+      )
+
+    const announce = (input: RuntimeEventInput, result: RuntimeEventResult) => {
+      if (input.method !== "turn/completed") return publishEvent(input, result)
+      // The finished turn's files are recorded before clients see the turn end or a queued
+      // follow-up can change them. Recording can take a while in a large folder, so it runs beside
+      // the event queue: only this thread's next delivery waits for it, behind the thread's lock.
+      // The lock is released before announcing, since delivering the follow-up takes it again.
+      return Effect.sync(() =>
+        runFork(
+          threadCapture(input.threadId, snapshotFinishedTurn(input)).pipe(
+            Effect.andThen(publishEvent(input, result)),
+            Effect.catchCause((cause) =>
+              Effect.sync(() =>
+                console.error(`Could not announce a finished ${label} turn.`, cause),
+              ),
+            ),
+          ),
+        ),
+      )
+    }
 
     const persistRuntimeEvent = (input: RuntimeEventInput): Effect.Effect<void> =>
       core.RecordRuntimeEvent(input).pipe(

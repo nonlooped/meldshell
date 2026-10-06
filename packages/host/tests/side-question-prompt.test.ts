@@ -68,6 +68,19 @@ test("a side question reads the whole conversation and leaves the thread untouch
       assert.deepEqual(yield* counts, before)
       assert.deepEqual(yield* getTranscript({ threadId: "thread" }), transcript)
 
+      // A finished turn's account is reused only while its events stay the same.
+      const late = { type: "agentMessage", id: "m3", text: "Moved the form to src/auth.tsx." }
+      yield* sql`INSERT INTO events (
+        id, thread_id, turn_id, sequence, kind, method, text, provider_data, created_at
+      ) VALUES (
+        'late', 'thread', ${first.turnId}, 1000, 'assistant', 'item/completed', ${late.text},
+        ${JSON.stringify({ item: late })}, 'now'
+      )`
+      yield* event(second.turnId, "turn/completed", { turn: { status: "completed" } })
+      const later = yield* sideQuestionPrompt("thread", "Where is the form now?")
+      assert.match(later, /Moved the form to src\/auth\.tsx\./)
+      assert.doesNotMatch(later, /still running/)
+
       const missing = yield* Effect.flip(sideQuestionPrompt("nowhere", "Hello?"))
       assert.match(String(missing.message), /Thread not found/)
     }).pipe(Effect.provide(SqliteClient.layer({ filename: ":memory:" }))),

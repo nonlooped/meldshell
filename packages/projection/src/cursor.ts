@@ -10,6 +10,7 @@ import {
 } from "@meldshell/contracts"
 import { Result, Schema } from "effect"
 import { createTwoFilesPatch, OMIT_HEADERS } from "diff"
+import { Slots } from "./slots"
 
 const contentText = (block: CursorContent | undefined): string => {
   if (!block) return ""
@@ -138,9 +139,11 @@ const toolEvent = (event: CanonicalEvent, tool: CursorUpdate): CanonicalEvent =>
   }
 }
 
-/** Project native ACP history at read time. Stored events never become Codex protocol items. */
-export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): CanonicalEvent[] => {
-  const result: CanonicalEvent[] = []
+/**
+ * Projects native ACP history at read time, one event at a time, into `result`. Stored events
+ * never become Codex protocol items.
+ */
+export const cursorProjection = (result: Slots): ((event: CanonicalEvent) => void) => {
   const tools = new Map<string, { index: number; state: CursorUpdate }>()
   const chunks = new Map<string, { kind: string; index: number }>()
   const todos = new Map<string, Map<string, typeof CursorTodo.Type>>()
@@ -165,10 +168,10 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
     }
     const previous = chunks.get(turn)
     if (previous?.kind === kind) {
-      const first = result[previous.index]!
-      result[previous.index] = { ...first, text: (first.text ?? "") + (content.text ?? "") }
+      const first = result.items[previous.index]!
+      result.set(previous.index, { ...first, text: (first.text ?? "") + (content.text ?? "") })
     } else {
-      chunks.set(turn, { kind, index: result.length })
+      chunks.set(turn, { kind, index: result.items.length })
       result.push({ ...event, kind, text: content.text ?? "" })
     }
   }
@@ -182,10 +185,10 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
     const key = `${turn}:${update.toolCallId ?? ""}`
     const previous = tools.get(key)
     const state = { ...previous?.state, ...update }
-    const projected = toolEvent(previous ? result[previous.index]! : event, state)
-    if (previous) result[previous.index] = projected
+    const projected = toolEvent(previous ? result.items[previous.index]! : event, state)
+    if (previous) result.set(previous.index, projected)
     else result.push(projected)
-    tools.set(key, { state, index: previous?.index ?? result.length - 1 })
+    tools.set(key, { state, index: previous?.index ?? result.items.length - 1 })
   }
   const appendPlan = (
     event: CanonicalEvent,
@@ -208,15 +211,15 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
       .join("\n")
     const previous = todoEvents.get(turn)
     const projected = {
-      ...(previous === undefined ? event : result[previous]!),
+      ...(previous === undefined ? event : result.items[previous]!),
       kind: "plan" as const,
       text: body,
       payload: event.payload,
     }
     if (previous === undefined) {
-      todoEvents.set(turn, result.length)
+      todoEvents.set(turn, result.items.length)
       result.push(projected)
-    } else result[previous] = projected
+    } else result.set(previous, projected)
   }
   const appendStatus = (
     event: CanonicalEvent,
@@ -299,11 +302,17 @@ export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): Cano
     }
     appendStatus(event, params, update)
   }
-  for (const event of events) {
+  return (event) => {
     if (event.method === "cursor/ask_user_question") result.push(event)
     else append(event)
   }
-  return result
+}
+
+export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): CanonicalEvent[] => {
+  const result = new Slots()
+  const push = cursorProjection(result)
+  for (const event of events) push(event)
+  return result.items
 }
 
 const cursorStateText = (

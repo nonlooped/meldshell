@@ -9,6 +9,7 @@ import {
   type PiPayload,
 } from "@meldshell/contracts"
 import { Result } from "effect"
+import { Slots } from "./slots"
 
 const DIALOGS = new Set(["select", "confirm", "input", "editor"])
 const SHELL_TOOLS = new Set(["bash", "powershell"])
@@ -164,9 +165,11 @@ const recordText = (payload: PiPayload): string => {
   }
 }
 
-/** Project native Pi RPC records at read time. Stored events never become Codex protocol items. */
-export const preparePiEvents = (events: ReadonlyArray<CanonicalEvent>): CanonicalEvent[] => {
-  const result: CanonicalEvent[] = []
+/**
+ * Projects native Pi RPC records at read time, one event at a time, into `result`. Stored events
+ * never become Codex protocol items.
+ */
+export const piProjection = (result: Slots): ((event: CanonicalEvent) => void) => {
   const messages = new Map<string, number>()
   const blockEvents = new Map<string, number>()
   const tools = new Map<string, { index: number; state: ToolState }>()
@@ -189,12 +192,12 @@ export const preparePiEvents = (events: ReadonlyArray<CanonicalEvent>): Canonica
     const previous = blockEvents.get(key)
     if (previous === undefined) {
       if (!text) return
-      blockEvents.set(key, result.length)
+      blockEvents.set(key, result.items.length)
       result.push({ ...event, kind, text, payload: { native: event.payload } })
       return
     }
-    const first = result[previous]!
-    result[previous] = { ...first, text: replace ? text : (first.text ?? "") + text }
+    const first = result.items[previous]!
+    result.set(previous, { ...first, text: replace ? text : (first.text ?? "") + text })
   }
 
   const setTool = (
@@ -206,10 +209,10 @@ export const preparePiEvents = (events: ReadonlyArray<CanonicalEvent>): Canonica
     const key = `${turn}:${id}`
     const previous = tools.get(key)
     const state = update(previous?.state)
-    const projected = toolEvent(previous ? result[previous.index]! : event, state)
-    if (previous) result[previous.index] = projected
+    const projected = toolEvent(previous ? result.items[previous.index]! : event, state)
+    if (previous) result.set(previous.index, projected)
     else result.push(projected)
-    tools.set(key, { state, index: previous?.index ?? result.length - 1 })
+    tools.set(key, { state, index: previous?.index ?? result.items.length - 1 })
   }
 
   const startTool = (event: CanonicalEvent, turn: string, call: PiContent | undefined): void => {
@@ -350,11 +353,11 @@ export const preparePiEvents = (events: ReadonlyArray<CanonicalEvent>): Canonica
     }
   }
 
-  for (const event of events) {
+  return (event) => {
     if (!event.method.startsWith("pi/")) {
       if (event.kind === "user") prompted.add(event.turnId ?? event.threadId)
       result.push(event)
-      continue
+      return
     }
     const decoded = decodePiPayload(event.payload)
     if (Result.isFailure(decoded)) {
@@ -364,9 +367,15 @@ export const preparePiEvents = (events: ReadonlyArray<CanonicalEvent>): Canonica
         text: `Invalid ${event.method} payload: ${decoded.failure.message}`,
         payload: { native: event.payload },
       })
-      continue
+      return
     }
     append(event, event.turnId ?? event.threadId, decoded.success)
   }
-  return result
+}
+
+export const preparePiEvents = (events: ReadonlyArray<CanonicalEvent>): CanonicalEvent[] => {
+  const result = new Slots()
+  const push = piProjection(result)
+  for (const event of events) push(event)
+  return result.items
 }

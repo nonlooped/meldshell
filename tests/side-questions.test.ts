@@ -2,7 +2,7 @@ import "../packages/host/tests/side-question-prompt.test.ts"
 import assert from "node:assert/strict"
 import test from "node:test"
 import type { CanonicalEvent } from "../packages/contracts/src/index.ts"
-import { buildSideQuestionPrompt } from "../packages/core/src/handoff.ts"
+import { buildSideQuestionPrompt, digestTurn } from "../packages/core/src/handoff.ts"
 import {
   SIDE_QUESTION_COMMAND,
   sideQuestionText,
@@ -71,7 +71,7 @@ test("the side question prompt carries the conversation, including a running tur
           event("two", "assistant", "Checking how ports are read."),
         ],
       },
-    ],
+    ].flatMap((turn) => digestTurn(turn) ?? []),
     "  What does parseConfig return?  ",
   )
   assert.match(prompt, /^The user is working with Claude Code/)

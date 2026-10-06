@@ -10,7 +10,15 @@ interface Terminal {
   closed: boolean
   pending: string
   flush?: NodeJS.Timeout | undefined
+  /** Characters sent but not yet parsed by the view. */
+  unacked: number
+  paused: boolean
 }
+
+// xterm parses about 20 MB/s, so a 1 MB window is ~50 ms of work: deep enough to cover an IPC or
+// relay round trip, yet far below xterm's 50 MB discard limit.
+const HIGH_WATER = 1024 * 1024
+const LOW_WATER = 256 * 1024
 
 const dimension = (value: number, fallback: number): number =>
   Number.isFinite(value) ? Math.max(1, Math.min(1000, Math.floor(value))) : fallback
@@ -31,17 +39,35 @@ function shellCommand(): { file: string; args: string[] } {
   }
 }
 
-/** PTYs live alongside the host, including when the desktop is on Windows and the host is Linux. */
+// Pausing or resuming races exit.
+const settle = (action: () => void) => {
+  try {
+    action()
+  } catch {
+    /* Already exited. */
+  }
+}
+
+/**
+ * PTYs live alongside the host, including when the desktop is on Windows and the host is Linux.
+ * A shell pauses while its view has too much unparsed output, so a flood cannot exhaust xterm.
+ */
 export function createTerminals(
   host: Pick<Host, "terminalContext">,
   send: (channel: string, args: unknown[]) => void,
+  load: () => Promise<Pick<typeof import("node-pty"), "spawn">> = () => import("node-pty"),
 ) {
   const sessions = new Map<string, Terminal>()
   const flush = (id: string, entry: Terminal) => {
     clearTimeout(entry.flush)
     entry.flush = undefined
-    if (entry.pending) send(IPC.terminalData, [id, entry.pending])
+    if (!entry.pending) return
+    send(IPC.terminalData, [id, entry.pending])
+    entry.unacked += entry.pending.length
     entry.pending = ""
+    if (entry.paused || entry.unacked <= HIGH_WATER) return
+    entry.paused = true
+    settle(() => entry.pty?.pause())
   }
   const close = async (id: string): Promise<void> => {
     const entry = sessions.get(id)
@@ -49,6 +75,8 @@ export function createTerminals(
     entry.closed = true
     sessions.delete(id)
     clearTimeout(entry.flush)
+    // A paused stream would hold the PTY's descriptor open after the shell ends.
+    if (entry.paused) settle(() => entry.pty?.resume())
     try {
       entry.pty?.kill()
     } catch {
@@ -60,12 +88,12 @@ export function createTerminals(
       if (typeof input?.id !== "string" || typeof input.threadId !== "string")
         throw new Error("A terminal needs a thread.")
       if (sessions.has(input.id)) throw new Error("This terminal is already open.")
-      const entry: Terminal = { closed: false, pending: "" }
+      const entry: Terminal = { closed: false, pending: "", unacked: 0, paused: false }
       sessions.set(input.id, entry)
       try {
         const { file, args } = shellCommand()
         const { cwd, env, run } = await host.terminalContext(input, input.run, input.cli === true)
-        const { spawn } = await import("node-pty")
+        const { spawn } = await load()
         if (entry.closed) throw new Error("This terminal was closed while opening.")
         const pty = spawn(file, args, {
           name: "xterm-256color",
@@ -81,6 +109,7 @@ export function createTerminals(
         })
         entry.pty = pty
         pty.onData((data) => {
+          if (entry.closed) return
           entry.pending += data
           if (entry.pending.length >= 64 * 1024) flush(input.id, entry)
           else entry.flush ??= setTimeout(() => flush(input.id, entry), 4)
@@ -105,6 +134,14 @@ export function createTerminals(
     },
     write: (id: string, data: string) => {
       if (typeof data === "string") sessions.get(id)?.pty?.write(data)
+    },
+    ack: (id: string, chars: number) => {
+      const entry = sessions.get(id)
+      if (!entry || !(chars > 0)) return
+      entry.unacked = Math.max(0, entry.unacked - chars)
+      if (!entry.paused || entry.unacked >= LOW_WATER) return
+      entry.paused = false
+      settle(() => entry.pty?.resume())
     },
     resize: (id: string, cols: number, rows: number) => {
       const pty = sessions.get(id)?.pty

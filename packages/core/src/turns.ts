@@ -24,7 +24,6 @@ import {
 import { Effect, Schema, Struct } from "effect"
 import { appendEvent } from "./database/persistence"
 import { transaction } from "./database/transaction"
-import { EventFromRow, readRows } from "./database/rows"
 import { buildHandoff, buildSideQuestionPrompt } from "./handoff"
 import {
   DEFAULT_THREAD_TITLE,
@@ -33,6 +32,7 @@ import {
   buildTitleRequest,
 } from "./titles"
 import { getSnapshot } from "./snapshots"
+import { turnDigests } from "./turn-digests"
 import { isShuttingDown, markShuttingDown, readAppSettings } from "./settings"
 import {
   CLAUDE_EXIT_PLAN_MODE,
@@ -212,19 +212,7 @@ const missedWork = (threadId: string, harness: string, hasSession: boolean) =>
       : yield* sql<{ readonly fork_title: string }>`
           SELECT fork_title FROM threads WHERE id = ${threadId} AND fork_fresh = 1
         `
-    const events = yield* readRows(
-      EventFromRow,
-      sql`SELECT * FROM events WHERE thread_id = ${threadId}
-        AND turn_id IN ${sql.in(missed.map((turn) => turn.id))} ORDER BY sequence`,
-    )
-    return buildHandoff(
-      harness,
-      missed.map((turn) => ({
-        ...turn,
-        events: events.filter((event) => event.turnId === turn.id),
-      })),
-      fork?.fork_title ?? null,
-    )
+    return buildHandoff(harness, yield* turnDigests(threadId, missed), fork?.fork_title ?? null)
   })
 
 /**
@@ -251,20 +239,9 @@ export const sideQuestionPrompt = (threadId: string, question: string) =>
       WHERE thread_id = ${threadId} AND rewound_at IS NULL
       ORDER BY started_at, rowid
     `
-    const events =
-      turns.length === 0
-        ? []
-        : yield* readRows(
-            EventFromRow,
-            sql`SELECT * FROM events WHERE thread_id = ${threadId}
-              AND turn_id IN ${sql.in(turns.map((turn) => turn.id))} ORDER BY sequence`,
-          )
     return buildSideQuestionPrompt(
       thread.harness ?? turns.at(-1)?.harness ?? "",
-      turns.map((turn) => ({
-        ...turn,
-        events: events.filter((event) => event.turnId === turn.id),
-      })),
+      yield* turnDigests(threadId, turns),
       question,
     )
   })

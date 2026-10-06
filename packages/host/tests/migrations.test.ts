@@ -23,3 +23,18 @@ test("a database already at version 15 gains the thread seen column on upgrade",
     }).pipe(Effect.provide(SqliteClient.layer({ filename: ":memory:" }))),
   )
 })
+
+test("events of one turn are read through an index", async () => {
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      yield* initializeDatabase
+      const sql = yield* SqlClient.SqlClient
+      const plan = yield* sql<{ detail: string }>`
+        EXPLAIN QUERY PLAN SELECT id FROM events WHERE turn_id = 'turn' ORDER BY sequence`
+      assert.ok(
+        plan.some((step) => step.detail.includes("events_turn_sequence_idx")),
+        JSON.stringify(plan),
+      )
+    }).pipe(Effect.provide(SqliteClient.layer({ filename: ":memory:" }))),
+  )
+})

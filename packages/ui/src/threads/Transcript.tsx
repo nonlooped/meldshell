@@ -918,14 +918,21 @@ export function Transcript({
   const client = useQueryClient()
   const key = queryKeys.transcript(threadId, revision)
   const current = () => client.getQueryData<TranscriptWindow>(key)
+  // A requested page of older history, until a read takes it.
+  const wantsOlder = useRef(false)
   const query = useQuery({
     queryKey: key,
-    queryFn: () => refreshTranscript(window.meldshell.getTranscript, threadId, current(), current),
+    queryFn: () => {
+      const older = wantsOlder.current
+      wantsOlder.current = false
+      return refreshTranscript(window.meldshell.getTranscript, threadId, current(), current, older)
+    },
     // The incremental merger already retains unchanged turn references. Avoid a
     // second deep traversal of every historical native payload on each delta.
     structuralSharing: false,
   })
   const turns = query.data?.turns ?? []
+  const olderCursor = query.data?.olderCursor ?? null
   const enteringTurn = useEnteringTurn(query.data?.turns)
   // TanStack Virtual exposes imperative measurements, so the compiler opt-out stays local.
   const virtualizer = useVirtualizer({
@@ -953,10 +960,40 @@ export function Transcript({
     () => turns.findIndex((turn) => turn.id === targetTurnId),
     [turns, targetTurnId],
   )
+  // Older history loading above the target moves its index, so each target is scrolled to once.
+  const landed = useRef<string | undefined>(undefined)
   useEffect(() => {
-    if (targetIndex >= 0) virtualizer.scrollToIndex(targetIndex, { align: "start" })
-    else if (hasTurns) virtualizer.scrollToEnd()
-  }, [targetIndex, hasTurns, virtualizer])
+    if (targetIndex >= 0) {
+      if (landed.current === targetTurnId) return
+      landed.current = targetTurnId
+      virtualizer.scrollToIndex(targetIndex, { align: "start" })
+    } else {
+      landed.current = undefined
+      if (hasTurns) virtualizer.scrollToEnd()
+    }
+  }, [targetIndex, targetTurnId, hasTurns, virtualizer])
+
+  // Older history loads as the reader nears the top, while the loaded turns are too short to
+  // scroll, or until a search result's turn is loaded.
+  const loadingOlder = useRef(false)
+  const loadOlder = () => {
+    // A failed read waits for the retry button rather than repeating on every render.
+    if (olderCursor === null || query.isError || loadingOlder.current) return
+    loadingOlder.current = true
+    wantsOlder.current = true
+    void (async () => {
+      // A read already under way is joined, not replaced; it may have started before the request.
+      while (wantsOlder.current) await query.refetch({ cancelRefetch: false })
+    })().finally(() => {
+      loadingOlder.current = false
+    })
+  }
+  useEffect(() => {
+    const element = scrollRef.current
+    const short =
+      element !== null && element.scrollHeight - element.clientHeight < element.clientHeight
+    if (short || (targetTurnId !== undefined && targetIndex < 0)) loadOlder()
+  })
 
   if (query.isLoading)
     return (
@@ -1008,6 +1045,9 @@ export function Transcript({
           )}
           <div
             ref={scrollRef}
+            onScroll={(event) => {
+              if (event.currentTarget.scrollTop < event.currentTarget.clientHeight) loadOlder()
+            }}
             className="transcript min-h-0 [padding:36px_var(--pane-gutter)] overflow-y-auto [scrollbar-gutter:stable] [mask-image:linear-gradient(to_bottom,transparent,black_28px,black_calc(100%_-_28px),transparent)]"
             aria-live="polite"
           >

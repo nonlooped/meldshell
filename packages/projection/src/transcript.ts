@@ -1,7 +1,8 @@
 import { Result, Schema } from "effect"
 import { eventKind, eventText, planText } from "./normalization"
-import { prepareCursorEvents } from "./cursor"
-import { preparePiEvents } from "./pi"
+import { cursorProjection } from "./cursor"
+import { piProjection } from "./pi"
+import { Slots } from "./slots"
 import {
   asRecord,
   decodeNativePayload,
@@ -205,79 +206,139 @@ const nativeReply = (
   return { ...event, sequence: previous?.sequence ?? event.sequence, text }
 }
 
-export const prepareTranscriptEvents = (
-  events: ReadonlyArray<CanonicalEvent>,
-): ReadonlyArray<CanonicalEvent> => {
-  const groups = new Map<string, EventGroup>()
-  const diffs = new Map<string, CanonicalEvent>()
-  const plans = new Map<string, CanonicalEvent>()
-  const standalone: CanonicalEvent[] = []
-  const questionTurns = new Set<string | null>()
-  const replies = new Map<string, CanonicalEvent>()
+type Route =
+  | { readonly to: "standalone"; readonly event: CanonicalEvent }
+  | { readonly to: "plan" }
+  | { readonly to: "diff"; readonly payload: NativePayload }
+  | { readonly to: "reply"; readonly payload: NativePayload; readonly id: string }
+  | {
+      readonly to: "group"
+      readonly key: string
+      readonly id: string
+      readonly payload: NativePayload
+      readonly item: ItemDetails
+      readonly kind: CanonicalEventKind
+    }
+  | { readonly to: "none" }
 
-  const appendReply = (event: CanonicalEvent, payload: NativePayload, id: string): void => {
-    if (!questionTurns.has(event.turnId)) return
-    const key = `${event.turnId}:${id}`
-    replies.set(key, nativeReply(event, payload, replies.get(key)))
+/**
+ * Groups provider events into the items the transcript shows, however many events streamed each
+ * one. A finished item keeps its object until an event changes it.
+ */
+class ItemProjection {
+  private readonly groups = new Map<string, EventGroup>()
+  private readonly finished = new Map<EventGroup, CanonicalEvent | null>()
+  private readonly diffs = new Map<string, CanonicalEvent>()
+  private readonly plans = new Map<string, CanonicalEvent>()
+  private readonly standalone: CanonicalEvent[] = []
+  private readonly questionTurns = new Set<string | null>()
+  private readonly replies = new Map<string, CanonicalEvent>()
+  /** The standalone entry each input became, so a replaced input can update it in place. */
+  private readonly entries = new Map<number, number>()
+  private output: ReadonlyArray<CanonicalEvent> | null = null
+
+  push(event: CanonicalEvent, input: number): void {
+    this.output = null
+    if (asyncQuestions(event).length > 0) this.questionTurns.add(event.turnId)
+    // MCP startup progress never appears in the transcript, so its payload shape cannot fail a turn.
+    if (event.method === "mcpServer/startupStatus/updated") return
+    const route = this.route(event)
+    switch (route.to) {
+      case "standalone":
+        this.entries.set(input, this.standalone.length)
+        this.standalone.push(route.event)
+        return
+      case "plan":
+        return updatePlan(this.plans, event)
+      case "diff":
+        return updateDiff(this.diffs, event, route.payload)
+      case "reply": {
+        // Initial prompts already have a local user/message. Native replies to mid-turn
+        // questions have no local duplicate and must survive transcript reloads.
+        if (!this.questionTurns.has(event.turnId)) return
+        const key = `${event.turnId}:${route.id}`
+        this.replies.set(key, nativeReply(event, route.payload, this.replies.get(key)))
+        return
+      }
+      case "group": {
+        const group =
+          this.groups.get(route.key) ?? newGroup(event, route.payload, route.id, route.kind)
+        this.groups.set(route.key, group)
+        updateGroup(group, event, route.payload, route.item, route.kind)
+        this.finished.delete(group)
+        return
+      }
+      case "none":
+        return
+    }
   }
 
-  const append = (event: CanonicalEvent): void => {
-    const decoded = decodeNativePayload(event.payload)
-    if (Result.isFailure(decoded)) {
-      standalone.push({
-        ...event,
-        kind: "error",
-        text: `Invalid ${event.method} payload: ${decoded.failure.message}`,
-      })
-      return
-    }
-    if (event.method === "turn/plan/updated") {
-      updatePlan(plans, event)
-      return
-    }
-    if (event.method === "turn/diff/updated") {
-      updateDiff(diffs, event, decoded.success)
-      return
-    }
+  /** Replaces an input already read, when it only ever stood alone; false otherwise. */
+  replace(input: number, event: CanonicalEvent): boolean {
+    const entry = this.entries.get(input)
+    if (entry === undefined || event.method === "mcpServer/startupStatus/updated") return false
+    if (asyncQuestions(event).length > 0 && !this.questionTurns.has(event.turnId)) return false
+    const route = this.route(event)
+    if (route.to !== "standalone") return false
+    this.standalone[entry] = route.event
+    this.output = null
+    return true
+  }
 
+  items(): ReadonlyArray<CanonicalEvent> {
+    if (this.output !== null) return this.output
+    const finished: CanonicalEvent[] = []
+    for (const group of this.groups.values()) {
+      if (!this.finished.has(group)) this.finished.set(group, finishGroup(group))
+      const item = this.finished.get(group)
+      if (item) finished.push(item)
+    }
+    this.output = [
+      ...this.standalone,
+      ...this.replies.values(),
+      ...this.diffs.values(),
+      ...this.plans.values(),
+      ...finished,
+    ].sort((left, right) => left.sequence - right.sequence)
+    return this.output
+  }
+
+  private route(event: CanonicalEvent): Route {
+    const decoded = decodeNativePayload(event.payload)
+    if (Result.isFailure(decoded))
+      return {
+        to: "standalone",
+        event: {
+          ...event,
+          kind: "error",
+          text: `Invalid ${event.method} payload: ${decoded.failure.message}`,
+        },
+      }
+    if (event.method === "turn/plan/updated") return { to: "plan" }
+    if (event.method === "turn/diff/updated") return { to: "diff", payload: decoded.success }
     const item = itemDetails(decoded.success)
     const kind = event.kind === "unknown" ? eventKind(event.method, event.payload) : event.kind
-    if (kind === "user" && item.id !== null) {
-      // Initial prompts already have a local user/message. Native replies to mid-turn
-      // questions have no local duplicate and must survive transcript reloads.
-      appendReply(event, decoded.success, item.id)
-      return
-    }
-
-    const groupKey = `${event.turnId ?? event.threadId}:${item.id}`
-    const existing = groups.get(groupKey)
-    if (item.id !== null && (existing !== undefined || groupable(kind))) {
-      const group = existing ?? newGroup(event, decoded.success, item.id, kind)
-      groups.set(groupKey, group)
-      updateGroup(group, event, decoded.success, item, kind)
-      return
-    }
-
-    if (standaloneVisible(event)) standalone.push(event)
+    if (kind === "user" && item.id !== null)
+      return { to: "reply", payload: decoded.success, id: item.id }
+    const key = `${event.turnId ?? event.threadId}:${item.id}`
+    if (item.id !== null && (this.groups.has(key) || groupable(kind)))
+      return { to: "group", key, id: item.id, payload: decoded.success, item, kind }
+    return standaloneVisible(event) ? { to: "standalone", event } : { to: "none" }
   }
-
-  // MCP startup progress never appears in the transcript, so its payload shape cannot fail a turn.
-  for (const event of prepareCursorEvents(preparePiEvents(events))) {
-    if (asyncQuestions(event).length > 0) questionTurns.add(event.turnId)
-    if (event.method !== "mcpServer/startupStatus/updated") append(event)
-  }
-
-  return [
-    ...standalone,
-    ...replies.values(),
-    ...diffs.values(),
-    ...plans.values(),
-    ...[...groups.values()].flatMap((group) => finishGroup(group) ?? []),
-  ].sort((left, right) => left.sequence - right.sequence)
 }
 
-const assistantPhase = (event: CanonicalEvent): string | null =>
-  nonEmptyText(payloadItem(event.payload)?.phase)
+/** Events, unlike the items they become, are read once each; their decoded items are kept. */
+const payloadItems = new WeakMap<CanonicalEvent, JsonRecord | null>()
+const itemOf = (event: CanonicalEvent): JsonRecord | null => {
+  let item = payloadItems.get(event)
+  if (item === undefined) {
+    item = payloadItem(event.payload)
+    payloadItems.set(event, item)
+  }
+  return item
+}
+
+const assistantPhase = (event: CanonicalEvent): string | null => nonEmptyText(itemOf(event)?.phase)
 
 const decodeAsyncQuestions = Schema.decodeUnknownResult(
   Schema.Array(
@@ -288,20 +349,27 @@ const decodeAsyncQuestions = Schema.decodeUnknownResult(
   ),
 )
 
+const questionsAsked = new WeakMap<CanonicalEvent, AsyncQuestion[]>()
+
 /**
  * Codex asks without blocking the turn: the question arrives as an agent message delivered
  * asynchronously, and the user's next message answers it.
  */
 const asyncQuestions = (event: CanonicalEvent): AsyncQuestion[] => {
-  const item = asRecord(payloadItem(event.payload))
-  if (item.delivery !== "async") return []
-  const decoded = decodeAsyncQuestions(item.questions)
-  if (Result.isFailure(decoded)) return []
-  return decoded.success.flatMap((question) =>
-    question.title.trim()
-      ? [{ title: question.title, options: (question.options ?? []).filter((o) => o.trim()) }]
-      : [],
-  )
+  const known = questionsAsked.get(event)
+  if (known !== undefined) return known
+  const item = asRecord(itemOf(event))
+  const decoded = item.delivery === "async" ? decodeAsyncQuestions(item.questions) : null
+  const questions =
+    decoded === null || Result.isFailure(decoded)
+      ? []
+      : decoded.success.flatMap((question) =>
+          question.title.trim()
+            ? [{ title: question.title, options: (question.options ?? []).filter((o) => o.trim()) }]
+            : [],
+        )
+  questionsAsked.set(event, questions)
+  return questions
 }
 
 const eventTime = (event: CanonicalEvent): number => {
@@ -309,31 +377,28 @@ const eventTime = (event: CanonicalEvent): number => {
   return Number.isNaN(time) ? 0 : time
 }
 
-export const prepareTranscriptTurns = (
-  events: ReadonlyArray<CanonicalEvent>,
+interface Clock {
+  start: number | null
+  first: number
+  latest: number
+  completed: number | null
+}
+
+const clock = (timing: Map<string, Clock>, entry: CanonicalEvent): void => {
+  const id = entry.turnId ?? `event:${entry.id}`
+  const time = eventTime(entry)
+  const current = timing.get(id) ?? { start: null, first: time, latest: time, completed: null }
+  current.first = Math.min(current.first, time)
+  current.latest = Math.max(current.latest, time)
+  if (entry.method === "turn/started") current.start = time
+  if (entry.method === "turn/completed") current.completed = time
+  timing.set(id, current)
+}
+
+const buildTurns = (
+  prepared: ReadonlyArray<CanonicalEvent>,
+  timing: ReadonlyMap<string, Clock>,
 ): ReadonlyArray<TranscriptTurn> => {
-  const prepared = prepareTranscriptEvents(events)
-  const timing = new Map<
-    string,
-    { start: number | null; first: number; latest: number; completed: number | null }
-  >()
-
-  for (const entry of events) {
-    const id = entry.turnId ?? `event:${entry.id}`
-    const time = eventTime(entry)
-    const current = timing.get(id) ?? {
-      start: null,
-      first: time,
-      latest: time,
-      completed: null,
-    }
-    current.first = Math.min(current.first, time)
-    current.latest = Math.max(current.latest, time)
-    if (entry.method === "turn/started") current.start = time
-    if (entry.method === "turn/completed") current.completed = time
-    timing.set(id, current)
-  }
-
   const turns = new Map<
     string,
     {
@@ -378,7 +443,7 @@ export const prepareTranscriptTurns = (
         turn.workingEvents.splice(turn.workingEvents.lastIndexOf(turn.finalResponse), 1)
       else {
         const finalIndex = turn.workingEvents.findLastIndex(
-          (entry) => entry.kind === "assistant" && !payloadItem(entry.payload)?.parentToolUseId,
+          (entry) => entry.kind === "assistant" && !itemOf(entry)?.parentToolUseId,
         )
         if (finalIndex >= 0 && timing.get(id)?.completed != null) {
           turn.finalResponse = turn.workingEvents.splice(finalIndex, 1)[0] ?? null
@@ -400,6 +465,121 @@ export const prepareTranscriptTurns = (
     })
     .sort((left, right) => left.sequence - right.sequence)
 }
+
+/** The provider stages and item grouping, fed one batch of new events at a time. */
+class Pipeline {
+  private readonly pi = new Slots()
+  private readonly cursor = new Slots()
+  private readonly readPi = piProjection(this.pi)
+  private readonly readCursor = cursorProjection(this.cursor)
+  private piRead = 0
+  private cursorRead = 0
+  /** The cursor stage's entry for each Pi output it passed through unchanged. */
+  private readonly passed = new Map<number, number>()
+  readonly items = new ItemProjection()
+  readonly timing = new Map<string, Clock>()
+
+  /** False when a stage changed an earlier output in a way only reading everything again can follow. */
+  read(events: ReadonlyArray<CanonicalEvent>): boolean {
+    for (const event of events) {
+      this.readPi(event)
+      clock(this.timing, event)
+    }
+    const piRead = this.piRead
+    for (const index of this.pi.drain()) {
+      const event = this.pi.items[index]!
+      if (index < piRead) {
+        // Pi only rewrites its own entries, which the cursor stage passes through.
+        const entry = this.passed.get(index)
+        if (entry === undefined) return false
+        this.cursor.set(entry, event)
+        continue
+      }
+      if (!event.method.startsWith("cursor/")) this.passed.set(index, this.cursor.items.length)
+      this.readCursor(event)
+    }
+    this.piRead = this.pi.items.length
+    const cursorRead = this.cursorRead
+    for (const index of this.cursor.drain()) {
+      const event = this.cursor.items[index]!
+      if (index >= cursorRead) this.items.push(event, index)
+      else if (!this.items.replace(index, event)) return false
+    }
+    this.cursorRead = this.cursor.items.length
+    return true
+  }
+}
+
+/**
+ * Projects a growing list of events. Events newer than every one already read are projected on
+ * their own: finished items keep their objects and only the items those events touch change.
+ * Anything else, such as an older page of history, projects every event again.
+ */
+export class TranscriptProjector {
+  private raw: CanonicalEvent[] = []
+  private ids = new Set<string>()
+  private latest = Number.NEGATIVE_INFINITY
+  private pipeline = new Pipeline()
+  private projected: ReadonlyArray<TranscriptTurn> | null = null
+
+  constructor(events: ReadonlyArray<CanonicalEvent> = []) {
+    this.read(events)
+  }
+
+  /** The native events read, kept as stored. */
+  get events(): ReadonlyArray<CanonicalEvent> {
+    return this.raw
+  }
+
+  items(): ReadonlyArray<CanonicalEvent> {
+    return this.pipeline.items.items()
+  }
+
+  turns(): ReadonlyArray<TranscriptTurn> {
+    this.projected ??= buildTurns(this.items(), this.pipeline.timing)
+    return this.projected
+  }
+
+  /** Adds events, replacing any already read with the same id. */
+  update(events: ReadonlyArray<CanonicalEvent>): void {
+    if (events.length === 0) return
+    if (this.appends(events) && this.read(events)) return
+    const byId = new Map(this.raw.map((event) => [event.id, event]))
+    for (const event of events) byId.set(event.id, event)
+    this.raw = []
+    this.ids = new Set()
+    this.latest = Number.NEGATIVE_INFINITY
+    this.pipeline = new Pipeline()
+    this.read([...byId.values()].sort((left, right) => left.sequence - right.sequence))
+  }
+
+  private appends(events: ReadonlyArray<CanonicalEvent>): boolean {
+    let latest = this.latest
+    for (const event of events) {
+      if (event.sequence <= latest || this.ids.has(event.id)) return false
+      latest = event.sequence
+    }
+    return true
+  }
+
+  private read(events: ReadonlyArray<CanonicalEvent>): boolean {
+    this.projected = null
+    for (const event of events) {
+      this.raw.push(event)
+      this.ids.add(event.id)
+      this.latest = Math.max(this.latest, event.sequence)
+    }
+    return this.pipeline.read(events)
+  }
+}
+
+export const prepareTranscriptEvents = (
+  events: ReadonlyArray<CanonicalEvent>,
+): ReadonlyArray<CanonicalEvent> => new TranscriptProjector(events).items()
+
+export const prepareTranscriptTurns = (
+  events: ReadonlyArray<CanonicalEvent>,
+): ReadonlyArray<TranscriptTurn> => new TranscriptProjector(events).turns()
 
 function updateGroup(
   group: EventGroup,

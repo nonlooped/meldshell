@@ -61,6 +61,14 @@ export function registerTerminalIpc(): void {
       .then((host) => host.notify("terminal.write", id, data))
       .catch(() => undefined)
   })
+  ipcMain.on(IPC.terminalAck, (event, id: unknown, chars: unknown) => {
+    if (typeof id !== "string" || typeof chars !== "number" || sessions.get(id) !== event.sender)
+      return
+    void desktopHost
+      .start()
+      .then((host) => host.notify("terminal.ack", id, chars))
+      .catch(() => undefined)
+  })
   ipcMain.on(IPC.terminalResize, (event, id: unknown, cols: unknown, rows: unknown) => {
     if (
       typeof id !== "string" ||

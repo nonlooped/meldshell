@@ -61,6 +61,7 @@ const api: MeldShellApi = {
     open: (input) => ipcRenderer.invoke(IPC.terminalOpen, input),
     // Keystrokes and resizes need no reply, so they skip invoke's round trip.
     write: (id, data) => ipcRenderer.send(IPC.terminalWrite, id, data),
+    ack: (id, chars) => ipcRenderer.send(IPC.terminalAck, id, chars),
     resize: (id, cols, rows) => ipcRenderer.send(IPC.terminalResize, id, cols, rows),
     close: (id) => ipcRenderer.send(IPC.terminalClose, id),
     onData: on(IPC.terminalData),

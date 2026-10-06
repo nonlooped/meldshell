@@ -358,6 +358,11 @@ export const runMigrations = Effect.gen(function* () {
         yield* sql`UPDATE threads SET seen_at = updated_at`
       }),
     },
+    {
+      version: 17,
+      // Forks, handoffs, side questions, and transcript windows read events one turn at a time.
+      apply: sql`CREATE INDEX IF NOT EXISTS events_turn_sequence_idx ON events(turn_id, sequence)`,
+    },
   ]
   const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table'`
   const has = (name: string) => tables.some((table) => table.name === name)

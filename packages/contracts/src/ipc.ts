@@ -320,6 +320,8 @@ export interface TerminalSession {
 interface TerminalApi {
   readonly open: (input: TerminalOpenInput) => Promise<TerminalSession>
   readonly write: (id: string, data: string) => void
+  /** Reports output characters the terminal has parsed, so the host can resume a paused shell. */
+  readonly ack: (id: string, chars: number) => void
   readonly resize: (id: string, cols: number, rows: number) => void
   readonly close: (id: string) => void
   readonly onData: (listener: (id: string, data: string) => void) => () => void
@@ -714,6 +716,7 @@ export const IPC = {
   remoteStatusChanged: "meldshell:remote-status-changed",
   terminalOpen: "meldshell:terminal-open",
   terminalWrite: "meldshell:terminal-write",
+  terminalAck: "meldshell:terminal-ack",
   terminalResize: "meldshell:terminal-resize",
   terminalClose: "meldshell:terminal-close",
   terminalData: "meldshell:terminal-data",

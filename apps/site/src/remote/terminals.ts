@@ -32,6 +32,9 @@ export function browserTerminals(
     write: (id, data) => {
       void call(IPC.terminalWrite, { id, data }).catch((cause) => failed(id, cause))
     },
+    ack: (id, chars) => {
+      void call(IPC.terminalAck, { id, chars }).catch(() => undefined)
+    },
     resize: (id, cols, rows) => {
       void call(IPC.terminalResize, { id, cols, rows }).catch(() => undefined)
     },
@@ -47,13 +50,14 @@ export function browserTerminals(
   return {
     api,
     connected: () => {
-      ready = call("meldshell:terminal-attach", { offsets: Object.fromEntries(offsets) }).then(
-        (value) => {
-          const active = value as string[]
-          for (const id of active) if (!ids.has(id)) api.close(id)
-          for (const id of ids) if (!active.includes(id)) emit(IPC.terminalExit, [id, 1])
-        },
-      )
+      ready = call("meldshell:terminal-attach", {
+        offsets: Object.fromEntries(offsets),
+        acks: true,
+      }).then((value) => {
+        const active = value as string[]
+        for (const id of active) if (!ids.has(id)) api.close(id)
+        for (const id of ids) if (!active.includes(id)) emit(IPC.terminalExit, [id, 1])
+      })
       void ready.catch((cause) => {
         for (const id of ids) failed(id, cause)
       })

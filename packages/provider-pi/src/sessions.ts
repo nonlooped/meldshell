@@ -1,4 +1,4 @@
-import { createReadStream } from "node:fs"
+import { createReadStream, type Stats } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -19,6 +19,10 @@ import {
  */
 
 const SESSION_LIMIT = 100
+/** Session files read at once while listing. */
+const READ_CONCURRENCY = 8
+/** Session files whose summaries are remembered between listings. */
+const SCAN_CACHE_LIMIT = 5_000
 
 const expandHome = (path: string): string =>
   path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(1)) : path
@@ -55,14 +59,19 @@ const sessionDirectory = async (
 }
 
 const entries = async function* (path: string): AsyncGenerator<UnknownRecord> {
-  const lines = createInterface({ input: createReadStream(path, "utf8"), crlfDelay: Infinity })
-  for await (const line of lines) {
-    if (!line.trim()) continue
-    try {
-      yield asRecord(JSON.parse(line))
-    } catch {
-      // A partly written last line is skipped, as Pi skips it.
+  const input = createReadStream(path, "utf8")
+  try {
+    for await (const line of createInterface({ input, crlfDelay: Infinity })) {
+      if (!line.trim()) continue
+      try {
+        yield asRecord(JSON.parse(line))
+      } catch {
+        // A partly written last line is skipped, as Pi skips it.
+      }
     }
+  } finally {
+    // A reader that stops early releases the file.
+    input.destroy()
   }
 }
 
@@ -81,20 +90,28 @@ const contentText = (content: unknown): string => {
     .trim()
 }
 
-/** What `/resume` shows for one session file, or null when the file is not a session. */
-const summary = async (
-  path: string,
-  workspacePath: string | null,
-): Promise<CliSessionSummary | null> => {
-  let header: UnknownRecord | null = null
+/**
+ * What one session file says about itself: the folder it ran in, null when the file is not a
+ * session, and what `/resume` shows for it, null when it has no prompt yet. The title is left
+ * unread when the file was read for another folder.
+ */
+interface Scanned {
+  readonly cwd: string | null
+  readonly title?: string | null
+}
+
+/** Scanned files, kept while their size and modification time are unchanged. */
+const scanned = new Map<string, Scanned & { readonly mtimeMs: number; readonly size: number }>()
+
+const scan = async (path: string, folder: string | null): Promise<Scanned> => {
+  let cwd: string | null = null
   let name = ""
   let first = ""
   for await (const entry of entries(path)) {
-    if (header === null) {
-      if (entry.type !== "session") return null
-      header = entry
-      if (workspacePath !== null && resolve(asText(entry.cwd) || ".") !== resolve(workspacePath))
-        return null
+    if (cwd === null) {
+      if (entry.type !== "session") return { cwd: null, title: null }
+      cwd = resolve(asText(entry.cwd) || ".")
+      if (folder !== null && cwd !== folder) return { cwd }
       continue
     }
     if (entry.type === "session_info") name = asText(entry.name).trim()
@@ -102,12 +119,39 @@ const summary = async (
     if (!first && entry.type === "message" && message.role === "user")
       first = contentText(message.content)
   }
-  if (header === null || !first) return null
-  const changed = await stat(path)
+  return { cwd, title: cwd !== null && first ? oneLine(name || first) || "Pi session" : null }
+}
+
+interface Candidate {
+  readonly path: string
+  readonly stats: Stats
+}
+
+/** What `/resume` shows for one session file, or null when it is not a session of `folder`. */
+const summary = async (
+  { path, stats }: Candidate,
+  folder: string | null,
+): Promise<CliSessionSummary | null> => {
+  let known = scanned.get(path)
+  if (
+    known?.mtimeMs !== stats.mtimeMs ||
+    known.size !== stats.size ||
+    (known.title === undefined && (folder === null || known.cwd === folder))
+  ) {
+    known = { mtimeMs: stats.mtimeMs, size: stats.size, ...(await scan(path, folder)) }
+    scanned.delete(path)
+    scanned.set(path, known)
+    // Past the limit, the files scanned longest ago are forgotten.
+    for (const stale of scanned.keys()) {
+      if (scanned.size <= SCAN_CACHE_LIMIT) break
+      scanned.delete(stale)
+    }
+  }
+  if (!known.title || (folder !== null && known.cwd !== folder)) return null
   return {
     nativeThreadId: path,
-    title: oneLine(name || first) || "Pi session",
-    updatedAt: changed.mtime.toISOString(),
+    title: known.title,
+    updatedAt: stats.mtime.toISOString(),
     branch: null,
   }
 }
@@ -115,19 +159,40 @@ const summary = async (
 /** The sessions Pi stored for exactly this folder, newest first. */
 export const listPiSessions = async (workspacePath: string): Promise<CliSessionSummary[]> => {
   const directory = await sessionDirectory(workspacePath)
+  const folder = directory.shared ? resolve(workspacePath) : null
   const names = await readdir(directory.path).catch(() => [] as string[])
-  const files = names
-    .filter((name) => name.endsWith(".jsonl"))
-    // File names start with the session's start time, so the newest sort last.
-    .sort((a, b) => b.localeCompare(a))
-    .map((name) => join(directory.path, name))
-  const sessions = await Promise.all(
-    files.map((file) => summary(file, directory.shared ? workspacePath : null).catch(() => null)),
+  const found = await Promise.all(
+    names
+      .filter((name) => name.endsWith(".jsonl"))
+      .map((name) => join(directory.path, name))
+      .map((path) =>
+        stat(path).then(
+          (stats) => (stats.isFile() ? { path, stats } : null),
+          () => null,
+        ),
+      ),
   )
-  return sessions
-    .filter((session) => session !== null)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, SESSION_LIMIT)
+  // A session's time is its file's, so only the newest files are read. Equal times keep the
+  // newest name first; names start with the session's start time.
+  const candidates = found
+    .filter((candidate) => candidate !== null)
+    .sort(
+      (a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime() || b.path.localeCompare(a.path),
+    )
+  const sessions: CliSessionSummary[] = []
+  for (
+    let start = 0;
+    start < candidates.length && sessions.length < SESSION_LIMIT;
+    start += READ_CONCURRENCY
+  ) {
+    const read = await Promise.all(
+      candidates
+        .slice(start, start + READ_CONCURRENCY)
+        .map((candidate) => summary(candidate, folder).catch(() => null)),
+    )
+    for (const session of read) if (session !== null) sessions.push(session)
+  }
+  return sessions.slice(0, SESSION_LIMIT)
 }
 
 /** The entries on the session's current branch, oldest first. */

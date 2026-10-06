@@ -58,6 +58,10 @@ export function desktopService(
         await host.close()
       },
     },
-    notifications: { "terminal.write": terminals.write, "terminal.resize": terminals.resize },
+    notifications: {
+      "terminal.write": terminals.write,
+      "terminal.ack": terminals.ack,
+      "terminal.resize": terminals.resize,
+    },
   }
 }

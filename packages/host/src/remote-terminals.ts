@@ -7,17 +7,16 @@ const key = Schema.String.pipe(
   Schema.check(Schema.isMaxLength(100)),
 )
 const dimensions = { cols: Schema.Number, rows: Schema.Number }
+const count = Schema.Number.pipe(
+  Schema.check(Schema.isGreaterThanOrEqualTo(0)),
+  Schema.check(Schema.isInt()),
+)
 const input = Schema.Struct({
   session: key,
-  offsets: Schema.optional(
-    Schema.Record(
-      Schema.String,
-      Schema.Number.pipe(
-        Schema.check(Schema.isGreaterThanOrEqualTo(0)),
-        Schema.check(Schema.isInt()),
-      ),
-    ),
-  ),
+  offsets: Schema.optional(Schema.Record(Schema.String, count)),
+  /** Browsers that acknowledge parsed output; older pages never do, so they must not hold a shell. */
+  acks: Schema.optional(Schema.Boolean),
+  chars: Schema.optional(count),
   id: Schema.optional(key),
   workspaceId: Schema.optional(Schema.String),
   threadId: Schema.optional(Schema.String),
@@ -30,6 +29,7 @@ const input = Schema.Struct({
 const methods = new Set([
   IPC.terminalOpen,
   IPC.terminalWrite,
+  IPC.terminalAck,
   IPC.terminalResize,
   IPC.terminalClose,
   "meldshell:terminal-attach",
@@ -49,6 +49,9 @@ export function remoteTerminals(
       client: string | null
       /** The client that lost its host connection; a relay reconnect that keeps it resumes it. */
       last: string | null
+      acks: boolean
+      /** Output delivered to the attached client that it has not yet acknowledged. */
+      owed: Map<string, number>
       terminals: ReturnType<typeof createTerminals>
       open: Map<string, TerminalSession | null>
       buffered: Map<string, { text: string; offset: number }>
@@ -60,6 +63,49 @@ export function remoteTerminals(
     }
   >()
   type Session = NonNullable<ReturnType<typeof sessions.get>>
+  /** A departing client's acknowledgements are lost, so its unparsed output stops holding shells. */
+  const release = (session: Session) => {
+    for (const [id, chars] of session.owed) session.terminals.ack(id, chars)
+    session.owed.clear()
+  }
+  const output = (session: Session, id: string, data: string) => {
+    const previous = session.buffered.get(id) ?? { text: "", offset: 0 }
+    const offset = previous.offset + data.length
+    session.buffered.set(id, { text: (previous.text + data).slice(-256 * 1024), offset })
+    if (session.client) {
+      session.sent.set(id, offset)
+      send({
+        type: "event",
+        clientId: session.client,
+        channel: IPC.terminalData,
+        args: [id, data, offset],
+      })
+    }
+    // Without an acknowledging client, output only reaches the bounded ring buffer.
+    if (session.client && session.acks)
+      session.owed.set(id, (session.owed.get(id) ?? 0) + data.length)
+    else session.terminals.ack(id, data.length)
+  }
+  /** Replayed output never counted against the shell, so acknowledgements stop at what is owed. */
+  const acknowledge = (session: Session, id: string, chars: number) => {
+    const owed = session.owed.get(id) ?? 0
+    const settled = Math.min(owed, chars)
+    if (settled > 0) {
+      session.owed.set(id, owed - settled)
+      session.terminals.ack(id, settled)
+    }
+    return null
+  }
+  const close = async (session: Session, id: string) => {
+    session.open.delete(id)
+    session.buffered.delete(id)
+    session.sent.delete(id)
+    session.owed.delete(id)
+    session.exits.delete(id)
+    session.reported.delete(id)
+    await session.terminals.close(id)
+    return null
+  }
   const replay = (
     session: Session,
     client: string,
@@ -94,6 +140,7 @@ export function remoteTerminals(
     token: string,
     client: string,
     offsets: Readonly<Record<string, number>> = {},
+    acks = false,
   ) => {
     let session = sessions.get(token)
     if (!session) {
@@ -103,16 +150,8 @@ export function remoteTerminals(
         const current = sessions.get(token)
         if (!current) return
         const id = String(args[0])
-        if (channel === IPC.terminalData) {
-          const previous = current.buffered.get(id) ?? { text: "", offset: 0 }
-          const data = String(args[1])
-          const offset = previous.offset + data.length
-          current.buffered.set(id, { text: (previous.text + data).slice(-256 * 1024), offset })
-          if (current.client) {
-            current.sent.set(id, offset)
-            send({ type: "event", clientId: current.client, channel, args: [id, data, offset] })
-          }
-        } else {
+        if (channel === IPC.terminalData) output(current, id, String(args[1]))
+        else {
           current.open.delete(id)
           current.exits.set(id, Number(args[1]))
           if (current.client) {
@@ -124,6 +163,8 @@ export function remoteTerminals(
       session = {
         client,
         last: null,
+        acks,
+        owed: new Map(),
         terminals,
         open: new Map(),
         buffered: new Map(),
@@ -134,8 +175,10 @@ export function remoteTerminals(
       sessions.set(token, session)
     }
     clearTimeout(session.timer)
+    release(session)
     session.client = client
     session.last = null
+    session.acks = acks
     replay(session, client, offsets, true)
     return session
   }
@@ -162,12 +205,19 @@ export function remoteTerminals(
       throw cause
     }
   }
+  const control = (session: Session, id: string, method: string, value: typeof input.Type) => {
+    if (!session.open.has(id)) throw new Error("This terminal has ended. Open another terminal.")
+    if (method === IPC.terminalWrite) session.terminals.write(id, value.data ?? "")
+    if (method === IPC.terminalResize)
+      session.terminals.resize(id, value.cols ?? 80, value.rows ?? 24)
+    return null
+  }
   return {
     handles: (method: string) => methods.has(method),
     execute: async (method: string, raw: unknown, client: string) => {
       const value = Schema.decodeUnknownSync(input)(raw)
       if (method === "meldshell:terminal-attach") {
-        const session = attach(value.session, client, value.offsets)
+        const session = attach(value.session, client, value.offsets, value.acks === true)
         return [...session.open.keys()]
       }
       const session = sessions.get(value.session)
@@ -176,20 +226,9 @@ export function remoteTerminals(
       const id = value.id
       if (!id) throw new Error("A terminal ID is required.")
       if (method === IPC.terminalOpen) return open(session, id, value)
-      if (method === IPC.terminalClose) {
-        session.open.delete(id)
-        session.buffered.delete(id)
-        session.sent.delete(id)
-        session.exits.delete(id)
-        session.reported.delete(id)
-        await session.terminals.close(id)
-        return null
-      }
-      if (!session.open.has(id)) throw new Error("This terminal has ended. Open another terminal.")
-      if (method === IPC.terminalWrite) session.terminals.write(id, value.data ?? "")
-      if (method === IPC.terminalResize)
-        session.terminals.resize(id, value.cols ?? 80, value.rows ?? 24)
-      return null
+      if (method === IPC.terminalClose) return close(session, id)
+      if (method === IPC.terminalAck) return acknowledge(session, id, value.chars ?? 0)
+      return control(session, id, method, value)
     },
     clients: (ids: readonly string[]) => {
       for (const [token, session] of sessions) {
@@ -204,6 +243,7 @@ export function remoteTerminals(
           continue
         }
         if (ids.includes(session.client)) continue
+        release(session)
         session.last = session.client
         session.client = null
         session.timer = setTimeout(() => {

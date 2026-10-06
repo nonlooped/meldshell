@@ -109,6 +109,28 @@ export const terminalSelection = (id: string): string =>
 export const terminalSelectAll = (id: string): void => instances.get(id)?.term.selectAll()
 export const terminalClear = (id: string): void => instances.get(id)?.term.clear()
 export const terminalPaste = (id: string, text: string): void => instances.get(id)?.term.paste(text)
+
+/** Keys an on-screen keyboard lacks, which a touch screen offers above the terminal instead. */
+export type TerminalKey = "escape" | "tab" | "interrupt" | "up" | "down" | "left" | "right"
+
+const arrows: Partial<Record<TerminalKey, string>> = { up: "A", down: "B", right: "C", left: "D" }
+const plainKeys: Partial<Record<TerminalKey, string>> = {
+  escape: "\x1b",
+  tab: "\t",
+  interrupt: "\x03",
+}
+
+/** Sends a key as if typed, with arrows encoded for the cursor mode the program asked for. */
+export function terminalKey(id: string, key: TerminalKey): void {
+  const term = instances.get(id)?.term
+  if (term === undefined) return
+  const arrow = arrows[key]
+  const data =
+    arrow === undefined
+      ? plainKeys[key]
+      : `\x1b${term.modes.applicationCursorKeysMode ? "O" : "["}${arrow}`
+  if (data !== undefined) term.input(data)
+}
 let pendingFocus: string | null = null
 // The run script each run shell starts, and the open shell for each thread's run script.
 const runShells = new Map<string, string>()
@@ -140,6 +162,7 @@ function focusTerminal(id: string): void {
 
 function disposeTerminal(id: string): void {
   outputTails.delete(id)
+  parsed.delete(id)
   runShells.delete(id)
   forgetRunShell(id)
   terminalApi?.close(id)
@@ -304,6 +327,22 @@ export function useRunningScripts(threadId: string | null): readonly string[] {
   )
 }
 
+/*
+ * The host pauses a shell while too much of its output is unparsed, so parsed output is reported
+ * in batches. A remainder below a batch is carried into the next one; the host's pause threshold
+ * leaves room for it.
+ */
+const ACK_BATCH = 64 * 1024
+const parsed = new Map<string, number>()
+function acknowledge(id: string, chars: number): void {
+  const total = (parsed.get(id) ?? 0) + chars
+  if (total < ACK_BATCH) parsed.set(id, total)
+  else {
+    parsed.delete(id)
+    terminalApi?.ack(id, total)
+  }
+}
+
 let listening = false
 function watchForServers(id: string, data: string): void {
   const text = (outputTails.get(id) ?? "") + data
@@ -319,7 +358,10 @@ function listen(): void {
   if (listening || terminalApi === undefined) return
   listening = true
   terminalApi.onData((id, data) => {
-    instances.get(id)?.term.write(data)
+    const instance = instances.get(id)
+    // Output for a closed view must not hold its shell.
+    if (instance === undefined) terminalApi?.ack(id, data.length)
+    else instance.term.write(data, () => acknowledge(id, data.length))
     watchForServers(id, data)
   })
   terminalApi.onExit((id, code) => {

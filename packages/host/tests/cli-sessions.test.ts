@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { test } from "node:test"
@@ -379,6 +379,96 @@ test("a Pi session file plays back its current branch as the records Pi streams 
     if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR
     else process.env.PI_CODING_AGENT_DIR = previous
     await rm(agent, { recursive: true, force: true })
+  }
+})
+
+/** A minimal Pi session file run in `cwd` whose first prompt is `prompt`. */
+const piSessionFile = (cwd: string, prompt: string): string =>
+  `${[
+    { type: "session", version: 3, id: prompt, timestamp: "2026-10-04T00:00:00.000Z", cwd },
+    {
+      type: "message",
+      id: "m1",
+      parentId: null,
+      timestamp: "2026-10-04T00:00:01.000Z",
+      message: { role: "user", content: [{ type: "text", text: prompt }] },
+    },
+  ]
+    .map((entry) => JSON.stringify(entry))
+    .join("\n")}\n`
+
+test("Pi lists its newest sessions by file time and rereads only files that changed", async () => {
+  const agent = await mkdtemp(join(tmpdir(), "meldshell-pi-"))
+  const previous = process.env.PI_CODING_AGENT_DIR
+  process.env.PI_CODING_AGENT_DIR = agent
+  try {
+    const folder = join(agent, "sessions", piFolder)
+    await mkdir(folder, { recursive: true })
+    const base = Date.parse("2026-10-01T00:00:00.000Z")
+    const files: string[] = []
+    // Later names get older file times, so only the times put the newest first.
+    for (let index = 0; index < 120; index += 1) {
+      const file = join(folder, `2026-10-01T00-00-00-${String(index).padStart(3, "0")}Z_s.jsonl`)
+      await writeFile(file, piSessionFile("/repo", `Prompt ${String(index).padStart(3, "0")}`))
+      await utimes(file, new Date(base), new Date(base - index * 60_000))
+      files.push(file)
+    }
+    // Newer files that are not listed sessions do not take places.
+    const blank = join(folder, "blank.jsonl")
+    await writeFile(blank, `${JSON.stringify(piSession[0])}\n`)
+    const notes = join(folder, "notes.jsonl")
+    await writeFile(notes, '{"type":"message"}\n')
+    await utimes(blank, new Date(base), new Date(base + 60_000))
+    await utimes(notes, new Date(base), new Date(base + 60_000))
+
+    const listed = await listPiSessions("/repo")
+    assert.deepEqual(
+      listed.map((session) => session.nativeThreadId),
+      files.slice(0, 100),
+    )
+    assert.equal(listed[0]?.title, "Prompt 000")
+    assert.equal(listed[0]?.updatedAt, new Date(base).toISOString())
+
+    // An unchanged file keeps its summary; a changed one is read again.
+    const first = files[0]!
+    const second = files[1]!
+    await writeFile(first, piSessionFile("/repo", "Edited 000"))
+    await utimes(first, new Date(base), new Date(base))
+    await writeFile(second, piSessionFile("/repo", "Edited 001"))
+    await utimes(second, new Date(base), new Date(base - 30_000))
+    const again = await listPiSessions("/repo")
+    assert.deepEqual(
+      again.slice(0, 2).map((session) => session.title),
+      ["Prompt 000", "Edited 001"],
+    )
+  } finally {
+    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR
+    else process.env.PI_CODING_AGENT_DIR = previous
+    await rm(agent, { recursive: true, force: true })
+  }
+})
+
+test("Pi lists each folder's own sessions from a shared session directory", async () => {
+  const shared = await mkdtemp(join(tmpdir(), "meldshell-pi-shared-"))
+  const previous = process.env.PI_CODING_AGENT_SESSION_DIR
+  process.env.PI_CODING_AGENT_SESSION_DIR = shared
+  try {
+    await writeFile(join(shared, "a.jsonl"), piSessionFile("/repo", "In repo"))
+    await writeFile(join(shared, "b.jsonl"), piSessionFile("/other", "In other"))
+    // A listing for one folder does not hide the other folder's sessions from a later listing.
+    for (const [folder, title] of [
+      ["/repo", "In repo"],
+      ["/other", "In other"],
+      ["/repo", "In repo"],
+    ] as const)
+      assert.deepEqual(
+        (await listPiSessions(folder)).map((session) => session.title),
+        [title],
+      )
+  } finally {
+    if (previous === undefined) delete process.env.PI_CODING_AGENT_SESSION_DIR
+    else process.env.PI_CODING_AGENT_SESSION_DIR = previous
+    await rm(shared, { recursive: true, force: true })
   }
 })
 
