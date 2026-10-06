@@ -152,7 +152,7 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
   test("the setup guide applies preferences and hands over to a focused first thread", async ({
     desktop,
   }) => {
-    const workspace = await desktop.addWorkspace()
+    await desktop.addWorkspace()
     const page = desktop.page
     await page.getByRole("button", { name: /^Settings/ }).click()
     await page
@@ -162,13 +162,12 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     await page.getByRole("button", { name: "Run setup again", exact: true }).click()
     const guide = page.getByRole("main", { name: "Set up MeldShell", exact: true })
     await guide.getByRole("button", { name: "Get started", exact: true }).click()
-    await guide.getByRole("switch", { name: "Use OpenAI", exact: true }).waitFor()
-    await guide.getByRole("button", { name: "Continue", exact: true }).click()
-    await guide.getByRole("radio", { name: /workspace with spaces/ }).click()
+    await guide.getByRole("radiogroup", { name: "First agent", exact: true }).waitFor()
     await guide.getByRole("button", { name: "Continue", exact: true }).click()
     await guide.getByRole("radio", { name: "Light", exact: true }).click()
     await page.waitForFunction(() => document.documentElement.dataset.theme === "light")
-    await guide.getByRole("button", { name: "Start your first thread", exact: true }).click()
+    await guide.getByRole("button", { name: "Continue", exact: true }).click()
+    await guide.getByRole("button", { name: "Start in Home", exact: true }).click()
     await guide.waitFor({ state: "detached" })
     await expect
       .poll(() => page.evaluate(() => document.activeElement?.tagName ?? null))
@@ -176,10 +175,9 @@ test.describe("Desktop journeys", { platforms: ["desktop"] }, () => {
     const snapshot = await desktop.call("getSnapshot")
     expect(snapshot.settings.onboarded).toBe(true)
     expect(snapshot.settings.theme).toBe("light")
+    const home = snapshot.workspaces.find((entry) => entry.home === true)
     expect(
-      snapshot.threads.some(
-        (thread) => thread.workspaceId === workspace.id && thread.turnCount === 0,
-      ),
+      snapshot.threads.some((thread) => thread.workspaceId === home?.id && thread.turnCount === 0),
     ).toBe(true)
     // The app stays inert behind the guide, so reaching Settings after a restart proves it stayed away.
     await desktop.restart()

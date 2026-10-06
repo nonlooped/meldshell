@@ -86,7 +86,7 @@ export class Desktop {
   private async skipSetup(): Promise<void> {
     const guide = this.page.getByRole("main", { name: "Set up MeldShell", exact: true })
     // The launch screen can wait on harness probes before the guide appears.
-    await guide.getByRole("button", { name: "Skip", exact: true }).click({ timeout: 30_000 })
+    await guide.getByRole("button", { name: "Skip setup", exact: true }).click({ timeout: 30_000 })
     await guide.waitFor({ state: "detached" })
   }
 
