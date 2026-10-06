@@ -55,6 +55,8 @@ import { useTabStore, type FileTab } from "./tab-store"
 import { visibleThreads } from "./thread-layout"
 import { useViewportTier, type ViewportTier } from "./viewport"
 import { useViewStore } from "./view-store"
+import { usePhoneNav, usePhoneNavigation, type PhoneScreen } from "./phone-nav"
+import { PhoneScreens } from "./PhoneScreens"
 import { ThreadWorkbench } from "./ThreadWorkbench"
 import { LaunchReveal, LaunchScreen, useLaunch } from "./LaunchScreen"
 import { RemoteConnectionNotice } from "./RemoteClientChrome"
@@ -226,46 +228,17 @@ function ThreadPane({
 }
 
 /**
- * Narrow windows cannot hold the sidebars beside the thread. Entering one folds the files sidebar
- * away, and on a phone the inbox too, so the thread keeps the screen.
+ * A compact window cannot hold both sidebars beside the thread. Entering one folds the files
+ * sidebar away, so the thread keeps the room. A phone shows one screen at a time instead.
  */
 function useNarrowPanels(
   tier: ViewportTier,
-  inbox: ReturnType<typeof usePanelRef>,
   files: ReturnType<typeof usePanelRef>,
   animate: (change: () => void) => void,
 ) {
   useEffect(() => {
-    if (tier === "regular") return
-    animate(() => {
-      files.current?.collapse()
-      if (tier === "phone") inbox.current?.collapse()
-    })
-  }, [tier, inbox, files, animate])
-}
-
-function usePhonePanels(
-  phone: boolean,
-  inbox: ReturnType<typeof usePanelRef>,
-  files: ReturnType<typeof usePanelRef>,
-  animate: (change: () => void) => void,
-) {
-  useEffect(
-    () =>
-      useTabStore.subscribe((state, previous) => {
-        if (
-          phone &&
-          (state.selectedThreadTabId !== previous.selectedThreadTabId ||
-            state.selectedFileId !== previous.selectedFileId)
-        ) {
-          animate(() => {
-            inbox.current?.collapse()
-            files.current?.collapse()
-          })
-        }
-      }),
-    [phone, inbox, files, animate],
-  )
+    if (tier === "compact") animate(() => files.current?.collapse())
+  }, [tier, files, animate])
 }
 
 /** Sidebar toggles animate the group's layout; drags and window resizes still apply instantly. */
@@ -298,23 +271,62 @@ function toggleSidebar(
   })
 }
 
-/** Panel bounds per tier. A phone stacks the sidebars above the thread instead of beside it. */
+/** A sidebar's shortcut on a phone moves to its screen, or back to the tab from there. */
+function togglePhoneScreen(current: PhoneScreen, screen: "inbox" | "files"): void {
+  usePhoneNav.getState().go(current === screen ? "main" : screen)
+}
+
+/** The inbox and files toggles: sidebars beside the thread, or a phone's screens. */
+function useSidebarToggles(
+  tier: ViewportTier,
+  phone: boolean,
+  inbox: { panelRef: ReturnType<typeof usePanelRef>; toggle: () => void },
+  files: { panelRef: ReturnType<typeof usePanelRef>; toggle: () => void; collapsed: boolean },
+  animate: (change: () => void) => void,
+) {
+  const screen = usePhoneNav((state) => state.screen)
+  return {
+    toggleInbox: () =>
+      phone
+        ? togglePhoneScreen(screen, "inbox")
+        : toggleSidebar(tier, files.panelRef, inbox.toggle, animate),
+    toggleSourceControl: () =>
+      phone
+        ? togglePhoneScreen(screen, "files")
+        : toggleSidebar(tier, inbox.panelRef, files.toggle, animate),
+    filesShown: phone ? screen === "files" : !files.collapsed,
+  }
+}
+
+/** A popped-out thread's window keeps its one thread, even as narrow as a phone. */
+const showsPhoneScreens = (tier: ViewportTier): boolean =>
+  tier === "phone" && windowThreadId === null
+
+/** On a phone, settings and scheduled prompts carry their own header with the way back. */
+const useTitleBarShown = (phone: boolean): boolean =>
+  useViewStore((state) => !phone || !(state.settingsOpen || state.schedulesOpen))
+
+/** The app's frame: the title bar's row, unless a phone's settings bring their own header. */
+const appFrameClasses = (titleBarShown: boolean): string =>
+  [
+    "w-full h-full grid text-[var(--text-primary)] text-[13px] leading-[1.45]",
+    titleBarShown
+      ? "grid-rows-[var(--titlebar-height)_minmax(0,_1fr)]"
+      : "grid-rows-[minmax(0,_1fr)]",
+    safeAreaClasses,
+  ].join(" ")
+
+/** Whether a thread waits on the operator: an approval, a failure, or finished work not yet seen. */
+const waitsOnOperator = (thread: Thread, unseenThreadIds: ReadonlySet<string>): boolean =>
+  thread.status === "active" &&
+  (thread.activity === "approval" || thread.activity === "failed" || unseenThreadIds.has(thread.id))
+
+/** Panel bounds for a window wide enough to show the sidebars beside the thread. */
 function panelLayout(tier: ViewportTier, inboxWidth: number, filesWidth: number) {
   switch (tier) {
     case "phone":
-      return {
-        orientation: "vertical" as const,
-        inboxMin: "160px",
-        inboxMax: "45%",
-        filesMin: "160px",
-        filesMax: "70%",
-        threadMin: "0px",
-        inboxWidth: "100%",
-        filesWidth: "100%",
-      }
     case "compact":
       return {
-        orientation: "horizontal" as const,
         inboxMin: "208px",
         inboxMax: "320px",
         filesMin: "220px",
@@ -325,7 +337,6 @@ function panelLayout(tier: ViewportTier, inboxWidth: number, filesWidth: number)
       }
     case "regular":
       return {
-        orientation: "horizontal" as const,
         inboxMin: "252px",
         inboxMax: "420px",
         filesMin: "240px",
@@ -376,23 +387,31 @@ function useSidebar(
   }
 }
 
-/** On a desktop layout the collapsed inbox narrows to its icon rail; on a phone it hides. */
-function useInboxSidebar(phone: boolean) {
-  const collapsedSize = phone ? 0 : INBOX_RAIL_WIDTH
-  const sidebar = useSidebar(304, phone, collapsedSize)
-  const rail = sidebar.collapsed && !phone
-  const hidden = sidebar.collapsed && phone
+/** The collapsed inbox narrows to its icon rail. */
+function useInboxSidebar() {
+  const sidebar = useSidebar(304, false, INBOX_RAIL_WIDTH)
   return {
     ...sidebar,
-    collapsedSize,
-    rail,
+    collapsedSize: INBOX_RAIL_WIDTH,
+    rail: sidebar.collapsed,
     asideProps: {
-      className: `motion-colors motion-duration-220 group/inbox grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto_auto] [padding:10px_8px_8px] ${hidden ? "opacity-0" : ""}`,
-      inert: hidden,
-      "data-rail": rail ? "" : undefined,
+      className:
+        "motion-colors motion-duration-220 group/inbox grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto_auto] [padding:10px_8px_8px]",
+      "data-rail": sidebar.collapsed ? "" : undefined,
     },
   }
 }
+
+/**
+ * A phone's notch and rounded corners keep clear of the app's controls. Each screen keeps its own
+ * bottom controls above the home indicator, so lists can still scroll beneath it.
+ */
+const safeAreaClasses =
+  "[padding:env(safe-area-inset-top,_0px)_env(safe-area-inset-right,_0px)_0_env(safe-area-inset-left,_0px)]"
+
+/** On a phone the inbox is a screen of its own, with room to breathe around its rows. */
+const phoneInboxClasses =
+  "group/inbox grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto_auto] [padding:12px_12px_max(8px,_env(safe-area-inset-bottom))]"
 
 function InboxFooter({
   rail,
@@ -463,6 +482,19 @@ function reviewThreadId(file: FileTab, thread: Thread | null): string | undefine
     : undefined
 }
 
+function FileContent({ file, thread }: { file: FileTab; thread: Thread | null }) {
+  return file.diffSide ? (
+    <DiffViewer
+      key={file.id}
+      file={file}
+      side={file.diffSide}
+      reviewThreadId={reviewThreadId(file, thread)}
+    />
+  ) : (
+    <FileViewer key={file.id} file={file} />
+  )
+}
+
 function FileOrThread({
   file,
   thread,
@@ -475,17 +507,20 @@ function FileOrThread({
   if (!file) return <>{children}</>
   return (
     <Tabs.Panel render={<FadeDiv />} value={file.id} className={threadContentClasses}>
-      {file.diffSide ? (
-        <DiffViewer
-          key={file.id}
-          file={file}
-          side={file.diffSide}
-          reviewThreadId={reviewThreadId(file, thread)}
-        />
-      ) : (
-        <FileViewer key={file.id} file={file} />
-      )}
+      <FileContent file={file} thread={thread} />
     </Tabs.Panel>
+  )
+}
+
+/** A phone's open file, which stays on screen while it slides away after the file is left. */
+function PhoneFile({ file, thread }: { file?: FileTab; thread: Thread | null }) {
+  const [shown, setShown] = useState(file)
+  if (file !== undefined && file !== shown) setShown(file)
+  if (shown === undefined) return null
+  return (
+    <main className={threadContentClasses}>
+      <FileContent file={shown} thread={thread} />
+    </main>
   )
 }
 
@@ -708,13 +743,14 @@ export function App(): React.JSX.Element {
   const [renameTitle, setRenameTitle] = useState("")
   const [filePaletteOpen, setFilePaletteOpen] = useState(false)
   const tier = useViewportTier()
-  const phone = tier === "phone"
-  const inbox = useInboxSidebar(phone)
+  const phone = showsPhoneScreens(tier)
+  const titleBarShown = useTitleBarShown(phone)
+  const inbox = useInboxSidebar()
   // Source control opens on request: the thread pane owns the window until the operator asks.
   const sourceControl = useSidebar(300, true)
   const panelMotion = usePanelMotion()
-  useNarrowPanels(tier, inbox.panelRef, sourceControl.panelRef, panelMotion.animate)
-  usePhonePanels(phone, inbox.panelRef, sourceControl.panelRef, panelMotion.animate)
+  useNarrowPanels(tier, sourceControl.panelRef, panelMotion.animate)
+  usePhoneNavigation(phone)
   const layout = panelLayout(tier, inbox.width, sourceControl.width)
 
   const { snapshotQuery, threadPagesQuery, snapshot } = useAppData()
@@ -859,16 +895,10 @@ export function App(): React.JSX.Element {
   )
   // The taskbar counts the threads waiting on the operator: approvals, failures, and finished work
   // they have not looked at. The main window owns the badge.
-  const attentionCount =
-    windowThreadId === null
-      ? snapshot.threads.filter(
-          (thread) =>
-            thread.status === "active" &&
-            (thread.activity === "approval" ||
-              thread.activity === "failed" ||
-              unseenThreadIds.has(thread.id)),
-        ).length
-      : null
+  const waitingThreads = snapshot.threads.filter((thread) =>
+    waitsOnOperator(thread, unseenThreadIds),
+  )
+  const attentionCount = windowThreadId === null ? waitingThreads.length : null
   useEffect(() => {
     if (attentionCount !== null) window.meldshell.desktop?.setAttention?.(attentionCount)
   }, [attentionCount])
@@ -897,10 +927,14 @@ export function App(): React.JSX.Element {
       },
     )
   }
-  const toggleInbox = () =>
-    toggleSidebar(tier, sourceControl.panelRef, inbox.toggle, panelMotion.animate)
-  const toggleSourceControl = () =>
-    toggleSidebar(tier, inbox.panelRef, sourceControl.toggle, panelMotion.animate)
+  // A phone has no sidebars to fold: the same toggles move between its screens.
+  const { toggleInbox, toggleSourceControl, filesShown } = useSidebarToggles(
+    tier,
+    phone,
+    inbox,
+    sourceControl,
+    panelMotion.animate,
+  )
 
   const keybindingOverrides = snapshot.settings.keybindings
   useEffect(() => {
@@ -919,7 +953,7 @@ export function App(): React.JSX.Element {
       openFilePalette: () => setFilePaletteOpen(true),
       searchFiles: () => {
         closeWorkbenchViews()
-        if (sourceControl.collapsed) toggleSourceControl()
+        if (!filesShown) toggleSourceControl()
         useContentSearch.getState().openSearch(selectedSearchText())
       },
       openIssuePicker: inMain(() => useViewStore.getState().openIssuePicker()),
@@ -959,13 +993,81 @@ export function App(): React.JSX.Element {
     return thread === undefined ? [] : [thread]
   })
 
+  // The inbox, the tab area, and the files sidebar sit side by side, or on a phone one at a time.
+  const inboxContent = (rail: boolean) => (
+    <>
+      <Inbox
+        rail={rail}
+        showSettled={snapshot.settings.showSettled ?? true}
+        onSearch={() => setThreadPaletteOpen(true)}
+        onManageWorkspaces={() => setWorkspacesOpen(true)}
+        onPin={(thread) => pinMutation.mutate(thread)}
+        threads={inboxThreads}
+        workspaces={snapshot.workspaces}
+        workspaceNames={workspaceNames}
+        providersByThreadId={providersByThreadId}
+        selectedThreadId={selectedThreadId}
+        unseenThreadIds={unseenThreadIds}
+        onNewThread={requestNewThread}
+        onNewThreadInWorkspace={(workspaceId) => createThreadMutation.mutate({ workspaceId })}
+        onRename={(thread) => {
+          setRenameTarget(thread)
+          setRenameTitle(thread.title)
+        }}
+        onAddWorkspace={() => addWorkspaceMutation.mutate()}
+        onOpen={(threadId) => {
+          closeWorkbenchViews()
+          openThread(threadId)
+        }}
+        onOpenBeside={(threadId, edge) => {
+          closeWorkbenchViews()
+          openBeside(threadId, edge)
+        }}
+        onPopOut={popOutAction}
+        onSetStatus={toggleArchived}
+        onDelete={setDeleteTarget}
+        canLoadMore={threadPagesQuery.hasNextPage}
+        loadingMore={threadPagesQuery.isFetchingNextPage}
+        onLoadMore={() => void threadPagesQuery.fetchNextPage()}
+      />
+
+      <InboxFooter
+        rail={rail}
+        onOpenSettings={() => openSettings()}
+        onOpenSchedules={openSchedules}
+      />
+    </>
+  )
+  const threadContent = (
+    <ThreadPane
+      databaseError={snapshotQuery.isError}
+      hasThread={selectedThread !== null}
+      recent={inboxThreads.filter((thread) => thread.status === "active").slice(0, 3)}
+      providersByThreadId={providersByThreadId}
+      onNewThread={requestNewThread}
+      onOpenThread={openThread}
+    >
+      <ThreadWorkbench snapshot={snapshot} threads={allThreads} searchTarget={searchTarget} />
+    </ThreadPane>
+  )
+  const mainClasses = "grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]"
+  const filesContent = (
+    <FilesSidebar
+      threadId={selectedThread?.id}
+      key={`${activeWorkspaceId}:${activeScope?.threadId ?? ""}`}
+      workspace={workspaceById.get(activeWorkspaceId)}
+      scope={activeScope}
+      worktreeThread={worktreeThread}
+    />
+  )
+
   return (
     <MotionPreferences reduceMotion={snapshot.settings.reduceMotion ?? false}>
       {/* The app and the launch screen crossfade over one shared backdrop. */}
       <div className="relative w-full h-full bg-[var(--scrim)]">
         <LaunchReveal loading={appHidden}>
           <Tabs.Root
-            className="w-full h-full grid grid-rows-[var(--titlebar-height)_minmax(0,_1fr)] text-[var(--text-primary)] text-[13px] leading-[1.45]"
+            className={appFrameClasses(titleBarShown)}
             value={selectedTabId}
             onValueChange={(value) => {
               if (typeof value === "string") {
@@ -976,6 +1078,7 @@ export function App(): React.JSX.Element {
           >
             <AppScale />
             <TitleBar
+              shown={titleBarShown}
               openThreads={openThreads}
               providersByThreadId={providersByThreadId}
               selectedTabId={selectedTabId}
@@ -1004,6 +1107,9 @@ export function App(): React.JSX.Element {
               onOpenInEditor={editor.open}
               cli={terminal.cli}
               onOpenInCli={terminal.continueInCli}
+              waitingCount={
+                waitingThreads.filter((thread) => thread.id !== selectedThreadId).length
+              }
             />
 
             {settingsOpen ? (
@@ -1022,126 +1128,75 @@ export function App(): React.JSX.Element {
               />
             ) : (
               <WorkspaceView snapshot={snapshot} schedulesOpen={schedulesOpen}>
-                <Group
-                  elementRef={panelMotion.groupRef}
-                  className="motion-panels motion-duration-220 min-h-0"
-                  orientation={layout.orientation}
-                >
-                  <MainWindowOnly>
-                    <SidebarPanel
-                      id="inbox"
-                      panelRef={inbox.panelRef}
-                      elementRef={inbox.elementRef}
-                      onTransitionEnd={inbox.onTransitionEnd}
-                      collapsible
-                      collapsedSize={inbox.collapsedSize}
-                      // The rail's controls size against the panel's live width, so they track its edge.
-                      className="@container"
-                      defaultSize={inbox.defaultSize}
-                      minSize={layout.inboxMin}
-                      maxSize={layout.inboxMax}
-                      groupResizeBehavior="preserve-pixel-size"
-                      onResize={inbox.onResize}
-                    >
-                      <aside {...inbox.asideProps} style={{ width: layout.inboxWidth }}>
-                        <Inbox
-                          rail={inbox.rail}
-                          showSettled={snapshot.settings.showSettled ?? true}
-                          onSearch={() => setThreadPaletteOpen(true)}
-                          onManageWorkspaces={() => setWorkspacesOpen(true)}
-                          onPin={(thread) => pinMutation.mutate(thread)}
-                          threads={inboxThreads}
-                          workspaces={snapshot.workspaces}
-                          workspaceNames={workspaceNames}
-                          providersByThreadId={providersByThreadId}
-                          selectedThreadId={selectedThreadId}
-                          unseenThreadIds={unseenThreadIds}
-                          onNewThread={requestNewThread}
-                          onNewThreadInWorkspace={(workspaceId) =>
-                            createThreadMutation.mutate({ workspaceId })
-                          }
-                          onRename={(thread) => {
-                            setRenameTarget(thread)
-                            setRenameTitle(thread.title)
-                          }}
-                          onAddWorkspace={() => addWorkspaceMutation.mutate()}
-                          onOpen={(threadId) => {
-                            closeWorkbenchViews()
-                            openThread(threadId)
-                          }}
-                          onOpenBeside={(threadId, edge) => {
-                            closeWorkbenchViews()
-                            openBeside(threadId, edge)
-                          }}
-                          onPopOut={popOutAction}
-                          onSetStatus={toggleArchived}
-                          onDelete={setDeleteTarget}
-                          canLoadMore={threadPagesQuery.hasNextPage}
-                          loadingMore={threadPagesQuery.isFetchingNextPage}
-                          onLoadMore={() => void threadPagesQuery.fetchNextPage()}
-                        />
-
-                        <InboxFooter
-                          rail={inbox.rail}
-                          onOpenSettings={() => openSettings()}
-                          onOpenSchedules={openSchedules}
-                        />
-                      </aside>
-                    </SidebarPanel>
-                    <Separator className={`motion-colors ${paneSeparatorClasses}`} />
-                  </MainWindowOnly>
-
-                  <Panel id="thread" minSize={layout.threadMin}>
-                    <main className="grid h-full min-w-0 min-h-0 grid-rows-[minmax(0,_1fr)_auto]">
-                      <FileOrThread file={selectedFile} thread={selectedThread}>
-                        <ThreadPane
-                          databaseError={snapshotQuery.isError}
-                          hasThread={selectedThread !== null}
-                          recent={inboxThreads
-                            .filter((thread) => thread.status === "active")
-                            .slice(0, 3)}
-                          providersByThreadId={providersByThreadId}
-                          onNewThread={requestNewThread}
-                          onOpenThread={openThread}
-                        >
-                          <ThreadWorkbench
-                            snapshot={snapshot}
-                            threads={allThreads}
-                            searchTarget={searchTarget}
-                          />
-                        </ThreadPane>
-                      </FileOrThread>
-                    </main>
-                  </Panel>
-                  <Separator className={`motion-colors ${paneSeparatorClasses}`} />
-                  <SidebarPanel
-                    id="source-control"
-                    panelRef={sourceControl.panelRef}
-                    elementRef={sourceControl.elementRef}
-                    onTransitionEnd={sourceControl.onTransitionEnd}
-                    collapsible
-                    collapsedSize={0}
-                    inert={sourceControl.collapsed}
-                    defaultSize={sourceControl.defaultSize}
-                    minSize={layout.filesMin}
-                    maxSize={layout.filesMax}
-                    groupResizeBehavior="preserve-pixel-size"
-                    onResize={sourceControl.onResize}
+                {phone ? (
+                  <PhoneScreens
+                    screens={{
+                      inbox: <aside className={phoneInboxClasses}>{inboxContent(false)}</aside>,
+                      main: <main className={mainClasses}>{threadContent}</main>,
+                      files: filesContent,
+                      file: <PhoneFile file={selectedFile} thread={selectedThread} />,
+                    }}
+                  />
+                ) : (
+                  <Group
+                    elementRef={panelMotion.groupRef}
+                    className="motion-panels motion-duration-220 min-h-0"
+                    orientation="horizontal"
                   >
-                    <div
-                      className={`motion-colors motion-duration-220 h-full ${sourceControl.collapsed ? "opacity-0" : ""}`}
-                      style={{ width: layout.filesWidth }}
+                    <MainWindowOnly>
+                      <SidebarPanel
+                        id="inbox"
+                        panelRef={inbox.panelRef}
+                        elementRef={inbox.elementRef}
+                        onTransitionEnd={inbox.onTransitionEnd}
+                        collapsible
+                        collapsedSize={inbox.collapsedSize}
+                        // The rail's controls size against the panel's live width, so they track its edge.
+                        className="@container"
+                        defaultSize={inbox.defaultSize}
+                        minSize={layout.inboxMin}
+                        maxSize={layout.inboxMax}
+                        groupResizeBehavior="preserve-pixel-size"
+                        onResize={inbox.onResize}
+                      >
+                        <aside {...inbox.asideProps} style={{ width: layout.inboxWidth }}>
+                          {inboxContent(inbox.rail)}
+                        </aside>
+                      </SidebarPanel>
+                      <Separator className={`motion-colors ${paneSeparatorClasses}`} />
+                    </MainWindowOnly>
+
+                    <Panel id="thread" minSize={layout.threadMin}>
+                      <main className={mainClasses}>
+                        <FileOrThread file={selectedFile} thread={selectedThread}>
+                          {threadContent}
+                        </FileOrThread>
+                      </main>
+                    </Panel>
+                    <Separator className={`motion-colors ${paneSeparatorClasses}`} />
+                    <SidebarPanel
+                      id="source-control"
+                      panelRef={sourceControl.panelRef}
+                      elementRef={sourceControl.elementRef}
+                      onTransitionEnd={sourceControl.onTransitionEnd}
+                      collapsible
+                      collapsedSize={0}
+                      inert={sourceControl.collapsed}
+                      defaultSize={sourceControl.defaultSize}
+                      minSize={layout.filesMin}
+                      maxSize={layout.filesMax}
+                      groupResizeBehavior="preserve-pixel-size"
+                      onResize={sourceControl.onResize}
                     >
-                      <FilesSidebar
-                        threadId={selectedThread?.id}
-                        key={`${activeWorkspaceId}:${activeScope?.threadId ?? ""}`}
-                        workspace={workspaceById.get(activeWorkspaceId)}
-                        scope={activeScope}
-                        worktreeThread={worktreeThread}
-                      />
-                    </div>
-                  </SidebarPanel>
-                </Group>
+                      <div
+                        className={`motion-colors motion-duration-220 h-full ${sourceControl.collapsed ? "opacity-0" : ""}`}
+                        style={{ width: layout.filesWidth }}
+                      >
+                        {filesContent}
+                      </div>
+                    </SidebarPanel>
+                  </Group>
+                )}
               </WorkspaceView>
             )}
 

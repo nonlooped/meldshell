@@ -42,6 +42,10 @@ export function SettingRow({
       className={cx(
         rowClasses,
         "items-center gap-[32px] [@container(max-width:_540px)]:items-start [@container(max-width:_540px)]:flex-col [@container(max-width:_540px)]:gap-[12px]",
+        // A lone switch stays beside its label, as a phone's own settings keep it. Base UI renders a
+        // hidden checkbox beside the switch, so a lone switch is a control with two children.
+        "[@container(max-width:_540px)]:[&:has(>_.setting-control_>_.switch):not(:has(>_.setting-control_>_:nth-child(3)))]:flex-row",
+        "[@container(max-width:_540px)]:[&:has(>_.setting-control_>_.switch):not(:has(>_.setting-control_>_:nth-child(3)))]:gap-[16px]",
       )}
     >
       <div className="flex min-w-0 flex-col gap-[3px]">
@@ -70,8 +74,11 @@ const descriptionClasses = "m-0 text-[var(--text-secondary)] text-[12px] leading
 
 const settingControlClasses = [
   // Fields and selects take the full column; a lone switch or button hugs its own width.
-  "flex min-w-[220px] max-w-[320px] flex-none justify-end [&_>_.text-input]:w-full [&_>_.text-input]:min-w-0",
+  "setting-control flex min-w-[220px] max-w-[320px] flex-none justify-end [&_>_.text-input]:w-full [&_>_.text-input]:min-w-0",
   "[&_>_.field]:w-full [&_>_.field]:min-w-0 [&_>_.button]:w-full [&_>_.button]:min-w-0",
   "[&_.button]:min-h-[32px] [&_.switch]:shrink-0 [@container(max-width:_540px)]:w-[min(100%,_220px)]",
   "[@container(max-width:_540px)]:basis-[auto] [@container(max-width:_540px)]:justify-start",
+  "[@container(max-width:_540px)]:[&:has(>_.switch):not(:has(>_:nth-child(3)))]:w-auto",
+  "[@container(max-width:_540px)]:[&:has(>_.switch):not(:has(>_:nth-child(3)))]:min-w-0",
+  "[@container(max-width:_540px)]:[&:has(>_.switch):not(:has(>_:nth-child(3)))]:pt-[2px]",
 ].join(" ")

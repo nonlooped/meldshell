@@ -220,7 +220,7 @@ function FileRow({
       role="treeitem"
       aria-level={depth + 1}
       className={
-        "flex items-center gap-[6px] w-full h-[24px] [padding:0_10px] border-0 bg-transparent text-inherit text-left cursor-default [&:hover]:bg-[var(--surface-hover)] [&_>_svg]:shrink-0 [&_>_svg]:w-[12px] [&_>_.file-icon]:w-[16px]"
+        "flex items-center gap-[6px] w-full h-[24px] [@media(pointer:coarse)]:h-[36px] [padding:0_10px] border-0 bg-transparent text-inherit text-left cursor-default [&:hover]:bg-[var(--surface-hover)] [&_>_svg]:shrink-0 [&_>_svg]:w-[12px] [&_>_.file-icon]:w-[16px]"
       }
       style={{ paddingLeft: 10 + depth * 14, ...indentGuides(depth) }}
       title={`${entry.path}${entry.status ? ` (${kind})` : ""}`}

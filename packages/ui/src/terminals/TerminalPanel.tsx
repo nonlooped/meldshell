@@ -1,10 +1,22 @@
 import { useEffect, useRef } from "react"
 import type { Thread } from "@meldshell/contracts"
 import { Group, Panel, Separator } from "react-resizable-panels"
-import { ChevronDown, Columns2, Rows2, SquareTerminal, X } from "lucide-react"
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ChevronDown,
+  Columns2,
+  Rows2,
+  SquareTerminal,
+  X,
+} from "lucide-react"
+import { Button as BaseButton } from "@base-ui-components/react/button"
 import { ContextMenu, IconButton, MenuAction, MenuSeparator } from "../ui/controls"
 import { paneSeparatorClasses } from "../ui/styles"
 import { useKeybindings, withShortcut } from "../app/keybindings"
+import { touchOnly } from "../app/viewport"
 import type { TerminalLayout } from "./terminal-layout"
 import {
   attachTerminal,
@@ -12,8 +24,10 @@ import {
   terminalPaste,
   terminalSelectAll,
   terminalSelection,
+  terminalKey,
   useTerminalStore,
   type TerminalInfo,
+  type TerminalKey,
   type ThreadTerminals,
 } from "./terminal-store"
 
@@ -105,7 +119,7 @@ function TerminalPane({
       </ContextMenu>
       {multiple && (
         <IconButton
-          className="terminal-pane-close absolute! top-[6px] right-[10px] z-[12] w-[22px]! h-[22px]! flex-[0_0_22px]! bg-[var(--surface-menu)]! opacity-[0] [&:focus-visible]:opacity-[1]"
+          className="terminal-pane-close absolute! top-[6px] right-[10px] z-[12] w-[22px]! h-[22px]! flex-[0_0_22px]! bg-[var(--surface-menu)]! opacity-[0] [&:focus-visible]:opacity-[1] [@media(hover:_none)]:opacity-[1]"
           label="Close this terminal"
           onClick={() => useTerminalStore.getState().close(threadId, id)}
         >
@@ -163,6 +177,47 @@ function TerminalNode({
   )
 }
 
+const touchKeys: ReadonlyArray<{
+  readonly key: TerminalKey
+  readonly label: string
+  readonly content: React.ReactNode
+}> = [
+  { key: "escape", label: "Escape", content: "esc" },
+  { key: "tab", label: "Tab", content: "tab" },
+  { key: "interrupt", label: "Control C", content: "^C" },
+  { key: "left", label: "Left arrow", content: <ArrowLeft size={14} /> },
+  { key: "up", label: "Up arrow", content: <ArrowUp size={14} /> },
+  { key: "down", label: "Down arrow", content: <ArrowDown size={14} /> },
+  { key: "right", label: "Right arrow", content: <ArrowRight size={14} /> },
+]
+
+/**
+ * The keys a phone's keyboard does not have, for the focused shell. Pressing one keeps the
+ * keyboard up, so a key can follow typing without the terminal losing focus.
+ */
+function TouchKeys({ terminalId }: { terminalId: string }): React.JSX.Element {
+  return (
+    <div
+      role="toolbar"
+      aria-label="Terminal keys"
+      className="flex min-w-0 gap-[6px] overflow-x-auto [padding:6px_10px_max(6px,_env(safe-area-inset-bottom))] border-t-[1px] border-t-[color:var(--line-subtle)] [scrollbar-width:none]"
+    >
+      {touchKeys.map(({ key, label, content }) => (
+        <BaseButton
+          key={key}
+          type="button"
+          aria-label={label}
+          className="motion-colors grid h-[34px] min-w-[44px] flex-none place-items-center [padding:0_10px] border-[1px] border-[color:var(--line)] rounded-[var(--radius)] bg-[var(--surface-button)] text-[var(--text-secondary)] [font:12px_var(--font-mono)] cursor-default [&:active]:bg-[var(--surface-active)] [&:active]:text-[var(--text-primary)]"
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => terminalKey(terminalId, key)}
+        >
+          {content}
+        </BaseButton>
+      ))}
+    </div>
+  )
+}
+
 /** A thread's shells, split into panes below its conversation. */
 export function TerminalPanel({
   thread,
@@ -176,7 +231,7 @@ export function TerminalPanel({
   const toggleChord = useKeybindings((state) => state.bindings.toggleTerminal)
   return (
     <section
-      className="grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)]"
+      className="grid h-full min-w-0 min-h-0 grid-rows-[auto_minmax(0,_1fr)_auto]"
       aria-label={`Terminals for ${thread.title}`}
     >
       <div className="flex min-w-0 items-center gap-[2px] [padding:3px_6px_3px_12px] text-[var(--text-tertiary)] text-[12px]">
@@ -198,6 +253,7 @@ export function TerminalPanel({
         </IconButton>
       </div>
       <TerminalNode node={terminals.layout} thread={thread} terminals={terminals} />
+      {touchOnly && <TouchKeys terminalId={terminals.focusedId} />}
     </section>
   )
 }

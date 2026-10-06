@@ -343,7 +343,7 @@ function NoteCard({
             aria-hidden="true"
           />
           <span className="flex-1">{linesLabel(noteLines(note))}</span>
-          <span className="flex gap-[2px] opacity-0 group-hover/note:opacity-100 group-focus-within/note:opacity-100 motion-colors">
+          <span className="flex gap-[2px] opacity-0 group-hover/note:opacity-100 group-focus-within/note:opacity-100 [@media(hover:_none)]:opacity-100 motion-colors">
             <IconButton unstyled className={noteButtonClasses} label="Edit note" onClick={onEdit}>
               <Pencil size={12} strokeWidth={1.75} />
             </IconButton>

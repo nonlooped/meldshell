@@ -5,7 +5,9 @@ import { Separator } from "@base-ui-components/react/separator"
 import type { Provider, Thread } from "@meldshell/contracts"
 import {
   ChevronDown,
+  ChevronLeft,
   Columns2,
+  FolderGit2,
   FolderCode,
   Globe,
   MoreHorizontal,
@@ -45,8 +47,11 @@ import { useViewportTier } from "./viewport"
 import { threadWindowsSupported, windowThreadId } from "./thread-windows"
 import { RemoteDeviceChip, RemoteViewersButton } from "./RemoteClientChrome"
 import { useRemoteClient } from "./remote-client"
+import { usePhoneNav } from "./phone-nav"
 
 interface TitleBarProps {
+  /** False while a phone's settings or scheduled prompts show their own header instead. */
+  readonly shown: boolean
   readonly openThreads: ReadonlyArray<Thread>
   readonly providersByThreadId: ReadonlyMap<string, Provider>
   readonly selectedTabId: string | null
@@ -84,6 +89,8 @@ interface TitleBarProps {
    * no thread is on screen or this client cannot open windows.
    */
   readonly onThreadWindow: (() => void) | null
+  /** Threads waiting on the operator, which a phone counts on its way back to the inbox. */
+  readonly waitingCount: number
 }
 
 const noDrag = "[-webkit-app-region:no-drag] [&_*]:[-webkit-app-region:no-drag]"
@@ -435,7 +442,7 @@ function TabSwitcher({
           <BaseButton
             render={<Pressable />}
             type="button"
-            className="motion-colors flex h-[30px] min-w-0 max-w-full items-center gap-[7px] [padding:0_8px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-selected)] text-[var(--text-primary)] text-[12px] [-webkit-app-region:no-drag]"
+            className="motion-colors flex h-[36px] min-w-0 max-w-full items-center gap-[8px] [padding:0_8px] border-0 rounded-[var(--radius)] bg-transparent text-[var(--text-primary)] text-[14px] font-semibold cursor-default [&:active]:bg-[var(--surface-active)] [&[data-popup-open]]:bg-[var(--surface-hover)]"
             aria-label={`Open tabs: ${current?.title ?? "none selected"}`}
           >
             {current?.icon}
@@ -443,7 +450,7 @@ function TabSwitcher({
               {current?.title ?? "Open tabs"}
             </span>
             {tabs.length > 1 && (
-              <span className="flex-none text-[var(--text-tertiary)] text-[10px] tabular-nums">
+              <span className="flex-none text-[var(--text-tertiary)] text-[11px] font-medium tabular-nums">
                 {tabs.length}
               </span>
             )}
@@ -811,7 +818,136 @@ function ThreadToolButtons({
   )
 }
 
-export function TitleBar({
+/** The way back to the inbox, counting the threads that wait there like a phone's mail app. */
+function PhoneBackButton({
+  label,
+  waiting,
+  onBack,
+}: {
+  label: string
+  waiting: number
+  onBack: () => void
+}): React.JSX.Element {
+  return (
+    <BaseButton
+      render={<Pressable />}
+      type="button"
+      className="motion-colors flex h-[36px] min-w-[36px] flex-none items-center gap-[1px] [padding:0_6px_0_2px] border-0 rounded-[var(--radius)] bg-transparent text-[var(--text-primary)] cursor-default [&:active]:bg-[var(--surface-active)]"
+      aria-label={waiting > 0 ? `${label}, ${waiting} waiting` : label}
+      onClick={onBack}
+    >
+      <ChevronLeft size={22} strokeWidth={1.9} aria-hidden="true" />
+      {waiting > 0 && (
+        <span
+          aria-hidden="true"
+          className="grid h-[18px] min-w-[18px] place-items-center [padding:0_5px] rounded-full bg-[var(--color-info)] text-[var(--accent-foreground)] text-[11px] font-semibold tabular-nums"
+        >
+          {waiting > 99 ? "99+" : waiting}
+        </span>
+      )}
+    </BaseButton>
+  )
+}
+
+/** A screen's name where a phone's header has nothing else to show. */
+function PhoneTitle({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <h1 className="m-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap [font-family:var(--font-display)] text-[15px] font-semibold tracking-[-0.01em]">
+      {children}
+    </h1>
+  )
+}
+
+/**
+ * A phone's header follows its screen: the inbox names the computer, a tab leads back to the inbox
+ * and on to its files, and the files lead back to the tab.
+ */
+function PhoneTitleBar({
+  openThreads,
+  providersByThreadId,
+  selectedTabId,
+  onSelectTab,
+  onCloseTab,
+  waitingCount,
+  threadTools,
+}: Pick<
+  TitleBarProps,
+  | "openThreads"
+  | "providersByThreadId"
+  | "selectedTabId"
+  | "onSelectTab"
+  | "onCloseTab"
+  | "waitingCount"
+> & { threadTools: ThreadToolsProps }): React.JSX.Element {
+  const screen = usePhoneNav((state) => state.screen)
+  const back = usePhoneNav((state) => state.back)
+  const go = usePhoneNav((state) => state.go)
+  const remote = useRemoteClient((state) => state.active)
+  return (
+    <header
+      className="titlebar flex items-center min-w-0 gap-[4px] border-b-[1px] border-b-[color:var(--line-subtle)] select-none"
+      data-tier="phone"
+    >
+      {screen === "inbox" && (
+        <>
+          {remote ? (
+            <RemoteDeviceChip />
+          ) : (
+            <span className="flex min-w-0 items-center gap-[9px] pl-[4px]">
+              <MeldMark className="brand-mark w-[17px] h-[17px] flex-[0_0_17px] text-[var(--text-primary)]" />
+              <PhoneTitle>MeldShell</PhoneTitle>
+            </span>
+          )}
+          <div className="flex-1" />
+          <RemoteViewersButton />
+        </>
+      )}
+      {screen === "main" && (
+        <>
+          <PhoneBackButton label="Inbox" waiting={waitingCount} onBack={back} />
+          <PhoneTabs
+            openThreads={openThreads}
+            providersByThreadId={providersByThreadId}
+            selectedTabId={selectedTabId}
+            onSelectTab={onSelectTab}
+            onCloseTab={onCloseTab}
+          />
+          <ThreadToolsMenu {...threadTools} />
+          <IconButton label="Files and changes" onClick={() => go("files")}>
+            <FolderGit2 size={17} strokeWidth={1.75} />
+          </IconButton>
+        </>
+      )}
+      {screen === "file" && (
+        <>
+          <PhoneBackButton label="Back" waiting={0} onBack={back} />
+          <PhoneTabs
+            openThreads={openThreads}
+            providersByThreadId={providersByThreadId}
+            selectedTabId={selectedTabId}
+            onSelectTab={onSelectTab}
+            onCloseTab={onCloseTab}
+          />
+          <IconButton label="Files and changes" onClick={() => go("files")}>
+            <FolderGit2 size={17} strokeWidth={1.75} />
+          </IconButton>
+        </>
+      )}
+      {screen === "files" && (
+        <>
+          <PhoneBackButton label="Back" waiting={0} onBack={back} />
+          <PhoneTitle>Files and changes</PhoneTitle>
+        </>
+      )}
+    </header>
+  )
+}
+
+export function TitleBar({ shown, ...props }: TitleBarProps): React.JSX.Element | null {
+  return shown ? <TitleBarContent {...props} /> : null
+}
+
+function TitleBarContent({
   openThreads,
   providersByThreadId,
   selectedTabId,
@@ -837,7 +973,8 @@ export function TitleBar({
   onOpenInCli,
   onPopOutThread,
   onThreadWindow,
-}: TitleBarProps): React.JSX.Element {
+  waitingCount,
+}: Omit<TitleBarProps, "shown">): React.JSX.Element {
   const bindings = useKeybindings((state) => state.bindings)
   const tier = useViewportTier()
   const phone = tier === "phone"
@@ -858,6 +995,18 @@ export function TitleBar({
     onOpenInCli,
     onThreadWindow,
   }
+  if (phone && windowThreadId === null)
+    return (
+      <PhoneTitleBar
+        openThreads={openThreads}
+        providersByThreadId={providersByThreadId}
+        selectedTabId={selectedTabId}
+        onSelectTab={onSelectTab}
+        onCloseTab={onCloseTab}
+        waitingCount={waitingCount}
+        threadTools={threadTools}
+      />
+    )
   return (
     <header
       className={`titlebar [-webkit-app-region:drag] flex items-center min-w-0 border-b-[1px] border-b-[color:var(--line-subtle)] select-none ${tier === "regular" ? "gap-[10px]" : "gap-[6px]"}`}

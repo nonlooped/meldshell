@@ -4,7 +4,7 @@ import "@meldshell/ui/styles.css"
 
 <!doctype html>
 <html lang="en" data-platform="web">
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" /><meta name="robots" content="noindex" /><title>MeldShell</title><link rel="icon" href="/favicon.svg" /></head>
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" /><meta name="theme-color" content="#161617" /><meta name="robots" content="noindex" /><title>MeldShell</title><link rel="icon" href="/favicon.svg" /></head>
   <body>
     <!-- Before the workspace is on screen, this page explains the connection. Afterwards the
          renderer's own title bar names the computer and reports the connection itself. -->
@@ -45,6 +45,22 @@ import "@meldshell/ui/styles.css"
         if (ended || offline) $("#gate-hint").hidden = true
       }
       $("#gate-retry").addEventListener("click", () => location.reload())
+
+      // Safari keeps the page's size when the on-screen keyboard opens and pans it instead, which
+      // pushes the header off screen. The app is sized to what stays visible and follows the pan,
+      // so the composer rests on the keyboard. A pinch zoom leaves the layout alone.
+      const visible = window.visualViewport
+      if (visible) {
+        const root = $("#root")
+        const fit = () => {
+          const zoomed = Math.abs(visible.scale - 1) > 0.01
+          root.style.height = zoomed ? "" : `${visible.height}px`
+          root.style.transform = zoomed || visible.offsetTop === 0 ? "" : `translateY(${visible.offsetTop}px)`
+        }
+        visible.addEventListener("resize", fit)
+        visible.addEventListener("scroll", fit)
+        fit()
+      }
 
       void (async () => {
         await requireSession()

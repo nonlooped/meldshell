@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { touchOnly } from "./viewport"
 
 /*
  * Keyboard shortcuts. Each app action has a default chord; the operator's changes are stored as
@@ -231,9 +232,12 @@ export const chordLabel = (chord: string): string => (chord === "" ? "None" : ch
 export const ariaShortcut = (chord: string): string | undefined =>
   chord === "" ? undefined : chord.replace(/^Ctrl\b/, "Control")
 
-/** A title with the action's shortcut appended, as in `Show terminal (Ctrl+`)`. */
+/**
+ * A title with the action's shortcut appended, as in `Show terminal (Ctrl+`)`. A touch screen has
+ * no keys to press, so its titles go without.
+ */
 export const withShortcut = (title: string, chord: string): string =>
-  chord === "" ? title : `${title} (${chord})`
+  chord === "" || touchOnly ? title : `${title} (${chord})`
 
 interface KeybindingStore {
   readonly bindings: Keybindings

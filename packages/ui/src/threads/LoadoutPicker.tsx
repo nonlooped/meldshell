@@ -10,6 +10,7 @@ import type { Selection } from "../data/catalog"
 import { useAppSettingsMutation } from "../data/mutations"
 import { LOADOUT_ACTIONS, useKeybindings } from "../app/keybindings"
 import { useViewStore } from "../app/view-store"
+import { touchOnly } from "../app/viewport"
 import { AppDialog, Button, ChordKeys, TextField } from "../ui/controls"
 import { cx } from "../ui/styles"
 import { ModelPicker } from "./ModelPicker"
@@ -127,7 +128,7 @@ function LoadoutStrip({
       {loadouts.length === 0 && (
         <p className="m-0 [padding:0_2px] text-[11px] leading-[1.45] text-[var(--text-secondary)]">
           Save this model and effort to switch back to them in one step
-          {chordFor(0) === "" ? "" : ` with ${chordFor(0)}`}.
+          {chordFor(0) === "" || touchOnly ? "" : ` with ${chordFor(0)}`}.
         </p>
       )}
       <div className="flex flex-wrap gap-[5px]">
@@ -223,7 +224,7 @@ function SaveLoadoutDialog({
         />
         <div className="flex flex-col gap-[6px] [padding:10px_12px] rounded-[var(--radius)] bg-[var(--surface-hover)] text-[12px] leading-[1.5]">
           <span className="text-[var(--text-primary)]">{describeLoadout(selection)}</span>
-          {chord !== "" && (
+          {chord !== "" && !touchOnly && (
             <span className="flex items-center gap-[6px] text-[var(--text-secondary)]">
               Switch to it with <ChordKeys chord={chord} />
             </span>

@@ -50,6 +50,11 @@ interface TabStore {
   readonly cycle: (direction: 1 | -1) => void
   /** Focuses the next pane of the selected split tab; a lone pane stays as it is. */
   readonly cyclePane: () => void
+  /**
+   * Counts requests to show a tab, including one already in front, so a phone can bring the tab
+   * area on screen whenever something is opened.
+   */
+  readonly revealed: number
 }
 
 function newThreadTab(threadId: string): ThreadTab {
@@ -89,6 +94,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
   threadTabs: [],
   selectedThreadTabId: null,
   layout: null,
+  revealed: 0,
   dropThread: (target, threadId, zone) => {
     if (shownElsewhere(threadId)) return showThreadWindow(threadId)
     set((state) => {
@@ -143,6 +149,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
           ? state.files.map((file) => (file.id === id ? { ...file, line, endLine } : file))
           : [...state.files, { id, workspaceId, threadId, path: normalized, line, endLine }],
         selectedFileId: id,
+        revealed: state.revealed + 1,
       }
     }),
   openDiff: ({ workspaceId, threadId }, path, diffSide) =>
@@ -154,14 +161,21 @@ export const useTabStore = create<TabStore>((set, get) => ({
           ? state.files
           : [...state.files, { id, workspaceId, threadId, path: normalized, diffSide }],
         selectedFileId: id,
+        revealed: state.revealed + 1,
       }
     }),
   selectTab: (id) => {
-    if (get().files.some((file) => file.id === id)) set({ selectedFileId: id })
+    const state = get()
+    if (state.files.some((file) => file.id === id))
+      set({ selectedFileId: id, revealed: state.revealed + 1 })
     else {
-      const state = get()
       const tab = state.threadTabs.find((candidate) => candidate.id === id)
-      if (tab) set({ ...tabState(state.threadTabs, id), selectedFileId: null })
+      if (tab)
+        set({
+          ...tabState(state.threadTabs, id),
+          selectedFileId: null,
+          revealed: state.revealed + 1,
+        })
       else state.openThread(id)
     }
   },
@@ -215,7 +229,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
             candidate.id === tab.id ? { ...candidate, focusedThreadId: threadId } : candidate,
           )
         : [...state.threadTabs, tab]
-      return { ...tabState(tabs, tab.id), selectedFileId: null }
+      return { ...tabState(tabs, tab.id), selectedFileId: null, revealed: state.revealed + 1 }
     })
   },
   closeThread: (threadId) =>

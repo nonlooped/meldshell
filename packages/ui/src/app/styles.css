@@ -328,9 +328,21 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* A tap flashes nothing; controls show their own pressed state. */
+    -webkit-tap-highlight-color: transparent;
   }
+  /* Pulling past the top of a list never reloads the page, which would drop a remote session. */
+  html,
   body {
     overscroll-behavior: none;
+  }
+  /* A long press opens the app's own menu instead of the system's link or image preview. */
+  @media (pointer: coarse) {
+    a,
+    img,
+    button {
+      -webkit-touch-callout: none;
+    }
   }
   html,
   body,

@@ -51,6 +51,7 @@ import { useScheduledThreadIds } from "../schedules/schedule-queries"
 import { HomeMark, WorkspaceLabel, splitHome } from "../workspaces/WorkspaceLabel"
 import { useViewStore } from "../app/view-store"
 import { useShownElsewhere } from "../app/thread-windows"
+import { touchOnly, useViewportTier } from "../app/viewport"
 import {
   glanceLabel,
   isFinished,
@@ -133,6 +134,35 @@ function PopOutAction({
     >
       {ownWindow ? "Show its window" : "Open in new window"}
     </MenuAction>
+  )
+}
+
+/** Opens a thread in a pane beside the one in front; a phone shows one thread at a time instead. */
+function SplitActions({
+  threadId,
+  onOpenBeside,
+  icons = false,
+}: {
+  threadId: string
+  onOpenBeside: InboxProps["onOpenBeside"]
+  icons?: boolean
+}): React.JSX.Element | null {
+  if (useViewportTier() === "phone") return null
+  return (
+    <>
+      <MenuAction
+        icon={icons ? <Columns2 size={13} strokeWidth={1.75} /> : undefined}
+        onClick={() => onOpenBeside(threadId, "right")}
+      >
+        Open to the right
+      </MenuAction>
+      <MenuAction
+        icon={icons ? <Rows2 size={13} strokeWidth={1.75} /> : undefined}
+        onClick={() => onOpenBeside(threadId, "bottom")}
+      >
+        Open below
+      </MenuAction>
+    </>
   )
 }
 
@@ -352,18 +382,7 @@ function InboxThread({
                 </BaseButton>
               }
             >
-              <MenuAction
-                icon={<Columns2 size={13} strokeWidth={1.75} />}
-                onClick={() => onOpenBeside(thread.id, "right")}
-              >
-                Open to the right
-              </MenuAction>
-              <MenuAction
-                icon={<Rows2 size={13} strokeWidth={1.75} />}
-                onClick={() => onOpenBeside(thread.id, "bottom")}
-              >
-                Open below
-              </MenuAction>
+              <SplitActions threadId={thread.id} onOpenBeside={onOpenBeside} icons />
               <PopOutAction thread={thread} onPopOut={onPopOut} icon />
               <MenuAction
                 icon={thread.pinned ? <PinOff size={13} /> : <Pin size={13} />}
@@ -395,8 +414,7 @@ function InboxThread({
       }
     >
       <MenuAction onClick={() => onOpen(thread.id)}>Open thread</MenuAction>
-      <MenuAction onClick={() => onOpenBeside(thread.id, "right")}>Open to the right</MenuAction>
-      <MenuAction onClick={() => onOpenBeside(thread.id, "bottom")}>Open below</MenuAction>
+      <SplitActions threadId={thread.id} onOpenBeside={onOpenBeside} />
       <PopOutAction thread={thread} onPopOut={onPopOut} />
       <MenuAction onClick={() => onPin(thread)}>
         {thread.pinned ? "Unpin thread" : "Pin thread"}
@@ -822,7 +840,7 @@ export function Inbox({
         >
           <Search size={15} strokeWidth={1.7} aria-hidden="true" />
           <span className={railLabelClasses}>Search</span>
-          {bindings.threadPalette !== "" && (
+          {bindings.threadPalette !== "" && !touchOnly && (
             <ChordKeys chord={bindings.threadPalette} className={railLabelClasses} />
           )}
         </BaseButton>

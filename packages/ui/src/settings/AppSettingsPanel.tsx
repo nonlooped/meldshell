@@ -133,7 +133,7 @@ export function AppSettingsPanel({
         </SettingRow>
         <SettingRow
           label="Setup guide"
-          description="Check your agents, pick a project, and revisit the basics."
+          description="See which agents are ready, pick a look, and start a thread."
         >
           <Button onClick={() => useViewStore.getState().openOnboarding()}>Run setup again</Button>
         </SettingRow>

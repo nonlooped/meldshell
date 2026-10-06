@@ -1230,6 +1230,11 @@ const composerClasses = [
   "[&_.composer-highlight]:leading-[1.55] [&_.composer-highlight]:[scrollbar-gutter:stable]",
   "[&_textarea]:outline-none [&_textarea]:resize-none",
   "[&_textarea::placeholder]:text-[var(--text-tertiary)]",
+  // A phone zooms into a field under 16px when it takes focus, so touch screens write at 16px. The
+  // highlight layer matches, or the caret would drift from the text it draws.
+  "[@media(pointer:coarse)]:[&_textarea]:text-[16px] [@media(pointer:coarse)]:[&_.composer-highlight]:text-[16px]",
+  // A phone on its side keeps more of the conversation in view above a shorter composer.
+  "[@media(max-height:_500px)]:[&_textarea]:min-h-[48px] [@media(max-height:_500px)]:[&_textarea]:max-h-[120px]",
 ].join(" ")
 
 /**

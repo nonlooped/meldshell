@@ -238,7 +238,8 @@ function SettingsSidebar({
         className={cx(
           "relative flex min-h-0",
           stacked
-            ? "flex-row gap-[2px] overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
+            ? // The bar's far edge fades, so sections past the screen read as more to scroll to.
+              "flex-row gap-[2px] overflow-x-auto overflow-y-hidden pr-[28px] [scrollbar-width:none] [mask-image:linear-gradient(to_right,_#000_calc(100%_-_28px),_transparent)]"
             : "flex-col gap-[1px] overflow-y-auto",
         )}
       >

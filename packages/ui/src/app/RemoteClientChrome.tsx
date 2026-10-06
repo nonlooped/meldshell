@@ -44,7 +44,7 @@ export function RemoteDeviceChip(): React.JSX.Element | null {
         <BaseButton
           render={<Pressable />}
           type="button"
-          className={`motion-colors flex h-[30px] min-w-0 max-w-[200px] [[data-tier='phone']_&]:max-w-[116px] items-center gap-[7px] [padding:0_9px_0_8px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-selected)] text-[var(--text-primary)] text-[12px] font-medium cursor-default [&:hover]:bg-[var(--surface-hover)] [&[data-popup-open]]:bg-[var(--surface-hover)] ${noDrag}`}
+          className={`motion-colors flex h-[30px] min-w-0 max-w-[200px] [[data-tier='phone']_&]:max-w-[min(280px,_70vw)] items-center gap-[7px] [padding:0_9px_0_8px] border-[1px] border-[color:var(--line-subtle)] rounded-[var(--radius)] bg-[var(--surface-selected)] text-[var(--text-primary)] text-[12px] font-medium cursor-default [&:hover]:bg-[var(--surface-hover)] [&[data-popup-open]]:bg-[var(--surface-hover)] ${noDrag}`}
           aria-label={`${client.deviceName}, ${label}. Remote connection`}
         >
           <StateDot state={client.state} />

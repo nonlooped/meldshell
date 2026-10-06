@@ -223,7 +223,7 @@ export function ThreadBranchToggle({
           : undefined
   return (
     <div className="thread-branch-toggle [padding:10px_var(--pane-gutter)_0]">
-      <div className="flex w-full max-w-[680px] min-w-0 items-center justify-center gap-[10px] [margin:0_auto]">
+      <div className="flex w-full max-w-[680px] min-w-0 flex-wrap items-center justify-center gap-[10px] [margin:0_auto]">
         {!home && (
           <ToggleGroup
             aria-label="Where the thread works"

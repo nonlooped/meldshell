@@ -152,7 +152,7 @@ function FileRow({
               type="button"
               onClick={() => openDiff(scope, change.path, side)}
               className={
-                "git-file flex items-center gap-[7px] w-full h-[28px] border-0 [padding:0_14px] bg-transparent text-left cursor-default [&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)]"
+                "git-file flex items-center gap-[7px] w-full h-[28px] [@media(pointer:coarse)]:h-[38px] border-0 [padding:0_14px] bg-transparent text-left cursor-default [&_>_svg]:shrink-0 [&_>_svg]:text-[var(--text-tertiary)]"
               }
               title={`${change.originalPath ? `${change.originalPath} → ` : ""}${change.path} · ${statusLabel(change)}`}
               aria-label={`${change.path}, ${statusLabel(change)}`}
@@ -722,7 +722,7 @@ function CommitRow({
       <ContextMenu
         trigger={
           <Collapsible.Trigger
-            className="w-full border-0 bg-transparent text-left cursor-default pl-[0] flex items-center gap-[6px] h-[28px] pr-[12px] [&:hover]:bg-[var(--surface-hover)] [&[aria-expanded='true']]:bg-[var(--surface-hover)]"
+            className="w-full border-0 bg-transparent text-left cursor-default pl-[0] flex items-center gap-[6px] h-[28px] [@media(pointer:coarse)]:h-[38px] pr-[12px] [&:hover]:bg-[var(--surface-hover)] [&[aria-expanded='true']]:bg-[var(--surface-hover)]"
             title={`${commit.subject}\n${commit.author} · ${new Date(commit.date).toLocaleString()}\n${commit.hash.slice(0, 7)}${commit.refs ? `\n${commit.refs}` : ""}`}
           >
             <svg

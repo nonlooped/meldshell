@@ -129,6 +129,8 @@ export const threadContentClasses = [
   "[&:has(>_.transcript-origin)_.composer]:max-w-[680px]",
   "[&:has(>_.transcript-origin)_.composer-zone_.notice]:max-w-[680px]",
   "[&:has(>_.transcript-origin)_.composer_textarea]:min-h-[120px] grid grid-rows-[minmax(0,_1fr)_auto]",
+  // Wide content scrolls or wraps inside the pane instead of widening it past a narrow window.
+  "grid-cols-[minmax(0,_1fr)]",
   "h-full min-w-0 min-h-0 overflow-hidden",
 ].join(" ")
 

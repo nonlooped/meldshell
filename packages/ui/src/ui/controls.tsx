@@ -629,7 +629,7 @@ export function AppDialog({
               <BaseButton
                 render={<Pressable />}
                 type="button"
-                className="motion-colors absolute top-[14px] right-[12px] grid w-[26px] h-[26px] border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
+                className="motion-colors absolute top-[14px] right-[12px] grid w-[26px] h-[26px] [@media(pointer:coarse)]:w-[36px] [@media(pointer:coarse)]:h-[36px] [@media(pointer:coarse)]:top-[10px] [@media(pointer:coarse)]:right-[8px] border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--text-tertiary)] cursor-default place-items-center [&:hover]:bg-[var(--surface-hover)] [&:hover]:text-[var(--text-primary)]"
                 aria-label="Close dialog"
               >
                 <X size={15} />
