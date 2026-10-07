@@ -72,17 +72,19 @@ jobs:
           cache: npm
       # Static checks do not need Electron downloads or native addon rebuilds.
       - run: npm ci --ignore-scripts
-      - name: Unused code
-        run: npm run knip
-      - name: Lint
-        run: npm run lint
-      - name: Format
-        run: npm run format:check
-      - name: Codex protocol types
-        if: fromJSON(needs.changes.outputs.scope).protocol
-        run: npm run check:protocol --workspace=@meldshell/provider-codex
-      - name: Typecheck
-        run: node scripts/ci-scope.mjs typecheck
+      # Collect independent diagnostics together; the group waits and propagates failures.
+      - parallel:
+          - name: Unused code
+            run: npm run knip
+          - name: Lint
+            run: npm run lint
+          - name: Format
+            run: npm run format:check
+          - name: Codex protocol types
+            if: fromJSON(needs.changes.outputs.scope).protocol
+            run: npm run check:protocol --workspace=@meldshell/provider-codex
+          - name: Typecheck
+            run: node scripts/ci-scope.mjs typecheck
 
   build-test:
     name: Website build and tooling tests
