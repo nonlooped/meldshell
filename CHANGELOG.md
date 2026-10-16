@@ -4,6 +4,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-16
+
 ### Changed
 
 - The first-run guide is rebuilt around four short pages. A welcome carries on from the launch screen with the MeldShell mark. The agents page shows Codex, Claude Code, Cursor and Pi as tiles: pick the ready one your first thread starts on, and any that can't run yet show the command that fixes them. Signed-in emails and version numbers no longer appear. A look page applies Dark, Light or System and a color theme as you pick them. The last page opens your first thread in a project folder or in Home, with its composer focused. The project, permissions and suggested-message pages are gone; permissions stay in the composer and Settings.
@@ -390,7 +392,8 @@ All notable changes to MeldShell are recorded here. The format follows [Keep a C
 
 - Initial internal Windows candidate. It was never tagged or published.
 
-[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/nonlooped/meldshell/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/nonlooped/meldshell/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/nonlooped/meldshell/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/nonlooped/meldshell/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/nonlooped/meldshell/compare/v0.13.0...v0.14.0
