@@ -1,9 +1,13 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import type { IPty } from "node-pty"
 import { IPC } from "@meldshell/contracts/ipc"
 import { createTerminals } from "../packages/host/src/terminals.ts"
 import { remoteTerminals } from "../packages/host/src/remote-terminals.ts"
+
+// The PTY type comes from the host's spawn seam, so this root test needs no direct node-pty import.
+type Pty = ReturnType<
+  Awaited<ReturnType<NonNullable<Parameters<typeof createTerminals>[2]>>>["spawn"]
+>
 
 const chunk = "x".repeat(64 * 1024)
 
@@ -30,7 +34,7 @@ function fakeShell() {
       resume: () => {
         shell.paused = false
       },
-    } as unknown as IPty,
+    } as unknown as Pty,
   }
   return shell
 }

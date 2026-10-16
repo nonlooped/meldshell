@@ -372,10 +372,3 @@ export const piProjection = (result: Slots): ((event: CanonicalEvent) => void) =
     append(event, event.turnId ?? event.threadId, decoded.success)
   }
 }
-
-export const preparePiEvents = (events: ReadonlyArray<CanonicalEvent>): CanonicalEvent[] => {
-  const result = new Slots()
-  const push = piProjection(result)
-  for (const event of events) push(event)
-  return result.items
-}

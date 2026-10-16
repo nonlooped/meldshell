@@ -308,13 +308,6 @@ export const cursorProjection = (result: Slots): ((event: CanonicalEvent) => voi
   }
 }
 
-export const prepareCursorEvents = (events: ReadonlyArray<CanonicalEvent>): CanonicalEvent[] => {
-  const result = new Slots()
-  const push = cursorProjection(result)
-  for (const event of events) push(event)
-  return result.items
-}
-
 const cursorStateText = (
   method: string,
   params: CursorPayload,
